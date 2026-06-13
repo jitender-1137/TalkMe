@@ -1,0 +1,221 @@
+package com.chat.talkMe.service.impl;
+
+import com.chat.talkMe.domain.DiscoverLike;
+import com.chat.talkMe.domain.User;
+import com.chat.talkMe.dto.response.DiscoverProfileResponse;
+import com.chat.talkMe.dto.response.PaginatedResponse;
+import com.chat.talkMe.enums.Interest;
+import com.chat.talkMe.enums.PresenceStatus;
+import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.repository.DiscoverLikeRepository;
+import com.chat.talkMe.repository.FriendRepository;
+import com.chat.talkMe.repository.FriendRequestRepository;
+import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.service.DiscoverService;
+import com.chat.talkMe.service.PresenceService;
+import com.chat.talkMe.domain.FriendRequest;
+import com.chat.talkMe.enums.FriendRequestStatus;
+import jakarta.persistence.criteria.Predicate;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class DiscoverServiceImpl implements DiscoverService {
+
+    private final UserRepository userRepository;
+    private final DiscoverLikeRepository discoverLikeRepository;
+    private final FriendRepository friendRepository;
+    private final FriendRequestRepository friendRequestRepository;
+    private final PresenceService presenceService;
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<DiscoverProfileResponse> getDiscover(
+            String query,
+            String interests,
+            Double distance,
+            Boolean verified,
+            Boolean isOnline,
+            String cursor,
+            int limit,
+            User currentUser
+    ) {
+        int page = 0;
+        if (cursor != null && !cursor.isBlank()) {
+            try {
+                page = Integer.parseInt(cursor);
+            } catch (NumberFormatException e) {
+                // Ignore and use default
+            }
+        }
+
+        Pageable pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
+
+        Set<Interest> interestEnums = new HashSet<>();
+        if (interests != null && !interests.isBlank()) {
+            for (String interestStr : interests.split(",")) {
+                try {
+                    interestEnums.add(Interest.valueOf(interestStr.trim().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    // Ignore invalid enums
+                }
+            }
+        }
+
+        Specification<User> spec = (root, q, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // Exclude currentUser
+            predicates.add(cb.notEqual(root.get("id"), currentUser.getId()));
+
+            // Exclude guest users
+            predicates.add(cb.equal(root.get("isGuest"), false));
+
+            // Search query filter
+            if (query != null && !query.isBlank()) {
+                String pattern = "%" + query.toLowerCase() + "%";
+                predicates.add(cb.or(
+                    cb.like(cb.lower(root.get("username")), pattern),
+                    cb.like(cb.lower(root.get("name")), pattern),
+                    cb.like(cb.lower(root.get("email")), pattern)
+                ));
+            }
+
+            // Verified filter
+            if (verified != null) {
+                predicates.add(cb.equal(root.get("isVerified"), verified));
+            }
+
+            // Interests filter
+            if (!interestEnums.isEmpty()) {
+                predicates.add(root.join("interests").in(interestEnums));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        Page<User> userPage = userRepository.findAll(spec, pageable);
+        List<User> currentUserFriends = friendRepository.findFriendsByUser(currentUser);
+
+        List<DiscoverProfileResponse> items = userPage.getContent().stream()
+                .map(u -> {
+                    List<User> targetUserFriends = friendRepository.findFriendsByUser(u);
+                    Set<Long> targetFriendIds = targetUserFriends.stream()
+                            .map(User::getId)
+                            .collect(Collectors.toSet());
+
+                    int mutualCount = (int) currentUserFriends.stream()
+                            .filter(friend -> targetFriendIds.contains(friend.getId()))
+                            .count();
+
+                    boolean online = presenceService.getStatus(u) == PresenceStatus.ONLINE;
+                    boolean liked = discoverLikeRepository.existsByUserAndLikedUser(currentUser, u);
+                    boolean isFriend = friendRepository.findByUserAndFriend(currentUser, u).isPresent();
+
+                    java.util.Optional<FriendRequest> reqOpt = friendRequestRepository.findBySenderAndReceiver(currentUser, u);
+                    boolean requestSent = false;
+                    String pendingReqId = null;
+                    if (reqOpt.isPresent() && reqOpt.get().getStatus() == FriendRequestStatus.PENDING) {
+                        requestSent = true;
+                        pendingReqId = reqOpt.get().getUuid().toString();
+                    }
+
+                    String locationStr = "";
+                    if (u.getCity() != null) {
+                        locationStr += u.getCity();
+                    }
+                    if (u.getCountry() != null) {
+                        if (!locationStr.isEmpty()) {
+                            locationStr += ", ";
+                        }
+                        locationStr += u.getCountry();
+                    }
+
+                    List<String> images = new ArrayList<>();
+                    if (u.getProfileImage() != null) {
+                        images.add(u.getProfileImage());
+                    }
+
+                    Set<String> userInterests = u.getInterests().stream()
+                            .map(Enum::name)
+                            .collect(Collectors.toSet());
+
+                    return DiscoverProfileResponse.builder()
+                            .id(u.getUuid().toString())
+                            .name(u.getName())
+                            .age(u.getAge())
+                            .gender(u.getGender())
+                            .username(u.getUsername())
+                            .bio(u.getBio())
+                            .location(locationStr)
+                            .distance("2 miles away")
+                            .distanceKm(3.2)
+                            .occupation(u.getOccupation())
+                            .education(u.getEducation())
+                            .interests(userInterests)
+                            .images(images)
+                            .isVerified(u.isVerified())
+                            .isOnline(online)
+                            .isLiked(liked)
+                            .isFriend(isFriend)
+                            .mutualFriendsCount(mutualCount)
+                            .isRequestSent(requestSent)
+                            .pendingRequestId(pendingReqId)
+                            .build();
+                })
+                .filter(item -> isOnline == null || item.isOnline() == isOnline)
+                .collect(Collectors.toList());
+
+        return PaginatedResponse.<DiscoverProfileResponse>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(userPage.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(userPage.hasNext())
+                        .hasPrevious(userPage.hasPrevious())
+                        .total(userPage.getTotalElements())
+                        .build())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void likeProfile(String userId, User currentUser) {
+        User targetUser = userRepository.findByUuid(UUID.fromString(userId))
+                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+
+        if (discoverLikeRepository.existsByUserAndLikedUser(currentUser, targetUser)) {
+            return;
+        }
+
+        DiscoverLike like = DiscoverLike.builder()
+                .user(currentUser)
+                .likedUser(targetUser)
+                .build();
+
+        discoverLikeRepository.save(like);
+    }
+
+    @Override
+    @Transactional
+    public void unlikeProfile(String userId, User currentUser) {
+        User targetUser = userRepository.findByUuid(UUID.fromString(userId))
+                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+
+        discoverLikeRepository.findByUserAndLikedUser(currentUser, targetUser)
+                .ifPresent(discoverLikeRepository::delete);
+    }
+}

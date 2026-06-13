@@ -1,0 +1,94 @@
+package com.chat.talkMe.domain;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import com.chat.talkMe.enums.Interest;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class User extends BaseEntity {
+
+    @Column(name = "username", nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Column(name = "email", unique = true, length = 100)
+    private String email;
+
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    @Column(name = "name", nullable = false, length = 100)
+    private String name;
+
+    @Column(name = "age")
+    private Integer age;
+
+    @Column(name = "gender", length = 20)
+    private String gender;
+
+    @Column(name = "is_guest", nullable = false)
+    @Builder.Default
+    private boolean isGuest = false;
+
+    @Column(name = "is_verified", nullable = false)
+    @Builder.Default
+    private boolean isVerified = false;
+
+    @Column(name = "profile_image", length = 512)
+    private String profileImage;
+
+    @Column(name = "country", length = 100)
+    private String country;
+
+    @Column(name = "city", length = 100)
+    private String city;
+
+    @Column(name = "mobile_number", length = 30)
+    private String mobileNumber;
+
+    @Column(name = "bio", length = 512)
+    private String bio;
+
+    @Column(name = "occupation", length = 100)
+    private String occupation;
+
+    @Column(name = "education", length = 100)
+    private String education;
+
+    @ElementCollection(targetClass = Interest.class, fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "interest", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Set<com.chat.talkMe.enums.Interest> interests = new java.util.HashSet<>();
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    @Builder.Default
+    private Set<Role> roles = new HashSet<>();
+}

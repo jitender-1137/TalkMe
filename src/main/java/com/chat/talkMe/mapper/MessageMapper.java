@@ -1,0 +1,55 @@
+package com.chat.talkMe.mapper;
+
+import com.chat.talkMe.domain.Message;
+import com.chat.talkMe.domain.MessageAttachment;
+import com.chat.talkMe.domain.MessageReaction;
+import com.chat.talkMe.dto.response.MessageAttachmentResponse;
+import com.chat.talkMe.dto.response.MessageReactionResponse;
+import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.dto.response.ParentMessageResponse;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+@Mapper(componentModel = "spring")
+public interface MessageMapper {
+
+    @Mapping(target = "isEdited", source = "edited")
+    @Mapping(target = "id", expression = "java(message.getUuid().toString())")
+    @Mapping(target = "senderId", expression = "java(message.getSender().getUuid().toString())")
+    @Mapping(target = "messageType", expression = "java(message.getMessageType().name())")
+    @Mapping(target = "createdAt", expression = "java(message.getCreatedAt() != null ? message.getCreatedAt().toString() : null)")
+    @Mapping(target = "status", expression = "java(resolveMessageStatus(message))")
+    @Mapping(target = "parentMessage", source = "parentMessage")
+    MessageResponse toMessageResponse(Message message);
+
+    default String resolveMessageStatus(Message message) {
+        if (message.getReadReceipts() == null || message.getReadReceipts().isEmpty()) {
+            return "SENT";
+        }
+        boolean hasDelivered = false;
+        for (var receipt : message.getReadReceipts()) {
+            if (!receipt.getUser().getId().equals(message.getSender().getId())) {
+                if ("READ".equals(receipt.getStatus())) {
+                    return "READ";
+                }
+                if ("DELIVERED".equals(receipt.getStatus())) {
+                    hasDelivered = true;
+                }
+            }
+        }
+        if (hasDelivered) {
+            return "DELIVERED";
+        }
+        return "SENT";
+    }
+
+    @Mapping(target = "id", expression = "java(attachment.getUuid().toString())")
+    MessageAttachmentResponse toAttachmentResponse(MessageAttachment attachment);
+
+    @Mapping(target = "username", expression = "java(reaction.getUser().getUsername())")
+    MessageReactionResponse toReactionResponse(MessageReaction reaction);
+
+    @Mapping(target = "id", expression = "java(parent.getUuid().toString())")
+    @Mapping(target = "senderId", expression = "java(parent.getSender().getUuid().toString())")
+    ParentMessageResponse toParentResponse(Message parent);
+}
