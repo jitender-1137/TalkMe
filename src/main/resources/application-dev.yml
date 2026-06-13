@@ -1,0 +1,68 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://postgres-dev:5432/talkme_dev}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:redis-dev}
+      port: ${REDIS_PORT:6379}
+  mail:
+    host: ${MAIL_HOST:mail-dev}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000, http://10.221.83.139:3000}
+    allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
+    exposed-headers: Set-Cookie
+    allow-credentials: true
+
+security:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY:c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5}
+    access-token-expiration-ms: 900000 # 15 minutes
+    refresh-token-expiration-ms: 2592000000 # 30 days
+    guest-refresh-token-expiration-ms: 604800000 # 7 days
+  rate-limit:
+    capacity: 200
+    refill-tokens: 20
+    refill-period-seconds: 1
+
+storage:
+  local:
+    directory: /var/lib/talkme/uploads
+  s3:
+    enabled: ${S3_ENABLED:true}
+    bucket-name: ${S3_BUCKET:talkme-dev-uploads}
+    region: ${S3_REGION:us-east-1}
+    endpoint: ${S3_ENDPOINT}
+
+websocket:
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://dev.talkme.app}
+
+logging:
+  level:
+    root: INFO
+    com.chat.talkMe: INFO
+    org.springframework.security: INFO

@@ -1,0 +1,13 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: talkMe
+  data:
+    web:
+      pageable:
+        serialization-mode: via-dto
+
+server:
+  address: 0.0.0.0
+  port: 8080
