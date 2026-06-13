@@ -18,17 +18,6 @@ spring:
     redis:
       host: ${REDIS_HOST:redis-dev}
       port: ${REDIS_PORT:6379}
-  mail:
-    host: ${MAIL_HOST:mail-dev}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
 
 app:
   cors:
@@ -37,6 +26,9 @@ app:
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
     allow-credentials: true
+  cookie:
+    secure: false
+    same-site: Lax
 
 security:
   jwt:

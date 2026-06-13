@@ -13,11 +13,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/uploads/**")
+        registry.addResourceHandler("/talkMe/**")
                 .addResourceLocations("file:" + uploadDir + "/");
-                
-        // Serve files stored in /opt/media/talkMe
-        registry.addResourceHandler("/opt/media/talkMe/**")
-                .addResourceLocations("file:/opt/media/talkMe/");
     }
 }

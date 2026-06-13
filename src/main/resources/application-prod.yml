@@ -2,12 +2,6 @@ server:
   port: ${SERVER_PORT:8443} # Updated default to 8443 for SSL
   servlet:
     context-path: /api/v1
-  ssl:
-    enabled: ${SSL_ENABLED:true} # Set to true to utilize your server-keystore
-    key-store: "file:/home/ubuntu/TalkMe/jar/server-keystore.p12"
-    key-store-password: ${SSL_KEY_STORE_PASSWORD}
-    key-store-type: PKCS12
-    key-alias: redis-server
 
 spring:
   datasource:
@@ -20,52 +14,34 @@ spring:
       minimum-idle: ${DB_MIN_IDLE:5}
       idle-timeout: 300000
       max-lifetime: 1800000
-
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
 
+  #### REDIS CONFIGURATION ####
   data:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}
-      ssl:
-        bundle: redis-ssl-bundle
-
-  # FIXED: Moved completely out of data.redis and aligned perfectly under spring:
-  # FIXED: Changed configuration key from 'pem' to 'jks' to properly digest binary .p12 structures
-  ssl:
-    bundle:
-      jks:
-        redis-ssl-bundle:
-          keystore:
-            location: "file:/home/ubuntu/TalkMe/jar/server-keystore.p12"
-            password: ${SSL_KEY_STORE_PASSWORD}
-            type: "PKCS12"
-#  mail:
-#    host: ${MAIL_HOST}
-#    port: ${MAIL_PORT:587}
-#    username: ${MAIL_USERNAME}
-#    password: ${MAIL_PASSWORD}
-#    properties:
-#      mail:
-#        smtp:
-#          auth: true
-#          starttls:
-#            enable: true
+      enabled: ${REDIS_ENABLED:true}
 
 app:
   cors:
     allowed-origins: '*'
-    # FIXED: Using allowed-origin-patterns to prevent a runtime crash with allow-credentials: true
-    allowed-origin-patterns: '*'
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
-    allow-credentials: true
+    allow-credentials: false
+  cookie:
+    secure: true
+    same-site: None
+
+# WebSocket Configuration
+websocket:
+  allowed-origins: '*'
 
 security:
   jwt:
@@ -80,17 +56,7 @@ security:
 
 storage:
   local:
-    directory: /opt/media/talkme
-  s3:
-    enabled: true
-    bucket-name: ${S3_BUCKET}
-    region: ${S3_REGION}
-    endpoint: ${S3_ENDPOINT}
-
-websocket:
-  allowed-origins: '*'
-  # FIXED: Using allowed-origin-patterns here as well
-  allowed-origin-patterns: '*'
+    directory: ${FILE_BASE_DIR:/opt/media/talkme}
 
 logging:
   level:

@@ -17,23 +17,19 @@ spring:
     properties:
       hibernate:
         format_sql: false
-#        default_schema: talkMe2
+        default_schema: public
+
+  #### Redis Configuration ####
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:80.225.248.140}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:TalkMeRedis@2050!}
       timeout: 2000
-  mail:
-    host: localhost
-    port: 1025 # Mailpit standard local port
-    username: ""
-    password: ""
-    properties:
-      mail:
-        smtp:
-          auth: false
-          starttls:
-            enable: false
+      enabled: ${REDIS_ENABLED:true}
+      ssl:
+        enabled: ${REDIS_SSL:true}
+  #### Multipart files ####
   servlet:
     multipart:
       max-file-size: 100MB
@@ -47,11 +43,13 @@ app:
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
     allow-credentials: true
+  cookie:
+    secure: true
+    same-site: None
 
 # Security JWT details
 security:
   jwt:
-    # 256-bit key base64 encoded: 'c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5'
     secret-key: c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5
     access-token-expiration-ms: 900000 # 15 minutes (15 * 60 * 1000)
     refresh-token-expiration-ms: 2592000000 # 30 days (30 * 24 * 60 * 60 * 1000)
@@ -61,23 +59,18 @@ security:
     refill-tokens: 10
     refill-period-seconds: 1
 
+# WebSocket Configuration
+websocket:
+  allowed-origins: '*'
+
 # Storage Engine (Local)
 storage:
   local:
-    directory: /Users/jitenderyadav/Development/chat/backend/talkMe/uploads
-  s3:
-    enabled: false
-    bucket-name: talkme-uploads
-    region: us-east-1
-    endpoint: http://localhost:4566
-
-# WebSocket Configuration
-websocket:
-  allowed-origins: http://localhost:3000
+    directory: ${FILE_BASE_DIR:/Users/jitenderyadav/Development/chat/backend/talkMe/uploads}
 
 logging:
   level:
     root: INFO
     com.chat.talkMe: DEBUG
     org.springframework.security: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: WARN

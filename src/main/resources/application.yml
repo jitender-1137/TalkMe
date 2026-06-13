@@ -7,7 +7,12 @@ spring:
     web:
       pageable:
         serialization-mode: via-dto
+  #### session base auth ####
+auth:
+  username: ${AUTH_USERNAME:admin}
+  password: ${AUTH_PASSWORD:#Admin$321}
 
-server:
-  address: 0.0.0.0
-  port: 8080
+app:
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:Lax}

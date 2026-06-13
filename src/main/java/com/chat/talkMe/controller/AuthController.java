@@ -1,42 +1,41 @@
 package com.chat.talkMe.controller;
 
-import com.chat.talkMe.domain.User;
-import com.chat.talkMe.dto.request.SignupRequest;
+import com.chat.talkMe.dto.request.ChangePasswordRequest;
+import com.chat.talkMe.dto.request.ForgotPasswordRequest;
 import com.chat.talkMe.dto.request.GuestLoginRequest;
 import com.chat.talkMe.dto.request.LoginRequest;
-import com.chat.talkMe.dto.request.ForgotPasswordRequest;
 import com.chat.talkMe.dto.request.ResetPasswordRequest;
-import com.chat.talkMe.dto.request.ChangePasswordRequest;
+import com.chat.talkMe.dto.request.SignupRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
-import com.chat.talkMe.dto.response.LoginResponse;
-import com.chat.talkMe.dto.response.JwtTokensResponse;
 import com.chat.talkMe.dto.response.AuthUserResponse;
-import com.chat.talkMe.dto.response.SessionResponse;
+import com.chat.talkMe.dto.response.JwtTokensResponse;
+import com.chat.talkMe.dto.response.LoginResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
+import com.chat.talkMe.dto.response.SessionResponse;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.AuthService;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
@@ -50,26 +49,32 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @Value("${app.cookie.secure:false}")
+    private boolean cookieSecure;
+
+    @Value("${app.cookie.same-site:Lax}")
+    private String cookieSameSite;
+
     private void setAuthCookies(HttpServletResponse response, String refreshToken, boolean isGuest) {
         long refreshMaxAge = isGuest ? 7 * 24 * 60 * 60 : 30 * 24 * 60 * 60; // seconds
-        
+
         // 1. Refresh Token Cookie (HttpOnly)
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(true)
-                .path("/api/v1/auth")
+                .secure(cookieSecure)
+                .path("/")
                 .maxAge(refreshMaxAge)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
-        
+
         // 2. CSRF Token Cookie (non-HttpOnly so client JS can read it)
         String csrfToken = UUID.randomUUID().toString();
         ResponseCookie csrfCookie = ResponseCookie.from("csrf_token", csrfToken)
                 .httpOnly(false)
-                .secure(true)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(refreshMaxAge)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
@@ -79,18 +84,18 @@ public class AuthController {
     private void clearAuthCookies(HttpServletResponse response) {
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
-                .secure(true)
-                .path("/api/v1/auth")
+                .secure(cookieSecure)
+                .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
 
         ResponseCookie csrfCookie = ResponseCookie.from("csrf_token", "")
                 .httpOnly(false)
-                .secure(true)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite(cookieSameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
@@ -111,7 +116,7 @@ public class AuthController {
             @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        
+
         String ip = getClientIp(httpRequest);
         LoginResponse loginResponse = authService.signup(request, userAgent, ip);
 
@@ -126,9 +131,9 @@ public class AuthController {
             @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        
+
         String ip = getClientIp(httpRequest);
-        
+
         // Unified route: check if body contains isGuest flag
         if (bodyRaw.contains("\"isGuest\":true") || bodyRaw.contains("\"isGuest\": true")) {
             // Guest login flow
@@ -161,7 +166,7 @@ public class AuthController {
             @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        
+
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new UnauthorizedException("Refresh token is missing", "TM_026");
         }
@@ -179,11 +184,11 @@ public class AuthController {
     public ResponseEntity<ResponseDto<Void>> logout(
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
             HttpServletResponse httpResponse) {
-        
+
         if (refreshToken != null && !refreshToken.isBlank()) {
             authService.logout(refreshToken);
         }
-        
+
         clearAuthCookies(httpResponse);
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Logout Successful", "TM_003"));
     }
