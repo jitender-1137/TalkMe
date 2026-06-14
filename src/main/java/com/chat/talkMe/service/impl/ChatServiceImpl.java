@@ -308,7 +308,7 @@ public class ChatServiceImpl implements ChatService {
             chatMemberRepository.save(m);
         }
 
-        // Broadcast WS event: chat_deleted to all subscribers of the chat messages topic
+        // Broadcast WS event: chat_deleted to all subscribers of the chat messages topic and other members' personal queues
         try {
             Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", "chat_deleted");
@@ -317,7 +317,21 @@ public class ChatServiceImpl implements ChatService {
             payload.put("chatId", uuid);
 
             eventWrapper.put("payload", payload);
+            
+            // 1. Send to chat topic
             messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
+
+            // 2. Send to other members' personal user queue
+            for (ChatMember memberObj : chat.getMembers()) {
+                User memberUser = memberObj.getUser();
+                if (memberUser != null && !memberUser.getId().equals(currentUser.getId())) {
+                    messagingTemplate.convertAndSendToUser(
+                        memberUser.getUsername(),
+                        "/queue/chats",
+                        eventWrapper
+                    );
+                }
+            }
         } catch (Exception e) {
             log.error("Failed to send chat_deleted WS event", e);
         }

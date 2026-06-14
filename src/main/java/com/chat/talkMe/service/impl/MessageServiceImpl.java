@@ -122,7 +122,28 @@ public class MessageServiceImpl implements MessageService {
         // WebSocket broadcast only if not blocked
         if (!isBlocked) {
             try {
+                // 1. Broadcast to the chat topic
                 messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", response);
+
+                // 2. Also send a message_received event to each other chat member's personal queue
+                // to handle the race condition where they are not subscribed to the chat topic yet.
+                java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+                eventWrapper.put("event", "message_received");
+                java.util.Map<String, Object> eventPayload = new java.util.HashMap<>();
+                eventPayload.put("chatId", chatUuid);
+                eventPayload.put("message", response);
+                eventWrapper.put("payload", eventPayload);
+
+                for (ChatMember memberObj : chat.getMembers()) {
+                    User memberUser = memberObj.getUser();
+                    if (memberUser != null && !memberUser.getId().equals(currentUser.getId())) {
+                        messagingTemplate.convertAndSendToUser(
+                            memberUser.getUsername(),
+                            "/queue/chats",
+                            eventWrapper
+                        );
+                    }
+                }
             } catch (Exception e) {
                 log.error("WebSocket message broadcast failed", e);
             }
