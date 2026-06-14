@@ -1,7 +1,7 @@
 server:
   port: ${SERVER_PORT:8443} # Updated default to 8443 for SSL
   servlet:
-    context-path: /api/v1
+    context-path: /
 
 spring:
   datasource:
@@ -36,8 +36,8 @@ app:
     exposed-headers: Set-Cookie
     allow-credentials: false
   cookie:
-    secure: true
-    same-site: None
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:Lax}
 
 # WebSocket Configuration
 websocket:

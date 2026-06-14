@@ -66,10 +66,13 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
     /**
      * Uses startsWith() so that paths with trailing slashes or future sub-paths
      * are still matched correctly against the exclusion list.
+     * Normalizes paths by removing the /api/v1 prefix if present for prefix-agnostic matching.
      */
     private boolean isExcluded(String path) {
+        String normalizedPath = path.startsWith("/api/v1") ? path.substring(7) : path;
         for (String excluded : EXCLUDED_PATHS) {
-            if (path.startsWith(excluded)) {
+            String normalizedExcluded = excluded.startsWith("/api/v1") ? excluded.substring(7) : excluded;
+            if (normalizedPath.startsWith(normalizedExcluded)) {
                 return true;
             }
         }

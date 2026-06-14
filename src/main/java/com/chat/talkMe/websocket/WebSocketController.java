@@ -9,6 +9,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.context.event.EventListener;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.UserService;
@@ -136,5 +138,27 @@ public class WebSocketController {
 
         // Send to recipient
         messagingTemplate.convertAndSendToUser(recipient, "/queue/lobby-typing", response);
+    }
+
+    @EventListener
+    public void handleSessionDisconnect(SessionDisconnectEvent event) {
+        Principal principal = event.getUser();
+        if (principal == null) return;
+        String username = principal.getName();
+        log.info("WebSocket connection closed for user: {}", username);
+
+        // Remove from Redis set safely
+        Long removedCount = redisTemplate.opsForSet().remove("lobby:users", username);
+        boolean wasRemoved = removedCount != null && removedCount > 0;
+        
+        if (wasRemoved) {
+            log.info("Removed user {} from lobby due to disconnect", username);
+
+            // Broadcast leave event
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("action", "LEAVE");
+            payload.put("username", username);
+            messagingTemplate.convertAndSend("/topic/lobby", (Object) payload);
+        }
     }
 }

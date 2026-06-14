@@ -55,3 +55,72 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
+// Task to build frontend static files and copy them to spring resources
+def frontendDir = "$projectDir/../TalkMe-UI"
+
+def getPnpmExecutable() {
+    def os = System.getProperty('os.name').toLowerCase()
+    if (os.contains('windows')) {
+        return 'pnpm.cmd'
+    }
+    
+    // Check common locations for pnpm
+    def paths = ['/opt/homebrew/bin/pnpm', '/usr/local/bin/pnpm', '/usr/bin/pnpm', 'pnpm']
+    for (path in paths) {
+        try {
+            def process = new ProcessBuilder(path, '--version').start()
+            if (process.waitFor() == 0) {
+                return path
+            }
+        } catch (Exception e) {
+            // Ignore and try next
+        }
+    }
+    return 'pnpm' // fallback
+}
+
+task buildFrontend(type: Exec) {
+    group = 'build'
+    description = 'Installs frontend dependencies'
+    workingDir frontendDir
+    
+    def pnpmExec = getPnpmExecutable()
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', "${pnpmExec} install"
+    } else {
+        commandLine pnpmExec, 'install'
+    }
+}
+
+task buildFrontendProduction(type: Exec) {
+    group = 'build'
+    description = 'Builds frontend static export'
+    dependsOn buildFrontend
+    workingDir frontendDir
+    
+    environment 'STATIC_EXPORT', 'true'
+    
+    def pnpmExec = getPnpmExecutable()
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', "${pnpmExec} build"
+    } else {
+        commandLine pnpmExec, 'build'
+    }
+}
+
+task cleanStaticResources(type: Delete) {
+    delete "src/main/resources/static"
+}
+
+task copyFrontendResources(type: Copy) {
+    group = 'build'
+    description = 'Copies frontend static export to Spring Boot static resources'
+    dependsOn buildFrontendProduction, cleanStaticResources
+    from "$frontendDir/out"
+    into "$projectDir/src/main/resources/static"
+}
+
+// Hook copyFrontendResources task into processResources so it runs automatically on build
+processResources.dependsOn copyFrontendResources
+clean.dependsOn cleanStaticResources
+

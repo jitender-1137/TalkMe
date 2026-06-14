@@ -47,8 +47,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable) // Custom CsrfTokenFilter handles CSRF check
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers(unSecured()).permitAll()
-                        .anyRequest().authenticated()
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(unSecured()).permitAll()
+                        .requestMatchers("/api/**").authenticated() // Require auth for API endpoints
+                        .anyRequest().permitAll() // Allow static resources and frontend routes
                 );
 
         // Filter sequence: Rate Limiting -> CSRF -> JWT -> UsernamePasswordAuth
@@ -69,16 +71,16 @@ public class SecurityConfig {
      */
     private String[] unSecured() {
         return new String[]{
-                "/auth/login",
-                "/auth/signup",
-                "/auth/refresh",
-                "/auth/forgot-password",
-                "/auth/reset-password",
-                "/v3/api-docs/**",
-                "/swagger-ui/**",
-                "/ws/**",
-                "/uploads/media",
-                "/users/lobby"
+                "/api/v1/auth/login", "/auth/login",
+                "/api/v1/auth/signup", "/auth/signup",
+                "/api/v1/auth/refresh", "/auth/refresh",
+                "/api/v1/auth/forgot-password", "/auth/forgot-password",
+                "/api/v1/auth/reset-password", "/auth/reset-password",
+                "/api/v1/v3/api-docs/**", "/v3/api-docs/**",
+                "/api/v1/swagger-ui/**", "/swagger-ui/**",
+                "/api/v1/ws/**", "/ws/**",
+                "/api/v1/uploads/media", "/uploads/media",
+                "/api/v1/users/lobby", "/users/lobby"
         };
     }
 }

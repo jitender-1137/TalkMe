@@ -52,6 +52,10 @@ public class DiscoverServiceImpl implements DiscoverService {
             Boolean isOnline,
             String cursor,
             int limit,
+            Integer minAge,
+            Integer maxAge,
+            String gender,
+            String country,
             User currentUser
     ) {
         int page = 0;
@@ -63,7 +67,10 @@ public class DiscoverServiceImpl implements DiscoverService {
             }
         }
 
-        Pageable pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
+        Pageable pageable = PageRequest.of(page, limit, Sort.by(
+                Sort.Order.desc("onlineSortWeight"),
+                Sort.Order.asc("name")
+        ));
 
         Set<Interest> interestEnums = new HashSet<>();
         if (interests != null && !interests.isBlank()) {
@@ -103,6 +110,24 @@ public class DiscoverServiceImpl implements DiscoverService {
             // Interests filter
             if (!interestEnums.isEmpty()) {
                 predicates.add(root.join("interests").in(interestEnums));
+            }
+
+            // Age filters
+            if (minAge != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("age"), minAge));
+            }
+            if (maxAge != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("age"), maxAge));
+            }
+
+            // Gender filter
+            if (gender != null && !gender.isBlank() && !gender.equalsIgnoreCase("all") && !gender.equalsIgnoreCase("any")) {
+                predicates.add(cb.equal(cb.lower(root.get("gender")), gender.toLowerCase().trim()));
+            }
+
+            // Country filter
+            if (country != null && !country.isBlank() && !country.equalsIgnoreCase("all") && !country.equalsIgnoreCase("any")) {
+                predicates.add(cb.equal(cb.lower(root.get("country")), country.toLowerCase().trim()));
             }
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
@@ -162,6 +187,8 @@ public class DiscoverServiceImpl implements DiscoverService {
                             .username(u.getUsername())
                             .bio(u.getBio())
                             .location(locationStr)
+                            .city(u.getCity())
+                            .country(u.getCountry())
                             .distance("2 miles away")
                             .distanceKm(3.2)
                             .occupation(u.getOccupation())

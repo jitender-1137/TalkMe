@@ -11,6 +11,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.JoinTable;
+import jakarta.persistence.OneToOne;
+import org.hibernate.annotations.Formula;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.Builder;
@@ -91,4 +93,10 @@ public class User extends BaseEntity {
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    private UserPresence presence;
+
+    @Formula("COALESCE((SELECT CASE WHEN p.status = 'ONLINE' AND p.invisible_mode_enabled = false THEN 1 ELSE 0 END FROM user_presences p WHERE p.user_id = id), 0)")
+    private int onlineSortWeight;
 }

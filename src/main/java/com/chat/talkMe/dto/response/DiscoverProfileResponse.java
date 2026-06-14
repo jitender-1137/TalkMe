@@ -22,6 +22,8 @@ public class DiscoverProfileResponse {
     private String gender;
     private String bio;
     private String location;
+    private String city;
+    private String country;
     private String distance;
     private Double distanceKm;
     private String occupation;

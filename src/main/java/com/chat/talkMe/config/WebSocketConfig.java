@@ -29,14 +29,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        String[] origins = allowedOrigins != null ? allowedOrigins.split(",") : new String[]{"*"};
-        registry.addEndpoint("/ws")
-                .setAllowedOrigins(origins)
+        String[] origins = allowedOrigins != null ?
+                java.util.Arrays.stream(allowedOrigins.split(",")).map(String::trim).toArray(String[]::new) :
+                new String[]{"*"};
+        registry.addEndpoint("/ws", "/api/v1/ws")
+                .setAllowedOriginPatterns(origins)
                 .withSockJS();
 
         // Also register raw websocket endpoint without SockJS fallback
-        registry.addEndpoint("/ws")
-                .setAllowedOrigins(origins);
+        registry.addEndpoint("/ws", "/api/v1/ws")
+                .setAllowedOriginPatterns(origins);
     }
 
     @Override

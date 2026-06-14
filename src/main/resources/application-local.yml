@@ -1,7 +1,7 @@
 server:
   port: 8080
   servlet:
-    context-path: /api/v1
+    context-path: /
 
 spring:
   datasource:
@@ -22,13 +22,11 @@ spring:
   #### Redis Configuration ####
   data:
     redis:
-      host: ${REDIS_HOST:80.225.248.140}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:TalkMeRedis@2050!}
+      password: ${REDIS_PASSWORD}
       timeout: 2000
-      enabled: ${REDIS_ENABLED:true}
-      ssl:
-        enabled: ${REDIS_SSL:true}
+      enabled: ${REDIS_ENABLED:false}
   #### Multipart files ####
   servlet:
     multipart:
@@ -44,8 +42,8 @@ app:
     exposed-headers: Set-Cookie
     allow-credentials: true
   cookie:
-    secure: true
-    same-site: None
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:Lax}
 
 # Security JWT details
 security:

@@ -41,19 +41,19 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(allowedOrigins != null && !allowedOrigins.isBlank() ?
-                Arrays.asList(allowedOrigins.split(",")) :
+                Arrays.stream(allowedOrigins.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setAllowedMethods(allowedMethods != null && !allowedMethods.isBlank() ?
-                Arrays.asList(allowedMethods.split(",")) :
+                Arrays.stream(allowedMethods.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setAllowedHeaders(allowedHeaders != null && !allowedHeaders.isBlank() ?
-                Arrays.asList(allowedHeaders.split(",")) :
+                Arrays.stream(allowedHeaders.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setExposedHeaders(exposedHeaders != null && !exposedHeaders.isBlank() ?
-                Arrays.asList(exposedHeaders.split(",")) :
+                Arrays.stream(exposedHeaders.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setAllowCredentials(allowCredentials);

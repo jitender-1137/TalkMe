@@ -14,6 +14,8 @@ public interface UserMapper {
     @Mapping(target = "id", expression = "java(user.getUuid().toString())")
     @Mapping(target = "avatar", source = "profileImage")
     @Mapping(target = "createdAt", expression = "java(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)")
+    @Mapping(target = "presence", ignore = true)
+    @Mapping(target = "lastSeen", ignore = true)
     AuthUserResponse toAuthUserResponse(User user);
 
     @Mapping(target = "isVerified", source = "verified")
