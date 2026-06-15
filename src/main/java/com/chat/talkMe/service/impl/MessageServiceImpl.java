@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -163,6 +164,19 @@ public class MessageServiceImpl implements MessageService {
 
         Page<Message> messages = messageRepository.findMessagesForUser(chat, currentUser.getId(), member.getClearedAt(), pageable);
         return messages.map(messageMapper::toMessageResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MessageResponse> getMessagesAfter(String chatUuid, Long afterSequence, User currentUser) {
+        Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
+                .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
+
+        List<Message> messages = messageRepository.findMessagesAfter(chat, currentUser.getId(), member.getClearedAt(), afterSequence);
+        return messages.stream().map(messageMapper::toMessageResponse).collect(java.util.stream.Collectors.toList());
     }
 
     @Override

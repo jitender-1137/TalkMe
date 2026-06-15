@@ -9,9 +9,12 @@ import org.springframework.data.domain.Pageable;
 
 import com.chat.talkMe.dto.request.ReactToMessageRequest;
 
+import java.util.List;
+
 public interface MessageService {
     MessageResponse sendMessage(String chatUuid, SendMessageRequest request, User currentUser);
     Page<MessageResponse> getMessages(String chatUuid, Pageable pageable, User currentUser);
+    List<MessageResponse> getMessagesAfter(String chatUuid, Long afterSequence, User currentUser);
     Page<MessageResponse> searchMessages(String chatUuid, String query, Pageable pageable, User currentUser);
     void deleteMessage(String chatUuid, String messageUuid, User currentUser);
     MessageAttachment getAttachment(String attachmentUuid);

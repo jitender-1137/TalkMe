@@ -12,6 +12,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.apache.catalina.connector.ClientAbortException;
+import java.io.IOException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -74,6 +78,34 @@ public class GlobalExceptionHandler {
         String localizedMessage = getLocalizedMessage(messageCode, defaultMsg);
         ResponseDto<Void> response = ResponseDto.error(localizedMessage, messageCode);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ResponseDto<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+        String localizedMessage = getLocalizedMessage("TM_004", "Resource Not Found");
+        ResponseDto<Void> response = ResponseDto.error(localizedMessage, "TM_004");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsableException(AsyncRequestNotUsableException ex) {
+        log.info("Async request aborted by client: {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(ClientAbortException.class)
+    public void handleClientAbortException(ClientAbortException ex) {
+        log.info("Client aborted connection: {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(IOException.class)
+    public void handleIOException(IOException ex) {
+        String msg = ex.getMessage();
+        if (msg != null && (msg.contains("Broken pipe") || msg.contains("Connection reset"))) {
+            log.info("Client aborted connection (Broken pipe/Connection reset): {}", msg);
+        } else {
+            log.error("IOException occurred", ex);
+        }
     }
 
     @ExceptionHandler(Exception.class)

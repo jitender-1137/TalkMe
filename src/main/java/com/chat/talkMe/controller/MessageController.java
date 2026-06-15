@@ -42,6 +42,15 @@ public class MessageController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    @GetMapping("/sync")
+    public ResponseEntity<ResponseDto<java.util.List<MessageResponse>>> syncMessages(
+            @PathVariable("chatId") String chatUuid,
+            @RequestParam("afterSequence") Long afterSequence,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        java.util.List<MessageResponse> response = messageService.getMessagesAfter(chatUuid, afterSequence, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
     @GetMapping("/search")
     public ResponseEntity<ResponseDto<Page<MessageResponse>>> searchMessages(
             @PathVariable("chatId") String chatUuid,

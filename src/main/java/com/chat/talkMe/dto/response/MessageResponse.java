@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 public class MessageResponse {
     private String id; // maps to uuid
+    private Long sequenceNumber;
     private String senderId; // maps to sender.uuid
     private String content;
     private String messageType; // MessageType enum representation

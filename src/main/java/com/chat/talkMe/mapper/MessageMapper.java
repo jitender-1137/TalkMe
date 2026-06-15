@@ -14,6 +14,7 @@ import org.mapstruct.Mapping;
 public interface MessageMapper {
 
     @Mapping(target = "isEdited", source = "edited")
+    @Mapping(target = "sequenceNumber", source = "id")
     @Mapping(target = "id", expression = "java(message.getUuid().toString())")
     @Mapping(target = "senderId", expression = "java(message.getSender().getUuid().toString())")
     @Mapping(target = "messageType", expression = "java(message.getMessageType().name())")
