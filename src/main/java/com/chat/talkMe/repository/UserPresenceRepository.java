@@ -10,4 +10,5 @@ import java.util.Optional;
 @Repository
 public interface UserPresenceRepository extends JpaRepository<UserPresence, Long> {
     Optional<UserPresence> findByUser(User user);
+    long countByStatus(String status);
 }

@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.PresenceService;
+import com.chat.talkMe.match.DisconnectHandlerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -24,6 +25,7 @@ public class WebSocketPresenceListener {
 
     private final PresenceService presenceService;
     private final StringRedisTemplate redisTemplate;
+    private final DisconnectHandlerService disconnectHandlerService;
 
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
     private static final Duration SESSION_TTL = Duration.ofDays(1);
@@ -89,6 +91,11 @@ public class WebSocketPresenceListener {
         // Set OFFLINE only if this is the last session remaining
         if (isLastSession) {
             presenceService.setStatus(user, PresenceStatus.OFFLINE);
+            try {
+                disconnectHandlerService.handleDisconnect(username);
+            } catch (Exception e) {
+                log.error("Failed to clean up matchmaking state on disconnect", e);
+            }
         }
     }
 
