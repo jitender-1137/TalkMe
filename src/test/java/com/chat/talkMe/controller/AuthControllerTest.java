@@ -103,7 +103,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(signupPayload))
                 .andExpect(status().isOk())
@@ -112,6 +111,28 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.data.user.username").value("newuser"))
                 .andExpect(cookie().exists("refreshToken"))
                 .andExpect(cookie().exists("csrf_token"));
+    }
+
+    @Test
+    void testSignupSuccessWithCloudflareCountry() throws Exception {
+        String signupPayload = """
+                {
+                  "name": "Cloudflare User",
+                  "username": "cfuser",
+                  "email": "cfuser@example.com",
+                  "password": "password123",
+                  "age": 28,
+                  "gender": "female"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/signup")
+                .header("CF-IPCountry", "IN")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(signupPayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.user.country").value("India"));
     }
 
     @Test
@@ -128,7 +149,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(signupPayload))
                 .andExpect(status().isConflict())
@@ -150,7 +170,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(invalidPayload))
                 .andExpect(status().isBadRequest())
@@ -168,7 +187,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginPayload))
                 .andExpect(status().isOk())
@@ -190,7 +208,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginPayload))
                 .andExpect(status().isOk())
@@ -198,6 +215,26 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.data.user.guest").value(true))
                 .andExpect(cookie().exists("refreshToken"))
                 .andExpect(cookie().exists("csrf_token"));
+    }
+
+    @Test
+    void testLoginGuestSuccessWithCloudflareCountry() throws Exception {
+        String loginPayload = """
+                {
+                  "name": "Guest CF",
+                  "age": 30,
+                  "gender": "male",
+                  "isGuest": true
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                .header("CF-IPCountry", "US")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(loginPayload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.user.country").value("United States"));
     }
 
     @Test
@@ -210,7 +247,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginPayload))
                 .andExpect(status().isUnauthorized())
@@ -230,7 +266,6 @@ public class AuthControllerTest {
         Cookie refreshCookie = new Cookie("refreshToken", tokenStr);
 
         mockMvc.perform(post("/api/v1/auth/refresh")
-                .contextPath("/api/v1")
                 .cookie(refreshCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -241,8 +276,7 @@ public class AuthControllerTest {
 
     @Test
     void testRefreshMissingCookie() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/refresh")
-                .contextPath("/api/v1"))
+        mockMvc.perform(post("/api/v1/auth/refresh"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_026"));
@@ -261,7 +295,6 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/logout")
-                .contextPath("/api/v1")
                 .with(user(testUserDetails()))
                 .cookie(refreshCookie)
                 .cookie(csrfCookie)
@@ -276,7 +309,6 @@ public class AuthControllerTest {
     @Test
     void testGetMeSuccess() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
-                .contextPath("/api/v1")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -295,7 +327,6 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(put("/api/v1/auth/me")
-                .contextPath("/api/v1")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
@@ -316,7 +347,6 @@ public class AuthControllerTest {
                 .build());
 
         mockMvc.perform(get("/api/v1/auth/sessions")
-                .contextPath("/api/v1")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -336,7 +366,6 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(delete("/api/v1/auth/sessions/" + sessionUuid)
-                .contextPath("/api/v1")
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
                 .with(user(testUserDetails())))
@@ -350,7 +379,6 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/sessions/revoke-all")
-                .contextPath("/api/v1")
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
                 .with(user(testUserDetails())))
@@ -368,7 +396,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/forgot-password")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
                 .andExpect(status().isOk())
@@ -386,7 +413,6 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/reset-password")
-                .contextPath("/api/v1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
                 .andExpect(status().isOk())
@@ -406,7 +432,6 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/change-password")
-                .contextPath("/api/v1")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
@@ -429,7 +454,6 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/change-password")
-                .contextPath("/api/v1")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")

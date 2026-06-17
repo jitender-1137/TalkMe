@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,6 +14,9 @@ import java.util.UUID;
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Long> {
     Optional<Chat> findByUuid(UUID uuid);
+
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.members m LEFT JOIN FETCH m.user WHERE c.uuid = :uuid")
+    Optional<Chat> findByUuidWithMembers(@Param("uuid") UUID uuid);
 
     @Query("SELECT c FROM Chat c JOIN c.members m WHERE m.user = :user AND c.isDeleted = false AND m.isDeleted = false ORDER BY c.updatedAt DESC")
     List<Chat> findChatsByUser(User user);

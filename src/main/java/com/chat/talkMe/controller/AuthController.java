@@ -117,8 +117,7 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
 
-        String ip = getClientIp(httpRequest);
-        LoginResponse loginResponse = authService.signup(request, userAgent, ip);
+        LoginResponse loginResponse = authService.signup(request, userAgent, httpRequest);
 
         setAuthCookies(httpResponse, loginResponse.getTokens().getRefreshToken(), false);
 
@@ -139,7 +138,7 @@ public class AuthController {
             // Guest login flow
             GuestLoginRequest request = new com.fasterxml.jackson.databind.ObjectMapper()
                     .convertValue(parseBody(bodyRaw), GuestLoginRequest.class);
-            LoginResponse response = authService.loginAsGuest(request, userAgent, ip);
+            LoginResponse response = authService.loginAsGuest(request, userAgent, httpRequest);
             setAuthCookies(httpResponse, response.getTokens().getRefreshToken(), true);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         } else {

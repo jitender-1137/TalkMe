@@ -28,6 +28,9 @@ import com.chat.talkMe.repository.SessionRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.JwtTokenProvider;
 import com.chat.talkMe.service.AuthService;
+import com.chat.talkMe.dto.response.CountryDetectionResult;
+import com.chat.talkMe.service.CountryDetectionService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider tokenProvider;
     private final UserMapper userMapper;
     private final SessionMapper sessionMapper;
+    private final CountryDetectionService countryDetectionService;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -85,16 +89,17 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public LoginResponse signup(SignupRequest request, String userAgent, String ip) {
+    public LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ConflictException("TM_047");
         }
 
         // Generate username from email prefix
         String username = request.getUsername();
-//                .getEmail().split("@")[0];
 
         Role userRole = getOrCreateRole("ROLE_USER");
+
+        CountryDetectionResult detectionResult = countryDetectionService.detectCountry(httpRequest);
 
         User user = User.builder()
                 .name(request.getName())
@@ -106,19 +111,23 @@ public class AuthServiceImpl implements AuthService {
                 .roles(Set.of(userRole))
                 .age(request.getAge())
                 .gender(request.getGender())
+                .country(detectionResult.getCountry())
                 .build();
 
         user = userRepository.save(user);
-        log.info("User registered successfully: {}", username);
+        log.info("User registered successfully: {}. Country detected: {} (Source: {}, IP: {})", 
+                username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
 
-        return generateLoginResponse(user, userAgent, ip);
+        return generateLoginResponse(user, userAgent, detectionResult.getClientIp());
     }
 
     @Override
     @Transactional
-    public LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, String ip) {
+    public LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, HttpServletRequest httpRequest) {
         String username = "guest_" + UUID.randomUUID().toString().substring(0, 8);
         Role guestRole = getOrCreateRole("ROLE_GUEST");
+
+        CountryDetectionResult detectionResult = countryDetectionService.detectCountry(httpRequest);
 
         User guest = User.builder()
                 .name(request.getName())
@@ -128,12 +137,14 @@ public class AuthServiceImpl implements AuthService {
                 .isGuest(true)
                 .isVerified(true)
                 .roles(Set.of(guestRole))
+                .country(detectionResult.getCountry())
                 .build();
 
         guest = userRepository.save(guest);
-        log.info("Guest user logged in: {}", username);
+        log.info("Guest user logged in: {}. Country detected: {} (Source: {}, IP: {})", 
+                username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
 
-        return generateLoginResponse(guest, userAgent, ip);
+        return generateLoginResponse(guest, userAgent, detectionResult.getClientIp());
     }
 
     @Override

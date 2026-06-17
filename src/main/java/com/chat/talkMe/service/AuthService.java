@@ -16,8 +16,8 @@ import java.util.List;
 
 public interface AuthService {
     LoginResponse login(LoginRequest request, String userAgent, String ip);
-    LoginResponse signup(SignupRequest request, String userAgent, String ip);
-    LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, String ip);
+    LoginResponse signup(SignupRequest request, String userAgent, jakarta.servlet.http.HttpServletRequest httpRequest);
+    LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, jakarta.servlet.http.HttpServletRequest httpRequest);
     JwtTokensResponse refresh(String refreshToken, String userAgent, String ip);
     void logout(String refreshToken);
     List<SessionResponse> getSessions(User currentUser);
