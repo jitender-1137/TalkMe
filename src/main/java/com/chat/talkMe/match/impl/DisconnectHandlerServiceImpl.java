@@ -2,6 +2,7 @@ package com.chat.talkMe.match.impl;
 
 import com.chat.talkMe.match.DisconnectHandlerService;
 import com.chat.talkMe.match.MatchServerEvent;
+import com.chat.talkMe.match.OnlineCountPublisher;
 import com.chat.talkMe.match.SessionCleanupService;
 import com.chat.talkMe.match.SessionService;
 import com.chat.talkMe.match.WaitingQueueService;
@@ -22,6 +23,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
     private final SessionCleanupService sessionCleanupService;
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
+    private final OnlineCountPublisher onlineCountPublisher;
 
     @Override
     public void handleDisconnect(String username) {
@@ -59,5 +61,8 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
             redisTemplate.opsForSet().remove("matchmaking:active_users", stranger);
             log.info("Cleaned up match session {} due to disconnect of {}", session.getId(), username);
         });
+
+        // Broadcast updated online count over WebSocket
+        onlineCountPublisher.publish();
     }
 }

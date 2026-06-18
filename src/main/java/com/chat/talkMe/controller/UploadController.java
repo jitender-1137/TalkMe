@@ -30,10 +30,22 @@ public class UploadController {
         
         String url = storageService.storeFile(file, type);
 
+        // Report the ACTUAL stored size — videos are transcoded server-side and
+        // are typically much smaller than the uploaded multipart file.
+        long storedSize = file.getSize();
+        try {
+            Path stored = Paths.get(url);
+            if (Files.exists(stored)) {
+                storedSize = Files.size(stored);
+            }
+        } catch (Exception ignored) {
+            // fall back to the original multipart size
+        }
+
         UploadResponse response = UploadResponse.builder()
                 .url(url)
                 .fileName(file.getOriginalFilename())
-                .fileSize(file.getSize())
+                .fileSize(storedSize)
                 .mimeType(file.getContentType())
                 .build();
 

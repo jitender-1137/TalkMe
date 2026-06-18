@@ -99,4 +99,15 @@ public class User extends BaseEntity {
 
     @Formula("COALESCE((SELECT CASE WHEN p.status = 'ONLINE' AND p.invisible_mode_enabled = false THEN 1 ELSE 0 END FROM user_presences p WHERE p.user_id = id), 0)")
     private int onlineSortWeight;
+
+    /** How the user most recently accessed the app — drives push vs WS-only delivery. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "installation_type", length = 20)
+    @Builder.Default
+    private com.chat.talkMe.enums.InstallationType installationType = com.chat.talkMe.enums.InstallationType.BROWSER;
+
+    /** Server-driven total unread message count, used for the app badge. */
+    @Column(name = "total_unread_count", nullable = false, columnDefinition = "integer default 0")
+    @Builder.Default
+    private int totalUnreadCount = 0;
 }

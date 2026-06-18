@@ -39,6 +39,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMapper chatMapper;
     private final PresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
     private final FriendRepository friendRepository;
     private final BlockUserRepository blockUserRepository;
 
@@ -378,6 +379,13 @@ public class ChatServiceImpl implements ChatService {
                 messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
             } catch (Exception e) {
                 log.error("WebSocket messages_read broadcast failed", e);
+            }
+
+            // Recompute + broadcast the authoritative unread total (badge sync).
+            try {
+                notificationDispatchService.recomputeUnread(managedUser);
+            } catch (Exception e) {
+                log.error("Unread recompute after markRead failed", e);
             }
         }
     }

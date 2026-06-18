@@ -8,6 +8,7 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.match.MatchSession;
 import com.chat.talkMe.match.MatchServerEvent;
 import com.chat.talkMe.match.MatchmakingService;
+import com.chat.talkMe.match.OnlineCountPublisher;
 import com.chat.talkMe.match.SessionService;
 import com.chat.talkMe.match.SessionCleanupService;
 import com.chat.talkMe.match.WaitingQueueService;
@@ -31,6 +32,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final UserMapper userMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
+    private final OnlineCountPublisher onlineCountPublisher;
 
     private static final String ACTIVE_USERS_KEY = "matchmaking:active_users";
 
@@ -70,6 +72,9 @@ public class MatchmakingServiceImpl implements MatchmakingService {
             waitingQueueService.enqueue(username);
             notifyWaiting(username);
         }
+
+        // Broadcast updated online count over WebSocket
+        onlineCountPublisher.publish();
     }
 
     @Override
@@ -83,6 +88,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
                 .payload(Map.of("reason", "CANCELLED"))
                 .build();
         messagingTemplate.convertAndSendToUser(username, "/queue/match", event);
+        onlineCountPublisher.publish();
     }
 
     @Override
@@ -99,6 +105,9 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         sessionService.getSessionByUser(username).ifPresent(session -> {
             sessionCleanupService.cleanupSession(session.getId(), "EXIT");
         });
+
+        // Broadcast updated online count over WebSocket
+        onlineCountPublisher.publish();
     }
 
     @Override
@@ -114,8 +123,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
 
     @Override
     public long getOnlineCount() {
-        Long size = redisTemplate.opsForSet().size(ACTIVE_USERS_KEY);
-        return size != null ? size : 0L;
+        return onlineCountPublisher.currentCount();
     }
 
     @Override

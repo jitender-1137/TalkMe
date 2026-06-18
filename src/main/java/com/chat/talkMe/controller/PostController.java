@@ -36,6 +36,15 @@ public class PostController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Post created successfully", "TM_210"));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ResponseDto<PostResponse>> updatePost(
+            @PathVariable("id") String postUuid,
+            @Valid @RequestBody PostRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        PostResponse response = postService.updatePost(postUuid, request, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Post updated successfully", "TM_214"));
+    }
+
     @GetMapping("/feed")
     public ResponseEntity<ResponseDto<Page<PostResponse>>> getFeed(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
@@ -84,6 +93,24 @@ public class PostController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         PostCommentResponse response = postService.addComment(postUuid, request, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Comment added to post", "TM_219"));
+    }
+
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<ResponseDto<Page<PostCommentResponse>>> getComments(
+            @PathVariable("id") String postUuid,
+            @PageableDefault(size = 15, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<PostCommentResponse> response = postService.getComments(postUuid, pageable);
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
+    @PutMapping("/{id}/comments/{commentId}")
+    public ResponseEntity<ResponseDto<PostCommentResponse>> editComment(
+            @PathVariable("id") String postUuid,
+            @PathVariable("commentId") String commentUuid,
+            @Valid @RequestBody PostCommentRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        PostCommentResponse response = postService.editComment(postUuid, commentUuid, request, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Comment updated", "TM_222"));
     }
 
     @DeleteMapping("/{id}/comments/{commentId}")

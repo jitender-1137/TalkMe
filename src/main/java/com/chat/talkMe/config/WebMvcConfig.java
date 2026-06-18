@@ -8,11 +8,21 @@ import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
     @Value("${storage.local.directory}")
     private String uploadDir;
+
+    @Bean
+    @Primary
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

@@ -13,9 +13,11 @@ import com.chat.talkMe.dto.response.LoginResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SessionResponse;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.AuthService;
+import com.chat.talkMe.service.CaptchaService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -48,9 +50,24 @@ import java.util.UUID;
 public class AuthController {
 
     private final AuthService authService;
+    private final CaptchaService captchaService;
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
+
+    /**
+     * Bot/human gate for the auth forms: rejects filled honeypots and requires a
+     * valid Cloudflare Turnstile token. Throws 400 if either check fails.
+     */
+    private void verifyHuman(String captchaToken, String honeypot, HttpServletRequest request) {
+        if (honeypot != null && !honeypot.isBlank()) {
+            log.warn("Honeypot triggered from IP {}", getClientIp(request));
+            throw new BadRequestException("Request rejected", "TM_403");
+        }
+        if (!captchaService.verify(captchaToken, getClientIp(request))) {
+            throw new BadRequestException("CAPTCHA verification failed. Please try again.", "TM_401");
+        }
+    }
 
     @Value("${app.cookie.same-site:Lax}")
     private String cookieSameSite;
@@ -117,6 +134,8 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
 
+        verifyHuman(request.getCaptchaToken(), request.getWebsite(), httpRequest);
+
         LoginResponse loginResponse = authService.signup(request, userAgent, httpRequest);
 
         setAuthCookies(httpResponse, loginResponse.getTokens().getRefreshToken(), false);
@@ -132,19 +151,27 @@ public class AuthController {
             HttpServletResponse httpResponse) {
 
         String ip = getClientIp(httpRequest);
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        Object parsed = parseBody(bodyRaw);
+
+        // Bot/human gate (CAPTCHA + honeypot) before any auth processing.
+        if (parsed instanceof Map<?, ?> body) {
+            Object token = body.get("captchaToken");
+            Object honeypot = body.get("website");
+            verifyHuman(token != null ? token.toString() : null,
+                    honeypot != null ? honeypot.toString() : null, httpRequest);
+        }
 
         // Unified route: check if body contains isGuest flag
         if (bodyRaw.contains("\"isGuest\":true") || bodyRaw.contains("\"isGuest\": true")) {
             // Guest login flow
-            GuestLoginRequest request = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .convertValue(parseBody(bodyRaw), GuestLoginRequest.class);
+            GuestLoginRequest request = mapper.convertValue(parsed, GuestLoginRequest.class);
             LoginResponse response = authService.loginAsGuest(request, userAgent, httpRequest);
             setAuthCookies(httpResponse, response.getTokens().getRefreshToken(), true);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         } else {
             // Standard credentials login
-            LoginRequest request = new com.fasterxml.jackson.databind.ObjectMapper()
-                    .convertValue(parseBody(bodyRaw), LoginRequest.class);
+            LoginRequest request = mapper.convertValue(parsed, LoginRequest.class);
             LoginResponse response = authService.login(request, userAgent, ip);
             setAuthCookies(httpResponse, response.getTokens().getRefreshToken(), false);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));

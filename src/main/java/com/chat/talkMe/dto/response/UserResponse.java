@@ -38,4 +38,8 @@ public class UserResponse {
     private String lastSeen; // ISO 8601 string or null
     private String createdAt;
     private String updatedAt;
+    
+    private long followersCount;
+    private long followingCount;
+    private long postsCount;
 }

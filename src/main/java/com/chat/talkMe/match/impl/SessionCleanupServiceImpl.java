@@ -1,6 +1,7 @@
 package com.chat.talkMe.match.impl;
 
 import com.chat.talkMe.match.MatchServerEvent;
+import com.chat.talkMe.match.OnlineCountPublisher;
 import com.chat.talkMe.match.SessionCleanupService;
 import com.chat.talkMe.match.SessionService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class SessionCleanupServiceImpl implements SessionCleanupService {
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
+    private final OnlineCountPublisher onlineCountPublisher;
 
     @Override
     public void cleanupSession(String sessionId, String reason) {
@@ -51,6 +53,9 @@ public class SessionCleanupServiceImpl implements SessionCleanupService {
             // Remove from active user tracking set in Redis
             redisTemplate.opsForSet().remove("matchmaking:active_users", session.getUserA());
             redisTemplate.opsForSet().remove("matchmaking:active_users", session.getUserB());
+
+            // Broadcast updated online count over WebSocket
+            onlineCountPublisher.publish();
         });
     }
 }

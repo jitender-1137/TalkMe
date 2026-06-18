@@ -51,16 +51,15 @@ public class PresenceServiceImpl implements PresenceService {
         String username = managedUser.getUsername();
         log.debug("Setting presence status for user {} to {}", username, status);
 
-        // Retrieve or initialize DB presence
+        // Retrieve or initialize DB presence (ensures the row exists)
         UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
 
-        // Update database properties
-        userPresence.setStatus(status.name());
+        // Persist via an atomic UPDATE rather than save() — the connect path is
+        // hot and concurrent updates would otherwise cause optimistic-lock failures.
         Instant lastSeen = Instant.now();
-        userPresence.setLastSeenAt(lastSeen);
-        userPresenceRepository.save(userPresence);
+        userPresenceRepository.updateStatus(managedUser.getId(), status.name(), lastSeen);
 
-        // Sync to Redis
+        // Sync to Redis (flags read from the loaded presence; unchanged here)
         String redisKey = REDIS_KEY_PREFIX + username;
         Map<String, String> presenceMap = new HashMap<>();
         presenceMap.put("status", status.name());
@@ -72,7 +71,7 @@ public class PresenceServiceImpl implements PresenceService {
         redisTemplate.expire(redisKey, CACHE_TTL);
 
         // Broadcast presence updates via STOMP WebSocket
-        broadcastPresence(managedUser, userPresence, status);
+        broadcastPresence(managedUser, userPresence, status, lastSeen);
     }
 
     @Override
@@ -172,14 +171,11 @@ public class PresenceServiceImpl implements PresenceService {
         String username = managedUser.getUsername();
         log.debug("Resetting presence for user {}", username);
 
-        UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
+        // Ensure the row exists, then reset it atomically (disconnect is a hot path).
+        presenceServiceHelper.getOrCreateUserPresence(managedUser);
 
         Instant now = Instant.now();
-        userPresence.setStatus(PresenceStatus.OFFLINE.name());
-        userPresence.setLastSeenAt(now);
-        userPresence.setGhostModeEnabled(false);
-        userPresence.setInvisibleModeEnabled(false);
-        userPresenceRepository.save(userPresence);
+        userPresenceRepository.resetPresence(managedUser.getId(), PresenceStatus.OFFLINE.name(), now);
 
         // Clear Redis cache key
         String redisKey = REDIS_KEY_PREFIX + username;
@@ -203,7 +199,7 @@ public class PresenceServiceImpl implements PresenceService {
         return presenceServiceHelper.getOrCreateUserPresence(managedUser);
     }
 
-    private void broadcastPresence(User user, UserPresence userPresence, PresenceStatus status) {
+    private void broadcastPresence(User user, UserPresence userPresence, PresenceStatus status, Instant lastSeen) {
         String username = user.getUsername();
         String statusToBroadcast = status.name();
 
@@ -217,7 +213,7 @@ public class PresenceServiceImpl implements PresenceService {
             return;
         }
 
-        sendWebSocketUpdate(user, statusToBroadcast, userPresence.getLastSeenAt().toString());
+        sendWebSocketUpdate(user, statusToBroadcast, lastSeen.toString());
     }
 
     private void sendWebSocketUpdate(User user, String status, String lastSeen) {

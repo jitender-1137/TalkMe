@@ -17,6 +17,8 @@ import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
+import com.chat.talkMe.repository.PostRepository;
 import com.chat.talkMe.service.UserService;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.service.StorageService;
@@ -53,6 +55,8 @@ public class UserServiceImpl implements UserService {
     private final StorageService storageService;
     private final UserMapper userMapper;
     private final StringRedisTemplate redisTemplate;
+    private final UserFollowRepository userFollowRepository;
+    private final PostRepository postRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -62,6 +66,7 @@ public class UserServiceImpl implements UserService {
         UserResponse response = userMapper.toUserResponse(user);
         response.setPresence("online");
         response.setLastSeen(Instant.now().toString());
+        populateUserCounts(response, user);
         return response;
     }
 
@@ -111,6 +116,7 @@ public class UserServiceImpl implements UserService {
         UserResponse response = userMapper.toUserResponse(user);
         response.setPresence("online");
         response.setLastSeen(Instant.now().toString());
+        populateUserCounts(response, user);
         return response;
     }
 
@@ -140,11 +146,17 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUserById(String userId, User currentUser) {
-        User targetUser = userRepository.findByUuid(UUID.fromString(userId))
-                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+        User targetUser;
+        if ("me".equalsIgnoreCase(userId)) {
+            targetUser = currentUser;
+        } else {
+            targetUser = userRepository.findByUuid(UUID.fromString(userId))
+                    .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+        }
 
         UserResponse response = userMapper.toUserResponse(targetUser);
         populatePresenceAndBlockStatus(response, currentUser, targetUser);
+        populateUserCounts(response, targetUser);
         return response;
     }
 
@@ -184,6 +196,7 @@ public class UserServiceImpl implements UserService {
                 .map(u -> {
                     UserResponse res = userMapper.toUserResponse(u);
                     populatePresenceAndBlockStatus(res, currentUser, u);
+                    populateUserCounts(res, u);
                     return res;
                 })
                 .collect(Collectors.toList());
@@ -292,6 +305,15 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    private void populateUserCounts(UserResponse response, User user) {
+        long followers = userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        long following = userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        long posts = postRepository.countByUserAndIsDeletedFalse(user);
+        response.setFollowersCount(followers);
+        response.setFollowingCount(following);
+        response.setPostsCount(posts);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<UserResponse> getLobbyUsers(User currentUser) {
@@ -305,6 +327,7 @@ public class UserServiceImpl implements UserService {
                 .map(u -> {
                     UserResponse res = userMapper.toUserResponse(u);
                     populatePresenceAndBlockStatus(res, currentUser, u);
+                    populateUserCounts(res, u);
                     return res;
                 })
                 .collect(Collectors.toList());

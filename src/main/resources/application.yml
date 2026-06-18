@@ -16,3 +16,19 @@ app:
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}
+
+# Cloudflare Turnstile CAPTCHA. Dev default is Cloudflare's "always passes"
+# TEST secret — set the real TURNSTILE_SECRET_KEY via env in production.
+security:
+  captcha:
+    enabled: ${CAPTCHA_ENABLED:true}
+    secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
+
+# Web Push (VAPID). Override the keys via env in production.
+# Generate a new pair with: openssl / web-push generate-vapid-keys
+webpush:
+  enabled: ${WEBPUSH_ENABLED:true}
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY:BKCeDr6ImE2uISF6APs0OyMfgoWkXWo-TNpXY1hdnrJyj1CtbH5Joo0tuqRrmXX-Zd1an5Bh7Y4cOQe6hv3yqzQ}
+    private-key: ${VAPID_PRIVATE_KEY:pMHBoMj1sI4zsmg2TIg0g870XZbUPElqR-nkOY-FfnQ}
+    subject: ${VAPID_SUBJECT:mailto:admin@talkme.app}

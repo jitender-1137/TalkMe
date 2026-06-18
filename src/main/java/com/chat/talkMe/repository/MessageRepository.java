@@ -37,6 +37,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
            "NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')")
     long countUnreadMessages(Chat chat, Long userId);
 
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false " +
+           "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId) " +
+           "AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')")
+    long countTotalUnreadForUser(Long userId);
+
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.isDeleted = false AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (m.isBlocked = false OR m.sender.id = :userId) AND m.id > :afterSequence ORDER BY m.id ASC")
     List<Message> findMessagesAfter(Chat chat, Long userId, Instant clearedAt, Long afterSequence);
 }

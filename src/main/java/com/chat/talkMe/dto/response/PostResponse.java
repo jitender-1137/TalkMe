@@ -16,6 +16,7 @@ public class PostResponse {
     private String content;
     private List<PostMediaResponse> media;
     private int likesCount;
+    private int commentsCount;
     private boolean likedByMe;
     private boolean bookmarkedByMe;
     private String createdAt;

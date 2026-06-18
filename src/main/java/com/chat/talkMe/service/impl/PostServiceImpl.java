@@ -66,17 +66,38 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional
+    public PostResponse updatePost(String postUuid, PostRequest request, User currentUser) {
+        Post post = postRepository.findByUuid(UUID.fromString(postUuid))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
+
+        if (!post.getUser().getId().equals(currentUser.getId())) {
+            throw new ForbiddenException("Cannot edit post of another user", "TM_103");
+        }
+
+        post.setContent(request.getContent());
+        post = postRepository.save(post);
+        log.info("Post {} caption updated by {}", postUuid, currentUser.getUsername());
+        return mapToPostResponse(post, currentUser);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<PostResponse> getFeed(Pageable pageable, User currentUser) {
-        Page<Post> posts = postRepository.findFeedForUser(currentUser, pageable);
+        Page<Post> posts = postRepository.findByIsDeletedFalse(pageable);
         return posts.map(post -> mapToPostResponse(post, currentUser));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<PostResponse> getProfileFeed(String userUuid, Pageable pageable, User currentUser) {
-        User targetUser = userRepository.findByUuid(UUID.fromString(userUuid))
-                .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+        User targetUser;
+        if ("me".equalsIgnoreCase(userUuid)) {
+            targetUser = currentUser;
+        } else {
+            targetUser = userRepository.findByUuid(UUID.fromString(userUuid))
+                    .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+        }
 
         Page<Post> posts = postRepository.findByUserAndIsDeletedFalse(targetUser, pageable);
         return posts.map(post -> mapToPostResponse(post, currentUser));
@@ -179,6 +200,21 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
+    public PostCommentResponse editComment(String postUuid, String commentUuid, PostCommentRequest request, User currentUser) {
+        PostComment comment = postCommentRepository.findByUuid(UUID.fromString(commentUuid))
+                .orElseThrow(() -> new NotFoundException("Comment not found", "TM_221"));
+
+        if (!comment.getUser().getId().equals(currentUser.getId())) {
+            throw new ForbiddenException("Cannot edit comment of another user", "TM_103");
+        }
+
+        comment.setContent(request.getContent());
+        comment = postCommentRepository.save(comment);
+        return mapToCommentResponse(comment);
+    }
+
+    @Override
+    @Transactional
     public void bookmarkPost(String postUuid, User currentUser) {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
@@ -223,6 +259,7 @@ public class PostServiceImpl implements PostService {
                 .content(post.getContent())
                 .media(mediaRes)
                 .likesCount(post.getLikes().size())
+                .commentsCount(commentsRes.size())
                 .likedByMe(liked)
                 .bookmarkedByMe(bookmarked)
                 .createdAt(post.getCreatedAt().toString())
@@ -230,11 +267,23 @@ public class PostServiceImpl implements PostService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostCommentResponse> getComments(String postUuid, Pageable pageable) {
+        Post post = postRepository.findByUuid(UUID.fromString(postUuid))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
+
+        return postCommentRepository.findByPostAndParentIsNull(post, pageable)
+                .map(this::mapToCommentResponse);
+    }
+
     private PostCommentResponse mapToCommentResponse(PostComment c) {
         return PostCommentResponse.builder()
                 .id(c.getUuid().toString())
+                .userId(c.getUser().getUuid().toString())
                 .username(c.getUser().getUsername())
                 .name(c.getUser().getName())
+                .profileImage(c.getUser().getProfileImage())
                 .content(c.getContent())
                 .createdAt(c.getCreatedAt().toString())
                 .build();

@@ -29,6 +29,9 @@ public interface UserMapper {
     @Mapping(target = "isBlocked", ignore = true)
     @Mapping(target = "presence", ignore = true)
     @Mapping(target = "lastSeen", ignore = true)
+    @Mapping(target = "followersCount", ignore = true)
+    @Mapping(target = "followingCount", ignore = true)
+    @Mapping(target = "postsCount", ignore = true)
     UserResponse toUserResponse(User user);
 
     default java.util.Set<String> mapInterestsToStringSet(java.util.Set<com.chat.talkMe.enums.Interest> interests) {

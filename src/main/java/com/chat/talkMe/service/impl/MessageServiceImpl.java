@@ -35,6 +35,7 @@ public class MessageServiceImpl implements MessageService {
     private final MessageMapper messageMapper;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final BlockUserRepository blockUserRepository;
+    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
 
     @Override
     @Transactional
@@ -143,6 +144,16 @@ public class MessageServiceImpl implements MessageService {
                             "/queue/chats",
                             eventWrapper
                         );
+
+                        // Bump + broadcast unread count, and Web Push if recipient
+                        // is on an installed PWA (background delivery).
+                        try {
+                            notificationDispatchService.onNewMessage(
+                                memberUser, chatUuid, response,
+                                currentUser.getName(), currentUser.getProfileImage());
+                        } catch (Exception e) {
+                            log.error("Notification dispatch failed for user {}", memberUser.getId(), e);
+                        }
                     }
                 }
             } catch (Exception e) {

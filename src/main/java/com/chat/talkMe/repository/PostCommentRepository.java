@@ -2,6 +2,8 @@ package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.Post;
 import com.chat.talkMe.domain.PostComment;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -13,4 +15,5 @@ import java.util.UUID;
 public interface PostCommentRepository extends JpaRepository<PostComment, Long> {
     Optional<PostComment> findByUuid(UUID uuid);
     List<PostComment> findByPostAndParentNullOrderByCreatedAtAsc(Post post);
+    Page<PostComment> findByPostAndParentIsNull(Post post, Pageable pageable);
 }

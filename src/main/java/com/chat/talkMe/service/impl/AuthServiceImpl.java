@@ -59,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final SessionMapper sessionMapper;
     private final CountryDetectionService countryDetectionService;
+    private final com.chat.talkMe.service.LoginAttemptService loginAttemptService;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -72,18 +73,30 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request, String userAgent, String ip) {
-        User user = userRepository.findByUsername(request.getEmail())
-                .or(() -> userRepository.findByEmail(request.getEmail()))
-                .orElseThrow(() -> new UnauthorizedException("Invalid username or password", "TM_024"));
+        String identifier = request.getEmail();
+
+        // Brute-force guard: reject if this account/IP is locked out.
+        loginAttemptService.assertNotBlocked(identifier, ip);
+
+        User user = userRepository.findByUsername(identifier)
+                .or(() -> userRepository.findByEmail(identifier))
+                .orElse(null);
+
+        if (user == null) {
+            loginAttemptService.recordFailure(identifier, ip);
+            throw new UnauthorizedException("Invalid username or password", "TM_024");
+        }
 
         if (user.isGuest()) {
             throw new ForbiddenException("Guest accounts must use Guest Login flow", "TM_029");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            loginAttemptService.recordFailure(identifier, ip);
             throw new UnauthorizedException("Invalid username or password", "TM_024");
         }
 
+        loginAttemptService.recordSuccess(identifier, ip);
         return generateLoginResponse(user, userAgent, ip);
     }
 
@@ -155,15 +168,16 @@ public class AuthServiceImpl implements AuthService {
 
         User user = token.getUser();
 
-        // REUSE DETECTION LOGIC
-        if (token.isRevoked()) {
-            log.warn("Token reuse detected! Token was already revoked. Revoking all active tokens for user: {}", user.getUsername());
-            refreshTokenRepository.revokeAllUserTokens(user);
-            throw new ForbiddenException("Token reuse detected. All sessions revoked.", "TM_058");
-        }
-
-        if (token.isExpired()) {
-            throw new UnauthorizedException("Refresh token has expired", "TM_026");
+        // Single-device policy: a revoked token means this device was superseded —
+        // either the user signed in on another device (which revokes prior tokens),
+        // or this exact token was already rotated. Either way it's no longer valid,
+        // so reject with 401 and let this device clear its state + show the login
+        // page. We deliberately DO NOT revoke all sessions here: that would also
+        // log out the device that currently holds the valid token (and turned a
+        // benign refresh race into a logout storm).
+        if (token.isRevoked() || token.isExpired()) {
+            throw new UnauthorizedException(
+                    "Session expired or signed in on another device. Please log in again.", "TM_026");
         }
 
         // Invalidate old token and replace
@@ -285,6 +299,11 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private LoginResponse generateLoginResponse(User user, String userAgent, String ip) {
+        // Single-device policy: invalidate any existing refresh tokens so a new
+        // login signs the user out everywhere else. The previously-logged-in device
+        // will get a 401 on its next refresh and be sent to the login page.
+        refreshTokenRepository.revokeAllUserTokens(user);
+
         // Generate Token pair
         String accessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest());
         String refreshTokenStr = UUID.randomUUID().toString();

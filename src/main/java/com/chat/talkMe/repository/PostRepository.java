@@ -18,6 +18,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Optional<Post> findByUuid(UUID uuid);
     Page<Post> findByUserAndIsDeletedFalse(User user, Pageable pageable);
     Page<Post> findByIsDeletedFalse(Pageable pageable);
+    long countByUserAndIsDeletedFalse(User user);
     
     @Query("SELECT p FROM Post p WHERE p.isDeleted = false AND (p.user = :currentUser OR p.user IN (SELECT f.following FROM UserFollow f WHERE f.follower = :currentUser AND f.status = 'ACCEPTED' AND f.isDeleted = false))")
     Page<Post> findFeedForUser(@Param("currentUser") User currentUser, Pageable pageable);

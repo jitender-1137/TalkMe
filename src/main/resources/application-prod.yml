@@ -30,18 +30,19 @@ spring:
 
 app:
   cors:
-    allowed-origins: '*'
+    # Locked to known origins (comma-separated). Override via env for extra domains.
+    allowed-origins: ${ALLOWED_ORIGINS:https://chat.parkarspot.com}
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
-    allow-credentials: false
+    allow-credentials: true
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}
 
 # WebSocket Configuration
 websocket:
-  allowed-origins: '*'
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://chat.parkarspot.com}
 
 security:
   jwt:

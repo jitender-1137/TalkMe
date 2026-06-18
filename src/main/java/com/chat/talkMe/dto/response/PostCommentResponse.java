@@ -11,8 +11,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PostCommentResponse {
     private String id; // maps uuid
+    private String userId; // comment author's user uuid
     private String username;
     private String name;
+    private String profileImage;
     private String content;
     private String createdAt;
 }

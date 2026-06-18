@@ -3,18 +3,31 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.exception.FileStorageException;
 import com.chat.talkMe.service.StorageService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class StorageServiceImpl implements StorageService {
 
     private static final Path STORAGE_PATH = Paths.get("/opt/media/talkMe");
+
+    /**
+     * Path to the ffmpeg binary. Defaults to "ffmpeg" (resolved via PATH).
+     * Override with `media.ffmpeg-path` (e.g. /usr/bin/ffmpeg) in config.
+     */
+    @Value("${media.ffmpeg-path:ffmpeg}")
+    private String ffmpegPath;
+
+    /** Max wall-clock time for a single transcode before we give up. */
+    private static final long TRANSCODE_TIMEOUT_MINUTES = 5;
 
     public StorageServiceImpl() {
         try {
@@ -27,32 +40,132 @@ public class StorageServiceImpl implements StorageService {
 
     @Override
     public String storeFile(MultipartFile file, String type) {
-
         String originalFileName = file.getOriginalFilename();
         String extension = "";
-
         if (originalFileName != null && originalFileName.contains(".")) {
             extension = originalFileName.substring(originalFileName.lastIndexOf("."));
         }
 
-        String fileName = UUID.randomUUID() + extension;
+        String contentType = file.getContentType();
+        boolean isVideo = "video".equalsIgnoreCase(type)
+                || (contentType != null && contentType.startsWith("video/"));
 
+        if (isVideo) {
+            return storeCompressedVideo(file, extension);
+        }
+
+        // Non-video: store as-is (images are already compressed on the client).
+        String fileName = UUID.randomUUID() + extension;
         try {
             Path targetLocation = STORAGE_PATH.resolve(fileName);
-
-            Files.copy(
-                    file.getInputStream(),
-                    targetLocation,
-                    StandardCopyOption.REPLACE_EXISTING
-            );
-
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
             log.info("File stored successfully: {}", targetLocation);
-
             return targetLocation.toString();
+        } catch (IOException e) {
+            throw new FileStorageException("Could not store file " + fileName + e);
+        }
+    }
+
+    /**
+     * Store a video, transcoding it to a compact H.264/AAC MP4 with ffmpeg.
+     *
+     * The upload is first written to a temp file, then ffmpeg downscales it to
+     * ≤720p and re-encodes at CRF 28 (good quality / much smaller). If ffmpeg is
+     * unavailable, fails, times out, or the result is not actually smaller, we
+     * fall back to storing the original file untouched — uploads must never fail
+     * because compression failed.
+     */
+    private String storeCompressedVideo(MultipartFile file, String extension) {
+        Path tempInput = null;
+        try {
+            tempInput = Files.createTempFile("talkme-upload-", extension.isEmpty() ? ".tmp" : extension);
+            Files.copy(file.getInputStream(), tempInput, StandardCopyOption.REPLACE_EXISTING);
+            long originalSize = Files.size(tempInput);
+
+            Path compressedTarget = STORAGE_PATH.resolve(UUID.randomUUID() + ".mp4");
+            boolean transcoded = transcodeVideo(tempInput, compressedTarget);
+
+            if (transcoded
+                    && Files.exists(compressedTarget)
+                    && Files.size(compressedTarget) > 0
+                    && Files.size(compressedTarget) < originalSize) {
+                long compressedSize = Files.size(compressedTarget);
+                log.info("Video compressed: {} bytes -> {} bytes ({}% smaller)",
+                        originalSize, compressedSize,
+                        Math.round((1 - (double) compressedSize / originalSize) * 100));
+                return compressedTarget.toString();
+            }
+
+            // Compression unavailable or not beneficial → keep the original.
+            Files.deleteIfExists(compressedTarget);
+            Path originalTarget = STORAGE_PATH.resolve(UUID.randomUUID() + extension);
+            Files.move(tempInput, originalTarget, StandardCopyOption.REPLACE_EXISTING);
+            tempInput = null; // moved
+            log.info("Video stored without compression: {}", originalTarget);
+            return originalTarget.toString();
 
         } catch (IOException e) {
-            throw new FileStorageException(
-                    "Could not store file " + fileName + e);
+            throw new FileStorageException("Could not store video file: " + e);
+        } finally {
+            if (tempInput != null) {
+                try {
+                    Files.deleteIfExists(tempInput);
+                } catch (IOException ignored) {
+                    // best-effort temp cleanup
+                }
+            }
+        }
+    }
+
+    /**
+     * Run ffmpeg to transcode {@code input} into a web-friendly MP4 at {@code output}.
+     * Returns true only on a clean (exit code 0) completion within the timeout.
+     */
+    private boolean transcodeVideo(Path input, Path output) {
+        // -vf scale=-2:'min(720,ih)'  → cap height at 720p, width auto-even, never upscale.
+        // -crf 28 / preset veryfast   → strong size reduction at good quality, reasonable speed.
+        // +faststart                  → move moov atom to the front for instant web playback.
+        List<String> command = List.of(
+                ffmpegPath, "-y",
+                "-i", input.toString(),
+                "-vf", "scale=-2:'min(720,ih)'",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-crf", "28",
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-movflags", "+faststart",
+                output.toString()
+        );
+
+        Process process = null;
+        try {
+            process = new ProcessBuilder(command)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+
+            boolean finished = process.waitFor(TRANSCODE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+            if (!finished) {
+                process.destroyForcibly();
+                log.warn("Video transcode timed out after {} min; using original.", TRANSCODE_TIMEOUT_MINUTES);
+                return false;
+            }
+            int exit = process.exitValue();
+            if (exit != 0) {
+                log.warn("ffmpeg exited with code {}; using original.", exit);
+                return false;
+            }
+            return true;
+        } catch (IOException e) {
+            // ffmpeg not installed / not on PATH — degrade gracefully.
+            log.warn("ffmpeg not available ('{}'); storing video uncompressed. {}", ffmpegPath, e.getMessage());
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (process != null) process.destroyForcibly();
+            log.warn("Video transcode interrupted; using original.");
+            return false;
         }
     }
 }
