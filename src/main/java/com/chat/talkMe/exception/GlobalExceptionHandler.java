@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.apache.catalina.connector.ClientAbortException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import java.util.HashMap;
@@ -96,6 +97,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ClientAbortException.class)
     public void handleClientAbortException(ClientAbortException ex) {
         log.info("Client aborted connection: {}", ex.getMessage());
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<ResponseDto<Void>> handleFileNotFoundException(FileNotFoundException ex) {
+        // Missing static/classpath resource (e.g. '/' -> static/index.html, '/sw.js' when the
+        // bundled UI is absent). Spring throws FileNotFoundException instead of a clean 404, so
+        // handle it here as a quiet 404 rather than logging a full stack trace per request.
+        log.debug("Static resource not found: {}", ex.getMessage());
+        String localizedMessage = getLocalizedMessage("TM_004", "Resource Not Found");
+        ResponseDto<Void> response = ResponseDto.error(localizedMessage, "TM_004");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
     @ExceptionHandler(IOException.class)

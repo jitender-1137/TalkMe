@@ -122,6 +122,27 @@ task copyFrontendResources(type: Copy) {
     dependsOn buildFrontendProduction, cleanStaticResources
     from "$frontendDir/out"
     into "$projectDir/src/main/resources/static"
+
+    // Fail loudly if the export is missing/empty — otherwise a build machine without a
+    // working frontend export would silently ship a JAR with no UI (no index.html / sw.js),
+    // which surfaces only at runtime as FileNotFoundException spam for every '/' and '/sw.js'.
+    doFirst {
+        def indexHtml = file("$frontendDir/out/index.html")
+        if (!indexHtml.exists()) {
+            throw new GradleException(
+                "Frontend export not found at ${indexHtml}. The Next.js static export did not " +
+                "produce output. Run the frontend build (STATIC_EXPORT=true) before packaging, " +
+                "and ensure pnpm/node are available on the build machine.")
+        }
+    }
+    doLast {
+        def copiedIndex = file("$projectDir/src/main/resources/static/index.html")
+        if (!copiedIndex.exists()) {
+            throw new GradleException(
+                "Frontend export was not copied into static resources (${copiedIndex} missing). " +
+                "Refusing to build a JAR without the bundled UI.")
+        }
+    }
 }
 
 // Hook copyFrontendResources task into processResources so it runs automatically on build

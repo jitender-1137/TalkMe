@@ -44,4 +44,13 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.isDeleted = false AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (m.isBlocked = false OR m.sender.id = :userId) AND m.id > :afterSequence ORDER BY m.id ASC")
     List<Message> findMessagesAfter(Chat chat, Long userId, Instant clearedAt, Long afterSequence);
+
+    /**
+     * Cursor pagination for older messages. Returns the newest messages strictly
+     * OLDER than :cursor (by the monotonic message id == sequenceNumber), newest
+     * first. Pass cursor = null to get the latest page. The caller uses a
+     * Pageable of size limit+1 to detect whether more older messages exist.
+     */
+    @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.isDeleted = false AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (m.isBlocked = false OR m.sender.id = :userId) AND (:cursor IS NULL OR m.id < :cursor) ORDER BY m.id DESC")
+    List<Message> findMessagesBeforeCursor(Chat chat, Long userId, Instant clearedAt, Long cursor, Pageable pageable);
 }

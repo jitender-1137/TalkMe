@@ -350,20 +350,11 @@ public class ChatServiceImpl implements ChatService {
         // Step 1: Bulk-update all existing non-READ receipts for this user in this chat
         int updatedCount = readReceiptRepository.bulkMarkAsRead(chat, managedUser.getId(), now);
 
-        // Step 2: Create receipts for messages that don't have any receipt for this user
-        List<Message> messagesWithoutReceipt = readReceiptRepository.findMessagesWithoutReceipt(chat, managedUser.getId());
-        for (Message message : messagesWithoutReceipt) {
-            MessageReadReceipt receipt = MessageReadReceipt.builder()
-                    .message(message)
-                    .user(managedUser)
-                    .status("READ")
-                    .readAt(now)
-                    .deliveredAt(now)
-                    .build();
-            readReceiptRepository.save(receipt);
-        }
+        // Step 2: Atomically create READ receipts for messages that have no receipt yet.
+        int insertedCount = readReceiptRepository.insertMissingReceipts(
+                chat.getId(), managedUser.getId(), "READ", now, now, now);
 
-        boolean hasUpdates = updatedCount > 0 || !messagesWithoutReceipt.isEmpty();
+        boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
         if (hasUpdates) {
             // Broadcast WS event: messages_read
@@ -402,19 +393,11 @@ public class ChatServiceImpl implements ChatService {
         // Step 1: Bulk-update all SENT receipts to DELIVERED (do NOT downgrade READ)
         int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
 
-        // Step 2: Create DELIVERED receipts for messages that don't have any receipt for this user
-        List<Message> messagesWithoutReceipt = readReceiptRepository.findMessagesWithoutReceipt(chat, managedUser.getId());
-        for (Message message : messagesWithoutReceipt) {
-            MessageReadReceipt receipt = MessageReadReceipt.builder()
-                    .message(message)
-                    .user(managedUser)
-                    .status("DELIVERED")
-                    .deliveredAt(now)
-                    .build();
-            readReceiptRepository.save(receipt);
-        }
+        // Step 2: Atomically create DELIVERED receipts for messages that have no receipt yet.
+        int insertedCount = readReceiptRepository.insertMissingReceipts(
+                chat.getId(), managedUser.getId(), "DELIVERED", null, now, now);
 
-        boolean hasUpdates = updatedCount > 0 || !messagesWithoutReceipt.isEmpty();
+        boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
         if (hasUpdates) {
             // Broadcast WS event: messages_delivered
@@ -445,19 +428,11 @@ public class ChatServiceImpl implements ChatService {
             // Step 1: Bulk-update all SENT receipts to DELIVERED
             int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
 
-            // Step 2: Create DELIVERED receipts for messages without any receipt
-            List<Message> messagesWithoutReceipt = readReceiptRepository.findMessagesWithoutReceipt(chat, managedUser.getId());
-            for (Message message : messagesWithoutReceipt) {
-                MessageReadReceipt receipt = MessageReadReceipt.builder()
-                        .message(message)
-                        .user(managedUser)
-                        .status("DELIVERED")
-                        .deliveredAt(now)
-                        .build();
-                readReceiptRepository.save(receipt);
-            }
+            // Step 2: Atomically create DELIVERED receipts for messages without any receipt
+            int insertedCount = readReceiptRepository.insertMissingReceipts(
+                    chat.getId(), managedUser.getId(), "DELIVERED", null, now, now);
 
-            boolean hasUpdates = updatedCount > 0 || !messagesWithoutReceipt.isEmpty();
+            boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
             if (hasUpdates) {
                 try {

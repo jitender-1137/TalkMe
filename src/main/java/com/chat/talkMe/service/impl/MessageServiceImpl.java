@@ -3,6 +3,7 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.request.SendMessageRequest;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.dto.response.MessagePageResponse;
 import com.chat.talkMe.enums.MessageType;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
@@ -13,6 +14,7 @@ import com.chat.talkMe.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,9 +117,10 @@ public class MessageServiceImpl implements MessageService {
         readReceiptRepository.save(receipt);
         message.getReadReceipts().add(receipt);
 
-        // Update chat updatedAt timestamp to sort active chats correctly
-        chat.setUpdatedAt(Instant.now());
-        chatRepository.save(chat);
+        // Update chat updatedAt timestamp to sort active chats correctly.
+        // Use a targeted UPDATE (not entity save) so the @Version column isn't bumped and
+        // concurrent sends to the same chat don't fail with optimistic-lock errors.
+        chatRepository.touchUpdatedAt(chat.getId(), Instant.now());
 
         MessageResponse response = messageMapper.toMessageResponse(message);
         
@@ -166,15 +169,36 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<MessageResponse> getMessages(String chatUuid, Pageable pageable, User currentUser) {
+    public MessagePageResponse getMessages(String chatUuid, Long cursor, int limit, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
 
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
 
-        Page<Message> messages = messageRepository.findMessagesForUser(chat, currentUser.getId(), member.getClearedAt(), pageable);
-        return messages.map(messageMapper::toMessageResponse);
+        int safeLimit = limit <= 0 ? 30 : Math.min(limit, 100);
+        // Fetch one extra to detect whether more older messages exist.
+        List<Message> rows = messageRepository.findMessagesBeforeCursor(
+                chat, currentUser.getId(), member.getClearedAt(), cursor, PageRequest.of(0, safeLimit + 1));
+
+        boolean hasMore = rows.size() > safeLimit;
+        if (hasMore) {
+            rows = rows.subList(0, safeLimit);
+        }
+
+        List<MessageResponse> items = rows.stream()
+                .map(messageMapper::toMessageResponse)
+                .collect(java.util.stream.Collectors.toList());
+
+        // rows are DESC (newest first) → the last item is the oldest; its
+        // sequenceNumber is the cursor for the next (older) page.
+        Long nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getSequenceNumber();
+
+        return MessagePageResponse.builder()
+                .items(items)
+                .nextCursor(nextCursor)
+                .hasMore(hasMore)
+                .build();
     }
 
     @Override

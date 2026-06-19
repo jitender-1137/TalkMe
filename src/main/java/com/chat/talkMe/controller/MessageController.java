@@ -3,6 +3,7 @@ package com.chat.talkMe.controller;
 import com.chat.talkMe.dto.request.SendMessageRequest;
 import com.chat.talkMe.dto.request.ReactToMessageRequest;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.dto.response.MessagePageResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.security.CustomUserDetails;
@@ -34,11 +35,12 @@ public class MessageController {
     }
 
     @GetMapping
-    public ResponseEntity<ResponseDto<Page<MessageResponse>>> getMessages(
+    public ResponseEntity<ResponseDto<MessagePageResponse>> getMessages(
             @PathVariable("chatId") String chatUuid,
-            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "limit", defaultValue = "30") int limit,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        Page<MessageResponse> response = messageService.getMessages(chatUuid, pageable, userDetails.getUser());
+        MessagePageResponse response = messageService.getMessages(chatUuid, cursor, limit, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
