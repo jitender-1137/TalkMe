@@ -30,6 +30,43 @@ public class WebSocketController {
     private final StringRedisTemplate redisTemplate;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final com.chat.talkMe.service.PresenceService presenceService;
+
+    /**
+     * Application-level heartbeat. The client publishes here every ~30s; the server
+     * refreshes the user's liveness timestamp so {@code PresenceWatchdog} keeps them
+     * ONLINE. Cheap: the user is read straight from the authenticated principal (no
+     * DB hit). When heartbeats stop, the watchdog marks the user OFFLINE.
+     */
+    @MessageMapping("/presence/heartbeat")
+    public void handleHeartbeat(Principal principal) {
+        if (principal instanceof UsernamePasswordAuthenticationToken auth
+                && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+            presenceService.recordHeartbeat(userDetails.getUser());
+        }
+    }
+
+    /**
+     * Tab/page visibility signal (WhatsApp-Web style). The client publishes
+     * visible=false when the tab is hidden/backgrounded and visible=true when it
+     * returns to the foreground, even though the WebSocket stays connected. The
+     * server flips the authoritative status and broadcasts it, so others see the
+     * user go offline/online immediately. The heartbeat watchdog remains the
+     * backstop for hard failures (crash/close/network loss).
+     */
+    @MessageMapping("/presence/visibility")
+    public void handleVisibility(@Payload boolean visible, Principal principal) {
+        if (principal instanceof UsernamePasswordAuthenticationToken auth
+                && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+            com.chat.talkMe.domain.User user = userDetails.getUser();
+            if (visible) {
+                presenceService.recordHeartbeat(user);
+                presenceService.setStatus(user, com.chat.talkMe.enums.PresenceStatus.ONLINE);
+            } else {
+                presenceService.setStatus(user, com.chat.talkMe.enums.PresenceStatus.OFFLINE);
+            }
+        }
+    }
 
     @MessageMapping("/chat/{chatUuid}/typing")
     public void handleTypingNotification(
@@ -58,6 +95,42 @@ public class WebSocketController {
                 userId, username, chatUuid, typing ? "STARTED" : "STOPPED", chatUuid);
         
         // Broadcast typing notification to all chat subscribers
+        messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/typing", notification);
+    }
+
+    /**
+     * Fine-grained activity indicator (typing / recording audio / recording video).
+     * Shares the /typing topic so existing subscribers receive it; the {@code activity}
+     * field carries the specific state and {@code typing} stays true while any activity
+     * is active (so legacy clients still show "typing…").
+     */
+    @MessageMapping("/chat/{chatUuid}/activity")
+    public void handleActivityNotification(
+            @DestinationVariable("chatUuid") String chatUuid,
+            @Payload String activity,
+            Principal principal) {
+
+        if (principal == null) return;
+        String username = principal.getName();
+
+        String userId = "";
+        if (principal instanceof UsernamePasswordAuthenticationToken auth) {
+            if (auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+                userId = userDetails.getUser().getUuid().toString();
+            }
+        }
+
+        String normalized = activity == null ? "NONE" : activity.trim().toUpperCase();
+        boolean active = !"NONE".equals(normalized);
+
+        TypingNotification notification = TypingNotification.builder()
+                .userId(userId)
+                .chatUuid(chatUuid)
+                .username(username)
+                .typing(active)
+                .activity(active ? normalized : "NONE")
+                .build();
+
         messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/typing", notification);
     }
 

@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 public class MessageResponse {
     private String id; // maps to uuid
+    private String clientId; // echoes the client idempotency key so the sender's own broadcast dedups
     private Long sequenceNumber;
     private String senderId; // maps to sender.uuid
     private String content;

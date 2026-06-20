@@ -23,8 +23,22 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // RabbitMQ: AMQP work plane (durable queues, DLQ, retry) + STOMP relay backbone
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    // Required by Spring's StompBrokerRelay (TCP STOMP client to RabbitMQ:61613)
+    implementation 'io.projectreactor.netty:reactor-netty'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // Observability: health/metrics endpoints, Prometheus scrape, distributed tracing
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+
+    // Circuit breaker (core lib, used programmatically — Spring-Boot-version agnostic)
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-micrometer:2.2.0'
 
     runtimeOnly 'org.postgresql:postgresql'
 

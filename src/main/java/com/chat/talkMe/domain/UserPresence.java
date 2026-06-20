@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "user_presences")
+@Table(name = "user_presences", indexes = {
+        // "Recently online" / last-seen ordered lookups.
+        @Index(name = "idx_user_presence_last_seen", columnList = "last_seen_at")
+})
 @Getter
 @Setter
 @Builder

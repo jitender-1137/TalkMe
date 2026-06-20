@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SendMessageRequest {
     private String content;
+    private String clientId; // client-generated idempotency key (UUID) for safe retries
     private String messageType; // maps to MessageType (default TEXT)
     private String parentMessageId; // parent message uuid (for quotes/replies)
     

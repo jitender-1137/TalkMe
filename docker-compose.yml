@@ -18,6 +18,27 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: talkme-rabbitmq
+    ports:
+      - "5672:5672"     # AMQP work plane
+      - "15672:15672"   # management UI
+      - "61613:61613"   # STOMP relay (rabbitmq_stomp plugin)
+    environment:
+      # A user created via DEFAULT_USER is NOT loopback-restricted (unlike guest),
+      # so the app container can authenticate over both AMQP and STOMP.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-talkme}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-talkme_dev_pass}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: talkme-redis
@@ -35,3 +56,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  rabbitmq_data:

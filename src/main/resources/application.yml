@@ -7,6 +7,77 @@ spring:
     web:
       pageable:
         serialization-mode: via-dto
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:talkme}
+    password: ${RABBITMQ_PASS:talkme_dev_pass}
+    # Treat a publish as accepted only after the broker confirms it (lets the
+    # producer fall back to a direct broadcast if RabbitMQ is unreachable).
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        # Failed deliveries dead-letter instead of requeueing forever (no poison loop).
+        default-requeue-rejected: false
+        prefetch: 20
+        retry:
+          enabled: true
+          initial-interval: 1000ms
+          max-attempts: 4
+          multiplier: 2.0
+          max-interval: 10000ms
+  jpa:
+    properties:
+      hibernate:
+        # Batch lazy association loads: when a page of messages is mapped to DTOs,
+        # their senders/receipts/reactions/attachments are fetched in grouped IN
+        # queries (≈ size per round-trip) instead of one query per row (N+1).
+        default_batch_fetch_size: 50
+        jdbc:
+          # Group multi-row writes within a transaction into batched round-trips.
+          batch_size: 30
+          # Sort statements so same-table writes batch together instead of
+          # alternating tables and breaking the batch.
+          order_inserts: true
+          order_updates: true
+          # Required for batching to apply to @Version (optimistic-lock) entities,
+          # which every entity is (BaseEntity has @Version).
+          batch_versioned_data: true
+        # Fail fast in dev if a query accidentally pages in memory.
+        query:
+          fail_on_pagination_over_collection_fetch: true
+
+# Observability. Endpoints live under /actuator (outside /api, so reachable);
+# RESTRICT /actuator to an internal network / scrape user in production.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    # Only health-check RabbitMQ when we actually use it; otherwise readiness
+    # probes would keep failing to connect on hosts without RabbitMQ.
+    rabbit:
+      enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
+  metrics:
+    tags:
+      application: talkMe
+  tracing:
+    # Sample 10% of traces by default; set TRACING_SAMPLING=0 to disable export
+    # (e.g. dev with no OTLP collector running).
+    sampling:
+      probability: ${TRACING_SAMPLING:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+
   #### session base auth ####
 auth:
   username: ${AUTH_USERNAME:admin}
@@ -16,6 +87,24 @@ app:
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}
+  broker:
+    # OFF BY DEFAULT so the app runs on the in-memory STOMP broker with NO external
+    # dependency. ONLY enable these where RabbitMQ (with the STOMP plugin on :61613)
+    # is actually deployed and reachable — otherwise the relay throws "Message broker
+    # not active" on every /topic broadcast and WS connections drop. Local dev turns
+    # them on in application-local.yml (docker-compose RabbitMQ).
+    #
+    # relay-enabled: relay /topic + /user/queue through RabbitMQ for multi-instance
+    # fan-out (RabbitDestinationInterceptor rewrites /topic/a/b/c -> /topic/a.b.c).
+    relay-enabled: ${BROKER_RELAY_ENABLED:false}
+    relay-host: ${BROKER_RELAY_HOST:localhost}
+    relay-port: ${BROKER_RELAY_PORT:61613}
+    relay-login: ${BROKER_RELAY_LOGIN:talkme}
+    relay-passcode: ${BROKER_RELAY_PASSCODE:talkme_dev_pass}
+    # amqp-events-enabled: route message fan-out through the AMQP work plane
+    # (durable queue + retry + DLQ). When false, MessageServiceImpl broadcasts
+    # directly in-request (and the RabbitMQ consumer/topology are not created).
+    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
 
 # Cloudflare Turnstile CAPTCHA. Dev default is Cloudflare's "always passes"
 # TEST secret — set the real TURNSTILE_SECRET_KEY via env in production.

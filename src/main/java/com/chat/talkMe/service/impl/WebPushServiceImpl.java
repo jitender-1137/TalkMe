@@ -7,6 +7,8 @@ import com.chat.talkMe.dto.request.SavePushSubscriptionRequest;
 import com.chat.talkMe.enums.InstallationType;
 import com.chat.talkMe.repository.PushSubscriptionRepository;
 import com.chat.talkMe.service.WebPushService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.martijndwars.webpush.Notification;
@@ -28,6 +30,7 @@ public class WebPushServiceImpl implements WebPushService {
     private final PushSubscriptionRepository subscriptionRepository;
     private final PushService pushService;
     private final WebPushProperties properties;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     @Transactional
@@ -91,7 +94,12 @@ public class WebPushServiceImpl implements WebPushService {
                 .urgency(Urgency.HIGH)
                 .ttl((int) java.util.concurrent.TimeUnit.HOURS.toSeconds(24))
                 .build();
-        HttpResponse response = pushService.send(notification);
+        // Guard the outbound push with a circuit breaker: if the push relays are
+        // failing/slow, the breaker opens and these calls fail fast (throwing
+        // CallNotPermittedException, handled by the per-subscription catch in the
+        // caller) instead of tying up async threads.
+        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("webpush");
+        HttpResponse response = breaker.executeCallable(() -> pushService.send(notification));
         return response.getStatusLine().getStatusCode();
     }
 }

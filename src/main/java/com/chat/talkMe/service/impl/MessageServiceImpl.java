@@ -1,6 +1,7 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.domain.*;
+import com.chat.talkMe.event.MessageSentEvent;
 import com.chat.talkMe.dto.request.SendMessageRequest;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.dto.response.MessagePageResponse;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -38,6 +40,8 @@ public class MessageServiceImpl implements MessageService {
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final BlockUserRepository blockUserRepository;
     private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
+    private final com.chat.talkMe.event.EventPublisher eventPublisher;
+    private final com.chat.talkMe.event.MessageBroadcaster messageBroadcaster;
 
     @Override
     @Transactional
@@ -47,6 +51,21 @@ public class MessageServiceImpl implements MessageService {
 
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
+
+        // Idempotent send: if the client retried with the same idempotency key,
+        // return the already-persisted message instead of creating a duplicate.
+        // This handles the common case (sequential retry after a network timeout).
+        // Truly-concurrent identical submits are caught by the
+        // uk_message_chat_sender_client unique constraint as a hard backstop.
+        String clientId = request.getClientId();
+        boolean hasClientId = clientId != null && !clientId.isBlank();
+        if (hasClientId) {
+            Optional<Message> existing =
+                    messageRepository.findFirstByChatAndSenderAndClientId(chat, currentUser, clientId);
+            if (existing.isPresent()) {
+                return messageMapper.toMessageResponse(existing.get());
+            }
+        }
 
         MessageType type = MessageType.TEXT;
         if (request.getMessageType() != null) {
@@ -85,6 +104,7 @@ public class MessageServiceImpl implements MessageService {
                 .chat(chat)
                 .sender(currentUser)
                 .content(request.getContent())
+                .clientId(hasClientId ? clientId : null)
                 .messageType(type)
                 .parentMessage(parentMessage)
                 .isBlocked(isBlocked)
@@ -123,44 +143,33 @@ public class MessageServiceImpl implements MessageService {
         chatRepository.touchUpdatedAt(chat.getId(), Instant.now());
 
         MessageResponse response = messageMapper.toMessageResponse(message);
-        
-        // WebSocket broadcast only if not blocked
+
+        // Fan-out only if not blocked. Routed through the RabbitMQ work plane so it
+        // (a) reaches all app instances via the STOMP relay and (b) is retried /
+        // dead-lettered on failure. If the broker is unreachable we degrade
+        // gracefully by broadcasting directly in-request so messages are not lost.
         if (!isBlocked) {
-            try {
-                // 1. Broadcast to the chat topic
-                messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", response);
+            List<String> recipientUsernames = chat.getMembers().stream()
+                    .map(ChatMember::getUser)
+                    .filter(u -> u != null && !u.getId().equals(currentUser.getId()))
+                    .map(User::getUsername)
+                    .toList();
 
-                // 2. Also send a message_received event to each other chat member's personal queue
-                // to handle the race condition where they are not subscribed to the chat topic yet.
-                java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
-                eventWrapper.put("event", "message_received");
-                java.util.Map<String, Object> eventPayload = new java.util.HashMap<>();
-                eventPayload.put("chatId", chatUuid);
-                eventPayload.put("message", response);
-                eventWrapper.put("payload", eventPayload);
+            MessageSentEvent event = MessageSentEvent.builder()
+                    .chatUuid(chatUuid)
+                    .message(response)
+                    .senderUserId(currentUser.getId())
+                    .senderName(currentUser.getName())
+                    .senderProfileImage(currentUser.getProfileImage())
+                    .recipientUsernames(recipientUsernames)
+                    .build();
 
-                for (ChatMember memberObj : chat.getMembers()) {
-                    User memberUser = memberObj.getUser();
-                    if (memberUser != null && !memberUser.getId().equals(currentUser.getId())) {
-                        messagingTemplate.convertAndSendToUser(
-                            memberUser.getUsername(),
-                            "/queue/chats",
-                            eventWrapper
-                        );
-
-                        // Bump + broadcast unread count, and Web Push if recipient
-                        // is on an installed PWA (background delivery).
-                        try {
-                            notificationDispatchService.onNewMessage(
-                                memberUser, chatUuid, response,
-                                currentUser.getName(), currentUser.getProfileImage());
-                        } catch (Exception e) {
-                            log.error("Notification dispatch failed for user {}", memberUser.getId(), e);
-                        }
-                    }
+            if (!eventPublisher.publishMessageSent(event)) {
+                try {
+                    messageBroadcaster.broadcast(event);
+                } catch (Exception e) {
+                    log.error("Direct fallback broadcast failed", e);
                 }
-            } catch (Exception e) {
-                log.error("WebSocket message broadcast failed", e);
             }
         }
 

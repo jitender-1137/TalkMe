@@ -33,6 +33,9 @@ public class PresenceServiceImpl implements PresenceService {
 
     private static final String REDIS_KEY_PREFIX = "presence:user:";
     private static final Duration CACHE_TTL = Duration.ofDays(1);
+    // Sorted set of last-heartbeat times (member = username, score = epoch millis).
+    // This is the authoritative liveness signal for server-side timeout detection.
+    private static final String HEARTBEAT_ZSET = "presence:heartbeats";
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -70,8 +73,56 @@ public class PresenceServiceImpl implements PresenceService {
         redisTemplate.opsForHash().putAll(redisKey, presenceMap);
         redisTemplate.expire(redisKey, CACHE_TTL);
 
+        // Maintain the liveness heartbeat set: ONLINE seeds it, OFFLINE removes it.
+        // AWAY/IDLE leave it untouched (the user is still connected; heartbeats keep
+        // the entry fresh).
+        if (status == PresenceStatus.ONLINE) {
+            redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, username, lastSeen.toEpochMilli());
+        } else if (status == PresenceStatus.OFFLINE) {
+            redisTemplate.opsForZSet().remove(HEARTBEAT_ZSET, username);
+        }
+
         // Broadcast presence updates via STOMP WebSocket
         broadcastPresence(managedUser, userPresence, status, lastSeen);
+    }
+
+    @Override
+    public void recordHeartbeat(User user) {
+        if (user == null || user.getUsername() == null) {
+            return;
+        }
+        // Lightweight: just refresh the liveness score. No DB write — the watchdog
+        // only cares about the timestamp, and status is already ONLINE from connect.
+        redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, user.getUsername(), Instant.now().toEpochMilli());
+    }
+
+    @Override
+    @Transactional
+    public int reapTimedOutUsers(Duration timeout) {
+        long cutoff = Instant.now().toEpochMilli() - timeout.toMillis();
+        java.util.Set<String> stale = redisTemplate.opsForZSet().rangeByScore(HEARTBEAT_ZSET, 0, cutoff);
+        if (stale == null || stale.isEmpty()) {
+            return 0;
+        }
+        int reaped = 0;
+        for (String username : stale) {
+            // Claim atomically: only the instance whose ZREM actually removed the
+            // member processes it, so multiple app instances don't double-broadcast.
+            Long removed = redisTemplate.opsForZSet().remove(HEARTBEAT_ZSET, username);
+            if (removed == null || removed == 0) {
+                continue;
+            }
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user == null) {
+                continue;
+            }
+            log.info("[Presence] Reaping timed-out user {} (no heartbeat for >{}s)", username, timeout.toSeconds());
+            setStatus(user, PresenceStatus.OFFLINE);
+            // Clear any stale WebSocket session ids that never fired a disconnect.
+            redisTemplate.delete("presence:sessions:" + username);
+            reaped++;
+        }
+        return reaped;
     }
 
     @Override
@@ -225,6 +276,13 @@ public class PresenceServiceImpl implements PresenceService {
                 .build();
 
         log.debug("Broadcasting STOMP presence update for user {}: {}", user.getUsername(), status);
-        simpMessagingTemplate.convertAndSend("/topic/presence/" + user.getUsername(), notification);
+        try {
+            simpMessagingTemplate.convertAndSend("/topic/presence/" + user.getUsername(), notification);
+        } catch (org.springframework.messaging.MessagingException e) {
+            // e.g. "Message broker not active" when the STOMP relay can't reach
+            // RabbitMQ. Presence is best-effort — never let it break the connect/
+            // disconnect lifecycle (which runs this on the WS event thread).
+            log.warn("Presence broadcast skipped for {} ({})", user.getUsername(), e.getMessage());
+        }
     }
 }

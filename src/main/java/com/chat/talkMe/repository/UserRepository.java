@@ -15,6 +15,8 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByUsername(String username);
+    // Batch lookup for fan-out (avoids N+1 when notifying all chat recipients).
+    List<User> findByUsernameIn(java.util.Collection<String> usernames);
     Optional<User> findByEmail(String email);
     Optional<User> findByUuid(UUID uuid);
     boolean existsByUsername(String username);

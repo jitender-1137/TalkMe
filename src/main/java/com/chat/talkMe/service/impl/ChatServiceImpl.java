@@ -65,16 +65,32 @@ public class ChatServiceImpl implements ChatService {
             // Check if private chat already exists between these users (active or deleted)
             List<Chat> existingChats = chatRepository.findPrivateChatBetweenUsers(managedUser.getId(), recipient.getId());
             if (!existingChats.isEmpty()) {
-                Chat chat = existingChats.get(0);
-                // Undelete the chat and its members
-                chat.setDeleted(false);
-                chatRepository.save(chat);
-                for (ChatMember m : chat.getMembers()) {
-                    m.setDeleted(false);
-                    m.setPinned(false);
-                    m.setArchived(false);
-                    chatMemberRepository.save(m);
+                // Reuse the existing 1:1 chat instead of minting a new id. Prefer an
+                // ACTIVE chat (deterministic — the query has no ordering); only fall
+                // back to a deleted one, which we then reopen. This is the path hit
+                // when B messages A from the feed / profile explorer.
+                Chat chat = existingChats.stream()
+                        .filter(c -> !c.isDeleted())
+                        .findFirst()
+                        .orElse(existingChats.get(0));
+
+                if (chat.isDeleted()) {
+                    // Reopen a previously-deleted conversation as a FRESH chat:
+                    // undelete the chat + members and stamp clearedAt = now so the
+                    // old (deleted) messages never resurface for either side.
+                    Instant reopenedAt = Instant.now();
+                    chat.setDeleted(false);
+                    chatRepository.save(chat);
+                    for (ChatMember m : chat.getMembers()) {
+                        m.setDeleted(false);
+                        m.setPinned(false);
+                        m.setArchived(false);
+                        m.setClearedAt(reopenedAt);
+                        chatMemberRepository.save(m);
+                    }
                 }
+                // An ACTIVE chat is returned untouched — reusing it must NOT reset
+                // the user's pin / archive / cleared state.
 
                 // Send user chat event to the recipient so their frontend can fetch it and subscribe
                 try {

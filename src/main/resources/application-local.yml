@@ -44,6 +44,9 @@ app:
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}
+  # RabbitMQ is OPT-IN via env (off by default in every profile, see base
+  # application.yml). To use it locally with docker-compose RabbitMQ, run with:
+  #   BROKER_RELAY_ENABLED=true BROKER_AMQP_EVENTS_ENABLED=true
 
 # Security JWT details
 security:

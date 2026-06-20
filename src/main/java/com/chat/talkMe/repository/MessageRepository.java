@@ -17,6 +17,9 @@ import java.time.Instant;
 public interface MessageRepository extends JpaRepository<Message, Long> {
     Optional<Message> findByUuid(UUID uuid);
 
+    // Idempotency lookup: returns the existing message for a retried send.
+    Optional<Message> findFirstByChatAndSenderAndClientId(Chat chat, com.chat.talkMe.domain.User sender, String clientId);
+
     Page<Message> findByChatAndIsDeletedFalse(Chat chat, Pageable pageable);
 
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.isDeleted = false AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (m.isBlocked = false OR m.sender.id = :userId)")
