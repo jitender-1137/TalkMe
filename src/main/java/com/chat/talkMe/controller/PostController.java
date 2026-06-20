@@ -36,6 +36,14 @@ public class PostController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Post created successfully", "TM_210"));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<ResponseDto<PostResponse>> getPost(
+            @PathVariable("id") String postUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        PostResponse response = postService.getPost(postUuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<ResponseDto<PostResponse>> updatePost(
             @PathVariable("id") String postUuid,

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 
 public interface PostService {
     PostResponse createPost(PostRequest request, User currentUser);
+    PostResponse getPost(String postUuid, User currentUser);
     PostResponse updatePost(String postUuid, PostRequest request, User currentUser);
     Page<PostResponse> getFeed(Pageable pageable, User currentUser);
     Page<PostResponse> getProfileFeed(String userUuid, Pageable pageable, User currentUser);

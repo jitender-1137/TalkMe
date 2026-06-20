@@ -66,6 +66,17 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PostResponse getPost(String postUuid, User currentUser) {
+        Post post = postRepository.findByUuid(UUID.fromString(postUuid))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
+        if (post.isDeleted()) {
+            throw new NotFoundException("Post not found", "TM_211");
+        }
+        return mapToPostResponse(post, currentUser);
+    }
+
+    @Override
     @Transactional
     public PostResponse updatePost(String postUuid, PostRequest request, User currentUser) {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))

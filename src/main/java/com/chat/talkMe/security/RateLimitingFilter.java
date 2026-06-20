@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -29,14 +30,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private final Environment env;
 
     // Authenticated users: 300 req/min (chat apps are inherently chatty — sync, read receipts, typing)
-    private static final int AUTH_LIMIT = 300;
+    private static final int AUTH_LIMIT = 100;
     // Anonymous / unauthenticated requests: 60 req/min (login, signup, etc.)
     private static final int ANON_LIMIT = 60;
     private static final int WINDOW_SECONDS = 60;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         // Skip rate limiting entirely in local/dev/test profiles
         if (env.acceptsProfiles(Profiles.of("local", "default", "test")) || env.getActiveProfiles().length == 0) {
@@ -49,6 +51,18 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // would otherwise burn the HTTP quota.
         String path = request.getRequestURI();
         if ("OPTIONS".equalsIgnoreCase(request.getMethod()) || (path != null && path.contains("/ws"))) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Only rate-limit API calls. The Next.js frontend is bundled into this
+        // same app's static resources, so a single page load fetches the HTML
+        // plus dozens of /_next/** JS & CSS chunks — all served from "/" and all
+        // anonymous. Counting those meant ~2-3 reloads (≈ ANON_LIMIT requests)
+        // tripped the limiter even though the user made no real API calls.
+        // Everything outside /api/** (pages, chunks, images, manifest) is static
+        // and must not consume the quota.
+        if (path == null || !path.startsWith("/api/")) {
             filterChain.doFilter(request, response);
             return;
         }
