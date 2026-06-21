@@ -31,7 +31,7 @@ spring:
 app:
   cors:
     # Locked to known origins (comma-separated). Override via env for extra domains.
-    allowed-origins: ${ALLOWED_ORIGINS:https://chat.parkarspot.com}
+    allowed-origins: ${ALLOWED_ORIGINS:https://talkme.fun,https://www.talkme.fun}
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
@@ -42,7 +42,7 @@ app:
 
 # WebSocket Configuration
 websocket:
-  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://chat.parkarspot.com}
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://talkme.fun,https://www.talkme.fun}
 
 security:
   jwt:
