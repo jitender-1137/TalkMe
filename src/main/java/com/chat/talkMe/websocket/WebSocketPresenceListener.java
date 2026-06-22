@@ -88,9 +88,12 @@ public class WebSocketPresenceListener {
             }
         }
 
-        // Set OFFLINE only if this is the last session remaining
+        // Last session gone (tab closed / navigated away). Don't drop straight to
+        // OFFLINE — show IDLE for a 5-minute grace window and let the idle reaper
+        // flip to OFFLINE afterwards. A quick reconnect (refresh, brief network
+        // blip) re-fires CONNECT → ONLINE and cancels the pending offline.
         if (isLastSession) {
-            presenceService.setStatus(user, PresenceStatus.OFFLINE);
+            presenceService.markIdle(user, Duration.ofMinutes(5));
             try {
                 disconnectHandlerService.handleDisconnect(username);
             } catch (Exception e) {

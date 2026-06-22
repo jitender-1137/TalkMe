@@ -72,7 +72,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public LoginResponse login(LoginRequest request, String userAgent, String ip) {
+    public LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest) {
         String identifier = request.getEmail();
 
         // Brute-force guard: reject if this account/IP is locked out.
@@ -97,6 +97,25 @@ public class AuthServiceImpl implements AuthService {
         }
 
         loginAttemptService.recordSuccess(identifier, ip);
+
+        // Backfill country from IP on login ONLY when the user has none set.
+        // An existing country is never overwritten. Best-effort: a detection
+        // failure must not block login.
+        if (user.getCountry() == null || user.getCountry().isBlank()) {
+            try {
+                CountryDetectionResult detection = countryDetectionService.detectCountry(httpRequest);
+                String detected = detection != null ? detection.getCountry() : null;
+                if (detected != null && !detected.isBlank() && !"Unknown".equalsIgnoreCase(detected)) {
+                    user.setCountry(detected);
+                    userRepository.save(user);
+                    log.info("Backfilled country '{}' for {} on login (source: {}, IP: {})",
+                            detected, identifier, detection.getSource(), detection.getClientIp());
+                }
+            } catch (Exception e) {
+                log.warn("Country backfill on login failed for {}: {}", identifier, e.getMessage());
+            }
+        }
+
         return generateLoginResponse(user, userAgent, ip);
     }
 

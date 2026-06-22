@@ -35,6 +35,10 @@ spring:
 
 # CORS configurations
 app:
+  geo:
+    # Dev only: geolocate the server's public IP when the client IP is local
+    # (localhost), so country detection works during development.
+    geolocate-local-ip: true
   cors:
     allowed-origins: http://localhost:3000, http://10.221.83.139:3000
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS

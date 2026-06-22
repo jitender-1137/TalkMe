@@ -15,7 +15,7 @@ import com.chat.talkMe.dto.response.SessionResponse;
 import java.util.List;
 
 public interface AuthService {
-    LoginResponse login(LoginRequest request, String userAgent, String ip);
+    LoginResponse login(LoginRequest request, String userAgent, String ip, jakarta.servlet.http.HttpServletRequest httpRequest);
     LoginResponse signup(SignupRequest request, String userAgent, jakarta.servlet.http.HttpServletRequest httpRequest);
     LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, jakarta.servlet.http.HttpServletRequest httpRequest);
     JwtTokensResponse refresh(String refreshToken, String userAgent, String ip);

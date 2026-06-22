@@ -84,6 +84,12 @@ auth:
   password: ${AUTH_PASSWORD:#Admin$321}
 
 app:
+  geo:
+    # Default ON for local dev: when the client IP is local/private (localhost),
+    # geolocate the server's own public IP so country detection still works.
+    # Deployed profiles (prod/dev) override this to false — there real client IPs
+    # arrive via proxy headers and a private IP would be a misconfiguration.
+    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:true}
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}

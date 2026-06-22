@@ -20,6 +20,10 @@ spring:
       port: ${REDIS_PORT:6379}
 
 app:
+  geo:
+    # Deployed env: real client IPs arrive via proxy headers; don't geolocate the
+    # server's own IP for a private/local address.
+    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:false}
   cors:
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000, http://10.221.83.139:3000}
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS

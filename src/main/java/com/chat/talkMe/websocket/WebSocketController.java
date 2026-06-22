@@ -49,10 +49,14 @@ public class WebSocketController {
     /**
      * Tab/page visibility signal (WhatsApp-Web style). The client publishes
      * visible=false when the tab is hidden/backgrounded and visible=true when it
-     * returns to the foreground, even though the WebSocket stays connected. The
-     * server flips the authoritative status and broadcasts it, so others see the
-     * user go offline/online immediately. The heartbeat watchdog remains the
-     * backstop for hard failures (crash/close/network loss).
+     * returns to the foreground, even though the WebSocket stays connected.
+     * <ul>
+     *   <li>visible=true  → ONLINE immediately.</li>
+     *   <li>visible=false → IDLE now, with an automatic flip to OFFLINE after a
+     *       10-minute grace window (the user is still connected, just inactive).</li>
+     * </ul>
+     * The heartbeat watchdog + idle reaper remain the backstop for hard failures
+     * (crash/close/network loss).
      */
     @MessageMapping("/presence/visibility")
     public void handleVisibility(@Payload boolean visible, Principal principal) {
@@ -63,7 +67,7 @@ public class WebSocketController {
                 presenceService.recordHeartbeat(user);
                 presenceService.setStatus(user, com.chat.talkMe.enums.PresenceStatus.ONLINE);
             } else {
-                presenceService.setStatus(user, com.chat.talkMe.enums.PresenceStatus.OFFLINE);
+                presenceService.markIdle(user, java.time.Duration.ofMinutes(10));
             }
         }
     }

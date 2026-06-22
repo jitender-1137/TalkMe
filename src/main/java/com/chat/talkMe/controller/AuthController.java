@@ -172,7 +172,7 @@ public class AuthController {
         } else {
             // Standard credentials login
             LoginRequest request = mapper.convertValue(parsed, LoginRequest.class);
-            LoginResponse response = authService.login(request, userAgent, ip);
+            LoginResponse response = authService.login(request, userAgent, ip, httpRequest);
             setAuthCookies(httpResponse, response.getTokens().getRefreshToken(), false);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         }

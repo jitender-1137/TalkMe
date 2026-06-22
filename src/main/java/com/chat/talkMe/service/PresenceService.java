@@ -7,16 +7,34 @@ import com.chat.talkMe.websocket.PresenceNotification;
 public interface PresenceService {
     void setStatus(User user, PresenceStatus status);
 
+    /**
+     * Mark a user IDLE and schedule an automatic flip to OFFLINE after
+     * {@code offlineAfter}. Used when the user is still reachable but inactive
+     * (tab backgrounded) or when the connection has just dropped — others see
+     * "idle" during the grace window instead of an instant "offline". The
+     * deadline is owned by the first idle trigger and is cleared the moment the
+     * user comes back ONLINE (or is reaped OFFLINE).
+     */
+    void markIdle(User user, java.time.Duration offlineAfter);
+
     /** Refresh a user's liveness timestamp (called on connect + every client heartbeat). */
     void recordHeartbeat(User user);
 
     /**
-     * Server-authoritative offline detection: marks OFFLINE every user whose last
-     * heartbeat is older than {@code timeout}, independent of any WebSocket
-     * disconnect event (which is unreliable on crash/sleep/network loss).
-     * @return number of users reaped.
+     * Server-authoritative liveness detection: when a user's heartbeat stops for
+     * longer than {@code timeout} (closed tab / crash / network loss, none of
+     * which reliably deliver a WebSocket disconnect), they are moved to IDLE with
+     * a short grace window. {@link #reapExpiredIdleUsers()} then flips them OFFLINE.
+     * @return number of users transitioned.
      */
     int reapTimedOutUsers(java.time.Duration timeout);
+
+    /**
+     * Flip to OFFLINE every IDLE user whose scheduled offline deadline has passed.
+     * Driven by a scheduled reaper.
+     * @return number of users flipped OFFLINE.
+     */
+    int reapExpiredIdleUsers();
 
     PresenceStatus getStatus(User user);
     void toggleGhostMode(User user, boolean enabled);

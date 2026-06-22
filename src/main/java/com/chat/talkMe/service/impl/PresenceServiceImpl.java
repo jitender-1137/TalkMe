@@ -36,6 +36,12 @@ public class PresenceServiceImpl implements PresenceService {
     // Sorted set of last-heartbeat times (member = username, score = epoch millis).
     // This is the authoritative liveness signal for server-side timeout detection.
     private static final String HEARTBEAT_ZSET = "presence:heartbeats";
+    // Sorted set of scheduled offline deadlines for IDLE users (member = username,
+    // score = epoch millis at which they should flip to OFFLINE). Drives IdleReaper.
+    private static final String IDLE_DEADLINE_ZSET = "presence:idle-deadlines";
+    // Grace window applied when a client's heartbeat stops (closed tab / lost
+    // network / crash): show idle for this long before flipping OFFLINE.
+    private static final Duration DISCONNECTED_IDLE_GRACE = Duration.ofMinutes(5);
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -75,15 +81,68 @@ public class PresenceServiceImpl implements PresenceService {
 
         // Maintain the liveness heartbeat set: ONLINE seeds it, OFFLINE removes it.
         // AWAY/IDLE leave it untouched (the user is still connected; heartbeats keep
-        // the entry fresh).
+        // the entry fresh). Both ONLINE and OFFLINE are terminal w.r.t. an idle
+        // countdown, so they also clear any pending offline deadline: coming back
+        // online cancels it, going offline has already happened.
         if (status == PresenceStatus.ONLINE) {
             redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, username, lastSeen.toEpochMilli());
+            redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
         } else if (status == PresenceStatus.OFFLINE) {
             redisTemplate.opsForZSet().remove(HEARTBEAT_ZSET, username);
+            redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
         }
 
         // Broadcast presence updates via STOMP WebSocket
         broadcastPresence(managedUser, userPresence, status, lastSeen);
+    }
+
+    @Override
+    @Transactional
+    public void markIdle(User user, Duration offlineAfter) {
+        User managedUser = ensureManagedUser(user);
+        String username = managedUser.getUsername();
+        log.debug("Marking presence IDLE for user {} (offline in {})", username, offlineAfter);
+
+        UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
+
+        Instant lastSeen = Instant.now();
+        userPresenceRepository.updateStatus(managedUser.getId(), PresenceStatus.IDLE.name(), lastSeen);
+
+        // Sync to Redis cache
+        String redisKey = REDIS_KEY_PREFIX + username;
+        Map<String, String> presenceMap = new HashMap<>();
+        presenceMap.put("status", PresenceStatus.IDLE.name());
+        presenceMap.put("lastSeenAt", lastSeen.toString());
+        presenceMap.put("ghostModeEnabled", String.valueOf(userPresence.isGhostModeEnabled()));
+        presenceMap.put("invisibleModeEnabled", String.valueOf(userPresence.isInvisibleModeEnabled()));
+        redisTemplate.opsForHash().putAll(redisKey, presenceMap);
+        redisTemplate.expire(redisKey, CACHE_TTL);
+
+        // Schedule the automatic OFFLINE flip. addIfAbsent → the first event to make
+        // the user idle owns the deadline; a later idle trigger (e.g. the watchdog
+        // firing because a backgrounded tab also throttled its heartbeat) must not
+        // push the deadline back. The deadline is cleared whenever the user returns
+        // ONLINE or is reaped OFFLINE (see setStatus).
+        long deadline = lastSeen.plus(offlineAfter).toEpochMilli();
+        redisTemplate.opsForZSet().addIfAbsent(IDLE_DEADLINE_ZSET, username, deadline);
+
+        // Note: heartbeat ZSET is intentionally left untouched — a backgrounded user
+        // keeps heartbeating (stays out of the watchdog), and a disconnected user's
+        // entry has already been claimed/removed by the watchdog.
+        broadcastPresence(managedUser, userPresence, PresenceStatus.IDLE, lastSeen);
+    }
+
+    /** Raw persisted status from the Redis cache (no privacy/invisible masking). */
+    private PresenceStatus rawStatus(String username) {
+        Object s = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "status");
+        if (s == null) {
+            return null;
+        }
+        try {
+            return PresenceStatus.valueOf(s.toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override
@@ -116,9 +175,44 @@ public class PresenceServiceImpl implements PresenceService {
             if (user == null) {
                 continue;
             }
-            log.info("[Presence] Reaping timed-out user {} (no heartbeat for >{}s)", username, timeout.toSeconds());
-            setStatus(user, PresenceStatus.OFFLINE);
+            // Already OFFLINE (e.g. a backgrounded user who passed their 10-min idle
+            // grace and was reaped, but whose still-connected tab kept heartbeating).
+            // Don't resurrect them to IDLE — just drop the stale liveness/session data.
+            if (rawStatus(username) == PresenceStatus.OFFLINE) {
+                redisTemplate.delete("presence:sessions:" + username);
+                continue;
+            }
+            log.info("[Presence] Heartbeat lost for {} (>{}s) — marking IDLE for {}m grace",
+                    username, timeout.toSeconds(), DISCONNECTED_IDLE_GRACE.toMinutes());
+            markIdle(user, DISCONNECTED_IDLE_GRACE);
             // Clear any stale WebSocket session ids that never fired a disconnect.
+            redisTemplate.delete("presence:sessions:" + username);
+            reaped++;
+        }
+        return reaped;
+    }
+
+    @Override
+    @Transactional
+    public int reapExpiredIdleUsers() {
+        long now = Instant.now().toEpochMilli();
+        java.util.Set<String> due = redisTemplate.opsForZSet().rangeByScore(IDLE_DEADLINE_ZSET, 0, now);
+        if (due == null || due.isEmpty()) {
+            return 0;
+        }
+        int reaped = 0;
+        for (String username : due) {
+            // Claim atomically so multiple app instances don't double-broadcast.
+            Long removed = redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
+            if (removed == null || removed == 0) {
+                continue;
+            }
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user == null) {
+                continue;
+            }
+            log.info("[Presence] Idle grace expired for {} — marking OFFLINE", username);
+            setStatus(user, PresenceStatus.OFFLINE);
             redisTemplate.delete("presence:sessions:" + username);
             reaped++;
         }

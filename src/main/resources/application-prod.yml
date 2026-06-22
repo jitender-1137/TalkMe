@@ -29,6 +29,10 @@ spring:
       enabled: ${REDIS_ENABLED:true}
 
 app:
+  geo:
+    # Real client IPs arrive via proxy headers in prod; never geolocate the
+    # server's own IP for a private/local address.
+    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:false}
   cors:
     # Locked to known origins (comma-separated). Override via env for extra domains.
     allowed-origins: ${ALLOWED_ORIGINS:https://talkme.fun,https://www.talkme.fun}

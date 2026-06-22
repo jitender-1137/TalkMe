@@ -19,6 +19,14 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
     @Value("${app.country-header:X-Country-Code}")
     private String proxyCountryHeader;
 
+    // Dev convenience: when the client IP is local/private (e.g. on localhost),
+    // geolocate the SERVER's own public IP instead of bailing out to "Unknown",
+    // so country detection works during local development. MUST stay false in
+    // production — there a private IP means a misconfigured proxy, not the dev's
+    // machine, and we don't want to attribute the server's location to a user.
+    @Value("${app.geo.geolocate-local-ip:false}")
+    private boolean geolocateLocalIp;
+
     private final RestTemplate restTemplate;
 
     public CountryDetectionServiceImpl() {
@@ -72,7 +80,8 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         }
 
         // 3. IP Geolocation Lookup
-        if (isLocalOrPrivateIp(clientIp)) {
+        boolean localIp = isLocalOrPrivateIp(clientIp);
+        if (localIp && !geolocateLocalIp) {
             log.debug("Bypassing GeoIP lookup for local/private IP: {}", clientIp);
             return CountryDetectionResult.builder()
                     .country("Unknown")
@@ -82,7 +91,10 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         }
 
         try {
-            String url = "http://ip-api.com/json/" + clientIp;
+            // For a local IP in dev mode, omit the IP so ip-api geolocates the
+            // requester (this server's public IP) — the developer's location.
+            String lookupIp = localIp ? "" : clientIp;
+            String url = "http://ip-api.com/json/" + lookupIp;
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response != null && "success".equals(response.get("status"))) {
