@@ -27,7 +27,7 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
 
         MatchServerEvent event = MatchServerEvent.builder()
                 .event("IMAGE_REQUEST_RECEIVED")
-                .payload(Map.of("requester", requester))
+                .payload(Map.of()) // anonymous — event signal only, no requester identity
                 .build();
 
         messagingTemplate.convertAndSendToUser(recipient, "/queue/match", event);
@@ -45,7 +45,7 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
         // Notify both users
         MatchServerEvent event = MatchServerEvent.builder()
                 .event("IMAGE_REQUEST_ACCEPTED")
-                .payload(Map.of("approver", approver))
+                .payload(Map.of()) // anonymous — event signal only, no approver identity
                 .build();
 
         messagingTemplate.convertAndSendToUser(session.getUserA(), "/queue/match", event);
@@ -61,7 +61,7 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
         // Notify both users
         MatchServerEvent event = MatchServerEvent.builder()
                 .event("IMAGE_REQUEST_DECLINED")
-                .payload(Map.of("decliner", decliner))
+                .payload(Map.of()) // anonymous — event signal only, no decliner identity
                 .build();
 
         messagingTemplate.convertAndSendToUser(session.getUserA(), "/queue/match", event);

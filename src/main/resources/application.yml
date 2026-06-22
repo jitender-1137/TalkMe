@@ -7,6 +7,23 @@ spring:
     web:
       pageable:
         serialization-mode: via-dto
+  # SMTP for transactional email (password reset). When MAIL_HOST is unset the
+  # autoconfigured sender still exists but app.mail.enabled gates real sending —
+  # see EmailServiceImpl, which logs the link instead of failing when disabled.
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+        connecttimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -111,6 +128,18 @@ app:
     # (durable queue + retry + DLQ). When false, MessageServiceImpl broadcasts
     # directly in-request (and the RabbitMQ consumer/topology are not created).
     amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
+  # Public base URL of the web app — used to build links in transactional emails
+  # (e.g. the password-reset page). Override per environment.
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  mail:
+    # Gate real SMTP sending. OFF by default so dev never fails on missing SMTP
+    # creds — EmailServiceImpl logs the reset link instead. Turn ON in prod.
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:TalkMe <noreply@talkme.app>}
+  auth:
+    # Password-reset token lifetime and the account-deletion recovery window.
+    password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN:30}
+    account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS:30}
 
 # Cloudflare Turnstile CAPTCHA. Dev default is Cloudflare's "always passes"
 # TEST secret — set the real TURNSTILE_SECRET_KEY via env in production.

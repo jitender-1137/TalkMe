@@ -311,6 +311,32 @@ public class PresenceServiceImpl implements PresenceService {
 
     @Override
     @Transactional
+    public void toggleHideLastSeen(User user, boolean enabled) {
+        User managedUser = ensureManagedUser(user);
+        String username = managedUser.getUsername();
+        log.debug("Toggling Hide Last Seen for user {} to {}", username, enabled);
+
+        UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
+        userPresence.setHideLastSeenEnabled(enabled);
+        userPresenceRepository.save(userPresence);
+
+        // Keep the Redis cache consistent.
+        String redisKey = REDIS_KEY_PREFIX + username;
+        redisTemplate.opsForHash().put(redisKey, "hideLastSeenEnabled", String.valueOf(enabled));
+
+        // Status is unchanged — re-broadcast so subscribers pick up the hidden/visible
+        // last-seen immediately (broadcastPresence nulls the timestamp when enabled).
+        PresenceStatus current;
+        try {
+            current = PresenceStatus.valueOf(userPresence.getStatus());
+        } catch (Exception e) {
+            current = PresenceStatus.OFFLINE;
+        }
+        broadcastPresence(managedUser, userPresence, current, userPresence.getLastSeenAt());
+    }
+
+    @Override
+    @Transactional
     public void resetPresence(User user) {
         User managedUser = ensureManagedUser(user);
         String username = managedUser.getUsername();
@@ -358,7 +384,9 @@ public class PresenceServiceImpl implements PresenceService {
             return;
         }
 
-        sendWebSocketUpdate(user, statusToBroadcast, lastSeen.toString());
+        // Hide Last Seen: broadcast the status but never the timestamp.
+        String lastSeenToBroadcast = userPresence.isHideLastSeenEnabled() ? null : lastSeen.toString();
+        sendWebSocketUpdate(user, statusToBroadcast, lastSeenToBroadcast);
     }
 
     private void sendWebSocketUpdate(User user, String status, String lastSeen) {

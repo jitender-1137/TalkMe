@@ -2,8 +2,7 @@ package com.chat.talkMe.match.impl;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.MatchSessionResponse;
-import com.chat.talkMe.dto.response.AuthUserResponse;
-import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.dto.response.AnonymousPartnerResponse;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.match.MatchSession;
 import com.chat.talkMe.match.MatchServerEvent;
@@ -29,7 +28,6 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final SessionService sessionService;
     private final SessionCleanupService sessionCleanupService;
     private final UserRepository userRepository;
-    private final UserMapper userMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
     private final OnlineCountPublisher onlineCountPublisher;
@@ -142,15 +140,14 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     }
 
     private void notifyMatchFound(String username, String peerUsername, String sessionId) {
-        User partner = userRepository.findByUsername(peerUsername).orElse(null);
-        AuthUserResponse partnerResponse = partner != null ? userMapper.toAuthUserResponse(partner) : null;
-
+        // Anonymous matchmaking: never expose the partner's identity to the peer.
+        // Only a non-identifying guest flag is shared (see AnonymousPartnerResponse).
         MatchServerEvent event = MatchServerEvent.builder()
                 .event("MATCH_FOUND")
                 .payload(Map.of(
                         "sessionId", sessionId,
                         "chatId", sessionId,
-                        "partner", partnerResponse != null ? partnerResponse : Map.of(),
+                        "partner", anonymizePartner(peerUsername),
                         "isActive", true
                 ))
                 .build();
@@ -160,14 +157,20 @@ public class MatchmakingServiceImpl implements MatchmakingService {
 
     private MatchSessionResponse mapToSessionResponse(MatchSession session, User currentUser) {
         String partnerUsername = session.getUserA().equals(currentUser.getUsername()) ? session.getUserB() : session.getUserA();
-        User partner = userRepository.findByUsername(partnerUsername).orElse(null);
-        AuthUserResponse partnerResponse = partner != null ? userMapper.toAuthUserResponse(partner) : null;
 
         return MatchSessionResponse.builder()
                 .id(session.getId())
-                .partner(partnerResponse)
+                .partner(anonymizePartner(partnerUsername))
                 .chatId(session.getId())
                 .isActive(true)
+                .build();
+    }
+
+    /** Build a privacy-safe partner view — strips all identifying fields. */
+    private AnonymousPartnerResponse anonymizePartner(String partnerUsername) {
+        User partner = userRepository.findByUsername(partnerUsername).orElse(null);
+        return AnonymousPartnerResponse.builder()
+                .isGuest(partner != null && partner.isGuest())
                 .build();
     }
 }

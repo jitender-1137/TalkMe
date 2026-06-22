@@ -110,4 +110,13 @@ public class User extends BaseEntity {
     @Column(name = "total_unread_count", nullable = false, columnDefinition = "integer default 0")
     @Builder.Default
     private int totalUnreadCount = 0;
+
+    /**
+     * When the user requested account deletion. Combined with the soft-delete flag
+     * ({@code isDeleted} from BaseEntity), the account is recoverable until this
+     * timestamp + the configured window, after which it is permanently anonymized.
+     * Null when the account is active (or already purged).
+     */
+    @Column(name = "deletion_requested_at")
+    private java.time.Instant deletionRequestedAt;
 }

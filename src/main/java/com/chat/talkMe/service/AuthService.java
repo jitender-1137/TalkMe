@@ -28,4 +28,18 @@ public interface AuthService {
     void changePassword(ChangePasswordRequest request, User currentUser);
     com.chat.talkMe.dto.response.AuthUserResponse getCurrentUser(User currentUser);
     com.chat.talkMe.dto.response.AuthUserResponse updateProfile(UpdateProfileRequest request, User currentUser);
+
+    /**
+     * Soft-delete the account: it is hidden/locked immediately but recoverable by
+     * simply logging in again within the configured window. All refresh tokens are
+     * revoked so other devices are signed out.
+     */
+    void requestAccountDeletion(User currentUser);
+
+    /**
+     * Permanently purge accounts whose deletion window has elapsed (irreversible
+     * anonymization + credential destruction). Driven by a scheduled reaper.
+     * @return number of accounts purged.
+     */
+    int purgeExpiredDeletedAccounts();
 }

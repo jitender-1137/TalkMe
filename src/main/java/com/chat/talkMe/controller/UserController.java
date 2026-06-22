@@ -9,6 +9,7 @@ import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.service.AuthService;
 import com.chat.talkMe.service.FriendService;
 import com.chat.talkMe.service.PostService;
 import com.chat.talkMe.service.UserService;
@@ -34,6 +35,7 @@ public class UserController {
     private final UserService userService;
     private final FriendService friendService;
     private final PostService postService;
+    private final AuthService authService;
 
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<UserResponse>> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -63,6 +65,19 @@ public class UserController {
     public ResponseEntity<ResponseDto<Void>> removeAvatar(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.removeAvatar(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Avatar removed", "TM_USER_002"));
+    }
+
+    /**
+     * Soft-delete the current account. It's locked immediately and recoverable for a
+     * grace period simply by logging back in; after the window it is permanently
+     * anonymized by the scheduled purge job.
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<ResponseDto<Void>> deleteAccount(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.requestAccountDeletion(userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                null, "Account scheduled for deletion. Log in again within the recovery window to restore it.",
+                "TM_USER_003"));
     }
 
     @GetMapping("/{userId}")

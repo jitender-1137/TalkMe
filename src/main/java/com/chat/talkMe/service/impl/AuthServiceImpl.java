@@ -28,17 +28,22 @@ import com.chat.talkMe.repository.SessionRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.JwtTokenProvider;
 import com.chat.talkMe.service.AuthService;
+import com.chat.talkMe.service.EmailService;
 import com.chat.talkMe.dto.response.CountryDetectionResult;
 import com.chat.talkMe.service.CountryDetectionService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -60,6 +65,8 @@ public class AuthServiceImpl implements AuthService {
     private final SessionMapper sessionMapper;
     private final CountryDetectionService countryDetectionService;
     private final com.chat.talkMe.service.LoginAttemptService loginAttemptService;
+    private final StringRedisTemplate redisTemplate;
+    private final EmailService emailService;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -69,6 +76,19 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${security.jwt.guest-refresh-token-expiration-ms}")
     private long guestRefreshTokenExpirationMs;
+
+    @Value("${app.auth.password-reset-token-ttl-minutes:30}")
+    private long passwordResetTtlMinutes;
+
+    @Value("${app.auth.account-deletion-window-days:30}")
+    private long accountDeletionWindowDays;
+
+    @Value("${app.frontend-base-url:http://localhost:3000}")
+    private String frontendBaseUrl;
+
+    /** Redis key prefix for one-time password-reset tokens (value = user UUID). */
+    private static final String PWRESET_KEY_PREFIX = "pwreset:token:";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Override
     @Transactional
@@ -97,6 +117,23 @@ public class AuthServiceImpl implements AuthService {
         }
 
         loginAttemptService.recordSuccess(identifier, ip);
+
+        // Account-deletion recovery: a soft-deleted account is automatically restored
+        // when the owner logs back in within the recovery window. Past the window the
+        // account is pending permanent purge and must not be resurrected.
+        if (user.isDeleted()) {
+            Instant requestedAt = user.getDeletionRequestedAt();
+            boolean withinWindow = requestedAt != null
+                    && Instant.now().isBefore(requestedAt.plus(Duration.ofDays(accountDeletionWindowDays)));
+            if (withinWindow) {
+                user.setDeleted(false);
+                user.setDeletionRequestedAt(null);
+                userRepository.save(user);
+                log.info("Account '{}' restored on login (was pending deletion)", user.getUsername());
+            } else {
+                throw new UnauthorizedException("This account has been deleted.", "TM_024");
+            }
+        }
 
         // Backfill country from IP on login ONLY when the user has none set.
         // An existing country is never overwritten. Best-effort: a detection
@@ -281,26 +318,51 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
-        // Safe check: do not expose email presence state
+        // Never reveal whether the email exists (anti-enumeration): always return
+        // success to the controller. Only real, non-guest, active accounts get a link.
         User user = userRepository.findByEmail(request.getEmail()).orElse(null);
-        if (user != null) {
-            String token = UUID.randomUUID().toString();
-            log.info("Safe mock: reset token generated for user {}: {}", user.getUsername(), token);
+        if (user == null || user.isGuest() || user.isDeleted()) {
+            return;
         }
+
+        // Cryptographically-strong, single-use token stored in Redis with a short TTL.
+        String token = generateSecureToken();
+        redisTemplate.opsForValue().set(
+                PWRESET_KEY_PREFIX + token,
+                user.getUuid().toString(),
+                Duration.ofMinutes(passwordResetTtlMinutes));
+
+        String resetLink = frontendBaseUrl.replaceAll("/+$", "") + "/reset-password?token=" + token;
+        emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetLink, passwordResetTtlMinutes);
+        log.info("Password reset requested for user '{}'", user.getUsername());
     }
 
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        // Mock token validation for reset
-        User user = userRepository.findAll().stream().filter(u -> !u.isGuest()).findFirst()
-                .orElseThrow(() -> new UnauthorizedException("Reset token invalid or expired", "TM_038"));
+        String key = PWRESET_KEY_PREFIX + request.getToken();
+        String userUuid = redisTemplate.opsForValue().get(key);
+        if (userUuid == null) {
+            throw new UnauthorizedException("Reset token invalid or expired", "TM_038");
+        }
+
+        User user;
+        try {
+            user = userRepository.findByUuid(UUID.fromString(userUuid))
+                    .orElseThrow(() -> new UnauthorizedException("Reset token invalid or expired", "TM_038"));
+        } catch (IllegalArgumentException e) {
+            throw new UnauthorizedException("Reset token invalid or expired", "TM_038");
+        }
 
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
 
-        // Revoke all tokens on password reset
+        // One-time use: consume the token so it can't be replayed.
+        redisTemplate.delete(key);
+
+        // Revoke all sessions/tokens — a reset should sign the user out everywhere.
         refreshTokenRepository.revokeAllUserTokens(user);
+        log.info("Password reset completed for user '{}'", user.getUsername());
     }
 
     @Override
@@ -315,6 +377,83 @@ public class AuthServiceImpl implements AuthService {
 
         // Revoke all tokens
         refreshTokenRepository.revokeAllUserTokens(currentUser);
+    }
+
+    @Override
+    @Transactional
+    public void requestAccountDeletion(User currentUser) {
+        // Re-load to operate on a managed entity (the principal may be detached).
+        User user = userRepository.findById(currentUser.getId()).orElse(currentUser);
+        if (user.isGuest()) {
+            throw new ForbiddenException("Guest accounts can't be deleted; just close the tab.", "TM_029");
+        }
+        if (user.isDeleted()) {
+            return; // already pending deletion — idempotent
+        }
+
+        user.setDeleted(true);
+        user.setDeletionRequestedAt(Instant.now());
+        userRepository.save(user);
+
+        // Sign the user out everywhere — no device should keep a working session.
+        refreshTokenRepository.revokeAllUserTokens(user);
+        log.info("Account '{}' scheduled for deletion (recoverable for {} days)",
+                user.getUsername(), accountDeletionWindowDays);
+    }
+
+    @Override
+    @Transactional
+    public int purgeExpiredDeletedAccounts() {
+        Instant cutoff = Instant.now().minus(Duration.ofDays(accountDeletionWindowDays));
+        List<User> due = userRepository.findAccountsDueForPurge(cutoff);
+        int purged = 0;
+        for (User user : due) {
+            try {
+                refreshTokenRepository.revokeAllUserTokens(user);
+                sessionRepository.deleteByUser(user);
+                anonymizeAccount(user);
+                userRepository.save(user);
+                purged++;
+                log.info("Permanently anonymized account id={} after deletion window elapsed", user.getId());
+            } catch (Exception e) {
+                log.error("Failed to purge account id={}: {}", user.getId(), e.getMessage());
+            }
+        }
+        return purged;
+    }
+
+    /**
+     * Irreversible permanent deletion: scrub all PII and destroy credentials so the
+     * account can never be recovered or re-identified. The row is retained (not
+     * hard-deleted) to preserve referential integrity of messages/posts authored by
+     * the account, which are de-identified by this scrub. isDeleted stays true.
+     */
+    private void anonymizeAccount(User user) {
+        user.setUsername("deleted_" + user.getUuid());
+        user.setEmail(null);
+        user.setPasswordHash(null);
+        user.setName("Deleted User");
+        user.setProfileImage(null);
+        user.setMobileNumber(null);
+        user.setBio(null);
+        user.setOccupation(null);
+        user.setEducation(null);
+        user.setCountry(null);
+        user.setCity(null);
+        user.setAge(null);
+        user.setGender(null);
+        if (user.getInterests() != null) {
+            user.getInterests().clear();
+        }
+        // Purge complete: clear the timer so it's no longer picked up by the reaper.
+        user.setDeletionRequestedAt(null);
+    }
+
+    /** 256-bit URL-safe random token for password resets. */
+    private String generateSecureToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private LoginResponse generateLoginResponse(User user, String userAgent, String ip) {

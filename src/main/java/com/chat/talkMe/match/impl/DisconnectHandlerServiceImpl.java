@@ -45,10 +45,8 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
             // Notify stranger
             MatchServerEvent event = MatchServerEvent.builder()
                     .event("STRANGER_DISCONNECTED")
-                    .payload(Map.of(
-                            "sessionId", session.getId(),
-                            "disconnectedUser", username
-                    ))
+                    // Anonymous — only the session id; never reveal who disconnected.
+                    .payload(Map.of("sessionId", session.getId()))
                     .build();
 
             try {

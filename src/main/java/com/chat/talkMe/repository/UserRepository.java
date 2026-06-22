@@ -46,4 +46,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Query("SELECT u.totalUnreadCount FROM User u WHERE u.id = :id")
     Integer getTotalUnreadCount(@Param("id") Long id);
+
+    /** Soft-deleted accounts whose recovery window has elapsed — due for permanent purge. */
+    @Query("SELECT u FROM User u WHERE u.isDeleted = true AND u.deletionRequestedAt IS NOT NULL AND u.deletionRequestedAt < :cutoff")
+    List<User> findAccountsDueForPurge(@Param("cutoff") java.time.Instant cutoff);
 }

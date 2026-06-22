@@ -30,9 +30,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .event("MESSAGE_RECEIVED")
                 .payload(Map.of(
                         "id", UUID.randomUUID().toString(),
-                        "content", content,
-                        "sender", sender,
-                        "timestamp", System.currentTimeMillis()
+                        "content", content,                        "timestamp", System.currentTimeMillis()
                 ))
                 .build();
 
@@ -51,9 +49,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .event("GIF_RECEIVED")
                 .payload(Map.of(
                         "id", UUID.randomUUID().toString(),
-                        "media", media,
-                        "sender", sender,
-                        "timestamp", System.currentTimeMillis()
+                        "media", media,                        "timestamp", System.currentTimeMillis()
                 ))
                 .build();
 
@@ -76,9 +72,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .event("IMAGE_RECEIVED")
                 .payload(Map.of(
                         "id", UUID.randomUUID().toString(),
-                        "media", media,
-                        "sender", sender,
-                        "timestamp", System.currentTimeMillis()
+                        "media", media,                        "timestamp", System.currentTimeMillis()
                 ))
                 .build();
 

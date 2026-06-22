@@ -59,6 +59,15 @@ public class PresenceController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, msg, "TM_PRESENCE_003"));
     }
 
+    @PutMapping("/hide-last-seen")
+    public ResponseEntity<ResponseDto<Void>> toggleHideLastSeen(
+            @RequestParam("enabled") boolean enabled,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        presenceService.toggleHideLastSeen(userDetails.getUser(), enabled);
+        String msg = enabled ? "Hide Last Seen enabled" : "Hide Last Seen disabled";
+        return ResponseEntity.ok(SuccessResponseDto.success(null, msg, "TM_PRESENCE_005"));
+    }
+
     @DeleteMapping("/reset")
     public ResponseEntity<ResponseDto<Void>> resetPresence(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -92,8 +101,10 @@ public class PresenceController {
             PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
             builder.status(apparentStatus.name());
 
-            // If ghost/invisible mode is enabled on target, hide their last seen
-            if (targetPresence.isGhostModeEnabled() || targetPresence.isInvisibleModeEnabled()) {
+            // Hide last seen from others when ghost / invisible / hide-last-seen is on.
+            if (targetPresence.isGhostModeEnabled()
+                    || targetPresence.isInvisibleModeEnabled()
+                    || targetPresence.isHideLastSeenEnabled()) {
                 builder.lastSeenAt(null);
             } else {
                 builder.lastSeenAt(targetPresence.getLastSeenAt().toString());

@@ -35,4 +35,9 @@ public class UserPresence extends BaseEntity {
     @Column(name = "invisible_mode_enabled", nullable = false)
     @Builder.Default
     private boolean invisibleModeEnabled = false;
+
+    /** When true, other users never see this user's "last seen" timestamp. */
+    @Column(name = "hide_last_seen_enabled", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean hideLastSeenEnabled = false;
 }

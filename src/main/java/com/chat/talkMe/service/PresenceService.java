@@ -39,6 +39,7 @@ public interface PresenceService {
     PresenceStatus getStatus(User user);
     void toggleGhostMode(User user, boolean enabled);
     void toggleInvisibleMode(User user, boolean enabled);
+    void toggleHideLastSeen(User user, boolean enabled);
     void resetPresence(User user);
     boolean isUserOnline(User user);
     com.chat.talkMe.domain.UserPresence getUserPresence(User user);
