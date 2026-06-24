@@ -36,7 +36,15 @@ public interface PresenceService {
      */
     int reapExpiredIdleUsers();
 
+    /** Apparent status for OTHER viewers (Invisible mode is masked to OFFLINE). Redis-first. */
     PresenceStatus getStatus(User user);
+
+    /** The user's TRUE status, unmasked by Invisible mode — for the owner's own view. Redis-first. */
+    PresenceStatus getRawStatus(User user);
+
+    /** Live last-seen timestamp, read from Redis (the DB value is only durable-on-OFFLINE). */
+    java.time.Instant getLastSeen(User user);
+
     void toggleGhostMode(User user, boolean enabled);
     void toggleInvisibleMode(User user, boolean enabled);
     void toggleHideLastSeen(User user, boolean enabled);

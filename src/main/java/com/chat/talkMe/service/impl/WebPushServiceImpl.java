@@ -53,6 +53,15 @@ public class WebPushServiceImpl implements WebPushService {
         subscriptionRepository.deleteByEndpoint(endpoint);
     }
 
+    @Override
+    @Transactional
+    public void removeAllSubscriptionsForUser(Long userId) {
+        int removed = subscriptionRepository.deleteByUserId(userId);
+        if (removed > 0) {
+            log.info("[WebPush] Cleared {} push subscription(s) for user {} on new login", removed, userId);
+        }
+    }
+
     @Async
     @Override
     @Transactional

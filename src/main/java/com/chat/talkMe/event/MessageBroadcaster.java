@@ -14,10 +14,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Performs the actual WebSocket fan-out for a sent message. Shared by
- * {@link MessageEventConsumer} (normal async path via RabbitMQ) and by the
- * in-request fallback in {@code MessageServiceImpl} (used when the AMQP publish
- * fails so messages are never lost if the broker is briefly unavailable).
+ * Performs the actual WebSocket fan-out for a sent message: chat-topic broadcast,
+ * per-member personal-queue events, and notification dispatch. Shared by
+ * {@link MessageEventConsumer} (the normal delivery path via RabbitMQ) and by the
+ * inline fallback in {@link MessageBroadcastListener} (used when the broker is
+ * unreachable so messages are never lost during an outage).
  */
 @Slf4j
 @Component

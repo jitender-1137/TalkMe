@@ -54,28 +54,16 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    @Transactional
     public void setStatus(User user, PresenceStatus status) {
-        User managedUser = ensureManagedUser(user);
-        String username = managedUser.getUsername();
+        String username = user.getUsername();
         log.debug("Setting presence status for user {} to {}", username, status);
 
-        // Retrieve or initialize DB presence (ensures the row exists)
-        UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
-
-        // Persist via an atomic UPDATE rather than save() — the connect path is
-        // hot and concurrent updates would otherwise cause optimistic-lock failures.
+        // Redis is the source of truth for live presence — write status + last-seen there.
         Instant lastSeen = Instant.now();
-        userPresenceRepository.updateStatus(managedUser.getId(), status.name(), lastSeen);
-
-        // Sync to Redis (flags read from the loaded presence; unchanged here)
         String redisKey = REDIS_KEY_PREFIX + username;
         Map<String, String> presenceMap = new HashMap<>();
         presenceMap.put("status", status.name());
         presenceMap.put("lastSeenAt", lastSeen.toString());
-        presenceMap.put("ghostModeEnabled", String.valueOf(userPresence.isGhostModeEnabled()));
-        presenceMap.put("invisibleModeEnabled", String.valueOf(userPresence.isInvisibleModeEnabled()));
-
         redisTemplate.opsForHash().putAll(redisKey, presenceMap);
         redisTemplate.expire(redisKey, CACHE_TTL);
 
@@ -90,31 +78,31 @@ public class PresenceServiceImpl implements PresenceService {
         } else if (status == PresenceStatus.OFFLINE) {
             redisTemplate.opsForZSet().remove(HEARTBEAT_ZSET, username);
             redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
+            // The ONLY DB write on the presence hot path — and only on OFFLINE — so
+            // last-seen is durable across a Redis eviction/restart. ONLINE/IDLE churn
+            // (incl. reconnect flapping) never touches the DB.
+            try {
+                presenceServiceHelper.persistOffline(user.getId(), status.name(), lastSeen);
+            } catch (Exception e) {
+                log.warn("Persisting OFFLINE last-seen failed for {}", username, e);
+            }
         }
 
-        // Broadcast presence updates via STOMP WebSocket
-        broadcastPresence(managedUser, userPresence, status, lastSeen);
+        // Broadcast presence updates via STOMP WebSocket (flags read from Redis).
+        broadcastPresence(user, readFlags(user), status, lastSeen);
     }
 
     @Override
-    @Transactional
     public void markIdle(User user, Duration offlineAfter) {
-        User managedUser = ensureManagedUser(user);
-        String username = managedUser.getUsername();
+        String username = user.getUsername();
         log.debug("Marking presence IDLE for user {} (offline in {})", username, offlineAfter);
 
-        UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
-
+        // Redis-only: IDLE is transient live state, never persisted to the DB.
         Instant lastSeen = Instant.now();
-        userPresenceRepository.updateStatus(managedUser.getId(), PresenceStatus.IDLE.name(), lastSeen);
-
-        // Sync to Redis cache
         String redisKey = REDIS_KEY_PREFIX + username;
         Map<String, String> presenceMap = new HashMap<>();
         presenceMap.put("status", PresenceStatus.IDLE.name());
         presenceMap.put("lastSeenAt", lastSeen.toString());
-        presenceMap.put("ghostModeEnabled", String.valueOf(userPresence.isGhostModeEnabled()));
-        presenceMap.put("invisibleModeEnabled", String.valueOf(userPresence.isInvisibleModeEnabled()));
         redisTemplate.opsForHash().putAll(redisKey, presenceMap);
         redisTemplate.expire(redisKey, CACHE_TTL);
 
@@ -129,7 +117,7 @@ public class PresenceServiceImpl implements PresenceService {
         // Note: heartbeat ZSET is intentionally left untouched — a backgrounded user
         // keeps heartbeating (stays out of the watchdog), and a disconnected user's
         // entry has already been claimed/removed by the watchdog.
-        broadcastPresence(managedUser, userPresence, PresenceStatus.IDLE, lastSeen);
+        broadcastPresence(user, readFlags(user), PresenceStatus.IDLE, lastSeen);
     }
 
     /** Raw persisted status from the Redis cache (no privacy/invisible masking). */
@@ -220,13 +208,11 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    @Transactional
     public PresenceStatus getStatus(User user) {
-        User managedUser = ensureManagedUser(user);
-        String username = managedUser.getUsername();
+        String username = user.getUsername();
         String redisKey = REDIS_KEY_PREFIX + username;
 
-        // Try getting from Redis Cache first
+        // Redis is authoritative — a cache hit returns with ZERO DB interaction.
         Map<Object, Object> cachedPresence = redisTemplate.opsForHash().entries(redisKey);
         if (cachedPresence != null && !cachedPresence.isEmpty()) {
             boolean invisible = Boolean.parseBoolean((String) cachedPresence.get("invisibleModeEnabled"));
@@ -241,15 +227,19 @@ public class PresenceServiceImpl implements PresenceService {
             }
         }
 
-        // Fallback to database
+        // Cold fallback: load (or create) from DB and warm the cache. Only reached on
+        // a cache miss (Redis evicted / first read after restart).
+        User managedUser = ensureManagedUser(user);
         UserPresence userPresence = presenceServiceHelper.getOrCreateUserPresence(managedUser);
 
-        // Cache the result
+        // Cache the result (include ALL privacy flags so readFlags never sees a
+        // partially-populated hash and mis-defaults a flag to false).
         Map<String, String> presenceMap = new HashMap<>();
         presenceMap.put("status", userPresence.getStatus());
         presenceMap.put("lastSeenAt", userPresence.getLastSeenAt().toString());
         presenceMap.put("ghostModeEnabled", String.valueOf(userPresence.isGhostModeEnabled()));
         presenceMap.put("invisibleModeEnabled", String.valueOf(userPresence.isInvisibleModeEnabled()));
+        presenceMap.put("hideLastSeenEnabled", String.valueOf(userPresence.isHideLastSeenEnabled()));
 
         redisTemplate.opsForHash().putAll(redisKey, presenceMap);
         redisTemplate.expire(redisKey, CACHE_TTL);
@@ -259,6 +249,30 @@ public class PresenceServiceImpl implements PresenceService {
         }
 
         return PresenceStatus.valueOf(userPresence.getStatus());
+    }
+
+    @Override
+    public PresenceStatus getRawStatus(User user) {
+        // Owner's own view: the true status, NOT masked by Invisible mode.
+        String s = liveStatus(user.getUsername(), null);
+        try {
+            return PresenceStatus.valueOf(s);
+        } catch (Exception e) {
+            // Cold fallback to DB.
+            UserPresence up = presenceServiceHelper.getOrCreateUserPresence(ensureManagedUser(user));
+            try { return PresenceStatus.valueOf(up.getStatus()); } catch (Exception ex) { return PresenceStatus.OFFLINE; }
+        }
+    }
+
+    @Override
+    public java.time.Instant getLastSeen(User user) {
+        Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + user.getUsername(), "lastSeenAt");
+        if (ls != null) {
+            try { return Instant.parse(ls.toString()); } catch (Exception ignored) { /* fall through */ }
+        }
+        // Cold fallback to DB (Redis evicted / first read after restart).
+        UserPresence up = presenceServiceHelper.getOrCreateUserPresence(ensureManagedUser(user));
+        return up.getLastSeenAt();
     }
 
     @Override
@@ -273,15 +287,19 @@ public class PresenceServiceImpl implements PresenceService {
         userPresence.setGhostModeEnabled(enabled);
         userPresenceRepository.save(userPresence);
 
-        // Update Redis Cache
-        String redisKey = REDIS_KEY_PREFIX + username;
-        redisTemplate.opsForHash().put(redisKey, "ghostModeEnabled", String.valueOf(enabled));
+        // Mirror the full flag set to Redis (source of truth for live presence decisions).
+        cacheFlags(username, userPresence.isGhostModeEnabled(),
+                userPresence.isInvisibleModeEnabled(), userPresence.isHideLastSeenEnabled());
 
-        // If ghost mode was enabled, broadcast OFFLINE. If disabled, broadcast current status.
+        // If ghost mode was enabled, broadcast OFFLINE. If disabled, broadcast the user's
+        // REAL current status from Redis (the DB status is stale — written only on offline).
         if (enabled) {
-            sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(), userPresence.getLastSeenAt().toString());
+            sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(),
+                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
         } else {
-            sendWebSocketUpdate(managedUser, userPresence.getStatus(), userPresence.getLastSeenAt().toString());
+            sendWebSocketUpdate(managedUser,
+                    liveStatus(username, userPresence.getStatus()),
+                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
         }
     }
 
@@ -297,15 +315,19 @@ public class PresenceServiceImpl implements PresenceService {
         userPresence.setInvisibleModeEnabled(enabled);
         userPresenceRepository.save(userPresence);
 
-        // Update Redis Cache
-        String redisKey = REDIS_KEY_PREFIX + username;
-        redisTemplate.opsForHash().put(redisKey, "invisibleModeEnabled", String.valueOf(enabled));
+        // Mirror the full flag set to Redis (source of truth for live presence decisions).
+        cacheFlags(username, userPresence.isGhostModeEnabled(),
+                userPresence.isInvisibleModeEnabled(), userPresence.isHideLastSeenEnabled());
 
-        // If invisible mode was enabled, broadcast OFFLINE. If disabled, broadcast current status.
+        // If invisible mode was enabled, broadcast OFFLINE. If disabled, broadcast the
+        // user's REAL current status from Redis (the DB status is stale by design now).
         if (enabled) {
-            sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(), userPresence.getLastSeenAt().toString());
+            sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(),
+                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
         } else {
-            sendWebSocketUpdate(managedUser, userPresence.getStatus(), userPresence.getLastSeenAt().toString());
+            sendWebSocketUpdate(managedUser,
+                    liveStatus(username, userPresence.getStatus()),
+                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
         }
     }
 
@@ -320,19 +342,25 @@ public class PresenceServiceImpl implements PresenceService {
         userPresence.setHideLastSeenEnabled(enabled);
         userPresenceRepository.save(userPresence);
 
-        // Keep the Redis cache consistent.
-        String redisKey = REDIS_KEY_PREFIX + username;
-        redisTemplate.opsForHash().put(redisKey, "hideLastSeenEnabled", String.valueOf(enabled));
+        // Mirror the full flag set to Redis (source of truth for live presence decisions).
+        cacheFlags(username, userPresence.isGhostModeEnabled(),
+                userPresence.isInvisibleModeEnabled(), userPresence.isHideLastSeenEnabled());
 
         // Status is unchanged — re-broadcast so subscribers pick up the hidden/visible
         // last-seen immediately (broadcastPresence nulls the timestamp when enabled).
+        // Read the live status/last-seen from Redis (the DB values are stale by design).
         PresenceStatus current;
         try {
-            current = PresenceStatus.valueOf(userPresence.getStatus());
+            current = PresenceStatus.valueOf(liveStatus(username, userPresence.getStatus()));
         } catch (Exception e) {
             current = PresenceStatus.OFFLINE;
         }
-        broadcastPresence(managedUser, userPresence, current, userPresence.getLastSeenAt());
+        // Flags are durable settings persisted on every toggle, so the DB values are fresh.
+        PresenceFlags flags = new PresenceFlags(
+                userPresence.isGhostModeEnabled(),
+                userPresence.isInvisibleModeEnabled(),
+                userPresence.isHideLastSeenEnabled());
+        broadcastPresence(managedUser, flags, current, liveLastSeen(username, userPresence.getLastSeenAt()));
     }
 
     @Override
@@ -357,10 +385,9 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public boolean isUserOnline(User user) {
-        User managedUser = ensureManagedUser(user);
-        return PresenceStatus.ONLINE.equals(getStatus(managedUser));
+        // getStatus is Redis-first and resolves the user itself only on a cache miss.
+        return PresenceStatus.ONLINE.equals(getStatus(user));
     }
 
     @Override
@@ -370,22 +397,88 @@ public class PresenceServiceImpl implements PresenceService {
         return presenceServiceHelper.getOrCreateUserPresence(managedUser);
     }
 
-    private void broadcastPresence(User user, UserPresence userPresence, PresenceStatus status, Instant lastSeen) {
+    /** Privacy flags (Ghost / Invisible / Hide-last-seen) — read from Redis, not the DB. */
+    private record PresenceFlags(boolean ghost, boolean invisible, boolean hideLastSeen) {}
+
+    /**
+     * Current live status from Redis (the source of truth). Falls back to the supplied
+     * DB value only on a cache miss. Toggles MUST use this instead of the DB status,
+     * which is now only written on OFFLINE and is otherwise stale.
+     */
+    private String liveStatus(String username, String dbFallback) {
+        Object s = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "status");
+        if (s != null) return s.toString();
+        return dbFallback != null ? dbFallback : PresenceStatus.OFFLINE.name();
+    }
+
+    /**
+     * Writes the COMPLETE privacy-flag set to the Redis presence hash (and refreshes
+     * the TTL). Always writing all three keeps the hash consistent so {@link #readFlags}
+     * never sees a partially-populated set after a single toggle.
+     */
+    private void cacheFlags(String username, boolean ghost, boolean invisible, boolean hide) {
+        String redisKey = REDIS_KEY_PREFIX + username;
+        Map<String, String> m = new HashMap<>();
+        m.put("ghostModeEnabled", String.valueOf(ghost));
+        m.put("invisibleModeEnabled", String.valueOf(invisible));
+        m.put("hideLastSeenEnabled", String.valueOf(hide));
+        redisTemplate.opsForHash().putAll(redisKey, m);
+        redisTemplate.expire(redisKey, CACHE_TTL);
+    }
+
+    /** Current live last-seen from Redis (source of truth), with a DB-value fallback. */
+    private Instant liveLastSeen(String username, Instant dbFallback) {
+        Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "lastSeenAt");
+        if (ls != null) {
+            try { return Instant.parse(ls.toString()); } catch (Exception ignored) { /* fall through */ }
+        }
+        return dbFallback != null ? dbFallback : Instant.now();
+    }
+
+    /**
+     * Reads the user's privacy flags from the Redis presence hash. On a cache miss
+     * (cold Redis) it loads them from the DB ONCE and caches them, so subsequent
+     * presence events — including reconnect flapping — never hit the DB for flags.
+     */
+    private PresenceFlags readFlags(User user) {
+        String redisKey = REDIS_KEY_PREFIX + user.getUsername();
+        Map<Object, Object> h = redisTemplate.opsForHash().entries(redisKey);
+        if (h != null && h.containsKey("ghostModeEnabled")) {
+            return new PresenceFlags(
+                    Boolean.parseBoolean((String) h.get("ghostModeEnabled")),
+                    Boolean.parseBoolean((String) h.get("invisibleModeEnabled")),
+                    Boolean.parseBoolean((String) h.get("hideLastSeenEnabled")));
+        }
+        // Cold load from DB once, then cache into Redis.
+        UserPresence up = userPresenceRepository.findByUser(user).orElse(null);
+        boolean ghost = up != null && up.isGhostModeEnabled();
+        boolean invisible = up != null && up.isInvisibleModeEnabled();
+        boolean hide = up != null && up.isHideLastSeenEnabled();
+        Map<String, String> flagMap = new HashMap<>();
+        flagMap.put("ghostModeEnabled", String.valueOf(ghost));
+        flagMap.put("invisibleModeEnabled", String.valueOf(invisible));
+        flagMap.put("hideLastSeenEnabled", String.valueOf(hide));
+        redisTemplate.opsForHash().putAll(redisKey, flagMap);
+        redisTemplate.expire(redisKey, CACHE_TTL);
+        return new PresenceFlags(ghost, invisible, hide);
+    }
+
+    private void broadcastPresence(User user, PresenceFlags flags, PresenceStatus status, Instant lastSeen) {
         String username = user.getUsername();
         String statusToBroadcast = status.name();
 
-        if (userPresence.isInvisibleModeEnabled()) {
+        if (flags.invisible()) {
             statusToBroadcast = PresenceStatus.OFFLINE.name();
         }
 
         // Under Ghost Mode, we bypass broadcasting presence updates entirely to remain stealthy
-        if (userPresence.isGhostModeEnabled()) {
+        if (flags.ghost()) {
             log.debug("Bypassing presence broadcast for user {} due to Ghost Mode", username);
             return;
         }
 
         // Hide Last Seen: broadcast the status but never the timestamp.
-        String lastSeenToBroadcast = userPresence.isHideLastSeenEnabled() ? null : lastSeen.toString();
+        String lastSeenToBroadcast = flags.hideLastSeen() ? null : (lastSeen != null ? lastSeen.toString() : null);
         sendWebSocketUpdate(user, statusToBroadcast, lastSeenToBroadcast);
     }
 

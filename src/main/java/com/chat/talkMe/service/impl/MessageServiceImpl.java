@@ -14,6 +14,7 @@ import com.chat.talkMe.repository.*;
 import com.chat.talkMe.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,11 +38,11 @@ public class MessageServiceImpl implements MessageService {
     private final MessageReadReceiptRepository readReceiptRepository;
     private final MessageReactionRepository messageReactionRepository;
     private final MessageMapper messageMapper;
-    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final BlockUserRepository blockUserRepository;
-    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
-    private final com.chat.talkMe.event.EventPublisher eventPublisher;
-    private final com.chat.talkMe.event.MessageBroadcaster messageBroadcaster;
+    private final ApplicationEventPublisher eventPublisher;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final OutboxEventRepository outboxEventRepository;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -144,10 +145,17 @@ public class MessageServiceImpl implements MessageService {
 
         MessageResponse response = messageMapper.toMessageResponse(message);
 
-        // Fan-out only if not blocked. Routed through the RabbitMQ work plane so it
-        // (a) reaches all app instances via the STOMP relay and (b) is retried /
-        // dead-lettered on failure. If the broker is unreachable we degrade
-        // gracefully by broadcasting directly in-request so messages are not lost.
+        // Fan-out only if not blocked.
+        //
+        // WhatsApp-grade, guaranteed-delivery pattern:
+        //  1. Write an outbox row in THIS transaction (atomic with the message) — so a
+        //     message can never be committed without a durable "needs delivery" record.
+        //  2. Publish a Spring event that fires AFTER commit (MessageBroadcastListener),
+        //     which hands off to RabbitMQ for instant delivery. The HTTP response
+        //     returns as soon as the commit completes — no waiting on WebSocket/AMQP/Redis.
+        //  3. If anything between commit and delivery fails (crash, broker outage), the
+        //     outbox row stays PENDING and OutboxPublisherJob re-drives it — no message
+        //     is ever lost, and delivery is idempotent so there are no duplicates.
         if (!isBlocked) {
             List<String> recipientUsernames = chat.getMembers().stream()
                     .map(ChatMember::getUser)
@@ -155,7 +163,7 @@ public class MessageServiceImpl implements MessageService {
                     .map(User::getUsername)
                     .toList();
 
-            MessageSentEvent event = MessageSentEvent.builder()
+            MessageSentEvent broadcastEvent = MessageSentEvent.builder()
                     .chatUuid(chatUuid)
                     .message(response)
                     .senderUserId(currentUser.getId())
@@ -164,13 +172,11 @@ public class MessageServiceImpl implements MessageService {
                     .recipientUsernames(recipientUsernames)
                     .build();
 
-            if (!eventPublisher.publishMessageSent(event)) {
-                try {
-                    messageBroadcaster.broadcast(event);
-                } catch (Exception e) {
-                    log.error("Direct fallback broadcast failed", e);
-                }
-            }
+            // 1. Durable outbox row (same transaction → atomic with the message save).
+            persistOutbox(response.getId(), broadcastEvent);
+
+            // 2. Fast path: delivered after commit by MessageBroadcastListener.
+            eventPublisher.publishEvent(broadcastEvent);
         }
 
         return response;
@@ -324,6 +330,30 @@ public class MessageServiceImpl implements MessageService {
         broadcastReactionUpdate(chatUuid, messageUuid, message);
 
         return response;
+    }
+
+    /**
+     * Writes the transactional outbox row for a sent message. Runs inside the caller's
+     * @Transactional, so the row commits atomically with the message — there is no
+     * window where a message exists without a durable delivery record.
+     */
+    private void persistOutbox(String messageId, MessageSentEvent event) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            OutboxEvent row = OutboxEvent.builder()
+                    .eventKey(messageId)
+                    .eventType(com.chat.talkMe.config.RabbitConfig.RK_MESSAGE_SEND)
+                    .payload(payload)
+                    .status(OutboxEvent.STATUS_PENDING)
+                    .attempts(0)
+                    .createdAt(Instant.now())
+                    .build();
+            outboxEventRepository.save(row);
+        } catch (Exception e) {
+            // An outbox failure must fail the whole send so the client retries — we must
+            // never acknowledge a message we can't guarantee delivery for.
+            throw new IllegalStateException("Failed to persist outbox event for message " + messageId, e);
+        }
     }
 
     private void broadcastReactionUpdate(String chatUuid, String messageUuid, Message message) {

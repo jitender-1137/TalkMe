@@ -67,6 +67,7 @@ public class AuthServiceImpl implements AuthService {
     private final com.chat.talkMe.service.LoginAttemptService loginAttemptService;
     private final StringRedisTemplate redisTemplate;
     private final EmailService emailService;
+    private final com.chat.talkMe.service.WebPushService webPushService;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -461,6 +462,15 @@ public class AuthServiceImpl implements AuthService {
         // login signs the user out everywhere else. The previously-logged-in device
         // will get a 401 on its next refresh and be sent to the login page.
         refreshTokenRepository.revokeAllUserTokens(user);
+
+        // ...and drop the superseded device's push subscriptions, so it stops receiving
+        // push notifications immediately (it's no longer a valid session). The device
+        // that just logged in re-registers its own subscription via NotificationSetup.
+        try {
+            webPushService.removeAllSubscriptionsForUser(user.getId());
+        } catch (Exception e) {
+            log.warn("Failed to clear push subscriptions on login for user {}", user.getId(), e);
+        }
 
         // Generate Token pair
         String accessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest());

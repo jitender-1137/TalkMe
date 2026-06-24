@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.request.CreateChatRequest;
 import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.event.StatusUpdateEvent;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.NotFoundException;
@@ -42,6 +43,9 @@ public class ChatServiceImpl implements ChatService {
     private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
     private final FriendRepository friendRepository;
     private final BlockUserRepository blockUserRepository;
+    private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final OutboxEventRepository outboxEventRepository;
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -373,27 +377,19 @@ public class ChatServiceImpl implements ChatService {
         boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
         if (hasUpdates) {
-            // Broadcast WS event: messages_read
-            try {
-                Map<String, Object> eventWrapper = new HashMap<>();
-                eventWrapper.put("event", "messages_read");
-
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("chatId", uuid);
-                payload.put("readBy", managedUser.getUuid().toString());
-
-                eventWrapper.put("payload", payload);
-                messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
-            } catch (Exception e) {
-                log.error("WebSocket messages_read broadcast failed", e);
-            }
-
-            // Recompute + broadcast the authoritative unread total (badge sync).
-            try {
-                notificationDispatchService.recomputeUnread(managedUser);
-            } catch (Exception e) {
-                log.error("Unread recompute after markRead failed", e);
-            }
+            // Guaranteed delivery via the transactional outbox: persist a status row in
+            // THIS transaction, then broadcast after commit (StatusBroadcastListener).
+            // If the broadcast is lost, the outbox poller re-drives it. The unread
+            // recompute now runs in the delivery handler (idempotent, from the DB).
+            StatusUpdateEvent event = StatusUpdateEvent.builder()
+                    .eventKey(UUID.randomUUID().toString())
+                    .chatUuid(uuid)
+                    .eventName(StatusUpdateEvent.READ)
+                    .actorUuid(managedUser.getUuid().toString())
+                    .actorUserId(managedUser.getId())
+                    .build();
+            persistStatusOutbox(event);
+            applicationEventPublisher.publishEvent(event);
         }
     }
 
@@ -416,20 +412,37 @@ public class ChatServiceImpl implements ChatService {
         boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
         if (hasUpdates) {
-            // Broadcast WS event: messages_delivered
-            try {
-                Map<String, Object> eventWrapper = new HashMap<>();
-                eventWrapper.put("event", "messages_delivered");
+            // Guaranteed delivery via the transactional outbox (see markRead).
+            StatusUpdateEvent event = StatusUpdateEvent.builder()
+                    .eventKey(UUID.randomUUID().toString())
+                    .chatUuid(uuid)
+                    .eventName(StatusUpdateEvent.DELIVERED)
+                    .actorUuid(managedUser.getUuid().toString())
+                    .build();
+            persistStatusOutbox(event);
+            applicationEventPublisher.publishEvent(event);
+        }
+    }
 
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("chatId", uuid);
-                payload.put("deliveredBy", managedUser.getUuid().toString());
-
-                eventWrapper.put("payload", payload);
-                messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
-            } catch (Exception e) {
-                log.error("WebSocket messages_delivered broadcast failed", e);
-            }
+    /**
+     * Persists a status-change outbox row in the caller's transaction, so it commits
+     * atomically with the receipt update. {@code StatusBroadcastListener} delivers it
+     * after commit; {@code OutboxPublisherJob} re-drives it if that delivery is lost.
+     */
+    private void persistStatusOutbox(StatusUpdateEvent event) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            OutboxEvent row = OutboxEvent.builder()
+                    .eventKey(event.getEventKey())
+                    .eventType(StatusUpdateEvent.EVENT_TYPE)
+                    .payload(payload)
+                    .status(OutboxEvent.STATUS_PENDING)
+                    .attempts(0)
+                    .createdAt(Instant.now())
+                    .build();
+            outboxEventRepository.save(row);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to persist status outbox event", e);
         }
     }
 
@@ -508,9 +521,10 @@ public class ChatServiceImpl implements ChatService {
                 AuthUserResponse otherUserDto = userMapper.toAuthUserResponse(otherUser);
                 if (presenceService != null) {
                     otherUserDto.setPresence(presenceService.getStatus(otherUser).name().toLowerCase());
-                    UserPresence userPresence = presenceService.getUserPresence(otherUser);
-                    if (userPresence != null && userPresence.getLastSeenAt() != null) {
-                        otherUserDto.setLastSeen(userPresence.getLastSeenAt().toString());
+                    // Live last-seen from Redis (DB value is stale — only written on OFFLINE).
+                    java.time.Instant lastSeen = presenceService.getLastSeen(otherUser);
+                    if (lastSeen != null) {
+                        otherUserDto.setLastSeen(lastSeen.toString());
                     }
                 }
                 response.setOtherUser(otherUserDto);

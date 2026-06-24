@@ -12,6 +12,13 @@ public interface WebPushService {
     void removeSubscription(String endpoint);
 
     /**
+     * Remove ALL push subscriptions for a user. Called on the single-device login
+     * sweep so a device whose session was just superseded stops receiving pushes.
+     * The newly-logged-in device re-registers its own subscription after login.
+     */
+    void removeAllSubscriptionsForUser(Long userId);
+
+    /**
      * Send a Web Push payload to every subscription of a user. Runs asynchronously
      * so it never blocks the message transaction. Prunes endpoints reported gone
      * (HTTP 404/410).

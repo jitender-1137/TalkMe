@@ -25,6 +25,17 @@ public class PresenceServiceHelper {
      * Running in REQUIRES_NEW propagation guarantees that the write is committed immediately
      * upon returning and database locks are released, avoiding cross-thread race conditions.
      */
+    /**
+     * The single durable presence write on the hot path: persists last-seen when a
+     * user goes OFFLINE, so "last seen" survives a Redis eviction or restart. Live
+     * ONLINE/IDLE state lives only in Redis (no DB write). A no-op (0 rows) for a user
+     * who never created a presence row — their last-seen stays in Redis until TTL.
+     */
+    @Transactional
+    public void persistOffline(Long userId, String status, Instant lastSeen) {
+        userPresenceRepository.updateStatus(userId, status, lastSeen);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public UserPresence getOrCreateUserPresence(User user) {
         Optional<UserPresence> existing = userPresenceRepository.findByUser(user);

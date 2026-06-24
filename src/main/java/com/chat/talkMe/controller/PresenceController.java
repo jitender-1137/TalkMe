@@ -91,13 +91,18 @@ public class PresenceController {
 
         // Privacy filters:
         if (currentUser.getId().equals(targetUser.getId())) {
-            // Owner sees their true settings and values
-            builder.status(targetPresence.getStatus())
-                    .lastSeenAt(targetPresence.getLastSeenAt().toString())
+            // Owner sees their TRUE live status + durable settings. Status/last-seen come
+            // from Redis (the DB values are only written on OFFLINE and are otherwise stale);
+            // flags come from the durable DB record. This is what the client uses to hydrate
+            // the privacy toggles correctly on load (incl. a fresh browser/device).
+            java.time.Instant lastSeen = presenceService.getLastSeen(targetUser);
+            builder.status(presenceService.getRawStatus(targetUser).name())
+                    .lastSeenAt(lastSeen != null ? lastSeen.toString() : null)
                     .ghostModeEnabled(targetPresence.isGhostModeEnabled())
-                    .invisibleModeEnabled(targetPresence.isInvisibleModeEnabled());
+                    .invisibleModeEnabled(targetPresence.isInvisibleModeEnabled())
+                    .hideLastSeenEnabled(targetPresence.isHideLastSeenEnabled());
         } else {
-            // Other users see apparent status
+            // Other users see apparent (Invisible-masked) status, live from Redis.
             PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
             builder.status(apparentStatus.name());
 
@@ -107,12 +112,14 @@ public class PresenceController {
                     || targetPresence.isHideLastSeenEnabled()) {
                 builder.lastSeenAt(null);
             } else {
-                builder.lastSeenAt(targetPresence.getLastSeenAt().toString());
+                java.time.Instant lastSeen = presenceService.getLastSeen(targetUser);
+                builder.lastSeenAt(lastSeen != null ? lastSeen.toString() : null);
             }
 
             // Hide configuration flags for other users
             builder.ghostModeEnabled(false)
-                    .invisibleModeEnabled(false);
+                    .invisibleModeEnabled(false)
+                    .hideLastSeenEnabled(false);
         }
 
         return ResponseEntity.ok(SuccessResponseDto.success(builder.build()));

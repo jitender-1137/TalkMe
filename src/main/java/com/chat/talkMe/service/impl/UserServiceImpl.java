@@ -289,18 +289,22 @@ public class UserServiceImpl implements UserService {
         }
         response.setBlocked(isBlocked);
 
+        // Flags come from the durable DB record; live status + last-seen come from Redis
+        // (the DB status/last-seen are stale by design — only written on OFFLINE).
         UserPresence targetPresence = presenceService.getUserPresence(targetUser);
         PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
+        java.time.Instant lastSeen = presenceService.getLastSeen(targetUser);
+        String lastSeenStr = lastSeen != null ? lastSeen.toString() : null;
 
         response.setPresence(apparentStatus.name().toLowerCase());
 
         if (currentUser != null && currentUser.getId().equals(targetUser.getId())) {
-            response.setLastSeen(targetPresence.getLastSeenAt() != null ? targetPresence.getLastSeenAt().toString() : null);
+            response.setLastSeen(lastSeenStr);
         } else {
             if (targetPresence.isGhostModeEnabled() || targetPresence.isInvisibleModeEnabled()) {
                 response.setLastSeen(null);
             } else {
-                response.setLastSeen(targetPresence.getLastSeenAt() != null ? targetPresence.getLastSeenAt().toString() : null);
+                response.setLastSeen(lastSeenStr);
             }
         }
     }
