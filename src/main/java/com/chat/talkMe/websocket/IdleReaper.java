@@ -38,4 +38,21 @@ public class IdleReaper {
             log.error("[Presence] Idle reaper run failed", e);
         }
     }
+
+    /**
+     * Background staging step one: flip backgrounded users from ONLINE to IDLE once
+     * their ONLINE grace window elapses. {@link #reapExpiredIdleUsers()} then
+     * finalizes them OFFLINE when the following IDLE grace expires.
+     */
+    @Scheduled(fixedDelayString = "${presence.away-reaper.interval-ms:30000}")
+    public void reapBackgroundedAwayUsers() {
+        try {
+            int reaped = presenceService.reapBackgroundedAwayUsers();
+            if (reaped > 0) {
+                log.debug("[Presence] Away reaper flipped {} backgrounded user(s) to IDLE", reaped);
+            }
+        } catch (Exception e) {
+            log.error("[Presence] Away reaper run failed", e);
+        }
+    }
 }

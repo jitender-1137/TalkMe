@@ -52,8 +52,10 @@ public class WebSocketController {
      * returns to the foreground, even though the WebSocket stays connected.
      * <ul>
      *   <li>visible=true  → ONLINE immediately.</li>
-     *   <li>visible=false → IDLE now, with an automatic flip to OFFLINE after a
-     *       10-minute grace window (the user is still connected, just inactive).</li>
+     *   <li>visible=false → stay ONLINE for a grace window, then auto-IDLE
+     *       ("Away"), then OFFLINE — 5 + 5 = 10 minutes total. Staged by
+     *       server-side deadlines (see {@link PresenceService#markBackgrounded}),
+     *       with last-seen frozen to the moment of backgrounding.</li>
      * </ul>
      * The heartbeat watchdog + idle reaper remain the backstop for hard failures
      * (crash/close/network loss).
@@ -67,7 +69,7 @@ public class WebSocketController {
                 presenceService.recordHeartbeat(user);
                 presenceService.setStatus(user, com.chat.talkMe.enums.PresenceStatus.ONLINE);
             } else {
-                presenceService.markIdle(user, java.time.Duration.ofMinutes(10));
+                presenceService.markBackgrounded(user);
             }
         }
     }

@@ -39,9 +39,20 @@ public class PresenceServiceImpl implements PresenceService {
     // Sorted set of scheduled offline deadlines for IDLE users (member = username,
     // score = epoch millis at which they should flip to OFFLINE). Drives IdleReaper.
     private static final String IDLE_DEADLINE_ZSET = "presence:idle-deadlines";
+    // Sorted set of scheduled ONLINE → IDLE deadlines for backgrounded-but-still-
+    // ONLINE users (member = username, score = epoch millis at which they should
+    // flip to IDLE). Drives the background-away reaper. While an entry exists the
+    // user is shown ONLINE; the liveness watchdog leaves them alone.
+    private static final String AWAY_DEADLINE_ZSET = "presence:away-deadlines";
     // Grace window applied when a client's heartbeat stops (closed tab / lost
     // network / crash): show idle for this long before flipping OFFLINE.
     private static final Duration DISCONNECTED_IDLE_GRACE = Duration.ofMinutes(5);
+    // Backgrounding (tab hidden / minimized / PWA backgrounded) is staged:
+    // stay ONLINE for the first window, then IDLE ("Away") for the second, then
+    // OFFLINE — 5 + 5 = 10 minutes total. Both windows are deadline-driven so the
+    // timeline holds even if a backgrounded tab throttles or stops heartbeating.
+    private static final Duration BACKGROUND_ONLINE_GRACE = Duration.ofMinutes(5);
+    private static final Duration BACKGROUND_IDLE_GRACE = Duration.ofMinutes(5);
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -75,9 +86,12 @@ public class PresenceServiceImpl implements PresenceService {
         if (status == PresenceStatus.ONLINE) {
             redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, username, lastSeen.toEpochMilli());
             redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
+            // Coming back to the foreground cancels any staged background away/offline.
+            redisTemplate.opsForZSet().remove(AWAY_DEADLINE_ZSET, username);
         } else if (status == PresenceStatus.OFFLINE) {
             redisTemplate.opsForZSet().remove(HEARTBEAT_ZSET, username);
             redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
+            redisTemplate.opsForZSet().remove(AWAY_DEADLINE_ZSET, username);
             // The ONLY DB write on the presence hot path — and only on OFFLINE — so
             // last-seen is durable across a Redis eviction/restart. ONLINE/IDLE churn
             // (incl. reconnect flapping) never touches the DB.
@@ -118,6 +132,95 @@ public class PresenceServiceImpl implements PresenceService {
         // keeps heartbeating (stays out of the watchdog), and a disconnected user's
         // entry has already been claimed/removed by the watchdog.
         broadcastPresence(user, readFlags(user), PresenceStatus.IDLE, lastSeen);
+    }
+
+    @Override
+    public void markBackgrounded(User user) {
+        String username = user.getUsername();
+        Instant now = Instant.now();
+        log.debug("Marking presence BACKGROUNDED for user {} (online for {}m, then idle)",
+                username, BACKGROUND_ONLINE_GRACE.toMinutes());
+
+        // Stay ONLINE — but FREEZE last-seen to this moment (the real last-active
+        // time). When the user later flips to IDLE/OFFLINE the preserving helpers
+        // keep this timestamp, so others see the true "last seen", not the synthetic
+        // transition time. Status is unchanged (still ONLINE), so no broadcast.
+        String redisKey = REDIS_KEY_PREFIX + username;
+        Map<String, String> presenceMap = new HashMap<>();
+        presenceMap.put("status", PresenceStatus.ONLINE.name());
+        presenceMap.put("lastSeenAt", now.toString());
+        redisTemplate.opsForHash().putAll(redisKey, presenceMap);
+        redisTemplate.expire(redisKey, CACHE_TTL);
+
+        // Schedule the ONLINE → IDLE flip. addIfAbsent: the first background event
+        // owns the deadline — re-fired visibility signals or throttled heartbeats
+        // must not push it back. Cleared the moment the user returns ONLINE.
+        long awayAt = now.plus(BACKGROUND_ONLINE_GRACE).toEpochMilli();
+        redisTemplate.opsForZSet().addIfAbsent(AWAY_DEADLINE_ZSET, username, awayAt);
+        // Defensive: a fresh background window must not inherit a stale idle deadline.
+        redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
+    }
+
+    @Override
+    public void markDisconnected(User user, Duration idleGrace) {
+        String username = user.getUsername();
+        // Already staged (intentional background): the socket dropping is just the OS
+        // suspending the backgrounded tab. Keep the ONLINE→IDLE→OFFLINE timeline and
+        // its frozen last-seen instead of collapsing to IDLE-now.
+        if (redisTemplate.opsForZSet().score(AWAY_DEADLINE_ZSET, username) != null
+                || redisTemplate.opsForZSet().score(IDLE_DEADLINE_ZSET, username) != null) {
+            log.debug("[Presence] Disconnect for {} deferred to staged background transition", username);
+            return;
+        }
+        // Genuine ungraceful disconnect while active → idle grace, then offline.
+        markIdle(user, idleGrace);
+    }
+
+    /**
+     * Flip ONLINE → IDLE for a backgrounded user whose online grace elapsed, WITHOUT
+     * touching last-seen (it was frozen at background time), and schedule the
+     * IDLE → OFFLINE deadline. Mirrors {@link #markIdle} but preserves the timestamp.
+     */
+    private void markIdlePreservingLastSeen(User user, Duration offlineAfter) {
+        String username = user.getUsername();
+        String redisKey = REDIS_KEY_PREFIX + username;
+        Instant lastSeen = liveLastSeen(username, Instant.now());
+
+        Map<String, String> presenceMap = new HashMap<>();
+        presenceMap.put("status", PresenceStatus.IDLE.name());
+        presenceMap.put("lastSeenAt", lastSeen.toString());
+        redisTemplate.opsForHash().putAll(redisKey, presenceMap);
+        redisTemplate.expire(redisKey, CACHE_TTL);
+
+        long deadline = Instant.now().plus(offlineAfter).toEpochMilli();
+        redisTemplate.opsForZSet().addIfAbsent(IDLE_DEADLINE_ZSET, username, deadline);
+        broadcastPresence(user, readFlags(user), PresenceStatus.IDLE, lastSeen);
+    }
+
+    /**
+     * Flip to OFFLINE preserving the existing last-seen (the real last-active time),
+     * rather than stamping "now". Mirrors the OFFLINE branch of {@link #setStatus}.
+     */
+    private void markOfflinePreservingLastSeen(User user) {
+        String username = user.getUsername();
+        String redisKey = REDIS_KEY_PREFIX + username;
+        Instant lastSeen = liveLastSeen(username, Instant.now());
+
+        Map<String, String> presenceMap = new HashMap<>();
+        presenceMap.put("status", PresenceStatus.OFFLINE.name());
+        presenceMap.put("lastSeenAt", lastSeen.toString());
+        redisTemplate.opsForHash().putAll(redisKey, presenceMap);
+        redisTemplate.expire(redisKey, CACHE_TTL);
+
+        redisTemplate.opsForZSet().remove(HEARTBEAT_ZSET, username);
+        redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
+        redisTemplate.opsForZSet().remove(AWAY_DEADLINE_ZSET, username);
+        try {
+            presenceServiceHelper.persistOffline(user.getId(), PresenceStatus.OFFLINE.name(), lastSeen);
+        } catch (Exception e) {
+            log.warn("Persisting OFFLINE last-seen failed for {}", username, e);
+        }
+        broadcastPresence(user, readFlags(user), PresenceStatus.OFFLINE, lastSeen);
     }
 
     /** Raw persisted status from the Redis cache (no privacy/invisible masking). */
@@ -170,6 +273,16 @@ public class PresenceServiceImpl implements PresenceService {
                 redisTemplate.delete("presence:sessions:" + username);
                 continue;
             }
+            // Already in a staged background transition (ONLINE grace or IDLE → OFFLINE
+            // countdown): those flips are deadline-driven and preserve the real
+            // last-seen. The liveness watchdog must NOT pre-empt the grace or stamp a
+            // fresh last-seen, so leave them to their deadline (claim already dropped
+            // their stale heartbeat above).
+            if (redisTemplate.opsForZSet().score(AWAY_DEADLINE_ZSET, username) != null
+                    || redisTemplate.opsForZSet().score(IDLE_DEADLINE_ZSET, username) != null) {
+                redisTemplate.delete("presence:sessions:" + username);
+                continue;
+            }
             log.info("[Presence] Heartbeat lost for {} (>{}s) — marking IDLE for {}m grace",
                     username, timeout.toSeconds(), DISCONNECTED_IDLE_GRACE.toMinutes());
             markIdle(user, DISCONNECTED_IDLE_GRACE);
@@ -200,8 +313,42 @@ public class PresenceServiceImpl implements PresenceService {
                 continue;
             }
             log.info("[Presence] Idle grace expired for {} — marking OFFLINE", username);
-            setStatus(user, PresenceStatus.OFFLINE);
+            // Preserve the real last-active time (frozen at background / disconnect),
+            // instead of stamping the offline-flip moment.
+            markOfflinePreservingLastSeen(user);
             redisTemplate.delete("presence:sessions:" + username);
+            reaped++;
+        }
+        return reaped;
+    }
+
+    @Override
+    @Transactional
+    public int reapBackgroundedAwayUsers() {
+        long now = Instant.now().toEpochMilli();
+        java.util.Set<String> due = redisTemplate.opsForZSet().rangeByScore(AWAY_DEADLINE_ZSET, 0, now);
+        if (due == null || due.isEmpty()) {
+            return 0;
+        }
+        int reaped = 0;
+        for (String username : due) {
+            // Claim atomically so multiple app instances don't double-broadcast.
+            Long removed = redisTemplate.opsForZSet().remove(AWAY_DEADLINE_ZSET, username);
+            if (removed == null || removed == 0) {
+                continue;
+            }
+            User user = userRepository.findByUsername(username).orElse(null);
+            if (user == null) {
+                continue;
+            }
+            // If they returned to the foreground (ONLINE re-stamped, deadline cleared)
+            // or already went OFFLINE, there is nothing to flip.
+            if (rawStatus(username) != PresenceStatus.ONLINE) {
+                continue;
+            }
+            log.info("[Presence] Background online-grace elapsed for {} — marking IDLE for {}m grace",
+                    username, BACKGROUND_IDLE_GRACE.toMinutes());
+            markIdlePreservingLastSeen(user, BACKGROUND_IDLE_GRACE);
             reaped++;
         }
         return reaped;
@@ -249,6 +396,31 @@ public class PresenceServiceImpl implements PresenceService {
         }
 
         return PresenceStatus.valueOf(userPresence.getStatus());
+    }
+
+    @Override
+    public java.util.Set<String> getOnlineUsernames() {
+        // Candidate live users (ONLINE seeds the heartbeat set; OFFLINE removes it).
+        java.util.Set<String> live = redisTemplate.opsForZSet().range(HEARTBEAT_ZSET, 0, -1);
+        if (live == null || live.isEmpty()) {
+            return java.util.Collections.emptySet();
+        }
+        java.util.Set<String> online = new java.util.HashSet<>();
+        for (String username : live) {
+            Map<Object, Object> presence = redisTemplate.opsForHash().entries(REDIS_KEY_PREFIX + username);
+            if (presence == null || presence.isEmpty()) {
+                continue;
+            }
+            // Mirror getStatus(): Invisible mode is masked to OFFLINE, and only a
+            // literal ONLINE status counts (IDLE/AWAY users are not "online").
+            if (Boolean.parseBoolean((String) presence.get("invisibleModeEnabled"))) {
+                continue;
+            }
+            if (PresenceStatus.ONLINE.name().equals(presence.get("status"))) {
+                online.add(username);
+            }
+        }
+        return online;
     }
 
     @Override

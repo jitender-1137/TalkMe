@@ -29,6 +29,7 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
     private final WebPushService webPushService;
     private final WebPushProperties webPushProperties;
     private final ObjectMapper objectMapper;
+    private final com.chat.talkMe.security.JwtTokenProvider jwtTokenProvider;
 
     @Override
     @Transactional
@@ -46,7 +47,7 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         //    push subscriptions (installed PWA or an explicit browser opt-in).
         //    sendToUser is a no-op when the recipient has no subscriptions.
         if (webPushProperties.isEnabled()) {
-            String payload = buildPayload(chatUuid, message, senderName, senderAvatar, newCount);
+            String payload = buildPayload(recipient, chatUuid, message, senderName, senderAvatar, newCount);
             if (payload != null) {
                 webPushService.sendToUser(recipient.getId(), payload);
             }
@@ -72,7 +73,7 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         }
     }
 
-    private String buildPayload(String chatUuid, MessageResponse m, String senderName,
+    private String buildPayload(User recipient, String chatUuid, MessageResponse m, String senderName,
                                 String senderAvatar, int badge) {
         try {
             Map<String, Object> data = new HashMap<>();
@@ -84,6 +85,12 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
             data.put("messageId", m.getId());   // used as notification tag → de-dup
             data.put("badge", badge);
             data.put("timestamp", m.getCreatedAt());
+            // Signed, narrowly-scoped token the service worker posts back on receipt
+            // so the server can mark this chat delivered for the recipient and notify
+            // the sender (the WhatsApp "double tick" while the recipient is
+            // backgrounded). Path is relative to the app origin (same-origin deploy).
+            data.put("deliveryToken", jwtTokenProvider.generateDeliveryToken(recipient.getUsername(), chatUuid));
+            data.put("deliveryAck", "/api/v1/push/delivered");
             return objectMapper.writeValueAsString(data);
         } catch (Exception e) {
             log.error("[WebPush] Failed to build payload", e);

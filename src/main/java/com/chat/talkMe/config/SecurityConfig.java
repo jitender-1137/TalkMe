@@ -109,7 +109,10 @@ public class SecurityConfig {
                 "/api/v1/swagger-ui/**", "/swagger-ui/**",
                 "/api/v1/ws/**", "/ws/**",
                 "/api/v1/uploads/media", "/uploads/media",
-                "/api/v1/users/lobby", "/users/lobby"
+                "/api/v1/users/lobby", "/users/lobby",
+                // Push delivery-ack: authorized by the signed token in the body,
+                // not a Bearer header (the service worker has no access token).
+                "/api/v1/push/delivered", "/push/delivered"
         };
     }
 }

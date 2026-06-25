@@ -20,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,10 +66,16 @@ public class DiscoverServiceImpl implements DiscoverService {
             }
         }
 
-        Pageable pageable = PageRequest.of(page, limit, Sort.by(
-                Sort.Order.desc("onlineSortWeight"),
-                Sort.Order.asc("name")
-        ));
+        // Online-first ordering is applied at the DB layer inside the Specification
+        // below (via a CASE on the live online set), so it holds ACROSS pagination —
+        // not just within a page. The old static Sort used the `onlineSortWeight`
+        // column, which is never written, so it always collapsed to name-asc
+        // (alphabetical). Presence is Redis-authoritative, hence the live set here.
+        Pageable pageable = PageRequest.of(page, limit);
+
+        // Apparent-online usernames (Invisible-masked) — exactly the users shown with
+        // a green dot. Empty set ⇒ fall back to plain alphabetical ordering.
+        Set<String> onlineUsernames = presenceService.getOnlineUsernames();
 
         Set<Interest> interestEnums = new HashSet<>();
         if (interests != null && !interests.isBlank()) {
@@ -128,6 +133,18 @@ public class DiscoverServiceImpl implements DiscoverService {
             // Country filter
             if (country != null && !country.isBlank() && !country.equalsIgnoreCase("all") && !country.equalsIgnoreCase("any")) {
                 predicates.add(cb.equal(cb.lower(root.get("country")), country.toLowerCase().trim()));
+            }
+
+            // Online-first ordering: ONLINE users rank 0 (top), everyone else 1,
+            // then alphabetical by name. Skip on the COUNT query (Long result type),
+            // where an ORDER BY is invalid and unnecessary.
+            if (q.getResultType() != Long.class) {
+                jakarta.persistence.criteria.Expression<Integer> onlineRank = onlineUsernames.isEmpty()
+                        ? cb.literal(1)
+                        : cb.<Integer>selectCase()
+                            .when(root.get("username").in(onlineUsernames), 0)
+                            .otherwise(1);
+                q.orderBy(cb.asc(onlineRank), cb.asc(root.get("name")));
             }
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));

@@ -8,8 +8,11 @@ import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.security.JwtTokenProvider;
+import com.chat.talkMe.service.ChatService;
 import com.chat.talkMe.service.NotificationDispatchService;
 import com.chat.talkMe.service.WebPushService;
+import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +30,8 @@ public class PushController {
     private final WebPushProperties webPushProperties;
     private final UserRepository userRepository;
     private final NotificationDispatchService notificationDispatchService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final ChatService chatService;
 
     /** VAPID public key the browser needs to create a push subscription. */
     @GetMapping("/vapid-public-key")
@@ -66,5 +71,33 @@ public class PushController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         int count = notificationDispatchService.recomputeUnread(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(Map.of("totalUnread", count)));
+    }
+
+    /**
+     * Delivery acknowledgement from the service worker, fired when a push is
+     * RECEIVED on the recipient's device (even while their tab/app is
+     * backgrounder and the WebSocket is closed). Marks the chat delivered for the
+     * recipient and broadcasts a DELIVERED receipt to the sender — the WhatsApp
+     * "double tick" without the recipient having to reopen the app.
+     *
+     * Public (no Bearer auth): the signed, short-lived delivery token in the body
+     * IS the authorization — it only grants "mark this one chat delivered for this
+     * one user". Best-effort: always returns 200 so the SW never retries noisily.
+     */
+    @PostMapping("/delivered")
+    public ResponseEntity<ResponseDto<Void>> ackDelivered(@RequestBody Map<String, String> body) {
+        String token = body != null ? body.get("token") : null;
+        if (token != null) {
+            Claims claims = jwtTokenProvider.parseDeliveryToken(token);
+            if (claims != null) {
+                String username = claims.getSubject();
+                String chatUuid = claims.get("chatUuid", String.class);
+                if (username != null && chatUuid != null) {
+                    userRepository.findByUsername(username).ifPresent(user ->
+                            chatService.markDelivered(chatUuid, user));
+                }
+            }
+        }
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "ok", "TM_283"));
     }
 }

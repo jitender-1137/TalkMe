@@ -88,12 +88,15 @@ public class WebSocketPresenceListener {
             }
         }
 
-        // Last session gone (tab closed / navigated away). Don't drop straight to
-        // OFFLINE — show IDLE for a 5-minute grace window and let the idle reaper
-        // flip to OFFLINE afterwards. A quick reconnect (refresh, brief network
-        // blip) re-fires CONNECT → ONLINE and cancels the pending offline.
+        // Last session gone (tab closed / navigated away / OS suspended a
+        // backgrounded tab). Don't drop straight to OFFLINE — show IDLE for a
+        // 5-minute grace and let the idle reaper flip OFFLINE afterwards. A quick
+        // reconnect (refresh, brief network blip) re-fires CONNECT → ONLINE and
+        // cancels the pending offline. markDisconnected defers to an in-progress
+        // staged background transition (intentional minimize) so the ONLINE grace
+        // and frozen last-seen are preserved rather than collapsing to IDLE now.
         if (isLastSession) {
-            presenceService.markIdle(user, Duration.ofMinutes(5));
+            presenceService.markDisconnected(user, Duration.ofMinutes(5));
             try {
                 disconnectHandlerService.handleDisconnect(username);
             } catch (Exception e) {
