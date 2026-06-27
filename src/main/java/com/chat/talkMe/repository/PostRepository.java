@@ -10,12 +10,16 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
     Optional<Post> findByUuid(UUID uuid);
+    Optional<Post> findByShortCode(String shortCode);
+    boolean existsByShortCode(String shortCode);
+    List<Post> findByShortCodeIsNull();
     Page<Post> findByUserAndIsDeletedFalse(User user, Pageable pageable);
     Page<Post> findByIsDeletedFalse(Pageable pageable);
     long countByUserAndIsDeletedFalse(User user);

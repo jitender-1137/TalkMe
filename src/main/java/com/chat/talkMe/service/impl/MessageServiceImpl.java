@@ -12,6 +12,7 @@ import com.chat.talkMe.dto.request.ReactToMessageRequest;
 import com.chat.talkMe.mapper.MessageMapper;
 import com.chat.talkMe.repository.*;
 import com.chat.talkMe.service.MessageService;
+import com.chat.talkMe.service.PresenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -43,6 +44,7 @@ public class MessageServiceImpl implements MessageService {
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final OutboxEventRepository outboxEventRepository;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final PresenceService presenceService;
 
     @Override
     @Transactional
@@ -245,15 +247,64 @@ public class MessageServiceImpl implements MessageService {
     @Override
     @Transactional
     public void deleteMessage(String chatUuid, String messageUuid, User currentUser) {
+        Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+
+        // Only chat members may delete within a chat (in either direction).
+        chatMemberRepository.findByChatAndUser(chat, currentUser)
+                .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
+
         Message message = messageRepository.findByUuid(UUID.fromString(messageUuid))
                 .orElseThrow(() -> new NotFoundException("Message not found", "TM_161"));
 
-        if (!message.getSender().getId().equals(currentUser.getId())) {
-            throw new ForbiddenException("Cannot delete message of another user", "TM_103");
+        if (!message.getChat().getId().equals(chat.getId())) {
+            throw new ForbiddenException("Message does not belong to this chat", "TM_162");
         }
 
-        message.setDeleted(true);
-        messageRepository.save(message);
+        boolean isSender = message.getSender().getId().equals(currentUser.getId());
+        if (isSender) {
+            // Sender deletes their own message → delete for EVERYONE. Tombstone it
+            // globally and broadcast so any ONLINE recipient's view updates in real
+            // time ("This message was deleted").
+            message.setDeleted(true);
+
+            // A recipient who is OFFLINE right now will miss the live event and
+            // never saw it in-session — so for them, hide the message entirely
+            // rather than surfacing a "This message was deleted" placeholder when
+            // they come back. (Online recipients keep the tombstone.)
+            for (ChatMember m : chat.getMembers()) {
+                User u = m.getUser();
+                if (u == null || u.getId().equals(currentUser.getId())) continue;
+                if (!presenceService.isUserOnline(u)) {
+                    message.getDeletedForUserIds().add(u.getId());
+                }
+            }
+
+            messageRepository.save(message);
+            broadcastMessageDeleted(chatUuid, messageUuid);
+        } else {
+            // Recipient deletes someone else's message → delete for ME only. Hide it
+            // for this user; the sender (and anyone else) keeps seeing it. No broadcast.
+            message.getDeletedForUserIds().add(currentUser.getId());
+            messageRepository.save(message);
+        }
+    }
+
+    /** Notifies chat subscribers that a message was deleted for everyone (tombstone). */
+    private void broadcastMessageDeleted(String chatUuid, String messageUuid) {
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("chatId", chatUuid);
+            payload.put("messageId", messageUuid);
+
+            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            eventWrapper.put("event", "message_deleted");
+            eventWrapper.put("payload", payload);
+
+            messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
+        } catch (Exception e) {
+            log.error("WebSocket message-deleted broadcast failed", e);
+        }
     }
 
     @Override

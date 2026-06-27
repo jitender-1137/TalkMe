@@ -44,6 +44,14 @@ public class PostController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    @GetMapping("/by-code/{code}")
+    public ResponseEntity<ResponseDto<PostResponse>> getPostByShortCode(
+            @PathVariable("code") String shortCode,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        PostResponse response = postService.getPostByShortCode(shortCode, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<ResponseDto<PostResponse>> updatePost(
             @PathVariable("id") String postUuid,
@@ -106,8 +114,19 @@ public class PostController {
     @GetMapping("/{id}/comments")
     public ResponseEntity<ResponseDto<Page<PostCommentResponse>>> getComments(
             @PathVariable("id") String postUuid,
-            @PageableDefault(size = 15, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<PostCommentResponse> response = postService.getComments(postUuid, pageable);
+            @PageableDefault(size = 15, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Page<PostCommentResponse> response = postService.getComments(postUuid, pageable, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
+    @GetMapping("/{id}/comments/{commentId}/replies")
+    public ResponseEntity<ResponseDto<Page<PostCommentResponse>>> getReplies(
+            @PathVariable("id") String postUuid,
+            @PathVariable("commentId") String commentUuid,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Page<PostCommentResponse> response = postService.getReplies(postUuid, commentUuid, pageable, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
@@ -128,6 +147,24 @@ public class PostController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         postService.deleteComment(postUuid, commentUuid, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Comment deleted from post", "TM_220"));
+    }
+
+    @PostMapping("/{id}/comments/{commentId}/like")
+    public ResponseEntity<ResponseDto<Void>> likeComment(
+            @PathVariable("id") String postUuid,
+            @PathVariable("commentId") String commentUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        postService.likeComment(postUuid, commentUuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Comment liked", "TM_223"));
+    }
+
+    @DeleteMapping("/{id}/comments/{commentId}/like")
+    public ResponseEntity<ResponseDto<Void>> unlikeComment(
+            @PathVariable("id") String postUuid,
+            @PathVariable("commentId") String commentUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        postService.unlikeComment(postUuid, commentUuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Comment unliked", "TM_224"));
     }
 
     @PostMapping("/{id}/bookmark")

@@ -4,7 +4,9 @@ import com.chat.talkMe.enums.MessageType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "messages", uniqueConstraints = {
@@ -75,4 +77,20 @@ public class Message extends BaseEntity {
     @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<MessageAttachment> attachments = new ArrayList<>();
+
+    /**
+     * "Delete for me" tracking: user ids that have hidden this message only on
+     * their own side. The global {@code isDeleted} flag (from BaseEntity) means
+     * "deleted for everyone" (sender removed it → tombstone for all). This set is
+     * the per-user variant: a recipient deleting a message they didn't send just
+     * adds their id here, so it's filtered out of their queries but stays for the
+     * sender.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "message_deleted_for",
+            joinColumns = @JoinColumn(name = "message_id"),
+            indexes = @Index(name = "idx_message_deleted_for_user", columnList = "user_id"))
+    @Column(name = "user_id", nullable = false)
+    @Builder.Default
+    private Set<Long> deletedForUserIds = new HashSet<>();
 }

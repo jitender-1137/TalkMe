@@ -32,6 +32,7 @@ public class PostServiceImpl implements PostService {
     private final PostMediaRepository postMediaRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
+    private final PostCommentLikeRepository postCommentLikeRepository;
     private final PostBookmarkRepository postBookmarkRepository;
     private final UserRepository userRepository;
     private final UserMapper userMapper;
@@ -43,6 +44,7 @@ public class PostServiceImpl implements PostService {
         Post post = Post.builder()
                 .user(currentUser)
                 .content(request.getContent())
+                .shortCode(com.chat.talkMe.util.ShortCodes.unique(c -> !postRepository.existsByShortCode(c)))
                 .build();
 
         post = postRepository.save(post);
@@ -69,6 +71,17 @@ public class PostServiceImpl implements PostService {
     @Transactional(readOnly = true)
     public PostResponse getPost(String postUuid, User currentUser) {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
+        if (post.isDeleted()) {
+            throw new NotFoundException("Post not found", "TM_211");
+        }
+        return mapToPostResponse(post, currentUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PostResponse getPostByShortCode(String shortCode, User currentUser) {
+        Post post = postRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
         if (post.isDeleted()) {
             throw new NotFoundException("Post not found", "TM_211");
@@ -192,7 +205,7 @@ public class PostServiceImpl implements PostService {
             );
         }
 
-        return mapToCommentResponse(comment);
+        return mapToCommentResponse(comment, currentUser);
     }
 
     @Override
@@ -211,6 +224,40 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
+    public void likeComment(String postUuid, String commentUuid, User currentUser) {
+        PostComment comment = postCommentRepository.findByUuid(UUID.fromString(commentUuid))
+                .orElseThrow(() -> new NotFoundException("Comment not found", "TM_221"));
+
+        if (postCommentLikeRepository.existsByCommentAndUser(comment, currentUser)) {
+            return; // already liked — idempotent
+        }
+
+        PostCommentLike like = PostCommentLike.builder().comment(comment).user(currentUser).build();
+        postCommentLikeRepository.save(like);
+
+        if (!comment.getUser().getId().equals(currentUser.getId())) {
+            notificationService.createNotification(
+                comment.getUser(),
+                "New Like",
+                currentUser.getUsername() + " liked your comment.",
+                "LIKE",
+                comment.getPost().getUuid().toString()
+            );
+        }
+    }
+
+    @Override
+    @Transactional
+    public void unlikeComment(String postUuid, String commentUuid, User currentUser) {
+        PostComment comment = postCommentRepository.findByUuid(UUID.fromString(commentUuid))
+                .orElseThrow(() -> new NotFoundException("Comment not found", "TM_221"));
+
+        postCommentLikeRepository.findByCommentAndUser(comment, currentUser)
+                .ifPresent(postCommentLikeRepository::delete);
+    }
+
+    @Override
+    @Transactional
     public PostCommentResponse editComment(String postUuid, String commentUuid, PostCommentRequest request, User currentUser) {
         PostComment comment = postCommentRepository.findByUuid(UUID.fromString(commentUuid))
                 .orElseThrow(() -> new NotFoundException("Comment not found", "TM_221"));
@@ -221,7 +268,7 @@ public class PostServiceImpl implements PostService {
 
         comment.setContent(request.getContent());
         comment = postCommentRepository.save(comment);
-        return mapToCommentResponse(comment);
+        return mapToCommentResponse(comment, currentUser);
     }
 
     @Override
@@ -258,7 +305,7 @@ public class PostServiceImpl implements PostService {
                 .collect(Collectors.toList());
 
         List<PostCommentResponse> commentsRes = postCommentRepository.findByPostAndParentNullOrderByCreatedAtAsc(post).stream()
-                .map(this::mapToCommentResponse)
+                .map(c -> mapToCommentResponse(c, currentUser))
                 .collect(Collectors.toList());
 
         boolean liked = postLikeRepository.existsByPostAndUser(post, currentUser);
@@ -266,6 +313,7 @@ public class PostServiceImpl implements PostService {
 
         return PostResponse.builder()
                 .id(post.getUuid().toString())
+                .shortCode(post.getShortCode())
                 .user(userMapper.toAuthUserResponse(post.getUser()))
                 .content(post.getContent())
                 .media(mediaRes)
@@ -280,15 +328,25 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<PostCommentResponse> getComments(String postUuid, Pageable pageable) {
+    public Page<PostCommentResponse> getComments(String postUuid, Pageable pageable, User currentUser) {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
 
         return postCommentRepository.findByPostAndParentIsNull(post, pageable)
-                .map(this::mapToCommentResponse);
+                .map(c -> mapToCommentResponse(c, currentUser));
     }
 
-    private PostCommentResponse mapToCommentResponse(PostComment c) {
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PostCommentResponse> getReplies(String postUuid, String commentUuid, Pageable pageable, User currentUser) {
+        PostComment parent = postCommentRepository.findByUuid(UUID.fromString(commentUuid))
+                .orElseThrow(() -> new NotFoundException("Comment not found", "TM_221"));
+
+        return postCommentRepository.findReplies(parent, pageable)
+                .map(c -> mapToCommentResponse(c, currentUser));
+    }
+
+    private PostCommentResponse mapToCommentResponse(PostComment c, User currentUser) {
         return PostCommentResponse.builder()
                 .id(c.getUuid().toString())
                 .userId(c.getUser().getUuid().toString())
@@ -297,6 +355,10 @@ public class PostServiceImpl implements PostService {
                 .profileImage(c.getUser().getProfileImage())
                 .content(c.getContent())
                 .createdAt(c.getCreatedAt().toString())
+                .likesCount(postCommentLikeRepository.countByComment(c))
+                .likedByMe(currentUser != null && postCommentLikeRepository.existsByCommentAndUser(c, currentUser))
+                .parentId(c.getParent() != null ? c.getParent().getUuid().toString() : null)
+                .replyCount(postCommentRepository.countReplies(c))
                 .build();
     }
 }

@@ -21,6 +21,10 @@ public class Post extends BaseEntity {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
+    // Opaque, URL-safe code for shareable post links (Instagram-style /post/{code}).
+    @Column(name = "short_code", unique = true, length = 16)
+    private String shortCode;
+
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PostMedia> media = new ArrayList<>();

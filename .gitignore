@@ -41,3 +41,6 @@ out/
 src/main/resources/static/
 /.ai/
 /.idea/
+
+# Local secrets — never commit
+.env

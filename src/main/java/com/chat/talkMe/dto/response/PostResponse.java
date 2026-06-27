@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PostResponse {
     private String id; // maps uuid
+    private String shortCode; // for shareable /post/{shortCode} links
     private AuthUserResponse user;
     private String content;
     private List<PostMediaResponse> media;

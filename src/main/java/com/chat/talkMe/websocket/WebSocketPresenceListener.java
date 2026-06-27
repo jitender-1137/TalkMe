@@ -56,6 +56,14 @@ public class WebSocketPresenceListener {
 
         // Update status to ONLINE
         presenceService.setStatus(user, PresenceStatus.ONLINE);
+
+        // Reconnected within the match grace window? Abort the pending teardown and
+        // resume the session (peer is told STRANGER_RECONNECTED). No-op otherwise.
+        try {
+            disconnectHandlerService.cancelDisconnect(username);
+        } catch (Exception e) {
+            log.error("Failed to cancel pending match disconnect on reconnect for {}", username, e);
+        }
     }
 
     @EventListener
@@ -98,9 +106,12 @@ public class WebSocketPresenceListener {
         if (isLastSession) {
             presenceService.markDisconnected(user, Duration.ofMinutes(5));
             try {
-                disconnectHandlerService.handleDisconnect(username);
+                // Don't tear the match down immediately — hold it for a grace window so a
+                // backgrounded/blipped client can reconnect and resume (peer sees
+                // "reconnecting…"). MatchDisconnectReaper finalizes it if grace expires.
+                disconnectHandlerService.scheduleDisconnect(username);
             } catch (Exception e) {
-                log.error("Failed to clean up matchmaking state on disconnect", e);
+                log.error("Failed to schedule matchmaking disconnect grace", e);
             }
         }
     }

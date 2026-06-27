@@ -243,7 +243,12 @@ public class PresenceServiceImpl implements PresenceService {
         }
         // Lightweight: just refresh the liveness score. No DB write — the watchdog
         // only cares about the timestamp, and status is already ONLINE from connect.
-        redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, user.getUsername(), Instant.now().toEpochMilli());
+        // Best-effort: a Redis failure must not bubble into the WS message handler.
+        try {
+            redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, user.getUsername(), Instant.now().toEpochMilli());
+        } catch (Exception e) {
+            log.warn("Failed to record heartbeat for {} (Redis unavailable/read-only)", user.getUsername(), e);
+        }
     }
 
     @Override
@@ -388,8 +393,16 @@ public class PresenceServiceImpl implements PresenceService {
         presenceMap.put("invisibleModeEnabled", String.valueOf(userPresence.isInvisibleModeEnabled()));
         presenceMap.put("hideLastSeenEnabled", String.valueOf(userPresence.isHideLastSeenEnabled()));
 
-        redisTemplate.opsForHash().putAll(redisKey, presenceMap);
-        redisTemplate.expire(redisKey, CACHE_TTL);
+        // Best-effort cache warming. The authoritative status has already been
+        // resolved from the DB above, so a failed write (e.g. Redis unavailable or
+        // pointed at a read-only replica) must NOT turn this read into a 500 —
+        // degrade gracefully like RateLimitingFilter does.
+        try {
+            redisTemplate.opsForHash().putAll(redisKey, presenceMap);
+            redisTemplate.expire(redisKey, CACHE_TTL);
+        } catch (Exception e) {
+            log.warn("Failed to warm presence cache for {} (Redis unavailable/read-only) — serving DB value", username, e);
+        }
 
         if (userPresence.isInvisibleModeEnabled()) {
             return PresenceStatus.OFFLINE;

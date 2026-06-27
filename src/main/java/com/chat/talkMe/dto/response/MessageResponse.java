@@ -19,6 +19,7 @@ public class MessageResponse {
     private String messageType; // MessageType enum representation
     private String createdAt;
     private boolean isEdited;
+    private boolean isDeleted; // true = deleted for everyone (tombstone)
     private List<MessageReactionResponse> reactions;
     private List<MessageAttachmentResponse> attachments;
     private String status; // SENT, DELIVERED, READ

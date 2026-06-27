@@ -32,6 +32,16 @@ public class WebSocketController {
     private final UserRepository userRepository;
     private final com.chat.talkMe.service.PresenceService presenceService;
 
+    /** Deadline ZSET for grace-evicting lobby members whose socket dropped. */
+    private static final String LOBBY_LEAVE_ZSET = "lobby:leave-deadlines";
+    /**
+     * Grace after a socket drop before evicting from the lobby. A tab-switch or brief
+     * network blip drops the socket but the client reconnects + re-joins within ~1s, so
+     * this short hold avoids a leave/join flicker for everyone else. An explicit leave
+     * (navigating out of the lobby) still removes the user instantly.
+     */
+    private static final long LOBBY_LEAVE_GRACE_MS = 2000L;
+
     /**
      * Application-level heartbeat. The client publishes here every ~30s; the server
      * refreshes the user's liveness timestamp so {@code PresenceWatchdog} keeps them
@@ -146,6 +156,9 @@ public class WebSocketController {
         String username = principal.getName();
         log.info("User {} joined the lobby", username);
 
+        // A (re)join cancels any pending grace-eviction from a previous socket drop.
+        redisTemplate.opsForZSet().remove(LOBBY_LEAVE_ZSET, username);
+
         // Add to Redis set
         redisTemplate.opsForSet().add("lobby:users", username);
 
@@ -166,6 +179,10 @@ public class WebSocketController {
         if (principal == null) return;
         String username = principal.getName();
         log.info("User {} left the lobby", username);
+
+        // Explicit leave (navigated out of the lobby) is immediate — drop any pending
+        // grace deadline and remove now so others update in real time.
+        redisTemplate.opsForZSet().remove(LOBBY_LEAVE_ZSET, username);
 
         // Remove from Redis set
         redisTemplate.opsForSet().remove("lobby:users", username);
@@ -227,18 +244,15 @@ public class WebSocketController {
         String username = principal.getName();
         log.info("WebSocket connection closed for user: {}", username);
 
-        // Remove from Redis set safely
-        Long removedCount = redisTemplate.opsForSet().remove("lobby:users", username);
-        boolean wasRemoved = removedCount != null && removedCount > 0;
-        
-        if (wasRemoved) {
-            log.info("Removed user {} from lobby due to disconnect", username);
-
-            // Broadcast leave event
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("action", "LEAVE");
-            payload.put("username", username);
-            messagingTemplate.convertAndSend("/topic/lobby", (Object) payload);
+        // Don't evict from the lobby immediately. A backgrounded PWA / tab-switch /
+        // brief blip drops the socket, but the client reconnects and re-joins shortly.
+        // Record a short grace deadline instead; LobbyDisconnectReaper finalizes the
+        // LEAVE only if the user still has no live session when it expires (joinLobby
+        // cancels it on reconnect). An explicit leaveLobby() remains instant.
+        Boolean inLobby = redisTemplate.opsForSet().isMember("lobby:users", username);
+        if (Boolean.TRUE.equals(inLobby)) {
+            long deadline = System.currentTimeMillis() + LOBBY_LEAVE_GRACE_MS;
+            redisTemplate.opsForZSet().add(LOBBY_LEAVE_ZSET, username, deadline);
         }
     }
 }

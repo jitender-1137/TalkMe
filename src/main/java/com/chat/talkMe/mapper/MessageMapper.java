@@ -14,10 +14,14 @@ import org.mapstruct.Mapping;
 public interface MessageMapper {
 
     @Mapping(target = "isEdited", source = "edited")
+    @Mapping(target = "isDeleted", source = "deleted")
     @Mapping(target = "sequenceNumber", source = "id")
     @Mapping(target = "id", expression = "java(message.getUuid().toString())")
     @Mapping(target = "senderId", expression = "java(message.getSender().getUuid().toString())")
     @Mapping(target = "messageType", expression = "java(message.getMessageType().name())")
+    // Never leak the original text of a tombstoned message — clients render their
+    // own "This message was deleted" placeholder off the isDeleted flag.
+    @Mapping(target = "content", expression = "java(message.isDeleted() ? \"This message was deleted\" : message.getContent())")
     @Mapping(target = "createdAt", expression = "java(message.getCreatedAt() != null ? message.getCreatedAt().toString() : null)")
     @Mapping(target = "status", expression = "java(resolveMessageStatus(message))")
     @Mapping(target = "parentMessage", source = "parentMessage")
