@@ -45,6 +45,8 @@ public class MessageServiceImpl implements MessageService {
     private final OutboxEventRepository outboxEventRepository;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final PresenceService presenceService;
+    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final ChatExplicitConsentRepository consentRepository;
 
     @Override
     @Transactional
@@ -103,6 +105,32 @@ public class MessageServiceImpl implements MessageService {
             }
         }
 
+        // ── Content moderation + consent gating ──────────────────────────────
+        // Explicit (vulgar/abusive/sexual) text is hard-blocked in GROUP chats and
+        // held pending mutual consent in 1:1 (PRIVATE/STRANGER) chats. (NSFW media is
+        // screened at upload time.)
+        com.chat.talkMe.enums.ModerationStatus moderationStatus = com.chat.talkMe.enums.ModerationStatus.CLEAN;
+        boolean explicit = moderationService.moderateText(request.getContent()).isExplicit();
+        if (!explicit && type != MessageType.TEXT && request.getFileUrl() != null && !request.getFileUrl().isBlank()) {
+            java.nio.file.Path mediaPath = resolveStoredMedia(request.getFileUrl());
+            if (mediaPath != null) {
+                explicit = moderationService.moderateMedia(mediaPath, type).isExplicit();
+            }
+        }
+        if (explicit) {
+            if (chat.getChatType() == com.chat.talkMe.enums.ChatType.GROUP) {
+                throw new com.chat.talkMe.exception.ContentModerationException(
+                        "Your message contains content that violates our community guidelines.");
+            }
+            com.chat.talkMe.enums.ConsentStatus consent = consentRepository.findByChat(chat)
+                    .map(ChatExplicitConsent::getStatus)
+                    .orElse(com.chat.talkMe.enums.ConsentStatus.NONE);
+            if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED) {
+                // Saved but withheld from the recipient until consent is granted.
+                moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
+            }
+        }
+
         Message message = Message.builder()
                 .chat(chat)
                 .sender(currentUser)
@@ -111,9 +139,11 @@ public class MessageServiceImpl implements MessageService {
                 .messageType(type)
                 .parentMessage(parentMessage)
                 .isBlocked(isBlocked)
+                .moderationStatus(moderationStatus)
                 .build();
 
         message = messageRepository.save(message);
+        final boolean held = moderationStatus == com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
 
         // Attachment mapping
         if (type != MessageType.TEXT && request.getFileUrl() != null) {
@@ -158,7 +188,9 @@ public class MessageServiceImpl implements MessageService {
         //  3. If anything between commit and delivery fails (crash, broker outage), the
         //     outbox row stays PENDING and OutboxPublisherJob re-drives it — no message
         //     is ever lost, and delivery is idempotent so there are no duplicates.
-        if (!isBlocked) {
+        // A message held pending consent must NOT be broadcast — it stays sender-only
+        // until consent is granted, then it's delivered via the `messages_released` event.
+        if (!isBlocked && !held) {
             List<String> recipientUsernames = chat.getMembers().stream()
                     .map(ChatMember::getUser)
                     .filter(u -> u != null && !u.getId().equals(currentUser.getId()))
@@ -305,6 +337,61 @@ public class MessageServiceImpl implements MessageService {
         } catch (Exception e) {
             log.error("WebSocket message-deleted broadcast failed", e);
         }
+    }
+
+    /**
+     * Resolve a stored media fileUrl to an on-disk path for moderation, guarding
+     * against path traversal — only files under the media root are returned.
+     */
+    private java.nio.file.Path resolveStoredMedia(String fileUrl) {
+        try {
+            String candidate = extractStoredPath(fileUrl);
+            if (candidate == null || candidate.isBlank()) {
+                return null;
+            }
+            java.nio.file.Path base = java.nio.file.Paths.get("/opt/media/talkMe").toRealPath();
+            java.nio.file.Path real = java.nio.file.Paths.get(candidate).normalize().toRealPath();
+            return real.startsWith(base) ? real : null;
+        } catch (Exception e) {
+            return null; // not a local path / missing file — skip media moderation
+        }
+    }
+
+    /**
+     * Recover the on-disk path from a message's fileUrl. The web client's response
+     * interceptor rewrites stored paths to "{base}/uploads/media?path={url-encoded
+     * absolute path}", so the fileUrl we receive is normally NOT a raw path. Prefer
+     * the {@code path=} query parameter (url-decoded); otherwise accept an absolute
+     * media path as-is, or resolve a bare filename under the media root. The caller
+     * still enforces the path-traversal guard.
+     */
+    private String extractStoredPath(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return null;
+        }
+        int idx = fileUrl.indexOf("path=");
+        if (idx >= 0) {
+            String raw = fileUrl.substring(idx + "path=".length());
+            int amp = raw.indexOf('&');
+            if (amp >= 0) {
+                raw = raw.substring(0, amp);
+            }
+            return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+        }
+        if (fileUrl.startsWith("/opt/media/")) {
+            return fileUrl; // already an absolute path under the media root
+        }
+        // Bare filename or other URL form → resolve its last segment under the root.
+        String name = fileUrl;
+        int q = name.indexOf('?');
+        if (q >= 0) {
+            name = name.substring(0, q);
+        }
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) {
+            name = name.substring(slash + 1);
+        }
+        return name.isBlank() ? null : "/opt/media/talkMe/" + name;
     }
 
     @Override

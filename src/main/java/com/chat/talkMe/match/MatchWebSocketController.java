@@ -16,6 +16,8 @@ public class MatchWebSocketController {
     private final MatchmakingService matchmakingService;
     private final ChatRoutingService chatRoutingService;
     private final ImagePermissionService imagePermissionService;
+    private final MatchConsentService matchConsentService;
+    private final com.chat.talkMe.match.impl.MatchMessageBufferService matchMessageBuffer;
 
     @MessageMapping("/match/start")
     public void startMatching(Principal principal) {
@@ -23,11 +25,43 @@ public class MatchWebSocketController {
         matchmakingService.startMatching(principal.getName());
     }
 
+    /**
+     * The client sends this right after (re)subscribing to its match queue on connect.
+     * We replay any match messages that were buffered while it had no live socket
+     * (backgrounded / suspended / briefly offline). No-op when nothing is buffered.
+     */
+    @MessageMapping("/match/resume")
+    public void resume(Principal principal) {
+        if (principal == null) return;
+        matchMessageBuffer.flush(principal.getName());
+    }
+
     @MessageMapping("/match/message")
     public void sendMessage(@Payload Map<String, Object> payload, Principal principal) {
         if (principal == null || payload == null) return;
         String content = (String) payload.get("content");
-        chatRoutingService.relayMessage(principal.getName(), content);
+        // Client-generated message id, echoed back if the message is held so the
+        // sender's UI can flag that exact bubble in-place.
+        String clientId = (String) payload.get("clientId");
+        chatRoutingService.relayMessage(principal.getName(), content, clientId);
+    }
+
+    @MessageMapping("/match/typing")
+    public void typing(@Payload boolean typing, Principal principal) {
+        if (principal == null) return;
+        chatRoutingService.relayTyping(principal.getName(), typing);
+    }
+
+    @MessageMapping("/match/accept-consent")
+    public void acceptConsent(Principal principal) {
+        if (principal == null) return;
+        matchConsentService.acceptConsent(principal.getName());
+    }
+
+    @MessageMapping("/match/decline-consent")
+    public void declineConsent(Principal principal) {
+        if (principal == null) return;
+        matchConsentService.declineConsent(principal.getName());
     }
 
     @MessageMapping("/match/gif")

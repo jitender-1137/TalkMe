@@ -126,7 +126,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
 
-        String avatarUrl = storageService.storeFile(file, "avatar");
+        // Avatars live under profiles/<userUuid> (server-derived id → traversal-safe).
+        String avatarUrl = storageService.storeFile(file, "avatar", "profiles/" + user.getUuid());
         user.setProfileImage(avatarUrl);
         userRepository.save(user);
 

@@ -20,6 +20,7 @@ public class MessageResponse {
     private String createdAt;
     private boolean isEdited;
     private boolean isDeleted; // true = deleted for everyone (tombstone)
+    private String moderationStatus; // CLEAN | BLOCKED_PENDING_CONSENT | RELEASED
     private List<MessageReactionResponse> reactions;
     private List<MessageAttachmentResponse> attachments;
     private String status; // SENT, DELIVERED, READ

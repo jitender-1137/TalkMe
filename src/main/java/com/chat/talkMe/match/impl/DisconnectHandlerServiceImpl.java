@@ -31,9 +31,21 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
 
     /** Deadline ZSET of users whose match teardown is on hold pending reconnect. */
     private static final String MATCH_DISCONNECT_ZSET = "match:disconnect-deadlines";
+    /**
+     * Deadline ZSET of dropped users whose peer has NOT yet been told "reconnecting…".
+     * The notice is deferred so a brief drop (quick minimize / network blip) that heals
+     * within {@link #RECONNECT_NOTIFY_DELAY} never surfaces a banner to the peer.
+     */
+    private static final String MATCH_RECONNECTING_NOTIFY_ZSET = "match:reconnecting-notify-deadlines";
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
     /** How long a matched/searching user may be gone before the match is torn down. */
     private static final Duration MATCH_DISCONNECT_GRACE = Duration.ofSeconds(45);
+    /**
+     * Grace before the peer is told "reconnecting…". A minimize/foreground toggle or
+     * network blip typically reconnects well within this window (STOMP retries from 1s),
+     * so the peer sees nothing. Must be shorter than {@link #MATCH_DISCONNECT_GRACE}.
+     */
+    private static final Duration RECONNECT_NOTIFY_DELAY = Duration.ofSeconds(8);
 
     @Override
     public void handleDisconnect(String username) {
@@ -44,6 +56,8 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
 
         // Remove from active user tracking set
         redisTemplate.opsForSet().remove("matchmaking:active_users", username);
+        // Drop any pending (un-fired) reconnecting notice — the match is ending now.
+        redisTemplate.opsForZSet().remove(MATCH_RECONNECTING_NOTIFY_ZSET, username);
 
         // 2. Destroy active session & 3. Notify stranger
         sessionService.getSessionByUser(username).ifPresent(session -> {
@@ -79,16 +93,22 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         // Hold the matchmaking state across a brief disconnect (tab-switch / blip /
         // backgrounded PWA). MatchDisconnectReaper runs the real teardown if the grace
         // expires; cancelDisconnect() aborts it when the user reconnects in time.
-        long deadline = System.currentTimeMillis() + MATCH_DISCONNECT_GRACE.toMillis();
+        long now = System.currentTimeMillis();
+        long deadline = now + MATCH_DISCONNECT_GRACE.toMillis();
 
         var sessionOpt = sessionService.getSessionByUser(username);
         if (sessionOpt.isPresent()) {
             MatchSession session = sessionOpt.get();
             redisTemplate.opsForZSet().add(MATCH_DISCONNECT_ZSET, username, deadline);
-            String stranger = session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
-            notifyStranger(stranger, "STRANGER_RECONNECTING", session.getId());
-            log.info("User {} dropped mid-match — holding session {} for {}s; peer notified RECONNECTING",
-                    username, session.getId(), MATCH_DISCONNECT_GRACE.toSeconds());
+            // Defer the peer notice instead of firing it now: a quick minimize/foreground
+            // toggle or network blip reconnects within RECONNECT_NOTIFY_DELAY and
+            // cancelDisconnect() clears this entry, so the peer never sees "reconnecting…".
+            // The reaper fires it only if the user is still gone past the delay.
+            redisTemplate.opsForZSet().add(MATCH_RECONNECTING_NOTIFY_ZSET, username,
+                    now + RECONNECT_NOTIFY_DELAY.toMillis());
+            log.info("User {} dropped mid-match — holding session {} for {}s; peer notice deferred {}s",
+                    username, session.getId(), MATCH_DISCONNECT_GRACE.toSeconds(),
+                    RECONNECT_NOTIFY_DELAY.toSeconds());
         } else if (Boolean.TRUE.equals(redisTemplate.opsForSet().isMember("matchmaking:active_users", username))) {
             // Still searching (no peer yet) — preserve their queue spot for the grace.
             redisTemplate.opsForZSet().add(MATCH_DISCONNECT_ZSET, username, deadline);
@@ -103,6 +123,15 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         if (removed == null || removed == 0) {
             return; // nothing pending — normal fresh connect
         }
+        // Was the "reconnecting…" notice still deferred (peer never told)? Then this was a
+        // brief drop — resume silently so the peer's UI never flickers a banner.
+        Long noticePending = redisTemplate.opsForZSet().remove(MATCH_RECONNECTING_NOTIFY_ZSET, username);
+        if (noticePending != null && noticePending > 0) {
+            log.info("User {} reconnected within {}s — peer never notified; silent resume",
+                    username, RECONNECT_NOTIFY_DELAY.toSeconds());
+            return;
+        }
+        // The notice had already fired — tell the peer they're back.
         sessionService.getSessionByUser(username).ifPresent(session -> {
             String stranger = session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
             notifyStranger(stranger, "STRANGER_RECONNECTED", session.getId());
@@ -114,6 +143,30 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
     @Override
     public int reapExpiredDisconnects() {
         long now = System.currentTimeMillis();
+
+        // Fire any deferred "reconnecting…" notices: the user is still gone past the
+        // notify delay, so the peer should now learn the chat is mid-reconnect.
+        Set<String> noticeDue = redisTemplate.opsForZSet().rangeByScore(MATCH_RECONNECTING_NOTIFY_ZSET, 0, now);
+        if (noticeDue != null) {
+            for (String username : noticeDue) {
+                Long claimed = redisTemplate.opsForZSet().remove(MATCH_RECONNECTING_NOTIFY_ZSET, username);
+                if (claimed == null || claimed == 0) {
+                    continue; // another instance claimed it, or cancelDisconnect cleared it
+                }
+                // Reconnected after the notice was queued but before we claimed it? Skip.
+                Long live = redisTemplate.opsForSet().size(SESSIONS_KEY_PREFIX + username);
+                if (live != null && live > 0) {
+                    continue;
+                }
+                sessionService.getSessionByUser(username).ifPresent(session -> {
+                    String stranger = session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
+                    notifyStranger(stranger, "STRANGER_RECONNECTING", session.getId());
+                    log.info("User {} still gone after {}s — peer notified RECONNECTING (session {})",
+                            username, RECONNECT_NOTIFY_DELAY.toSeconds(), session.getId());
+                });
+            }
+        }
+
         Set<String> due = redisTemplate.opsForZSet().rangeByScore(MATCH_DISCONNECT_ZSET, 0, now);
         if (due == null || due.isEmpty()) {
             return 0;

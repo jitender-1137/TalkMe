@@ -24,14 +24,14 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}
+      password: ${REDIS_PASSWORD:talkMeRedis}
       timeout: 2000
       enabled: ${REDIS_ENABLED:false}
-  #### Multipart files ####
+  #### Multipart files (image 2MB / video 30MB — enforced in UploadController) ####
   servlet:
     multipart:
-      max-file-size: 100MB
-      max-request-size: 110MB
+      max-file-size: 30MB
+      max-request-size: 35MB
 
 # CORS configurations
 app:

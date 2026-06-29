@@ -2,6 +2,7 @@ package com.chat.talkMe.controller;
 
 import com.chat.talkMe.dto.request.PostCommentRequest;
 import com.chat.talkMe.dto.request.PostRequest;
+import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.PostCommentResponse;
 import com.chat.talkMe.dto.response.PostResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
@@ -100,6 +101,15 @@ public class PostController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         postService.unlikePost(postUuid, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Post unliked", "TM_215"));
+    }
+
+    @GetMapping("/{id}/likes")
+    public ResponseEntity<ResponseDto<Page<AuthUserResponse>>> getPostLikes(
+            @PathVariable("id") String postUuid,
+            @PageableDefault(size = 30, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Page<AuthUserResponse> response = postService.getPostLikes(postUuid, pageable, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
     @PostMapping("/{id}/comments")

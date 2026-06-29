@@ -24,7 +24,9 @@ import java.util.Set;
         @Index(name = "idx_messages_chat_id_created_at", columnList = "chat_id, created_at"),
         // Sender-scoped lookups / unread fan-out joins (Postgres does not
         // auto-index FK referencing columns).
-        @Index(name = "idx_messages_sender_id", columnList = "sender_id")
+        @Index(name = "idx_messages_sender_id", columnList = "sender_id"),
+        // Release-on-consent query: find held messages per chat.
+        @Index(name = "idx_messages_chat_moderation", columnList = "chat_id, moderation_status")
 })
 @Getter
 @Setter
@@ -65,6 +67,17 @@ public class Message extends BaseEntity {
     @Column(name = "is_blocked", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean isBlocked = false;
+
+    // Content-moderation state (distinct from is_blocked which is user-to-user blocking).
+    // @ColumnDefault gives a real DB DEFAULT so ddl-auto can add this NOT NULL column
+    // to an existing, non-empty table (Postgres backfills existing rows). Unlike
+    // columnDefinition, it isn't injected into a "SET DATA TYPE" clause on later runs,
+    // so it won't generate invalid ALTER statements once the column exists.
+    @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.ColumnDefault("'CLEAN'")
+    @Column(name = "moderation_status", nullable = false, length = 32)
+    @Builder.Default
+    private com.chat.talkMe.enums.ModerationStatus moderationStatus = com.chat.talkMe.enums.ModerationStatus.CLEAN;
 
     @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

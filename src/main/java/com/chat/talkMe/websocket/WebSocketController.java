@@ -31,9 +31,14 @@ public class WebSocketController {
     private final UserService userService;
     private final UserRepository userRepository;
     private final com.chat.talkMe.service.PresenceService presenceService;
+    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
 
     /** Deadline ZSET for grace-evicting lobby members whose socket dropped. */
     private static final String LOBBY_LEAVE_ZSET = "lobby:leave-deadlines";
+    /** Same Redis set the presence listener maintains: non-empty ⇒ a live socket. */
+    private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
+    /** Deep link a lobby-chat notification opens. */
+    private static final String LOBBY_DEEP_LINK = "/#match/lobby";
     /**
      * Grace after a socket drop before evicting from the lobby. A tab-switch or brief
      * network blip drops the socket but the client reconnects + re-joins within ~1s, so
@@ -216,6 +221,27 @@ public class WebSocketController {
 
         // Also echo back to sender
         messagingTemplate.convertAndSendToUser(sender, "/queue/lobby-chat", payload);
+
+        // Recipient backgrounded/suspended (no live socket)? The frame above never
+        // reaches them — fire a Web Push so they still get the message. Lobby is not
+        // anonymous, so the sender's name is fine to show.
+        pushLobbyIfBackgrounded(sender, recipient, content);
+    }
+
+    private void pushLobbyIfBackgrounded(String sender, String recipient, String content) {
+        try {
+            Long live = redisTemplate.opsForSet().size(SESSIONS_KEY_PREFIX + recipient);
+            if (live != null && live > 0) {
+                return; // recipient is connected — in-app delivery already happened
+            }
+            String body = content.length() > 120 ? content.substring(0, 117) + "…" : content;
+            userRepository.findByUsername(recipient).ifPresent(user ->
+                    notificationDispatchService.onEphemeralMessage(
+                            user.getId(), sender, body, LOBBY_DEEP_LINK));
+        } catch (Exception e) {
+            // Push is best-effort and must never break lobby chat.
+            log.warn("[WebPush] lobby push failed for {}", recipient, e);
+        }
     }
 
     @MessageMapping("/lobby/typing")

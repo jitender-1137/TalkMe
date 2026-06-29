@@ -40,6 +40,13 @@ public class StorageServiceImpl implements StorageService {
 
     @Override
     public String storeFile(MultipartFile file, String type) {
+        return storeFile(file, type, "");
+    }
+
+    @Override
+    public String storeFile(MultipartFile file, String type, String subdir) {
+        Path targetDir = resolveTargetDir(subdir);
+
         String originalFileName = file.getOriginalFilename();
         String extension = "";
         if (originalFileName != null && originalFileName.contains(".")) {
@@ -51,19 +58,40 @@ public class StorageServiceImpl implements StorageService {
                 || (contentType != null && contentType.startsWith("video/"));
 
         if (isVideo) {
-            return storeCompressedVideo(file, extension);
+            return storeCompressedVideo(file, extension, targetDir);
         }
 
         // Non-video: store as-is (images are already compressed on the client).
         String fileName = UUID.randomUUID() + extension;
         try {
-            Path targetLocation = STORAGE_PATH.resolve(fileName);
+            Path targetLocation = targetDir.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
             log.info("File stored successfully: {}", targetLocation);
             return targetLocation.toString();
         } catch (IOException e) {
             throw new FileStorageException("Could not store file " + fileName + e);
         }
+    }
+
+    /**
+     * Resolve a relative subdir under the media root, creating it on demand and
+     * guaranteeing the result can never escape the root (defense-in-depth — callers
+     * already build the subdir from a fixed category + a validated UUID). A blank
+     * subdir stores at the root.
+     */
+    private Path resolveTargetDir(String subdir) {
+        Path dir = (subdir == null || subdir.isBlank())
+                ? STORAGE_PATH
+                : STORAGE_PATH.resolve(subdir).normalize();
+        if (!dir.startsWith(STORAGE_PATH)) {
+            throw new FileStorageException("Invalid media subdirectory: " + subdir);
+        }
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new FileStorageException("Could not create media directory: " + dir + " " + e);
+        }
+        return dir;
     }
 
     /**
@@ -75,14 +103,14 @@ public class StorageServiceImpl implements StorageService {
      * fall back to storing the original file untouched — uploads must never fail
      * because compression failed.
      */
-    private String storeCompressedVideo(MultipartFile file, String extension) {
+    private String storeCompressedVideo(MultipartFile file, String extension, Path targetDir) {
         Path tempInput = null;
         try {
             tempInput = Files.createTempFile("talkme-upload-", extension.isEmpty() ? ".tmp" : extension);
             Files.copy(file.getInputStream(), tempInput, StandardCopyOption.REPLACE_EXISTING);
             long originalSize = Files.size(tempInput);
 
-            Path compressedTarget = STORAGE_PATH.resolve(UUID.randomUUID() + ".mp4");
+            Path compressedTarget = targetDir.resolve(UUID.randomUUID() + ".mp4");
             boolean transcoded = transcodeVideo(tempInput, compressedTarget);
 
             if (transcoded
@@ -98,7 +126,7 @@ public class StorageServiceImpl implements StorageService {
 
             // Compression unavailable or not beneficial → keep the original.
             Files.deleteIfExists(compressedTarget);
-            Path originalTarget = STORAGE_PATH.resolve(UUID.randomUUID() + extension);
+            Path originalTarget = targetDir.resolve(UUID.randomUUID() + extension);
             Files.move(tempInput, originalTarget, StandardCopyOption.REPLACE_EXISTING);
             tempInput = null; // moved
             log.info("Video stored without compression: {}", originalTarget);

@@ -55,6 +55,27 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
     }
 
     @Override
+    public void onEphemeralMessage(Long recipientUserId, String title, String body, String url) {
+        if (!webPushProperties.isEnabled() || recipientUserId == null) {
+            return;
+        }
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("type", "ephemeral");
+            data.put("title", title != null && !title.isBlank() ? title : "New message");
+            data.put("body", body);
+            data.put("url", url);
+            // Unique tag per push so successive ephemeral alerts each surface (these
+            // messages have no stable server id to de-dup on).
+            data.put("messageId", java.util.UUID.randomUUID().toString());
+            data.put("timestamp", System.currentTimeMillis());
+            webPushService.sendToUser(recipientUserId, objectMapper.writeValueAsString(data));
+        } catch (Exception e) {
+            log.error("[WebPush] Failed to build ephemeral payload", e);
+        }
+    }
+
+    @Override
     @Transactional
     public int recomputeUnread(User user) {
         int count = (int) messageRepository.countTotalUnreadForUser(user.getId());

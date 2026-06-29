@@ -3,6 +3,14 @@ spring:
     active: local
   application:
     name: talkMe
+  # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.
+  # This is the GLOBAL multipart limit, so it must be the LARGEST allowed media:
+  # videos = 30MB. The stricter per-type image cap (2MB) is enforced in
+  # UploadController; anything over 30MB is rejected with HTTP 413.
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 35MB
   data:
     web:
       pageable:
@@ -156,3 +164,13 @@ webpush:
     public-key: ${VAPID_PUBLIC_KEY:BKCeDr6ImE2uISF6APs0OyMfgoWkXWo-TNpXY1hdnrJyj1CtbH5Joo0tuqRrmXX-Zd1an5Bh7Y4cOQe6hv3yqzQ}
     private-key: ${VAPID_PRIVATE_KEY:pMHBoMj1sI4zsmg2TIg0g870XZbUPElqR-nkOY-FfnQ}
     subject: ${VAPID_SUBJECT:mailto:admin@talkme.app}
+
+# Content moderation (free, self-hosted). Text uses bundled multilingual word-lists;
+# images/video are screened by the free nsfwjs sidecar (see docker-compose `nsfw`).
+moderation:
+  enabled: ${MODERATION_ENABLED:true}
+  nsfw:
+    enabled: ${NSFW_ENABLED:true}
+    base-url: ${NSFW_BASE_URL:http://localhost:8081}
+
+NSFW_BASE_URL: http://nsfw.parkarspot.com

@@ -14,7 +14,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-talkMe_prod}
       POSTGRES_USER: ${POSTGRES_USER:-talkMe_prod}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-TalkMe$9211!}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,8 +33,8 @@ services:
     environment:
       # A user created via DEFAULT_USER is NOT loopback-restricted (unlike guest),
       # so the app can authenticate over both AMQP and STOMP.
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?set RABBITMQ_USER in .env}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?set RABBITMQ_PASS in .env}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-talkme}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-talkme_dev_pass}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
@@ -53,12 +53,28 @@ services:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     # Hardened config (disables REPLICAOF/MODULE/CONFIG/etc.) + password from env.
-    command: redis-server /usr/local/etc/redis/redis.conf --requirepass "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass "${REDIS_PASSWORD:-talkMeRedis}"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Free self-hosted NSFW image classifier (nsfwjs). The backend POSTs image bytes
+  # and gets back a verdict — no paid APIs. See moderation.nsfw.base-url.
+  nsfw:
+    build: ./nsfw-service
+    container_name: talkme-nsfw
+    ports:
+      - "${NSFW_PORT:-7999}:8081"
+    environment:
+      NSFW_THRESHOLD: ${NSFW_THRESHOLD:-0.7}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8081/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:

@@ -3,6 +3,7 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.request.PostCommentRequest;
 import com.chat.talkMe.dto.request.PostRequest;
+import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.PostCommentResponse;
 import com.chat.talkMe.dto.response.PostMediaResponse;
 import com.chat.talkMe.dto.response.PostResponse;
@@ -37,10 +38,16 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
+    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
 
     @Override
     @Transactional
     public PostResponse createPost(PostRequest request, User currentUser) {
+        // Public feed is hard-blocked: explicit captions are rejected outright.
+        if (moderationService.moderateText(request.getContent()).isExplicit()) {
+            throw new com.chat.talkMe.exception.ContentModerationException(
+                    "Your post contains content that violates our community guidelines.");
+        }
         Post post = Post.builder()
                 .user(currentUser)
                 .content(request.getContent())
@@ -52,6 +59,16 @@ public class PostServiceImpl implements PostService {
         if (request.getMedia() != null) {
             int order = 0;
             for (var mediaReq : request.getMedia()) {
+                // Public feed → NSFW media is hard-blocked.
+                java.nio.file.Path mediaPath = resolveStoredMedia(mediaReq.getMediaUrl());
+                if (mediaPath != null) {
+                    boolean isVideo = "VIDEO".equalsIgnoreCase(mediaReq.getMediaType());
+                    var mt = isVideo ? com.chat.talkMe.enums.MessageType.VIDEO : com.chat.talkMe.enums.MessageType.IMAGE;
+                    if (moderationService.moderateMedia(mediaPath, mt).isExplicit()) {
+                        throw new com.chat.talkMe.exception.ContentModerationException(
+                                "Your post contains media that violates our community guidelines.");
+                    }
+                }
                 PostMedia media = PostMedia.builder()
                         .post(post)
                         .mediaUrl(mediaReq.getMediaUrl())
@@ -176,8 +193,22 @@ public class PostServiceImpl implements PostService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<AuthUserResponse> getPostLikes(String postUuid, Pageable pageable, User currentUser) {
+        Post post = postRepository.findByUuid(UUID.fromString(postUuid))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
+        return postLikeRepository.findByPost(post, pageable)
+                .map(like -> userMapper.toAuthUserResponse(like.getUser()));
+    }
+
+    @Override
     @Transactional
     public PostCommentResponse addComment(String postUuid, PostCommentRequest request, User currentUser) {
+        // Comments are public → hard-block explicit content.
+        if (moderationService.moderateText(request.getContent()).isExplicit()) {
+            throw new com.chat.talkMe.exception.ContentModerationException(
+                    "Your comment contains content that violates our community guidelines.");
+        }
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
 
@@ -293,6 +324,53 @@ public class PostServiceImpl implements PostService {
 
         postBookmarkRepository.findByPostAndUser(post, currentUser)
                 .ifPresent(postBookmarkRepository::delete);
+    }
+
+    /** Resolve a stored media URL to an on-disk path for moderation (path-traversal safe). */
+    private java.nio.file.Path resolveStoredMedia(String mediaUrl) {
+        try {
+            String candidate = extractStoredPath(mediaUrl);
+            if (candidate == null || candidate.isBlank()) return null;
+            java.nio.file.Path base = java.nio.file.Paths.get("/opt/media/talkMe").toRealPath();
+            java.nio.file.Path real = java.nio.file.Paths.get(candidate).normalize().toRealPath();
+            return real.startsWith(base) ? real : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Recover the on-disk path from a media URL. The web client rewrites stored
+     * paths to "{base}/uploads/media?path={url-encoded absolute path}", so the URL
+     * is normally NOT a raw path. Prefer the {@code path=} query parameter; else
+     * accept an absolute media path, or resolve a bare filename under the root.
+     */
+    private String extractStoredPath(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return null;
+        }
+        int idx = mediaUrl.indexOf("path=");
+        if (idx >= 0) {
+            String raw = mediaUrl.substring(idx + "path=".length());
+            int amp = raw.indexOf('&');
+            if (amp >= 0) {
+                raw = raw.substring(0, amp);
+            }
+            return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
+        }
+        if (mediaUrl.startsWith("/opt/media/")) {
+            return mediaUrl;
+        }
+        String name = mediaUrl;
+        int q = name.indexOf('?');
+        if (q >= 0) {
+            name = name.substring(0, q);
+        }
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) {
+            name = name.substring(slash + 1);
+        }
+        return name.isBlank() ? null : "/opt/media/talkMe/" + name;
     }
 
     private PostResponse mapToPostResponse(Post post, User currentUser) {

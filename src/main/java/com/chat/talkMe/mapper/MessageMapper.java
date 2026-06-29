@@ -15,6 +15,7 @@ public interface MessageMapper {
 
     @Mapping(target = "isEdited", source = "edited")
     @Mapping(target = "isDeleted", source = "deleted")
+    @Mapping(target = "moderationStatus", expression = "java(message.getModerationStatus() != null ? message.getModerationStatus().name() : \"CLEAN\")")
     @Mapping(target = "sequenceNumber", source = "id")
     @Mapping(target = "id", expression = "java(message.getUuid().toString())")
     @Mapping(target = "senderId", expression = "java(message.getSender().getUuid().toString())")
@@ -56,5 +57,8 @@ public interface MessageMapper {
 
     @Mapping(target = "id", expression = "java(parent.getUuid().toString())")
     @Mapping(target = "senderId", expression = "java(parent.getSender().getUuid().toString())")
+    @Mapping(target = "messageType", expression = "java(parent.getMessageType() != null ? parent.getMessageType().name() : \"TEXT\")")
+    @Mapping(target = "fileUrl", expression = "java(parent.getAttachments() != null && !parent.getAttachments().isEmpty() ? parent.getAttachments().get(0).getFileUrl() : null)")
+    @Mapping(target = "fileName", expression = "java(parent.getAttachments() != null && !parent.getAttachments().isEmpty() ? parent.getAttachments().get(0).getFileName() : null)")
     ParentMessageResponse toParentResponse(Message parent);
 }

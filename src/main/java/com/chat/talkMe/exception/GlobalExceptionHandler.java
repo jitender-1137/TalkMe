@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.apache.catalina.connector.ClientAbortException;
@@ -42,6 +43,16 @@ public class GlobalExceptionHandler {
         String localizedMessage = getLocalizedMessage(ex.getMessageCode(), ex.getMessage());
         ResponseDto<Void> response = ResponseDto.error(localizedMessage, ex.getMessageCode(), ex.getErrors());
         return ResponseEntity.status(ex.getStatus()).body(response);
+    }
+
+    // A file over the global multipart cap (30MB) is rejected during parsing — before
+    // the controller runs — so surface a clean 413 instead of a generic 500.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ResponseDto<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        log.warn("Upload exceeded multipart limit: {}", ex.getMessage());
+        ResponseDto<Void> response = ResponseDto.error(
+                "File is too large. Images can be up to 2 MB and videos up to 30 MB.", "TM_493", null);
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
