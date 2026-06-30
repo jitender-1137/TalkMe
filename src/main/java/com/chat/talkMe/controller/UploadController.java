@@ -3,7 +3,9 @@ package com.chat.talkMe.controller;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.dto.response.UploadResponse;
+import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.exception.ServiceException;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.security.CustomUserDetails;
@@ -37,6 +39,10 @@ public class UploadController {
     private final StorageService storageService;
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
+    private final ContentModerationService moderationService;
+
+    /** Upload categories whose images/videos must be CLEAN (publicly visible content). */
+    private static final java.util.Set<String> MODERATED_CONTEXTS = java.util.Set.of("profile", "post", "story");
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<UploadResponse>> uploadFile(
@@ -50,6 +56,16 @@ public class UploadController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         validateSize(file, type);
+
+        // Publicly-visible images/videos (profile photos, feed posts, stories) must be
+        // clean — reject NSFW uploads up-front, before the file is ever stored. 1:1 /
+        // group conversation media is intentionally NOT hard-blocked here (it's handled
+        // at send time with the consent flow), and stranger/lobby are excluded.
+        if (context != null && MODERATED_CONTEXTS.contains(context.toLowerCase())
+                && moderationService.moderateUpload(file).isExplicit()) {
+            throw new ContentModerationException(
+                    "This image violates our community guidelines and can't be uploaded.");
+        }
 
         String subdir = resolveSubdir(context, contextId, userDetails);
         String url = storageService.storeFile(file, type, subdir);

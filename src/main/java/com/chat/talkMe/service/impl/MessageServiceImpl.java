@@ -235,9 +235,7 @@ public class MessageServiceImpl implements MessageService {
             rows = rows.subList(0, safeLimit);
         }
 
-        List<MessageResponse> items = rows.stream()
-                .map(messageMapper::toMessageResponse)
-                .collect(java.util.stream.Collectors.toList());
+        List<MessageResponse> items = toResponsesGhostAware(rows, currentUser);
 
         // rows are DESC (newest first) → the last item is the oldest; its
         // sequenceNumber is the cursor for the next (older) page.
@@ -260,7 +258,7 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
 
         List<Message> messages = messageRepository.findMessagesAfter(chat, currentUser.getId(), member.getClearedAt(), afterSequence);
-        return messages.stream().map(messageMapper::toMessageResponse).collect(java.util.stream.Collectors.toList());
+        return toResponsesGhostAware(messages, currentUser);
     }
 
     @Override
@@ -273,7 +271,56 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
 
         Page<Message> messages = messageRepository.searchMessagesInChat(chat, query, currentUser.getId(), member.getClearedAt(), pageable);
-        return messages.map(messageMapper::toMessageResponse);
+        java.util.Set<Long> ghostIds = ghostReceiptUserIds(messages.getContent(), currentUser);
+        return messages.map(m -> toResponseGhostAware(m, ghostIds));
+    }
+
+    // ── Ghost-mode receipt suppression (sender-visible status) ──────────────────
+    // A recipient in Ghost mode must never reveal delivered/seen to the sender, so on
+    // a fetch/reload the sender-visible status caps at SENT. (The live WS path is
+    // suppressed in StatusDeliveryService.) Zero overhead when no participant is ghost.
+
+    private List<MessageResponse> toResponsesGhostAware(List<Message> rows, User viewer) {
+        java.util.Set<Long> ghostIds = ghostReceiptUserIds(rows, viewer);
+        return rows.stream()
+                .map(m -> toResponseGhostAware(m, ghostIds))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private MessageResponse toResponseGhostAware(Message m, java.util.Set<Long> ghostIds) {
+        MessageResponse r = messageMapper.toMessageResponse(m);
+        if (!ghostIds.isEmpty()) {
+            r.setStatus(resolveStatusExcludingGhosts(m, ghostIds));
+        }
+        return r;
+    }
+
+    /** Distinct receipt users (other than the viewer) who are in Ghost mode. */
+    private java.util.Set<Long> ghostReceiptUserIds(java.util.Collection<Message> rows, User viewer) {
+        java.util.Map<Long, User> users = new java.util.HashMap<>();
+        for (Message m : rows) {
+            if (m.getReadReceipts() == null) continue;
+            for (var rec : m.getReadReceipts()) {
+                User u = rec.getUser();
+                if (u != null && !u.getId().equals(viewer.getId())) users.putIfAbsent(u.getId(), u);
+            }
+        }
+        if (users.isEmpty()) return java.util.Collections.emptySet();
+        return presenceService.getGhostUserIds(users.values());
+    }
+
+    /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
+    private String resolveStatusExcludingGhosts(Message m, java.util.Set<Long> ghostIds) {
+        if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
+        boolean delivered = false;
+        for (var rec : m.getReadReceipts()) {
+            Long uid = rec.getUser().getId();
+            if (uid.equals(m.getSender().getId())) continue;
+            if (ghostIds.contains(uid)) continue; // ghost recipient → invisible to sender
+            if ("READ".equals(rec.getStatus())) return "READ";
+            if ("DELIVERED".equals(rec.getStatus())) delivered = true;
+        }
+        return delivered ? "DELIVERED" : "SENT";
     }
 
     @Override

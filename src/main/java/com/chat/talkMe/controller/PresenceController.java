@@ -102,19 +102,13 @@ public class PresenceController {
                     .invisibleModeEnabled(targetPresence.isInvisibleModeEnabled())
                     .hideLastSeenEnabled(targetPresence.isHideLastSeenEnabled());
         } else {
-            // Other users see apparent (Invisible-masked) status, live from Redis.
+            // Other users see apparent (Invisible-masked) status + apparent last-seen
+            // (nulled by Invisible / Hide-last-seen) — the single privacy rule lives in
+            // the service so every consumer is consistent.
             PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
             builder.status(apparentStatus.name());
-
-            // Hide last seen from others when ghost / invisible / hide-last-seen is on.
-            if (targetPresence.isGhostModeEnabled()
-                    || targetPresence.isInvisibleModeEnabled()
-                    || targetPresence.isHideLastSeenEnabled()) {
-                builder.lastSeenAt(null);
-            } else {
-                java.time.Instant lastSeen = presenceService.getLastSeen(targetUser);
-                builder.lastSeenAt(lastSeen != null ? lastSeen.toString() : null);
-            }
+            java.time.Instant lastSeen = presenceService.getApparentLastSeen(targetUser);
+            builder.lastSeenAt(lastSeen != null ? lastSeen.toString() : null);
 
             // Hide configuration flags for other users
             builder.ghostModeEnabled(false)

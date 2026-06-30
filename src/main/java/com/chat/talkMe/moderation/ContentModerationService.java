@@ -1,6 +1,7 @@
 package com.chat.talkMe.moderation;
 
 import com.chat.talkMe.enums.MessageType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 
@@ -18,6 +19,14 @@ public interface ContentModerationService {
      * self-hosted NSFW microservice. Returns CLEAN for non-media types.
      */
     ModerationResult moderateMedia(Path storedFile, MessageType type);
+
+    /**
+     * Classify an in-flight upload (image/video) BEFORE it is persisted, by inspecting
+     * its bytes directly — so callers don't depend on resolving a stored URL back to a
+     * filesystem path. Returns CLEAN for non-media uploads or when disabled. Fail-open
+     * if the classifier is unavailable.
+     */
+    ModerationResult moderateUpload(MultipartFile file);
 
     /** Whether moderation is enabled at all (config-gated kill switch). */
     boolean isEnabled();

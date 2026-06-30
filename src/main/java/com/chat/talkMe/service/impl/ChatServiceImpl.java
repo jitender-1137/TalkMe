@@ -418,6 +418,10 @@ public class ChatServiceImpl implements ChatService {
                     .chatUuid(uuid)
                     .eventName(StatusUpdateEvent.DELIVERED)
                     .actorUuid(managedUser.getUuid().toString())
+                    // actorUserId lets the delivery handler suppress the receipt when the
+                    // recipient (this user) is in Ghost mode — was missing, so ghost
+                    // "delivered" still leaked to the sender.
+                    .actorUserId(managedUser.getId())
                     .build();
             persistStatusOutbox(event);
             applicationEventPublisher.publishEvent(event);
@@ -453,6 +457,10 @@ public class ChatServiceImpl implements ChatService {
         List<Chat> chats = chatRepository.findChatsByUser(managedUser);
         Instant now = Instant.now();
 
+        // Ghost recipient: still record delivery (their unread tracking needs it) but
+        // NEVER tell the senders — suppress the outbound "delivered" broadcast.
+        boolean ghost = presenceService != null && presenceService.isGhost(managedUser);
+
         for (Chat chat : chats) {
             // Step 1: Bulk-update all SENT receipts to DELIVERED
             int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
@@ -463,7 +471,7 @@ public class ChatServiceImpl implements ChatService {
 
             boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
-            if (hasUpdates) {
+            if (hasUpdates && !ghost) {
                 try {
                     Map<String, Object> eventWrapper = new HashMap<>();
                     eventWrapper.put("event", "messages_delivered");
@@ -479,6 +487,29 @@ public class ChatServiceImpl implements ChatService {
                 }
             }
         }
+    }
+
+    /** Ids of this chat's members (other than the viewer) who are in Ghost mode. */
+    private java.util.Set<Long> ghostMemberIds(Chat chat, User viewer) {
+        java.util.List<User> others = chat.getMembers().stream()
+                .map(ChatMember::getUser)
+                .filter(u -> u != null && !u.getId().equals(viewer.getId()))
+                .collect(java.util.stream.Collectors.toList());
+        return presenceService.getGhostUserIds(others);
+    }
+
+    /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
+    private String resolveStatusExcludingGhosts(Message m, java.util.Set<Long> ghostIds) {
+        if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
+        boolean delivered = false;
+        for (var rec : m.getReadReceipts()) {
+            Long uid = rec.getUser().getId();
+            if (uid.equals(m.getSender().getId())) continue;
+            if (ghostIds.contains(uid)) continue; // ghost recipient → invisible to sender
+            if ("READ".equals(rec.getStatus())) return "READ";
+            if ("DELIVERED".equals(rec.getStatus())) delivered = true;
+        }
+        return delivered ? "DELIVERED" : "SENT";
     }
 
     private ChatResponse mapToChatResponse(Chat chat, User currentUser) {
@@ -504,7 +535,18 @@ public class ChatServiceImpl implements ChatService {
         }
 
         if (lastMessage != null) {
-            response.setLastMessage(messageMapper.toMessageResponse(lastMessage));
+            MessageResponse lastMessageDto = messageMapper.toMessageResponse(lastMessage);
+            // Ghost recipients must not reveal delivered/seen to the sender — including
+            // the chat-list preview ticks. For the viewer's OWN last message, recompute
+            // the status ignoring receipts from any ghost member (caps at SENT).
+            if (presenceService != null
+                    && lastMessage.getSender().getId().equals(currentUser.getId())) {
+                java.util.Set<Long> ghostIds = ghostMemberIds(chat, currentUser);
+                if (!ghostIds.isEmpty()) {
+                    lastMessageDto.setStatus(resolveStatusExcludingGhosts(lastMessage, ghostIds));
+                }
+            }
+            response.setLastMessage(lastMessageDto);
         }
 
         // Set dynamic properties based on ChatType
@@ -521,11 +563,11 @@ public class ChatServiceImpl implements ChatService {
                 AuthUserResponse otherUserDto = userMapper.toAuthUserResponse(otherUser);
                 if (presenceService != null) {
                     otherUserDto.setPresence(presenceService.getStatus(otherUser).name().toLowerCase());
-                    // Live last-seen from Redis (DB value is stale — only written on OFFLINE).
-                    java.time.Instant lastSeen = presenceService.getLastSeen(otherUser);
-                    if (lastSeen != null) {
-                        otherUserDto.setLastSeen(lastSeen.toString());
-                    }
+                    // Apparent last-seen: nulled for Invisible / Hide-last-seen (privacy
+                    // rule centralized in PresenceService) so the conversation list never
+                    // leaks a hidden last-seen.
+                    java.time.Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
+                    otherUserDto.setLastSeen(lastSeen != null ? lastSeen.toString() : null);
                 }
                 response.setOtherUser(otherUserDto);
                 // Avatar mappings

@@ -82,6 +82,22 @@ public interface PresenceService {
     /** Live last-seen timestamp, read from Redis (the DB value is only durable-on-OFFLINE). */
     java.time.Instant getLastSeen(User user);
 
+    /**
+     * Last-seen as OTHER viewers should see it: {@code null} when the target has
+     * Invisible OR Hide-last-seen enabled (Ghost mode does NOT hide presence —
+     * it only suppresses message receipts). This is the single source of truth for
+     * the last-seen privacy rule; every consumer that shows another user's last-seen
+     * (chat list, friends, profile, lobby, presence endpoint) MUST use this, never
+     * the raw {@link #getLastSeen}.
+     */
+    java.time.Instant getApparentLastSeen(User user);
+
+    /** Whether the user has Ghost mode on (suppresses outbound delivered/seen receipts). */
+    boolean isGhost(User user);
+
+    /** Of the given users, the ids of those in Ghost mode (batched receipt-suppression check). */
+    java.util.Set<Long> getGhostUserIds(java.util.Collection<User> users);
+
     void toggleGhostMode(User user, boolean enabled);
     void toggleInvisibleMode(User user, boolean enabled);
     void toggleHideLastSeen(User user, boolean enabled);

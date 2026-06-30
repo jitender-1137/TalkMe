@@ -461,6 +461,32 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
+    public java.time.Instant getApparentLastSeen(User user) {
+        // Invisible or Hide-last-seen hides the timestamp from others. Ghost does NOT
+        // (ghost only suppresses message receipts; presence is unaffected).
+        PresenceFlags flags = readFlags(user);
+        if (flags.invisible() || flags.hideLastSeen()) {
+            return null;
+        }
+        return getLastSeen(user);
+    }
+
+    @Override
+    public boolean isGhost(User user) {
+        return readFlags(user).ghost();
+    }
+
+    @Override
+    public java.util.Set<Long> getGhostUserIds(java.util.Collection<User> users) {
+        if (users == null || users.isEmpty()) return java.util.Collections.emptySet();
+        java.util.Set<Long> ghosts = new java.util.HashSet<>();
+        for (User u : users) {
+            if (u != null && readFlags(u).ghost()) ghosts.add(u.getId());
+        }
+        return ghosts;
+    }
+
+    @Override
     @Transactional
     public void toggleGhostMode(User user, boolean enabled) {
         User managedUser = ensureManagedUser(user);
@@ -476,16 +502,30 @@ public class PresenceServiceImpl implements PresenceService {
         cacheFlags(username, userPresence.isGhostModeEnabled(),
                 userPresence.isInvisibleModeEnabled(), userPresence.isHideLastSeenEnabled());
 
-        // If ghost mode was enabled, broadcast OFFLINE. If disabled, broadcast the user's
-        // REAL current status from Redis (the DB status is stale — written only on offline).
-        if (enabled) {
-            sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(),
-                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
-        } else {
-            sendWebSocketUpdate(managedUser,
-                    liveStatus(username, userPresence.getStatus()),
-                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
+        // Ghost mode does NOT change presence — it only suppresses outbound message
+        // receipts (see StatusDeliveryService / MessageServiceImpl). Re-broadcast the
+        // user's REAL current status (still subject to Invisible / Hide-last-seen).
+        broadcastCurrent(managedUser, userPresence);
+    }
+
+    /**
+     * Re-broadcast a user's live status/last-seen through {@link #broadcastPresence}
+     * so the Invisible / Hide-last-seen filters are applied consistently. Shared by
+     * all three privacy toggles.
+     */
+    private void broadcastCurrent(User managedUser, UserPresence userPresence) {
+        String username = managedUser.getUsername();
+        PresenceStatus current;
+        try {
+            current = PresenceStatus.valueOf(liveStatus(username, userPresence.getStatus()));
+        } catch (Exception e) {
+            current = PresenceStatus.OFFLINE;
         }
+        PresenceFlags flags = new PresenceFlags(
+                userPresence.isGhostModeEnabled(),
+                userPresence.isInvisibleModeEnabled(),
+                userPresence.isHideLastSeenEnabled());
+        broadcastPresence(managedUser, flags, current, liveLastSeen(username, userPresence.getLastSeenAt()));
     }
 
     @Override
@@ -504,16 +544,9 @@ public class PresenceServiceImpl implements PresenceService {
         cacheFlags(username, userPresence.isGhostModeEnabled(),
                 userPresence.isInvisibleModeEnabled(), userPresence.isHideLastSeenEnabled());
 
-        // If invisible mode was enabled, broadcast OFFLINE. If disabled, broadcast the
-        // user's REAL current status from Redis (the DB status is stale by design now).
-        if (enabled) {
-            sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(),
-                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
-        } else {
-            sendWebSocketUpdate(managedUser,
-                    liveStatus(username, userPresence.getStatus()),
-                    liveLastSeen(username, userPresence.getLastSeenAt()).toString());
-        }
+        // Re-broadcast through broadcastPresence so Invisible (→ OFFLINE) AND a
+        // simultaneously-enabled Hide-last-seen (→ null timestamp) are both applied.
+        broadcastCurrent(managedUser, userPresence);
     }
 
     @Override
@@ -533,19 +566,7 @@ public class PresenceServiceImpl implements PresenceService {
 
         // Status is unchanged — re-broadcast so subscribers pick up the hidden/visible
         // last-seen immediately (broadcastPresence nulls the timestamp when enabled).
-        // Read the live status/last-seen from Redis (the DB values are stale by design).
-        PresenceStatus current;
-        try {
-            current = PresenceStatus.valueOf(liveStatus(username, userPresence.getStatus()));
-        } catch (Exception e) {
-            current = PresenceStatus.OFFLINE;
-        }
-        // Flags are durable settings persisted on every toggle, so the DB values are fresh.
-        PresenceFlags flags = new PresenceFlags(
-                userPresence.isGhostModeEnabled(),
-                userPresence.isInvisibleModeEnabled(),
-                userPresence.isHideLastSeenEnabled());
-        broadcastPresence(managedUser, flags, current, liveLastSeen(username, userPresence.getLastSeenAt()));
+        broadcastCurrent(managedUser, userPresence);
     }
 
     @Override
@@ -649,18 +670,15 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     private void broadcastPresence(User user, PresenceFlags flags, PresenceStatus status, Instant lastSeen) {
-        String username = user.getUsername();
         String statusToBroadcast = status.name();
 
         if (flags.invisible()) {
             statusToBroadcast = PresenceStatus.OFFLINE.name();
         }
 
-        // Under Ghost Mode, we bypass broadcasting presence updates entirely to remain stealthy
-        if (flags.ghost()) {
-            log.debug("Bypassing presence broadcast for user {} due to Ghost Mode", username);
-            return;
-        }
+        // NOTE: Ghost mode intentionally does NOT affect presence broadcasts — it only
+        // suppresses message delivered/seen receipts (StatusDeliveryService /
+        // MessageServiceImpl). A ghost user appears online/last-seen exactly as normal.
 
         // Hide Last Seen: broadcast the status but never the timestamp.
         String lastSeenToBroadcast = flags.hideLastSeen() ? null : (lastSeen != null ? lastSeen.toString() : null);

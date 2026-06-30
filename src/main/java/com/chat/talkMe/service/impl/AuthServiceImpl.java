@@ -68,6 +68,7 @@ public class AuthServiceImpl implements AuthService {
     private final StringRedisTemplate redisTemplate;
     private final EmailService emailService;
     private final com.chat.talkMe.service.WebPushService webPushService;
+    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -162,6 +163,12 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ConflictException("TM_047");
+        }
+
+        // The display name is publicly visible — reject a non-clean one at signup.
+        if (moderationService.moderateText(request.getName()).isExplicit()) {
+            throw new com.chat.talkMe.exception.ContentModerationException(
+                    "Your display name contains content that violates our community guidelines.");
         }
 
         // Generate username from email prefix

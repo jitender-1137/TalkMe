@@ -3,7 +3,6 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.BlockUser;
 import com.chat.talkMe.domain.MatchReport;
-import com.chat.talkMe.domain.UserPresence;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
@@ -11,8 +10,10 @@ import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
@@ -57,6 +58,7 @@ public class UserServiceImpl implements UserService {
     private final StringRedisTemplate redisTemplate;
     private final UserFollowRepository userFollowRepository;
     private final PostRepository postRepository;
+    private final ContentModerationService moderationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -77,6 +79,11 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
 
         if (request.getName() != null) {
+            // Display name is publicly visible everywhere — must stay clean.
+            if (moderationService.moderateText(request.getName()).isExplicit()) {
+                throw new ContentModerationException(
+                        "Your display name contains content that violates our community guidelines.");
+            }
             user.setName(request.getName());
         }
         if (request.getProfileImage() != null) {
@@ -125,6 +132,12 @@ public class UserServiceImpl implements UserService {
     public Map<String, String> uploadAvatar(MultipartFile file, User currentUser) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+
+        // Profile photos are publicly visible — reject NSFW before storing.
+        if (moderationService.moderateUpload(file).isExplicit()) {
+            throw new ContentModerationException(
+                    "This profile photo violates our community guidelines and can't be used.");
+        }
 
         // Avatars live under profiles/<userUuid> (server-derived id → traversal-safe).
         String avatarUrl = storageService.storeFile(file, "avatar", "profiles/" + user.getUuid());
@@ -290,23 +303,21 @@ public class UserServiceImpl implements UserService {
         }
         response.setBlocked(isBlocked);
 
-        // Flags come from the durable DB record; live status + last-seen come from Redis
-        // (the DB status/last-seen are stale by design — only written on OFFLINE).
-        UserPresence targetPresence = presenceService.getUserPresence(targetUser);
+        // Live status + last-seen come from Redis (the DB values are stale by design —
+        // only written on OFFLINE). Status is Invisible-masked via getStatus.
         PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
-        java.time.Instant lastSeen = presenceService.getLastSeen(targetUser);
-        String lastSeenStr = lastSeen != null ? lastSeen.toString() : null;
-
         response.setPresence(apparentStatus.name().toLowerCase());
 
         if (currentUser != null && currentUser.getId().equals(targetUser.getId())) {
-            response.setLastSeen(lastSeenStr);
+            // Owner sees their own real last-seen.
+            java.time.Instant own = presenceService.getLastSeen(targetUser);
+            response.setLastSeen(own != null ? own.toString() : null);
         } else {
-            if (targetPresence.isGhostModeEnabled() || targetPresence.isInvisibleModeEnabled()) {
-                response.setLastSeen(null);
-            } else {
-                response.setLastSeen(lastSeenStr);
-            }
+            // Others: apparent last-seen, nulled for Invisible / Hide-last-seen
+            // (single privacy rule in PresenceService — previously this missed
+            // hide-last-seen, leaking the timestamp).
+            java.time.Instant apparent = presenceService.getApparentLastSeen(targetUser);
+            response.setLastSeen(apparent != null ? apparent.toString() : null);
         }
     }
 

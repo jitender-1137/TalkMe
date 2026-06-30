@@ -178,8 +178,9 @@ public class FriendServiceImpl implements FriendService {
                     AuthUserResponse response = userMapper.toAuthUserResponse(friend);
                     if (presenceService != null) {
                         response.setPresence(presenceService.getStatus(friend).name().toLowerCase());
-                        // Live last-seen from Redis (DB value is stale — only written on OFFLINE).
-                        java.time.Instant lastSeen = presenceService.getLastSeen(friend);
+                        // Apparent last-seen: nulled for Invisible / Hide-last-seen
+                        // (privacy rule centralized in PresenceService).
+                        java.time.Instant lastSeen = presenceService.getApparentLastSeen(friend);
                         if (lastSeen != null) {
                             response.setLastSeen(lastSeen.toString());
                         }

@@ -28,10 +28,17 @@ public class StoryServiceImpl implements StoryService {
     private final StoryRepository storyRepository;
     private final StoryViewRepository storyViewRepository;
     private final UserMapper userMapper;
+    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
 
     @Override
     @Transactional
     public StoryResponse createStory(StoryRequest request, User currentUser) {
+        // Stories are publicly visible — the caption must be clean. (The media image
+        // is hard-blocked at upload time for the "story" context in UploadController.)
+        if (moderationService.moderateText(request.getCaption()).isExplicit()) {
+            throw new com.chat.talkMe.exception.ContentModerationException(
+                    "Your story caption contains content that violates our community guidelines.");
+        }
         Story story = Story.builder()
                 .user(currentUser)
                 .mediaUrl(request.getMediaUrl())

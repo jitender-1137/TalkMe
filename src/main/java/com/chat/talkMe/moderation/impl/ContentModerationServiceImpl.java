@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -158,6 +159,40 @@ public class ContentModerationServiceImpl implements ContentModerationService {
                     1.0, java.util.List.of(isVideo ? "nsfw_video" : "nsfw_image"));
         }
         return ModerationResult.clean();
+    }
+
+    @Override
+    public ModerationResult moderateUpload(MultipartFile file) {
+        if (!enabled || file == null || file.isEmpty()) {
+            return ModerationResult.clean();
+        }
+        String ct = file.getContentType();
+        boolean isImage = ct != null && ct.startsWith("image/");
+        boolean isVideo = ct != null && ct.startsWith("video/");
+        if (!isImage && !isVideo) {
+            return ModerationResult.clean();
+        }
+        // Classify the raw upload bytes via a short-lived temp file — avoids depending
+        // on resolving a stored URL back to a path (which is brittle across envs).
+        java.nio.file.Path temp = null;
+        try {
+            temp = java.nio.file.Files.createTempFile("mod-upload-", isVideo ? ".mp4" : ".img");
+            try (var in = file.getInputStream()) {
+                java.nio.file.Files.copy(in, temp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return moderateMedia(temp, isVideo ? MessageType.VIDEO : MessageType.IMAGE);
+        } catch (Exception e) {
+            log.warn("moderateUpload failed; allowing (fail-open): {}", e.getMessage());
+            return ModerationResult.clean();
+        } finally {
+            if (temp != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(temp);
+                } catch (Exception ignore) {
+                    // best-effort temp cleanup
+                }
+            }
+        }
     }
 
     /** lowercase → NFKC → leetspeak fold → collapse 3+ repeats to one. */
