@@ -70,7 +70,7 @@ public class WebSocketController {
      *   <li>visible=true  → ONLINE immediately.</li>
      *   <li>visible=false → stay ONLINE for a grace window, then auto-IDLE
      *       ("Away"), then OFFLINE — 5 + 5 = 10 minutes total. Staged by
-     *       server-side deadlines (see {@link PresenceService#markBackgrounded}),
+     *       server-side deadlines (see ),
      *       with last-seen frozen to the moment of backgrounding.</li>
      * </ul>
      * The heartbeat watchdog + idle reaper remain the backstop for hard failures
