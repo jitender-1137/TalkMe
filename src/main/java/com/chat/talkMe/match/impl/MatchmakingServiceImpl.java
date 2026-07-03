@@ -31,6 +31,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
     private final OnlineCountPublisher onlineCountPublisher;
+    private final BotMatchService botMatchService;
 
     private static final String ACTIVE_USERS_KEY = "matchmaking:active_users";
 
@@ -69,6 +70,9 @@ public class MatchmakingServiceImpl implements MatchmakingService {
             // Keep user waiting in queue
             waitingQueueService.enqueue(username);
             notifyWaiting(username);
+            // No human peer available — after a short wait, a bot steps in so the user
+            // always gets a "stranger" (bots never match each other; see BotMatchService).
+            botMatchService.scheduleFallback(username);
         }
 
         // Broadcast updated online count over WebSocket

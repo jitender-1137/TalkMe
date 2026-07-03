@@ -1,4 +1,11 @@
 spring:
+  # Load secrets/overrides from a local .env file (git-ignored). It's parsed as a
+  # .properties source, so lines are KEY=VALUE — e.g. AI_API_KEY, BOT_GROQ_API_KEYS.
+  # "optional:" means the app still starts if the file is absent (e.g. in prod, where
+  # real env vars are injected instead). Values here satisfy the ${...} placeholders
+  # below. NEVER commit .env — see .gitignore.
+  config:
+    import: optional:file:.env[.properties]
   profiles:
     active: local
   application:
@@ -148,6 +155,96 @@ app:
     # Password-reset token lifetime and the account-deletion recovery window.
     password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN:30}
     account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS:30}
+  # Smart-reply suggestions via OpenAI-compatible chat APIs, with a primary →
+  # fallback chain. Primary = Groq (free, fast); fallback = Hugging Face router,
+  # tried automatically only if Groq errors / rate-limits / times out / returns
+  # nothing. OFF until a primary key is set; if both fail the client uses its
+  # local rule-based suggestions. Any OpenAI-compatible provider works by config.
+  #
+  # PRIVACY: the recent conversation is sent to these external providers (it
+  # leaves your network). Keep the Privacy/Terms copy in sync and review each
+  # provider's data-retention policy before enabling in production.
+  ai:
+    enabled: ${AI_SUGGESTIONS_ENABLED:true}
+    # Fewer context messages + fewer chips = fewer tokens = faster/cheaper.
+    context-messages: ${AI_CONTEXT_MESSAGES:10}
+    suggestions: ${AI_SUGGESTIONS_COUNT:3}
+    timeout-ms: ${AI_TIMEOUT_MS:8000}
+    # PRIMARY — Groq. Free key at https://console.groq.com (no card). NEVER commit it.
+    # llama-3.1-8b-instant: 14,400 req/day + 500K tokens/day free, fast, good Hinglish.
+    primary:
+      base-url: ${AI_BASE_URL:https://api.groq.com/openai/v1}
+      api-key: ${AI_API_KEY:}
+      model: ${AI_MODEL:llama-3.1-8b-instant}
+    # FALLBACK — Hugging Face router (OpenAI-compatible). Token from
+    # https://huggingface.co/settings/tokens. Small free credit (~$0.10/mo) then
+    # pay-as-you-go — used only when Groq is unavailable. Leave api-key blank to disable.
+    fallback:
+      base-url: ${AI_FALLBACK_BASE_URL:https://router.huggingface.co/v1}
+      api-key: ${AI_FALLBACK_API_KEY:}
+      # Ungated model (no license approval). meta-llama/* is gated → 403 unless approved.
+      model: ${AI_FALLBACK_MODEL:Qwen/Qwen2.5-7B-Instruct}
+
+  # Conversational AI bots (Sonal / Ruchi / Annu). They appear as normal users;
+  # when a HUMAN messages one of them in a 1:1 chat, the server auto-replies via an
+  # OpenAI-compatible LLM. A PROVIDER FALLBACK CHAIN is tried in order until one
+  # answers (advances on rate-limit / error / empty):
+  #   Groq keys #1..#N (llama-3.1-8b-instant) → Hugging Face keys #1..#N (Qwen2.5-7B) → self-hosted Ollama.
+  # This is separate from smart-reply's app.ai.* config — they don't share keys.
+  #
+  # Bots never reply to other bots (server guard: only human-sent messages trigger
+  # a reply), so they cannot talk to each other.
+  bot:
+    enabled: ${BOT_ENABLED:false}
+    # Cap per reply.
+    max-output-tokens: ${BOT_MAX_OUTPUT_TOKENS:220}
+    # (1) PRIMARY — Groq. Comma-separated keys (4 free accounts), each its own free bucket;
+    # tried in order, next on rate-limit. Free keys: https://console.groq.com/keys
+    groq:
+      base-url: ${BOT_GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      model: ${BOT_GROQ_MODEL:llama-3.1-8b-instant}
+      api-keys: ${BOT_GROQ_API_KEYS:}
+    # (2) FALLBACK — Hugging Face router (Qwen2.5-7B). Comma-separated tokens (4 accounts),
+    # each fine-grained with "Make calls to Inference Providers". Blank = skip this step.
+    hf:
+      base-url: ${BOT_HF_BASE_URL:https://router.huggingface.co/v1}
+      model: ${BOT_HF_MODEL:Qwen/Qwen2.5-7B-Instruct}
+      api-keys: ${BOT_HF_API_KEYS:}
+    # (3) LAST RESORT — self-hosted Ollama (unlimited, private, slower). Blank base-url = skip.
+    ollama:
+      base-url: ${BOT_OLLAMA_BASE_URL:https://ollama.parkarspot.com/v1}
+      model: ${BOT_OLLAMA_MODEL:qwen2.5:7b}
+      api-key: ${BOT_OLLAMA_API_KEY:}
+    # Which bots circulate where (all 12 stay online/searchable for DMs regardless).
+    # Lobby shows these 7; quick-match randomly pairs from these 8.
+    lobby-usernames: ${BOT_LOBBY_USERNAMES:sonal,ruchi,annu,seema,parvathy,fatima,arti,aryan,rohan,karan,nikhil,aditya,rahul,arjun,sameer,vikram,manish}
+    match-usernames: ${BOT_MATCH_USERNAMES:sia,neetu,ekta,anjali,asiya,sonal,annu,parvathy,aryan,rohan,karan,nikhil,aditya,rahul,arjun,sameer,vikram,manish}
+    match:
+      # A waiting user with no human peer is paired with a bot after this delay.
+      min-wait-ms: ${BOT_MATCH_MIN_WAIT_MS:2000}
+      max-wait-ms: ${BOT_MATCH_MAX_WAIT_MS:5000}
+    # How many recent messages of the conversation are sent as context each turn.
+    context-messages: ${BOT_CONTEXT_MESSAGES:12}
+    # Generous — self-hosted CPU inference is slow; bots reply async so a long wait
+    # is fine (and looks human). Lower it on a GPU.
+    timeout-ms: ${BOT_TIMEOUT_MS:45000}
+    # Human-feel: show "typing…" then wait a randomised delay before the reply
+    # lands, scaled a little by reply length (bounded by these two values, in ms).
+    # Reply delay: a real person doesn't answer instantly. Random pause in this range
+    # (default 3-20s) before each bot reply lands, shown behind a "typing…" indicator.
+    min-delay-ms: ${BOT_MIN_DELAY_MS:3000}
+    max-delay-ms: ${BOT_MAX_DELAY_MS:20000}
+    # Lobby presence realism: each lobby bot has a small chance per heartbeat to leave
+    # the lobby for a random 10-20 min, then return (feels like a user coming and going).
+    lobby-away-chance: ${BOT_LOBBY_AWAY_CHANCE:0.04}
+    lobby-away-min-ms: ${BOT_LOBBY_AWAY_MIN_MS:600000}
+    lobby-away-max-ms: ${BOT_LOBBY_AWAY_MAX_MS:1200000}
+    # Discover presence realism: keep a rotating 3-7 bots OFFLINE, each for a random
+    # 30-60 min, then back online (so Discover shows some bots offline like real users).
+    offline-min: ${BOT_OFFLINE_MIN:3}
+    offline-max: ${BOT_OFFLINE_MAX:7}
+    offline-min-ms: ${BOT_OFFLINE_MIN_MS:1800000}
+    offline-max-ms: ${BOT_OFFLINE_MAX_MS:3600000}
 
 # Cloudflare Turnstile CAPTCHA. Dev default is Cloudflare's "always passes"
 # TEST secret — set the real TURNSTILE_SECRET_KEY via env in production.
@@ -174,3 +271,6 @@ moderation:
     base-url: ${NSFW_BASE_URL:http://localhost:8081}
 
 NSFW_BASE_URL: http://nsfw.parkarspot.com
+# Smart-reply / Groq key is provided via the AI_API_KEY environment variable
+# (see app.ai.api-key above). NEVER commit a real key here — a committed key is
+# exposed in git history and must be rotated in the Groq console.

@@ -27,6 +27,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     List<Message> findByChat(Chat chat);
 
+    // Self-destruct backstop reaper: messages a receiver has opened (armed) but not yet
+    // destroyed. The set is tiny (only currently-counting-down media) since expired ones
+    // are excluded; the service filters by each message's own deadline.
+    List<Message> findBySelfDestructArmedAtIsNotNullAndSelfDestructExpiredFalse();
+
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.isDeleted = false AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND LOWER(m.content) LIKE LOWER(CONCAT('%', :query, '%')) AND (m.isBlocked = false OR m.sender.id = :userId) AND :userId NOT MEMBER OF m.deletedForUserIds AND (m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT OR m.sender.id = :userId)")
     Page<Message> searchMessagesInChat(Chat chat, String query, Long userId, Instant clearedAt, Pageable pageable);
 

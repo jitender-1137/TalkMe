@@ -22,4 +22,8 @@ public class UpdateSettingRequest {
     private Boolean safeModeEnabled;
 
     private Boolean soundEnabled;
+
+    /** "EVERYONE" or "FRIENDS_ONLY"; null leaves it unchanged. */
+    @Size(max = 20, message = "Invalid messaging privacy value")
+    private String messagingPrivacy;
 }

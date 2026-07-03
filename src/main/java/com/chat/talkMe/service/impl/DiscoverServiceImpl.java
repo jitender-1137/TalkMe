@@ -11,6 +11,7 @@ import com.chat.talkMe.repository.DiscoverLikeRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.FriendRequestRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.DiscoverService;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.domain.FriendRequest;
@@ -39,6 +40,7 @@ public class DiscoverServiceImpl implements DiscoverService {
     private final DiscoverLikeRepository discoverLikeRepository;
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
+    private final UserSettingRepository userSettingRepository;
     private final PresenceService presenceService;
 
     @Override
@@ -152,6 +154,10 @@ public class DiscoverServiceImpl implements DiscoverService {
 
         Page<User> userPage = userRepository.findAll(spec, pageable);
         List<User> currentUserFriends = friendRepository.findFriendsByUser(currentUser);
+        Set<Long> friendsOnlyIds = userPage.getContent().isEmpty()
+                ? java.util.Collections.emptySet()
+                : userSettingRepository.findFriendsOnlyUserIds(
+                        userPage.getContent().stream().map(User::getId).collect(Collectors.toList()));
 
         List<DiscoverProfileResponse> items = userPage.getContent().stream()
                 .map(u -> {
@@ -219,6 +225,7 @@ public class DiscoverServiceImpl implements DiscoverService {
                             .mutualFriendsCount(mutualCount)
                             .isRequestSent(requestSent)
                             .pendingRequestId(pendingReqId)
+                            .messagingFriendsOnly(friendsOnlyIds.contains(u.getId()))
                             .build();
                 })
                 .filter(item -> isOnline == null || item.isOnline() == isOnline)

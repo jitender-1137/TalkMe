@@ -28,6 +28,7 @@ public class FriendServiceImpl implements FriendService {
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final BlockUserRepository blockUserRepository;
+    private final UserSettingRepository userSettingRepository;
     private final FriendRequestMapper friendRequestMapper;
     private final UserMapper userMapper;
     private final PresenceService presenceService;
@@ -173,7 +174,12 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional(readOnly = true)
     public List<AuthUserResponse> getFriends(User currentUser) {
-        return friendRepository.findFriendsByUser(currentUser).stream()
+        List<User> friends = friendRepository.findFriendsByUser(currentUser);
+        java.util.Set<Long> friendsOnlyIds = friends.isEmpty()
+                ? java.util.Collections.emptySet()
+                : userSettingRepository.findFriendsOnlyUserIds(
+                        friends.stream().map(User::getId).collect(Collectors.toList()));
+        return friends.stream()
                 .map(friend -> {
                     AuthUserResponse response = userMapper.toAuthUserResponse(friend);
                     if (presenceService != null) {
@@ -185,6 +191,7 @@ public class FriendServiceImpl implements FriendService {
                             response.setLastSeen(lastSeen.toString());
                         }
                     }
+                    response.setMessagingFriendsOnly(friendsOnlyIds.contains(friend.getId()));
                     return response;
                 })
                 .collect(Collectors.toList());

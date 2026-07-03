@@ -26,7 +26,18 @@ public interface MessageMapper {
     @Mapping(target = "createdAt", expression = "java(message.getCreatedAt() != null ? message.getCreatedAt().toString() : null)")
     @Mapping(target = "status", expression = "java(resolveMessageStatus(message))")
     @Mapping(target = "parentMessage", source = "parentMessage")
+    // selfDestructSeconds / selfDestructExpired auto-map by name; armedAt is Instant→String.
+    @Mapping(target = "selfDestructArmedAt", expression = "java(message.getSelfDestructArmedAt() != null ? message.getSelfDestructArmedAt().toString() : null)")
     MessageResponse toMessageResponse(Message message);
+
+    // Once the media is destroyed the attachment row is gone, but strip defensively so an
+    // expired message never carries a media URL to the client.
+    @org.mapstruct.AfterMapping
+    default void stripExpiredSelfDestructMedia(Message message, @org.mapstruct.MappingTarget MessageResponse response) {
+        if (message.isSelfDestructExpired()) {
+            response.setAttachments(java.util.Collections.emptyList());
+        }
+    }
 
     default String resolveMessageStatus(Message message) {
         if (message.getReadReceipts() == null || message.getReadReceipts().isEmpty()) {

@@ -20,11 +20,15 @@ public class SessionCleanupServiceImpl implements SessionCleanupService {
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
     private final OnlineCountPublisher onlineCountPublisher;
+    private final BotMatchService botMatchService;
 
     @Override
     public void cleanupSession(String sessionId, String reason) {
         sessionService.getSession(sessionId).ifPresent(session -> {
             log.info("Cleaning up session {} due to {}", sessionId, reason);
+
+            // Drop any in-memory bot conversation state for this session.
+            botMatchService.cleanup(sessionId);
 
             // Destroy the session in-memory mapping
             sessionService.destroySession(sessionId);

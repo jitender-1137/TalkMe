@@ -47,6 +47,8 @@ public class MessageServiceImpl implements MessageService {
     private final PresenceService presenceService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
     private final ChatExplicitConsentRepository consentRepository;
+    private final FriendRepository friendRepository;
+    private final UserSettingRepository userSettingRepository;
 
     @Override
     @Transactional
@@ -88,6 +90,7 @@ public class MessageServiceImpl implements MessageService {
 
         // Check blocking logic
         boolean isBlocked = false;
+        boolean recipientIsBot = false;
         if (chat.getChatType() == com.chat.talkMe.enums.ChatType.PRIVATE || chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER) {
             User otherUser = chat.getMembers().stream()
                     .map(ChatMember::getUser)
@@ -96,11 +99,31 @@ public class MessageServiceImpl implements MessageService {
                     .orElse(null);
 
             if (otherUser != null) {
+                recipientIsBot = otherUser.isBot();
                 if (blockUserRepository.existsByUserAndBlocked(currentUser, otherUser)) {
                     throw new ForbiddenException("You blocked this contact. Unblock to send a message", "TM_142");
                 }
                 if (blockUserRepository.existsByUserAndBlocked(otherUser, currentUser)) {
                     isBlocked = true;
+                }
+
+                // "Who can message me": if the recipient only accepts messages from
+                // friends, a non-friend cannot send. (Stranger/anonymous chats are
+                // exempt — friendship has no meaning there.)
+                if (chat.getChatType() == com.chat.talkMe.enums.ChatType.PRIVATE) {
+                    com.chat.talkMe.enums.MessagingPrivacy privacy = userSettingRepository.findByUser(otherUser)
+                            .map(UserSetting::getMessagingPrivacy)
+                            .orElse(com.chat.talkMe.enums.MessagingPrivacy.EVERYONE);
+                    if (privacy == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY) {
+                        boolean isFriend = friendRepository.findByUserAndFriend(currentUser, otherUser)
+                                .map(f -> !f.isDeleted())
+                                .orElse(false);
+                        if (!isFriend) {
+                            throw new ForbiddenException(
+                                    "This person only accepts messages from friends. Send a friend request to start chatting.",
+                                    "TM_143");
+                        }
+                    }
                 }
             }
         }
@@ -125,7 +148,10 @@ public class MessageServiceImpl implements MessageService {
             com.chat.talkMe.enums.ConsentStatus consent = consentRepository.findByChat(chat)
                     .map(ChatExplicitConsent::getStatus)
                     .orElse(com.chat.talkMe.enums.ConsentStatus.NONE);
-            if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED) {
+            // Bots are consenting adult personas — never hold explicit text destined for a
+            // bot, so the message reaches it and it can reply in kind. Human-to-human 1:1
+            // still requires the normal mutual-consent handshake.
+            if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED && !recipientIsBot) {
                 // Saved but withheld from the recipient until consent is granted.
                 moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
             }
@@ -140,6 +166,8 @@ public class MessageServiceImpl implements MessageService {
                 .parentMessage(parentMessage)
                 .isBlocked(isBlocked)
                 .moderationStatus(moderationStatus)
+                // Self-destruct/view-once applies to media only (ignored for TEXT).
+                .selfDestructSeconds(type != MessageType.TEXT ? request.getSelfDestructSeconds() : null)
                 .build();
 
         message = messageRepository.save(message);
@@ -212,6 +240,62 @@ public class MessageServiceImpl implements MessageService {
             // 2. Fast path: delivered after commit by MessageBroadcastListener.
             eventPublisher.publishEvent(broadcastEvent);
         }
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public MessageResponse sendBotMessage(String chatUuid, String content, User bot) {
+        Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        chatMemberRepository.findByChatAndUser(chat, bot)
+                .orElseThrow(() -> new ForbiddenException("Bot is not a member of this chat", "TM_141"));
+
+        Message message = Message.builder()
+                .chat(chat)
+                .sender(bot)
+                .content(content)
+                .messageType(MessageType.TEXT)
+                .moderationStatus(com.chat.talkMe.enums.ModerationStatus.CLEAN)
+                .build();
+        message = messageRepository.save(message);
+
+        // Bot has "read" its own message (mirrors the human send path).
+        MessageReadReceipt receipt = MessageReadReceipt.builder()
+                .message(message)
+                .user(bot)
+                .status("READ")
+                .readAt(Instant.now())
+                .deliveredAt(Instant.now())
+                .build();
+        readReceiptRepository.save(receipt);
+        message.getReadReceipts().add(receipt);
+
+        chatRepository.touchUpdatedAt(chat.getId(), Instant.now());
+
+        MessageResponse response = messageMapper.toMessageResponse(message);
+
+        List<String> recipientUsernames = chat.getMembers().stream()
+                .map(ChatMember::getUser)
+                .filter(u -> u != null && !u.getId().equals(bot.getId()))
+                .map(User::getUsername)
+                .toList();
+
+        MessageSentEvent broadcastEvent = MessageSentEvent.builder()
+                .chatUuid(chatUuid)
+                .message(response)
+                .senderUserId(bot.getId())
+                .senderName(bot.getName())
+                .senderProfileImage(bot.getProfileImage())
+                .recipientUsernames(recipientUsernames)
+                .build();
+
+        // Same guaranteed-delivery pattern as sendMessage: durable outbox row in this
+        // transaction + post-commit broadcast. The event re-fires the bot listener, but
+        // its human-sender guard drops it immediately (a bot never replies to a bot).
+        persistOutbox(response.getId(), broadcastEvent);
+        eventPublisher.publishEvent(broadcastEvent);
 
         return response;
     }
@@ -383,6 +467,106 @@ public class MessageServiceImpl implements MessageService {
             messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
         } catch (Exception e) {
             log.error("WebSocket message-deleted broadcast failed", e);
+        }
+    }
+
+    // ── Self-destruct / view-once media ────────────────────────────────────────
+    // View-once messages have no countdown; this grace caps how long after opening
+    // they can linger if the client never reports back, so they still self-destruct.
+    private static final long VIEW_ONCE_GRACE_SECONDS = 120;
+
+    @Override
+    @Transactional
+    public MessageResponse revealSelfDestruct(String chatUuid, String messageUuid, User currentUser) {
+        Message message = loadChatMessage(chatUuid, messageUuid, currentUser);
+        // The sender is sealed — only the RECEIVER opening it arms the timer.
+        if (message.getSender().getId().equals(currentUser.getId())) {
+            throw new ForbiddenException("Sender cannot open a self-destruct message", "TM_165");
+        }
+        if (message.getSelfDestructSeconds() != null
+                && !message.isSelfDestructExpired()
+                && message.getSelfDestructArmedAt() == null) {
+            message.setSelfDestructArmedAt(Instant.now());
+            messageRepository.save(message);
+        }
+        return messageMapper.toMessageResponse(message);
+    }
+
+    @Override
+    @Transactional
+    public void consumeSelfDestruct(String chatUuid, String messageUuid, User currentUser) {
+        Message message = loadChatMessage(chatUuid, messageUuid, currentUser);
+        // Only the receiver consumes; the sender is sealed.
+        if (message.getSender().getId().equals(currentUser.getId())) return;
+        if (message.getSelfDestructSeconds() == null || message.isSelfDestructExpired()) return;
+        expireSelfDestruct(message);
+    }
+
+    @Override
+    @Transactional
+    public int reapExpiredSelfDestruct(Instant now) {
+        List<Message> armed = messageRepository.findBySelfDestructArmedAtIsNotNullAndSelfDestructExpiredFalse();
+        int reaped = 0;
+        for (Message m : armed) {
+            int secs = m.getSelfDestructSeconds() != null ? m.getSelfDestructSeconds() : 0;
+            long deadlineSecs = secs > 0 ? secs : VIEW_ONCE_GRACE_SECONDS;
+            if (!m.getSelfDestructArmedAt().plusSeconds(deadlineSecs).isAfter(now)) {
+                expireSelfDestruct(m);
+                reaped++;
+            }
+        }
+        return reaped;
+    }
+
+    /** Load a message and verify the caller is a member of the chat it belongs to. */
+    private Message loadChatMessage(String chatUuid, String messageUuid, User currentUser) {
+        Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        chatMemberRepository.findByChatAndUser(chat, currentUser)
+                .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
+        Message message = messageRepository.findByUuid(UUID.fromString(messageUuid))
+                .orElseThrow(() -> new NotFoundException("Message not found", "TM_161"));
+        if (!message.getChat().getId().equals(chat.getId())) {
+            throw new ForbiddenException("Message does not belong to this chat", "TM_162");
+        }
+        return message;
+    }
+
+    /** Destroy the media forever: delete files from disk, drop attachment rows, flag expired, broadcast. */
+    private void expireSelfDestruct(Message message) {
+        if (message.isSelfDestructExpired()) return; // idempotent
+        for (MessageAttachment att : message.getAttachments()) {
+            deleteMediaFileQuietly(att.getFileUrl());
+            deleteMediaFileQuietly(att.getThumbnailUrl());
+        }
+        message.getAttachments().clear(); // orphanRemoval deletes the attachment rows
+        message.setSelfDestructExpired(true);
+        message.setContent(null);
+        messageRepository.save(message);
+        broadcastMediaExpired(message.getChat().getUuid().toString(), message.getUuid().toString());
+        log.info("[self-destruct] media destroyed for message {}", message.getUuid());
+    }
+
+    private void deleteMediaFileQuietly(String fileUrl) {
+        try {
+            java.nio.file.Path p = resolveStoredMedia(fileUrl);
+            if (p != null) java.nio.file.Files.deleteIfExists(p);
+        } catch (Exception e) {
+            log.warn("[self-destruct] failed to delete media file {}", fileUrl, e);
+        }
+    }
+
+    private void broadcastMediaExpired(String chatUuid, String messageUuid) {
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("chatId", chatUuid);
+            payload.put("messageId", messageUuid);
+            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            eventWrapper.put("event", "media_expired");
+            eventWrapper.put("payload", payload);
+            messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
+        } catch (Exception e) {
+            log.error("WebSocket media-expired broadcast failed", e);
         }
     }
 

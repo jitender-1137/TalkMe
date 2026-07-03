@@ -36,4 +36,23 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * Isolated pool for AI bot replies. A bot turn makes a (slow) network call to the
+     * AI provider and deliberately sleeps to fake "typing…", so it must never run on
+     * {@code broadcastExecutor} where it would starve real message fan-out. Small pool
+     * with a bounded queue: under a flood, extra turns are simply dropped (a bot not
+     * replying is fine) rather than piling up unboundedly.
+     */
+    @Bean(name = "botExecutor")
+    public Executor botExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("bot-reply-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.initialize();
+        return executor;
+    }
 }

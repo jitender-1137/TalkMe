@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -35,6 +36,16 @@ public class UserSettingController {
             @Valid @RequestBody UpdateSettingRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         UserSettingResponse response = userSettingService.updateSettings(request, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Settings updated successfully", "TM_066"));
+    }
+
+    /** Dedicated, param-based update for the "who can message me" preference. */
+    @PutMapping("/messaging-privacy")
+    public ResponseEntity<ResponseDto<UserSettingResponse>> updateMessagingPrivacy(
+            @RequestParam("value") String value,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserSettingResponse response =
+                userSettingService.updateMessagingPrivacy(value, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Settings updated successfully", "TM_066"));
     }
 }

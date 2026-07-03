@@ -72,6 +72,27 @@ public class MessageController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Message deleted successfully", "TM_163"));
     }
 
+    // Receiver opens a self-destruct/view-once media → arms the timer (server-side) and
+    // returns the message so the client can run its countdown. Only the receiver may arm.
+    @PostMapping("/{messageId}/reveal")
+    public ResponseEntity<ResponseDto<MessageResponse>> revealSelfDestruct(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        MessageResponse response = messageService.revealSelfDestruct(chatUuid, messageUuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
+    // Receiver finished viewing (countdown hit 0 / view-once closed) → destroy the media now.
+    @PostMapping("/{messageId}/consume")
+    public ResponseEntity<ResponseDto<Void>> consumeSelfDestruct(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        messageService.consumeSelfDestruct(chatUuid, messageUuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Media destroyed", "TM_164"));
+    }
+
     @PostMapping("/{messageId}/reactions")
     public ResponseEntity<ResponseDto<MessageResponse>> reactToMessage(
             @PathVariable("chatId") String chatUuid,

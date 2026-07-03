@@ -32,6 +32,7 @@ public class WebSocketController {
     private final UserRepository userRepository;
     private final com.chat.talkMe.service.PresenceService presenceService;
     private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
+    private final com.chat.talkMe.service.BotLobbyService botLobbyService;
 
     /** Deadline ZSET for grace-evicting lobby members whose socket dropped. */
     private static final String LOBBY_LEAVE_ZSET = "lobby:leave-deadlines";
@@ -221,6 +222,14 @@ public class WebSocketController {
 
         // Also echo back to sender
         messagingTemplate.convertAndSendToUser(sender, "/queue/lobby-chat", payload);
+
+        // If the recipient is an AI bot, generate & deliver its reply (bots have no
+        // socket, so the frame above was a no-op for them). Skip the Web Push below —
+        // there's no human to notify.
+        if (botLobbyService.isBot(recipient)) {
+            botLobbyService.onHumanLobbyMessage(sender, recipient, content);
+            return;
+        }
 
         // Recipient backgrounded/suspended (no live socket)? The frame above never
         // reaches them — fire a Web Push so they still get the message. Lobby is not

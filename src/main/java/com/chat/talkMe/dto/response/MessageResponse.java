@@ -25,4 +25,9 @@ public class MessageResponse {
     private List<MessageAttachmentResponse> attachments;
     private String status; // SENT, DELIVERED, READ
     private ParentMessageResponse parentMessage;
+
+    // Self-destruct / view-once media: null = normal; 0 = view-once; 5/10/30 = timed.
+    private Integer selfDestructSeconds;
+    private String selfDestructArmedAt; // ISO instant the receiver first opened it (timer start), else null
+    private boolean selfDestructExpired; // true → media destroyed; render the greyed "expired" note
 }

@@ -43,6 +43,7 @@ public class ChatServiceImpl implements ChatService {
     private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
     private final FriendRepository friendRepository;
     private final BlockUserRepository blockUserRepository;
+    private final UserSettingRepository userSettingRepository;
     private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
@@ -569,6 +570,10 @@ public class ChatServiceImpl implements ChatService {
                     java.time.Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
                     otherUserDto.setLastSeen(lastSeen != null ? lastSeen.toString() : null);
                 }
+                otherUserDto.setMessagingFriendsOnly(
+                        userSettingRepository.findByUser(otherUser)
+                                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
+                                .orElse(false));
                 response.setOtherUser(otherUserDto);
                 // Avatar mappings
                 response.setAvatar(null);

@@ -20,4 +20,8 @@ public class SendMessageRequest {
     private String fileUrl;
     private String mimeType;
     private Double duration;
+
+    // Self-destruct / view-once (media only): null = normal, 0 = view-once,
+    // 5/10/30 = destroy N seconds after the receiver opens it.
+    private Integer selfDestructSeconds;
 }

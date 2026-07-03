@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.apache.catalina.connector.ClientAbortException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -131,11 +132,54 @@ public class GlobalExceptionHandler {
         }
     }
 
+    /**
+     * Thrown by Jackson while writing the response body. When the CLIENT closed the
+     * socket mid-write (page reload, navigate away, network drop) the broken pipe is
+     * buried in the cause chain and the type isn't a ClientAbortException, so it used
+     * to fall through to the catch-all and log a full ERROR stack. The socket is gone —
+     * there's nothing to write — so log it quietly and return no body. A genuine
+     * serialization failure (not a client abort) still surfaces as a 500.
+     */
+    @ExceptionHandler(HttpMessageNotWritableException.class)
+    public ResponseEntity<ResponseDto<Void>> handleHttpMessageNotWritable(HttpMessageNotWritableException ex) {
+        if (isClientAbort(ex)) {
+            log.debug("Response write aborted by client (broken pipe): {}", ex.getMessage());
+            return null; // socket already closed — writing anything else just fails again
+        }
+        log.error("Failed to serialize response", ex);
+        String localizedMessage = getLocalizedMessage("TM_002", "Internal Server Error");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ResponseDto.error(localizedMessage, "TM_002"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ResponseDto<Void>> handleAllExceptions(Exception ex) {
+        // Belt-and-suspenders: any exception whose cause chain is a client abort
+        // (broken pipe / connection reset) is a dead socket, not a server fault —
+        // log quietly without a stack trace and write nothing.
+        if (isClientAbort(ex)) {
+            log.debug("Request aborted by client (broken pipe/connection reset): {}", ex.getMessage());
+            return null;
+        }
         log.error("Unhandled Exception occurred", ex);
         String localizedMessage = getLocalizedMessage("TM_002", "Internal Server Error");
         ResponseDto<Void> response = ResponseDto.error(localizedMessage, "TM_002");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    /** True if anywhere in the cause chain is a client-side disconnect (dead socket). */
+    private boolean isClientAbort(Throwable ex) {
+        Throwable t = ex;
+        for (int hops = 0; t != null && hops < 12; t = t.getCause(), hops++) {
+            if (t instanceof ClientAbortException || t instanceof AsyncRequestNotUsableException) {
+                return true;
+            }
+            String m = t.getMessage();
+            if (m != null && (m.contains("Broken pipe") || m.contains("Connection reset"))) {
+                return true;
+            }
+            if (t.getCause() == t) break; // guard against a self-referential cause
+        }
+        return false;
     }
 }

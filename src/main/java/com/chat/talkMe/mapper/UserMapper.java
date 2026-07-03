@@ -16,6 +16,7 @@ public interface UserMapper {
     @Mapping(target = "createdAt", expression = "java(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)")
     @Mapping(target = "presence", ignore = true)
     @Mapping(target = "lastSeen", ignore = true)
+    @Mapping(target = "messagingFriendsOnly", ignore = true)
     AuthUserResponse toAuthUserResponse(User user);
 
     @Mapping(target = "isVerified", source = "verified")
@@ -27,6 +28,8 @@ public interface UserMapper {
     @Mapping(target = "createdAt", expression = "java(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)")
     @Mapping(target = "updatedAt", expression = "java(user.getUpdatedAt() != null ? user.getUpdatedAt().toString() : null)")
     @Mapping(target = "isBlocked", ignore = true)
+    @Mapping(target = "canMessage", ignore = true)
+    @Mapping(target = "messagingFriendsOnly", ignore = true)
     @Mapping(target = "presence", ignore = true)
     @Mapping(target = "lastSeen", ignore = true)
     @Mapping(target = "followersCount", ignore = true)

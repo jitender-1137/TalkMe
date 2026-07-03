@@ -29,4 +29,7 @@ public class AuthUserResponse {
     private java.util.Set<String> interests;
     private String presence; // "online", "idle", "offline"
     private String lastSeen;
+    /** True when this user restricts messaging to friends — drives the avatar lock badge. */
+    @JsonProperty("messagingFriendsOnly")
+    private Boolean messagingFriendsOnly;
 }

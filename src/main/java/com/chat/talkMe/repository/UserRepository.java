@@ -22,6 +22,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
 
+    /** All AI bot accounts (used by the presence heartbeat that keeps them "online"). */
+    @Query("SELECT u FROM User u WHERE u.isBot = true AND u.isDeleted = false")
+    List<User> findAllBots();
+
     @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u " +
            "WHERE up.status = 'ONLINE' " +
            "AND up.invisibleModeEnabled = false " +

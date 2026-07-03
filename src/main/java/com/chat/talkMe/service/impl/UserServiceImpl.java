@@ -8,6 +8,8 @@ import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.dto.response.UserResponse;
+import com.chat.talkMe.domain.UserSetting;
+import com.chat.talkMe.enums.MessagingPrivacy;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ContentModerationException;
@@ -18,6 +20,7 @@ import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.repository.UserFollowRepository;
 import com.chat.talkMe.repository.PostRepository;
 import com.chat.talkMe.service.UserService;
@@ -50,6 +53,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
+    private final UserSettingRepository userSettingRepository;
     private final BlockUserRepository blockUserRepository;
     private final MatchReportRepository matchReportRepository;
     private final PresenceService presenceService;
@@ -302,6 +306,24 @@ public class UserServiceImpl implements UserService {
                     || blockUserRepository.existsByUserAndBlocked(targetUser, currentUser);
         }
         response.setBlocked(isBlocked);
+
+        // "Who can message me": expose whether this user restricts messages to friends
+        // (drives the lock badge on their avatar), and whether the viewer specifically
+        // can message them. canMessage mirrors the hard enforcement in
+        // MessageServiceImpl.sendMessage: blocked only when friends-only AND not a friend.
+        MessagingPrivacy privacy = userSettingRepository.findByUser(targetUser)
+                .map(UserSetting::getMessagingPrivacy)
+                .orElse(MessagingPrivacy.EVERYONE);
+        boolean friendsOnly = privacy == MessagingPrivacy.FRIENDS_ONLY;
+        response.setMessagingFriendsOnly(friendsOnly);
+
+        boolean canMessage = true;
+        if (friendsOnly && currentUser != null && !currentUser.getId().equals(targetUser.getId())) {
+            canMessage = friendRepository.findByUserAndFriend(currentUser, targetUser)
+                    .map(f -> !f.isDeleted())
+                    .orElse(false);
+        }
+        response.setCanMessage(canMessage);
 
         // Live status + last-seen come from Redis (the DB values are stale by design —
         // only written on OFFLINE). Status is Invisible-masked via getStatus.

@@ -36,6 +36,7 @@ public class PostServiceImpl implements PostService {
     private final PostCommentLikeRepository postCommentLikeRepository;
     private final PostBookmarkRepository postBookmarkRepository;
     private final UserRepository userRepository;
+    private final UserSettingRepository userSettingRepository;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
@@ -198,7 +199,11 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
         return postLikeRepository.findByPost(post, pageable)
-                .map(like -> userMapper.toAuthUserResponse(like.getUser()));
+                .map(like -> {
+                    AuthUserResponse res = userMapper.toAuthUserResponse(like.getUser());
+                    res.setMessagingFriendsOnly(isFriendsOnly(like.getUser()));
+                    return res;
+                });
     }
 
     @Override
@@ -373,6 +378,13 @@ public class PostServiceImpl implements PostService {
         return name.isBlank() ? null : "/opt/media/talkMe/" + name;
     }
 
+    /** Whether a user restricts messaging to friends (drives the avatar lock badge). */
+    private boolean isFriendsOnly(User user) {
+        return userSettingRepository.findByUser(user)
+                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
+                .orElse(false);
+    }
+
     private PostResponse mapToPostResponse(Post post, User currentUser) {
         List<PostMediaResponse> mediaRes = post.getMedia().stream()
                 .map(m -> PostMediaResponse.builder()
@@ -389,10 +401,13 @@ public class PostServiceImpl implements PostService {
         boolean liked = postLikeRepository.existsByPostAndUser(post, currentUser);
         boolean bookmarked = postBookmarkRepository.existsByPostAndUser(post, currentUser);
 
+        AuthUserResponse author = userMapper.toAuthUserResponse(post.getUser());
+        author.setMessagingFriendsOnly(isFriendsOnly(post.getUser()));
+
         return PostResponse.builder()
                 .id(post.getUuid().toString())
                 .shortCode(post.getShortCode())
-                .user(userMapper.toAuthUserResponse(post.getUser()))
+                .user(author)
                 .content(post.getContent())
                 .media(mediaRes)
                 .likesCount(post.getLikes().size())

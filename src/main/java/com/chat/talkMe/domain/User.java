@@ -119,4 +119,22 @@ public class User extends BaseEntity {
      */
     @Column(name = "deletion_requested_at")
     private java.time.Instant deletionRequestedAt;
+
+    /**
+     * True for AI bot accounts (Sonal / Ruchi / Annu …). Bots are ordinary {@code User}
+     * rows so they look identical to humans everywhere (chat list, profile, avatar,
+     * presence), but they can't log in and the server auto-replies on their behalf.
+     * Also the guard for "bots must never talk to each other": a reply is only ever
+     * generated for a message whose sender is NOT a bot.
+     */
+    @Column(name = "is_bot", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean isBot = false;
+
+    /**
+     * The bot's personality / system prompt (name, age, vibe, how it should talk).
+     * Fed to the AI model on every turn. Null for human users.
+     */
+    @Column(name = "bot_persona", length = 4000)
+    private String botPersona;
 }

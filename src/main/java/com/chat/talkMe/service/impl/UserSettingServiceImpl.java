@@ -4,6 +4,8 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserSetting;
 import com.chat.talkMe.dto.request.UpdateSettingRequest;
 import com.chat.talkMe.dto.response.UserSettingResponse;
+import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.UserSettingService;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +21,10 @@ public class UserSettingServiceImpl implements UserSettingService {
     private final UserSettingRepository userSettingRepository;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public UserSettingResponse getSettings(User currentUser) {
+        // NOT readOnly: first read lazily creates (and persists) the default row,
+        // which is an INSERT — a read-only transaction would reject it.
         log.debug("Fetching user settings for: {}", currentUser.getUsername());
         UserSetting settings = userSettingRepository.findByUser(currentUser)
                 .orElseGet(() -> createDefaultSettings(currentUser));
@@ -49,10 +53,34 @@ public class UserSettingServiceImpl implements UserSettingService {
         if (request.getSoundEnabled() != null) {
             settings.setSoundEnabled(request.getSoundEnabled());
         }
+        if (request.getMessagingPrivacy() != null) {
+            settings.setMessagingPrivacy(parsePrivacy(request.getMessagingPrivacy()));
+        }
 
         settings = userSettingRepository.save(settings);
         log.info("Settings updated successfully for user: {}", currentUser.getUsername());
         return mapToResponse(settings);
+    }
+
+    @Override
+    @Transactional
+    public UserSettingResponse updateMessagingPrivacy(String value, User currentUser) {
+        UserSetting settings = userSettingRepository.findByUser(currentUser)
+                .orElseGet(() -> createDefaultSettings(currentUser));
+        settings.setMessagingPrivacy(parsePrivacy(value));
+        settings = userSettingRepository.save(settings);
+        log.info("Messaging privacy set to {} for user: {}",
+                settings.getMessagingPrivacy(), currentUser.getUsername());
+        return mapToResponse(settings);
+    }
+
+    private MessagingPrivacy parsePrivacy(String value) {
+        try {
+            return MessagingPrivacy.valueOf(value.trim().toUpperCase());
+        } catch (Exception e) {
+            throw new BadRequestException(
+                    "messagingPrivacy must be EVERYONE or FRIENDS_ONLY", "TM_067");
+        }
     }
 
     private UserSetting createDefaultSettings(User user) {
@@ -63,6 +91,7 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .notificationsEnabled(true)
                 .safeModeEnabled(true)
                 .soundEnabled(true)
+                .messagingPrivacy(MessagingPrivacy.EVERYONE)
                 .build();
         return userSettingRepository.save(defaultSettings);
     }
@@ -75,6 +104,9 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .notificationsEnabled(setting.isNotificationsEnabled())
                 .safeModeEnabled(setting.isSafeModeEnabled())
                 .soundEnabled(setting.isSoundEnabled())
+                .messagingPrivacy(setting.getMessagingPrivacy() != null
+                        ? setting.getMessagingPrivacy().name()
+                        : MessagingPrivacy.EVERYONE.name())
                 .build();
     }
 }

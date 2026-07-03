@@ -17,6 +17,7 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
 
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.chat.talkMe.service.BotRegistry botRegistry;
 
     @Override
     public void requestImage(String requester) {
@@ -24,6 +25,15 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
                 .orElseThrow(() -> new IllegalArgumentException("No active session found for user: " + requester));
 
         String recipient = session.getUserA().equals(requester) ? session.getUserB() : session.getUserA();
+
+        // Bots are text-only — they never share photos. Auto-decline so the requester
+        // gets an immediate, clean response instead of waiting on a peer that can't answer.
+        if (botRegistry.isBot(recipient)) {
+            messagingTemplate.convertAndSendToUser(requester, "/queue/match",
+                    MatchServerEvent.builder().event("IMAGE_REQUEST_DECLINED").payload(Map.of()).build());
+            log.info("Auto-declined IMAGE_REQUEST from {} (peer is a bot)", requester);
+            return;
+        }
 
         MatchServerEvent event = MatchServerEvent.builder()
                 .event("IMAGE_REQUEST_RECEIVED")

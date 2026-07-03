@@ -29,6 +29,7 @@ public class StoryServiceImpl implements StoryService {
     private final StoryViewRepository storyViewRepository;
     private final UserMapper userMapper;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final UserSettingRepository userSettingRepository;
 
     @Override
     @Transactional
@@ -115,9 +116,14 @@ public class StoryServiceImpl implements StoryService {
     private StoryResponse mapToStoryResponse(Story story, User currentUser) {
         boolean viewed = storyViewRepository.existsByStoryAndUser(story, currentUser);
 
+        AuthUserResponse owner = userMapper.toAuthUserResponse(story.getUser());
+        owner.setMessagingFriendsOnly(userSettingRepository.findByUser(story.getUser())
+                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
+                .orElse(false));
+
         return StoryResponse.builder()
                 .id(story.getUuid().toString())
-                .user(userMapper.toAuthUserResponse(story.getUser()))
+                .user(owner)
                 .mediaUrl(story.getMediaUrl())
                 .caption(story.getCaption())
                 .expiresAt(story.getExpiresAt().toString())

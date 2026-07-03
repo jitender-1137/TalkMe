@@ -106,4 +106,25 @@ public class Message extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     @Builder.Default
     private Set<Long> deletedForUserIds = new HashSet<>();
+
+    // ── Telegram-style self-destruct / view-once media (1:1 only) ──────────────
+    // null  = normal media (no self-destruct)
+    // 0     = view-once (destroyed shortly after the receiver opens/closes it)
+    // 5/10/30 = destroyed N seconds after the RECEIVER opens it
+    @Column(name = "self_destruct_seconds")
+    private Integer selfDestructSeconds;
+
+    // Set the moment the RECEIVER first opens (reveals) the media — this is the ONLY
+    // thing that arms the timer. null until then. Deadline = armedAt + (seconds>0 ?
+    // seconds : VIEW_ONCE_GRACE).
+    @Column(name = "self_destruct_armed_at")
+    private java.time.Instant selfDestructArmedAt;
+
+    // Once the media has been destroyed (file + attachment removed) the message row is
+    // kept as a greyed "expired" note. @ColumnDefault lets ddl-auto add the NOT-NULL
+    // column to the existing table.
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(name = "self_destruct_expired", nullable = false)
+    @Builder.Default
+    private boolean selfDestructExpired = false;
 }
