@@ -23,6 +23,22 @@ public interface MessageService {
      * the content is generated server-side and trusted.
      */
     MessageResponse sendBotMessage(String chatUuid, String content, User bot);
+
+    /**
+     * Persists a SYSTEM message (group event like "X added Y") authored by
+     * {@code actor} and broadcasts it to the chat like a normal message so it
+     * appears inline. {@code contentJson} is the serialized system-event payload.
+     */
+    MessageResponse sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser);
+
+    /** Pin or unpin a message (authz enforced by the caller). Broadcasts the change. */
+    MessageResponse setMessagePinned(String chatUuid, String messageUuid, boolean pinned, User currentUser);
+
+    /** Star / unstar (save) a message for the current user. */
+    void setMessageStarred(String chatUuid, String messageUuid, boolean starred, User currentUser);
+
+    /** The current user's starred (saved) messages, newest-first. */
+    List<MessageResponse> getStarredMessages(User currentUser, int limit);
     MessagePageResponse getMessages(String chatUuid, Long cursor, int limit, User currentUser);
     List<MessageResponse> getMessagesAfter(String chatUuid, Long afterSequence, User currentUser);
     Page<MessageResponse> searchMessages(String chatUuid, String query, Pageable pageable, User currentUser);

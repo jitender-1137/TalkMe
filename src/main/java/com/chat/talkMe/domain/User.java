@@ -60,6 +60,14 @@ public class User extends BaseEntity {
     @Column(name = "profile_image", length = 512)
     private String profileImage;
 
+    /**
+     * Google account subject id ("sub" claim) for users who signed in with Google.
+     * Null for password/guest accounts. Unique so a Google identity maps to exactly
+     * one local user; login links by this first, then falls back to email.
+     */
+    @Column(name = "google_id", unique = true, length = 64)
+    private String googleId;
+
     @Column(name = "country", length = 100)
     private String country;
 

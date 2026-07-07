@@ -22,4 +22,7 @@ public class PostResponse {
     private boolean bookmarkedByMe;
     private String createdAt;
     private List<PostCommentResponse> comments;
+    private PollResponse poll; // non-null only for poll posts
+    private AudioTrackDto audio; // non-null only when a soundtrack is attached
+    private String audience; // EVERYONE | FRIENDS
 }

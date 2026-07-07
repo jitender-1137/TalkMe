@@ -27,6 +27,24 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     List<Chat> findPrivateChatBetweenUsers(Long user1Id, Long user2Id);
 
     /**
+     * Discovery: public channels/rooms of the given types, optional name search and
+     * interest tag. Newest-active first.
+     */
+    // :pattern is a pre-lowercased "%term%" (or null). Using it directly in LIKE
+    // keeps the bind type unambiguously text — concatenating a nullable param
+    // inside SQL made Postgres infer bytea (lower(bytea) does not exist).
+    @Query("SELECT DISTINCT c FROM Chat c LEFT JOIN c.tags t " +
+           "WHERE c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC AND c.isDeleted = false " +
+           "AND c.chatType IN :types " +
+           "AND (:pattern IS NULL OR LOWER(c.name) LIKE :pattern OR LOWER(c.slug) LIKE :pattern) " +
+           "AND (:tag IS NULL OR t = :tag) " +
+           "ORDER BY c.updatedAt DESC")
+    List<Chat> findPublicForDiscovery(@Param("types") List<com.chat.talkMe.enums.ChatType> types,
+                                      @Param("pattern") String pattern,
+                                      @Param("tag") com.chat.talkMe.enums.Interest tag,
+                                      org.springframework.data.domain.Pageable pageable);
+
+    /**
      * Bump a chat's sort timestamp without touching the @Version column, so concurrent
      * sends to the same chat don't collide on optimistic locking. Single-column UPDATE by id.
      */

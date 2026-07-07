@@ -19,6 +19,9 @@ public interface MessageMapper {
     @Mapping(target = "sequenceNumber", source = "id")
     @Mapping(target = "id", expression = "java(message.getUuid().toString())")
     @Mapping(target = "senderId", expression = "java(message.getSender().getUuid().toString())")
+    @Mapping(target = "chatId", expression = "java(message.getChat() != null ? message.getChat().getUuid().toString() : null)")
+    @Mapping(target = "senderName", expression = "java(message.getSender().getName())")
+    @Mapping(target = "senderAvatar", expression = "java(message.getSender().getProfileImage())")
     @Mapping(target = "messageType", expression = "java(message.getMessageType().name())")
     // Never leak the original text of a tombstoned message — clients render their
     // own "This message was deleted" placeholder off the isDeleted flag.

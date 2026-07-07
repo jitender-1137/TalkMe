@@ -151,19 +151,20 @@ public class ChatServiceImpl implements ChatService {
 
             return mapToChatResponse(chat, managedUser);
         } else {
-            // Group Chat
+            // Group Chat (legacy path — new groups should use GroupService.createGroup)
             Chat chat = Chat.builder()
                     .name(request.getName())
                     .chatType(ChatType.GROUP)
+                    .ownerId(managedUser.getId())
                     .build();
             chat = chatRepository.save(chat);
 
             ChatMember adminMember = ChatMember.builder()
                     .chat(chat)
                     .user(managedUser)
-                    .isAdmin(true)
                     .joinedAt(Instant.now())
                     .build();
+            adminMember.setRole(com.chat.talkMe.enums.MemberRole.OWNER);
             chatMemberRepository.save(adminMember);
             chat.getMembers().add(adminMember);
 
@@ -174,9 +175,9 @@ public class ChatServiceImpl implements ChatService {
                         ChatMember groupMember = ChatMember.builder()
                                 .chat(chat)
                                 .user(user)
-                                .isAdmin(false)
                                 .joinedAt(Instant.now())
                                 .build();
+                        groupMember.setRole(com.chat.talkMe.enums.MemberRole.MEMBER);
                         chatMemberRepository.save(groupMember);
                         chat.getMembers().add(groupMember);
                     }
@@ -198,13 +199,16 @@ public class ChatServiceImpl implements ChatService {
 
         for (Chat chat : chats) {
             ChatResponse resp = mapToChatResponse(chat, managedUser);
-            
-            // Filter out non-group chats that have no messages (e.g. cleared)
-            if (!"GROUP".equals(resp.getChatType()) && resp.getLastMessage() == null) {
+
+            boolean isMultiParty = chat.isMultiParty();
+
+            // Filter out 1:1 chats that have no messages (e.g. cleared). Multi-party
+            // chats (group/channel/room) are always shown once joined.
+            if (!isMultiParty && resp.getLastMessage() == null) {
                 continue;
             }
 
-            if (!"GROUP".equals(resp.getChatType())) {
+            if (!isMultiParty) {
                 ChatMember memberOther = chat.getMembers().stream()
                         .filter(m -> !m.getUser().getId().equals(managedUser.getId()))
                         .findFirst()
@@ -315,6 +319,13 @@ public class ChatServiceImpl implements ChatService {
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
                 .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
+        // For a group/channel/room, deleting removes it for EVERYONE — only the
+        // owner may do that. (1:1 chats keep the existing per-user delete behavior.)
+        if (chat.isMultiParty() && member.getRole() != com.chat.talkMe.enums.MemberRole.OWNER) {
+            throw new com.chat.talkMe.exception.ForbiddenException(
+                    "Only the group owner can delete the group", "TM_291");
+        }
+
         // Delete all messages in the chat from the database (cascading deletes for read receipts, reactions, and attachments)
         List<Message> messages = messageRepository.findByChat(chat);
         messageRepository.deleteAll(messages);
@@ -367,6 +378,18 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
 
         Instant now = Instant.now();
+
+        // Multi-party chats use the watermark model (no per-message receipts): advance
+        // this member's lastReadMessageId to the latest message. Cheaper and correct
+        // for N members. "Seen by" is derived from watermarks (deferred feature).
+        if (chat.isMultiParty()) {
+            // Atomic, forward-only watermark advance — see advanceReadWatermark. Avoids
+            // the optimistic-lock race when two mark-read calls (join + chat-open on an
+            // invite link) hit the same ChatMember row concurrently.
+            long maxId = messageRepository.findMaxMessageId(chat);
+            chatMemberRepository.advanceReadWatermark(chat, managedUser, maxId);
+            return;
+        }
 
         // Step 1: Bulk-update all existing non-READ receipts for this user in this chat
         int updatedCount = readReceiptRepository.bulkMarkAsRead(chat, managedUser.getId(), now);
@@ -527,13 +550,14 @@ public class ChatServiceImpl implements ChatService {
             response.setPinned(memberSelf.isPinned());
         }
 
-        // Last Message
-        Message lastMessage = null;
-        if (memberSelf != null && memberSelf.getClearedAt() != null) {
-            lastMessage = messageRepository.findFirstByChatAndIsDeletedFalseAndCreatedAtGreaterThanOrderByCreatedAtDesc(chat, memberSelf.getClearedAt()).orElse(null);
-        } else {
-            lastMessage = messageRepository.findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(chat).orElse(null);
-        }
+        // Last Message — capped to the viewer's visible window: after clearedAt (if the
+        // chat was cleared) AND at/before leftAt (a former member must keep seeing the
+        // last message from BEFORE they left, never messages sent after their exit).
+        java.time.Instant previewClearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+        java.time.Instant previewLeftAt = memberSelf != null ? memberSelf.getLeftAt() : null;
+        java.util.List<Message> lastList = messageRepository.findLastVisibleMessage(
+                chat, previewClearedAt, previewLeftAt, org.springframework.data.domain.PageRequest.of(0, 1));
+        Message lastMessage = lastList.isEmpty() ? null : lastList.get(0);
 
         if (lastMessage != null) {
             MessageResponse lastMessageDto = messageMapper.toMessageResponse(lastMessage);
@@ -598,15 +622,71 @@ public class ChatServiceImpl implements ChatService {
                 }
             }
         } else {
+            // Multi-party (GROUP / CHANNEL / ROOM)
             response.setName(chat.getName());
-            response.setAvatar(null);
+            response.setAvatar(chat.getImageUrl());
+            response.setGroup(buildGroupInfo(chat, memberSelf));
         }
 
-        // Calculate dynamic unread count
-        long unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
+        // Calculate dynamic unread count.
+        long unreadCount;
+        if (chat.isMultiParty() && (memberSelf == null || memberSelf.getLeftAt() != null)) {
+            // Non-member (discovery preview) or former member → nothing unread.
+            unreadCount = 0;
+        } else if (chat.isMultiParty()) {
+            // Watermark model: cheaper than the per-message read-receipt scan and
+            // correct for N members.
+            Long watermark = memberSelf != null ? memberSelf.getLastReadMessageId() : null;
+            Instant clearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+            unreadCount = messageRepository.countUnreadForWatermark(
+                    chat, currentUser.getId(), watermark != null ? watermark : 0L, clearedAt);
+        } else {
+            unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
+        }
         response.setUnreadCount((int) unreadCount);
         response.setTypingUsers(new ArrayList<>());
 
         return response;
+    }
+
+    /** Builds the group/channel/room metadata block for a multi-party chat. */
+    private com.chat.talkMe.dto.response.GroupInfoResponse buildGroupInfo(Chat chat, ChatMember memberSelf) {
+        ChatSettings s = chat.getSettings() != null ? chat.getSettings() : ChatSettings.builder().build();
+
+        String ownerUuid = null;
+        if (chat.getOwnerId() != null) {
+            ownerUuid = userRepository.findById(chat.getOwnerId())
+                    .map(u -> u.getUuid().toString())
+                    .orElse(null);
+        }
+
+        String pinnedMessageId = messageRepository.findFirstByChatAndPinnedTrueOrderByPinnedAtDesc(chat)
+                .map(m -> m.getUuid().toString())
+                .orElse(null);
+
+        return com.chat.talkMe.dto.response.GroupInfoResponse.builder()
+                .subtype(chat.getChatType().name().toLowerCase())
+                .visibility(chat.getVisibility().name())
+                .joinPolicy(chat.getJoinPolicy().name())
+                .allowExplicitContent(chat.isAllowExplicitContent())
+                .allowNonFriends(chat.isAllowNonFriends())
+                .memberLimit(chat.getMemberLimit())
+                .memberCount((int) chatMemberRepository.countActiveMembers(chat))
+                .description(chat.getDescription())
+                .imageUrl(chat.getImageUrl())
+                .publicUsername(chat.getSlug())
+                .category(chat.getCategory())
+                .tags(chat.getTags() == null ? java.util.List.of()
+                        : chat.getTags().stream().map(Enum::name).collect(Collectors.toList()))
+                .ownerId(ownerUuid)
+                .myRole(memberSelf != null ? memberSelf.getRole().name() : null)
+                .active(memberSelf != null && memberSelf.getLeftAt() == null)
+                .pinnedMessageId(pinnedMessageId)
+                .whoCanSend(s.getWhoCanSend().name())
+                .whoCanAddMembers(s.getWhoCanAddMembers().name())
+                .whoCanEditInfo(s.getWhoCanEditInfo().name())
+                .whoCanPin(s.getWhoCanPin().name())
+                .slowModeSeconds(s.getSlowModeSeconds())
+                .build();
     }
 }

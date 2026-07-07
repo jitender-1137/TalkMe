@@ -4,9 +4,16 @@ import com.chat.talkMe.security.CsrfTokenFilter;
 import com.chat.talkMe.security.JwtAuthenticationEntryPoint;
 import com.chat.talkMe.security.JwtAuthenticationFilter;
 import com.chat.talkMe.security.RateLimitingFilter;
+import com.chat.talkMe.security.oauth.HttpCookieOAuth2AuthorizationRequestRepository;
+import com.chat.talkMe.security.oauth.OAuth2LoginFailureHandler;
+import com.chat.talkMe.security.oauth.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -44,7 +51,21 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            Environment environment,
+            // Injected as method params (NOT constructor fields) so resolving the
+            // OAuth handler graph — which transitively needs the passwordEncoder bean
+            // defined in THIS class — happens after SecurityConfig is constructed,
+            // avoiding a bean-creation cycle.
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
+            HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository,
+            OAuth2LoginSuccessHandler oauth2LoginSuccessHandler,
+            OAuth2LoginFailureHandler oauth2LoginFailureHandler) throws Exception {
+        // Swagger / OpenAPI docs are reachable without auth only in non-prod profiles.
+        // In prod they require authentication (effectively off, since the browser
+        // Swagger UI has no Bearer token to present) — see the authorize rules below.
+        boolean docsPublic = !environment.acceptsProfiles(Profiles.of("prod"));
         http
                 .csrf(AbstractHttpConfigurer::disable) // Custom CsrfTokenFilter handles CSRF check
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
@@ -72,11 +93,48 @@ public class SecurityConfig {
                                 "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"))
                         .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
                                 "geolocation=(), microphone=(self), camera=(self), payment=()")))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(unSecured()).permitAll()
+                .authorizeHttpRequests(auth -> {
+                    // Actuator lives at /actuator (OUTSIDE the /api/v1 prefix), so it would
+                    // otherwise fall through to anyRequest().permitAll() and be exposed
+                    // unauthenticated. These MUST come before the /api/** and anyRequest rules.
+                    // Liveness/readiness probes stay public (health show-details=when_authorized,
+                    // so anonymous callers see only UP/DOWN); metrics, prometheus, info and the
+                    // rest require authentication. authenticated() — not hasRole("ADMIN") — because
+                    // no user is ever granted ROLE_ADMIN, so admin-only would lock out everyone.
+                    auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").authenticated();
+
+                    // Swagger / OpenAPI docs. In prod: locked down (not public). In dev/local:
+                    // reachable. The root-path UI (/swagger-ui.html + static assets) and the
+                    // prefixed @RestController doc endpoints (/api/v1/v3/api-docs, ...) are both
+                    // covered so neither leaks via anyRequest().permitAll() or the /api/** rule.
+                    if (docsPublic) {
+                        auth.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
+                                "/api/v1/swagger-ui/**", "/api/v1/v3/api-docs/**").permitAll();
+                    } else {
+                        auth.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
+                                .authenticated();
+                        // the /api/v1/... doc paths are caught by the /api/** rule below
+                    }
+
+                    auth.requestMatchers(unSecured()).permitAll()
                         .requestMatchers("/api/**").authenticated() // Require auth for API endpoints
-                        .anyRequest().permitAll() // Allow static resources and frontend routes
-                );
+                        .anyRequest().permitAll(); // Allow static SPA resources and frontend routes
+                });
+
+        // Google social login (authorization-code flow). Enabled only when a Google
+        // client is configured; otherwise the app behaves exactly as before. The
+        // in-flight authorization request is stored in a cookie (see the repository)
+        // because sessions are STATELESS. Endpoints (root, NOT under /api/v1):
+        //   start:    /oauth2/authorization/google
+        //   callback: /login/oauth2/code/google
+        if (clientRegistrationRepository.getIfAvailable() != null) {
+            http.oauth2Login(oauth -> oauth
+                    .authorizationEndpoint(a -> a
+                            .authorizationRequestRepository(cookieAuthorizationRequestRepository))
+                    .successHandler(oauth2LoginSuccessHandler)
+                    .failureHandler(oauth2LoginFailureHandler));
+        }
 
         // Filter sequence: CSRF -> JWT (auth) -> Rate Limiting -> UsernamePasswordAuth.
         // Rate limiting MUST run after JWT authentication so the SecurityContext is
@@ -100,19 +158,37 @@ public class SecurityConfig {
      */
     private String[] unSecured() {
         return new String[]{
+                // Pre-login auth flows. NOTE: guest/anonymous signup is NOT a separate
+                // endpoint — it is folded into POST /auth/login (isGuest:true in the body),
+                // so it is already public here.
                 "/api/v1/auth/login", "/auth/login",
                 "/api/v1/auth/signup", "/auth/signup",
                 "/api/v1/auth/refresh", "/auth/refresh",
                 "/api/v1/auth/forgot-password", "/auth/forgot-password",
                 "/api/v1/auth/reset-password", "/auth/reset-password",
-                "/api/v1/v3/api-docs/**", "/v3/api-docs/**",
-                "/api/v1/swagger-ui/**", "/swagger-ui/**",
+                // WebSocket handshake: auth happens on the STOMP CONNECT frame (token in
+                // the frame), not the HTTP handshake, so the handshake must be public.
                 "/api/v1/ws/**", "/ws/**",
+                // Media serve: browsers load <img>/<video> src with no Authorization
+                // header, so this must stay public. It currently lacks per-file
+                // authorization — see the follow-up note; that is a controller-level fix,
+                // not solvable via a security rule.
                 "/api/v1/uploads/media", "/uploads/media",
-                "/api/v1/users/lobby", "/users/lobby",
+                // Google OAuth2 start + callback. Root Spring Security filter endpoints
+                // (NOT under the /api/v1 @RestController prefix); listed explicitly so they
+                // never get caught by the /api/** authenticated() rule.
+                "/oauth2/**", "/login/oauth2/**",
+                // Default error dispatch target; kept reachable so 401/403 (and other)
+                // error bodies render instead of recursing back into authentication.
+                "/error",
                 // Push delivery-ack: authorized by the signed token in the body,
                 // not a Bearer header (the service worker has no access token).
                 "/api/v1/push/delivered", "/push/delivered"
+                // REMOVED (now require auth):
+                //  - /users/lobby : returned full user records incl. phone numbers to
+                //    unauthenticated callers (PII/IDOR leak). The frontend only ever calls
+                //    it with a token, so this breaks nothing.
+                //  - swagger / v3/api-docs : handled by the profile-gated rules above.
         };
     }
 }

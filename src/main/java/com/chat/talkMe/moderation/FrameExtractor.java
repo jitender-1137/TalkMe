@@ -1,7 +1,8 @@
 package com.chat.talkMe.moderation;
 
+import com.chat.talkMe.service.impl.FfmpegSupport;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -11,13 +12,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** Extracts a few evenly-spaced frames from a video using ffmpeg (already installed). */
+/** Extracts a few evenly-spaced frames from a video using the app's bundled ffmpeg. */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class FrameExtractor {
 
-    @Value("${media.ffmpeg-path:ffmpeg}")
-    private String ffmpegPath;
+    private final FfmpegSupport ffmpeg;
 
     private static final int FRAME_COUNT = 5;
     private static final long TIMEOUT_SECONDS = 60;
@@ -30,7 +31,7 @@ public class FrameExtractor {
             Path pattern = dir.resolve(UUID.randomUUID() + "-%03d.jpg");
             // One frame every few seconds, capped at FRAME_COUNT, scaled small for speed.
             List<String> cmd = List.of(
-                    ffmpegPath, "-y",
+                    ffmpeg.path(), "-y",
                     "-i", video.toString(),
                     "-vf", "fps=1/2,scale=224:-1",
                     "-frames:v", String.valueOf(FRAME_COUNT),

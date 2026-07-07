@@ -5,6 +5,9 @@ import com.chat.talkMe.dto.request.PostCommentRequest;
 import com.chat.talkMe.dto.request.PostRequest;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.PostCommentResponse;
+import com.chat.talkMe.dto.response.AudioTrackDto;
+import com.chat.talkMe.dto.response.PollOptionResponse;
+import com.chat.talkMe.dto.response.PollResponse;
 import com.chat.talkMe.dto.response.PostMediaResponse;
 import com.chat.talkMe.dto.response.PostResponse;
 import com.chat.talkMe.exception.*;
@@ -35,33 +38,86 @@ public class PostServiceImpl implements PostService {
     private final PostCommentRepository postCommentRepository;
     private final PostCommentLikeRepository postCommentLikeRepository;
     private final PostBookmarkRepository postBookmarkRepository;
+    private final PollRepository pollRepository;
+    private final PollOptionRepository pollOptionRepository;
+    private final PollVoteRepository pollVoteRepository;
     private final UserRepository userRepository;
     private final UserSettingRepository userSettingRepository;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final PhotoMusicMuxer photoMusicMuxer;
+    private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
 
     @Override
     @Transactional
     public PostResponse createPost(PostRequest request, User currentUser) {
+        // A post must carry something: text, media, or a poll. (Text-only is allowed.)
+        boolean hasContent = request.getContent() != null && !request.getContent().isBlank();
+        boolean hasMedia = request.getMedia() != null && !request.getMedia().isEmpty();
+        boolean hasPoll = request.getPoll() != null;
+        if (!hasContent && !hasMedia && !hasPoll) {
+            throw new BadRequestException("A post must have text, media, or a poll", "TM_230");
+        }
         // Public feed is hard-blocked: explicit captions are rejected outright.
         if (moderationService.moderateText(request.getContent()).isExplicit()) {
             throw new com.chat.talkMe.exception.ContentModerationException(
                     "Your post contains content that violates our community guidelines.");
         }
+        com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+        if (request.getAudience() != null && "FRIENDS".equalsIgnoreCase(request.getAudience().trim())) {
+            audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
+        }
+
         Post post = Post.builder()
                 .user(currentUser)
                 .content(request.getContent())
+                .audience(audience)
                 .shortCode(com.chat.talkMe.util.ShortCodes.unique(c -> !postRepository.existsByShortCode(c)))
                 .build();
 
         post = postRepository.save(post);
 
+        // Instagram-style photo + music → merge into an auto-playing video. When the
+        // post is a SINGLE image with a soundtrack, mux the still image + trimmed clip
+        // into an MP4 so the sound plays with the post like an uploaded video. Falls
+        // back silently to the plain image (+ audio attribution) if muxing is
+        // unavailable.
+        // The mediaUrl of our own muxed output — moderation is skipped for it (the
+        // SOURCE image was already moderated below, before muxing; re-running video
+        // frame-extraction moderation on the fresh mp4 is wasteful and was breaking
+        // photo+music posts).
+        String muxedMediaUrl = null;
+        if (request.getAudio() != null && request.getAudio().getAudioUrl() != null
+                && request.getMedia() != null && request.getMedia().size() == 1) {
+            var only = request.getMedia().get(0);
+            boolean isImage = !"VIDEO".equalsIgnoreCase(only.getMediaType());
+            if (isImage) {
+                // Moderate the still image up front (public feed hard-blocks NSFW).
+                java.nio.file.Path imgPath = resolveStoredMedia(only.getMediaUrl());
+                if (imgPath != null && moderationService.moderateMedia(imgPath, com.chat.talkMe.enums.MessageType.IMAGE).isExplicit()) {
+                    throw new com.chat.talkMe.exception.ContentModerationException(
+                            "Your post contains media that violates our community guidelines.");
+                }
+                var a = request.getAudio();
+                int start = a.getAudioStartSec() == null ? 0 : a.getAudioStartSec();
+                int clip = a.getAudioClipSeconds() == null ? 15 : a.getAudioClipSeconds();
+                String video = photoMusicMuxer.muxPhotoWithMusic(only.getMediaUrl(), a.getAudioUrl(), start, clip);
+                if (video != null) {
+                    only.setMediaUrl(video);
+                    only.setMediaType("VIDEO");
+                    muxedMediaUrl = video;
+                }
+            }
+        }
+
         if (request.getMedia() != null) {
             int order = 0;
             for (var mediaReq : request.getMedia()) {
-                // Public feed → NSFW media is hard-blocked.
-                java.nio.file.Path mediaPath = resolveStoredMedia(mediaReq.getMediaUrl());
+                // Public feed → NSFW media is hard-blocked. Skip our own muxed output
+                // (its source image was already moderated above).
+                boolean isMuxedOutput = mediaReq.getMediaUrl() != null && mediaReq.getMediaUrl().equals(muxedMediaUrl);
+                java.nio.file.Path mediaPath = isMuxedOutput ? null : resolveStoredMedia(mediaReq.getMediaUrl());
                 if (mediaPath != null) {
                     boolean isVideo = "VIDEO".equalsIgnoreCase(mediaReq.getMediaType());
                     var mt = isVideo ? com.chat.talkMe.enums.MessageType.VIDEO : com.chat.talkMe.enums.MessageType.IMAGE;
@@ -81,7 +137,89 @@ public class PostServiceImpl implements PostService {
             }
         }
 
+        // Poll posts: build the poll + its options alongside the post.
+        if (request.getPoll() != null) {
+            var pollReq = request.getPoll();
+            List<String> options = pollReq.getOptions() == null ? List.of() : pollReq.getOptions().stream()
+                    .filter(o -> o != null && !o.isBlank())
+                    .map(String::trim)
+                    .collect(Collectors.toList());
+            if (options.size() < 2) {
+                throw new BadRequestException("A poll needs at least 2 options", "TM_225");
+            }
+            // Poll question + options are public → hard-block explicit content.
+            if (moderationService.moderateText(pollReq.getQuestion()).isExplicit()
+                    || options.stream().anyMatch(o -> moderationService.moderateText(o).isExplicit())) {
+                throw new com.chat.talkMe.exception.ContentModerationException(
+                        "Your poll contains content that violates our community guidelines.");
+            }
+
+            Poll poll = Poll.builder()
+                    .post(post)
+                    .question(pollReq.getQuestion().trim())
+                    .build();
+            poll = pollRepository.save(poll);
+
+            int order = 0;
+            for (String text : options) {
+                PollOption option = PollOption.builder()
+                        .poll(poll)
+                        .text(text)
+                        .orderIndex(order++)
+                        .build();
+                pollOptionRepository.save(option);
+                poll.getOptions().add(option);
+            }
+            post.setPoll(poll);
+        }
+
+        // Optional soundtrack.
+        if (request.getAudio() != null) {
+            AudioTrack track = request.getAudio().toEntity();
+            if (track != null) {
+                post.setAudio(track);
+                postRepository.save(post);
+            }
+        }
+
         log.info("Post created successfully by {}", currentUser.getUsername());
+        return mapToPostResponse(post, currentUser);
+    }
+
+    @Override
+    @Transactional
+    public PostResponse votePoll(String postUuid, String optionUuid, User currentUser) {
+        Post post = postRepository.findByUuid(UUID.fromString(postUuid))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
+        Poll poll = post.getPoll();
+        if (poll == null) {
+            throw new BadRequestException("This post is not a poll", "TM_226");
+        }
+        PollOption option = pollOptionRepository.findByUuid(UUID.fromString(optionUuid))
+                .orElseThrow(() -> new NotFoundException("Poll option not found", "TM_227"));
+        if (!option.getPoll().getId().equals(poll.getId())) {
+            throw new BadRequestException("Option does not belong to this poll", "TM_228");
+        }
+
+        var existing = pollVoteRepository.findByPollAndUser(poll, currentUser);
+        if (existing.isPresent()) {
+            PollVote vote = existing.get();
+            if (vote.getOption().getId().equals(option.getId())) {
+                // Tapping the current choice again retracts the vote (toggle off).
+                pollVoteRepository.delete(vote);
+            } else {
+                // Switch the vote to the newly chosen option.
+                vote.setOption(option);
+                pollVoteRepository.save(vote);
+            }
+        } else {
+            pollVoteRepository.save(PollVote.builder()
+                    .poll(poll)
+                    .option(option)
+                    .user(currentUser)
+                    .build());
+        }
+
         return mapToPostResponse(post, currentUser);
     }
 
@@ -90,7 +228,7 @@ public class PostServiceImpl implements PostService {
     public PostResponse getPost(String postUuid, User currentUser) {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
-        if (post.isDeleted()) {
+        if (post.isDeleted() || !canViewPost(post, currentUser)) {
             throw new NotFoundException("Post not found", "TM_211");
         }
         return mapToPostResponse(post, currentUser);
@@ -101,10 +239,23 @@ public class PostServiceImpl implements PostService {
     public PostResponse getPostByShortCode(String shortCode, User currentUser) {
         Post post = postRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
-        if (post.isDeleted()) {
+        if (post.isDeleted() || !canViewPost(post, currentUser)) {
             throw new NotFoundException("Post not found", "TM_211");
         }
         return mapToPostResponse(post, currentUser);
+    }
+
+    /**
+     * A FRIENDS-only post is viewable by its author or an accepted friend (an
+     * ACCEPTED follow in either direction); EVERYONE posts are viewable by all.
+     * Non-viewers get a 404 (don't reveal the post exists).
+     */
+    private boolean canViewPost(Post post, User viewer) {
+        if (post.getAudience() != com.chat.talkMe.enums.PostAudience.FRIENDS) return true;
+        if (viewer == null) return false;
+        if (post.getUser().getId().equals(viewer.getId())) return true;
+        return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, post.getUser(), "ACCEPTED")
+                || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(post.getUser(), viewer, "ACCEPTED");
     }
 
     @Override
@@ -141,7 +292,9 @@ public class PostServiceImpl implements PostService {
                     .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
         }
 
-        Page<Post> posts = postRepository.findByUserAndIsDeletedFalse(targetUser, pageable);
+        // Hide the target's FRIENDS-only posts from viewers who aren't the author or
+        // an accepted friend.
+        Page<Post> posts = postRepository.findProfileFeedFor(targetUser, currentUser, pageable);
         return posts.map(post -> mapToPostResponse(post, currentUser));
     }
 
@@ -416,6 +569,36 @@ public class PostServiceImpl implements PostService {
                 .bookmarkedByMe(bookmarked)
                 .createdAt(post.getCreatedAt().toString())
                 .comments(commentsRes)
+                .poll(mapToPollResponse(post.getPoll(), currentUser))
+                .audio(AudioTrackDto.from(post.getAudio()))
+                .audience(post.getAudience() != null ? post.getAudience().name() : "EVERYONE")
+                .build();
+    }
+
+    /** Map a poll (or null) to its response, resolving per-option counts and the caller's vote. */
+    private PollResponse mapToPollResponse(Poll poll, User currentUser) {
+        if (poll == null) {
+            return null;
+        }
+        String myVoteOptionId = pollVoteRepository.findByPollAndUser(poll, currentUser)
+                .map(v -> v.getOption().getUuid().toString())
+                .orElse(null);
+
+        List<PollOptionResponse> optionRes = poll.getOptions().stream()
+                .map(o -> PollOptionResponse.builder()
+                        .id(o.getUuid().toString())
+                        .text(o.getText())
+                        .votes(pollVoteRepository.countByOption(o))
+                        .votedByMe(o.getUuid().toString().equals(myVoteOptionId))
+                        .build())
+                .collect(Collectors.toList());
+
+        return PollResponse.builder()
+                .id(poll.getUuid().toString())
+                .question(poll.getQuestion())
+                .totalVotes(pollVoteRepository.countByPoll(poll))
+                .myVoteOptionId(myVoteOptionId)
+                .options(optionRes)
                 .build();
     }
 

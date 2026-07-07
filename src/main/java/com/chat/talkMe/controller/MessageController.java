@@ -93,6 +93,44 @@ public class MessageController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Media destroyed", "TM_164"));
     }
 
+    // Pin / unpin a message (group admins per settings.whoCanPin).
+    @PostMapping("/{messageId}/pin")
+    public ResponseEntity<ResponseDto<MessageResponse>> pinMessage(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        MessageResponse response = messageService.setMessagePinned(chatUuid, messageUuid, true, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Message pinned", "TM_287"));
+    }
+
+    @DeleteMapping("/{messageId}/pin")
+    public ResponseEntity<ResponseDto<MessageResponse>> unpinMessage(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        MessageResponse response = messageService.setMessagePinned(chatUuid, messageUuid, false, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Message unpinned", "TM_288"));
+    }
+
+    // Star / unstar (save) a message for the current user.
+    @PostMapping("/{messageId}/star")
+    public ResponseEntity<ResponseDto<Void>> starMessage(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        messageService.setMessageStarred(chatUuid, messageUuid, true, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Message starred", "TM_308"));
+    }
+
+    @DeleteMapping("/{messageId}/star")
+    public ResponseEntity<ResponseDto<Void>> unstarMessage(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        messageService.setMessageStarred(chatUuid, messageUuid, false, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Message unstarred", "TM_309"));
+    }
+
     @PostMapping("/{messageId}/reactions")
     public ResponseEntity<ResponseDto<MessageResponse>> reactToMessage(
             @PathVariable("chatId") String chatUuid,

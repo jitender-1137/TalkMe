@@ -26,6 +26,10 @@ public class Story extends BaseEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    // Optional soundtrack.
+    @Embedded
+    private AudioTrack audio;
+
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

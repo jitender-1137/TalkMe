@@ -12,9 +12,13 @@ import java.util.List;
 @AllArgsConstructor
 public class MessageResponse {
     private String id; // maps to uuid
+    private String chatId; // owning chat uuid (needed by the starred-messages list)
     private String clientId; // echoes the client idempotency key so the sender's own broadcast dedups
     private Long sequenceNumber;
     private String senderId; // maps to sender.uuid
+    private String senderName; // sender display name (group bubbles show it)
+    private String senderAvatar; // sender profile image (group bubbles show it)
+    private boolean starred; // whether the CURRENT user has starred (saved) this message
     private String content;
     private String messageType; // MessageType enum representation
     private String createdAt;

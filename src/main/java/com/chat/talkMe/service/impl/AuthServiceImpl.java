@@ -226,6 +226,132 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
+    public LoginResponse oauthLogin(com.chat.talkMe.dto.OAuthUserInfo info, String userAgent,
+                                    HttpServletRequest httpRequest) {
+        // Geo-locate from the callback request IP — the OAuth callback is a top-level
+        // browser navigation so the client IP is the real user's. Google's profile has
+        // no reliable country, so we reuse the SAME detector as password/guest signup
+        // (IP → proxy headers → server public IP fallback; see CountryDetectionService).
+        CountryDetectionResult detection = countryDetectionService.detectCountry(httpRequest);
+
+        // 1. Match an existing account: by provider id first, then by email (links the
+        //    Google identity onto a pre-existing password account with the same email).
+        User user = null;
+        if (info.getProviderId() != null && !info.getProviderId().isBlank()) {
+            user = userRepository.findByGoogleId(info.getProviderId()).orElse(null);
+        }
+        if (user == null && info.getEmail() != null && !info.getEmail().isBlank()) {
+            user = userRepository.findByEmail(info.getEmail()).orElse(null);
+        }
+
+        if (user == null) {
+            // 2. First-time Google user → create a full, verified account and persist
+            //    the googleId, so every subsequent login resolves to this same row.
+            Role userRole = getOrCreateRole("ROLE_USER");
+            String name = (info.getName() != null && !info.getName().isBlank()) ? info.getName() : "User";
+            User newUser = User.builder()
+                    .name(name)
+                    .email(info.getEmail())
+                    .username(generateUniqueUsername(info.getEmail(), name))
+                    .googleId(info.getProviderId())
+                    .isGuest(false)
+                    .isVerified(info.isEmailVerified())
+                    .roles(Set.of(userRole))
+                    .age(info.getAge())        // may be null (Google rarely shares it)
+                    .gender(info.getGender())  // may be null
+                    .profileImage(info.getPicture())
+                    .country(detection.getCountry())
+                    .build();
+            try {
+                user = userRepository.save(newUser);
+                log.info("New Google user provisioned: {} (email: {}, country: {}, source: {})",
+                        user.getUsername(), info.getEmail(), detection.getCountry(), detection.getSource());
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                // Concurrent first-login for the same identity: the unique google_id/
+                // email constraint rejected the duplicate. Reuse the row that won the
+                // race so the same Google account always maps to one user id.
+                user = userRepository.findByGoogleId(info.getProviderId())
+                        .or(() -> (info.getEmail() != null && !info.getEmail().isBlank())
+                                ? userRepository.findByEmail(info.getEmail())
+                                : java.util.Optional.empty())
+                        .orElseThrow(() -> e);
+                log.info("Reused existing Google user after create race: {}", user.getUsername());
+            }
+        } else {
+            // 3. Existing account → link + backfill any fields we don't already have.
+            boolean dirty = false;
+            if (user.getGoogleId() == null && info.getProviderId() != null) {
+                user.setGoogleId(info.getProviderId());
+                dirty = true;
+            }
+            if ((user.getProfileImage() == null || user.getProfileImage().isBlank())
+                    && info.getPicture() != null) {
+                user.setProfileImage(info.getPicture());
+                dirty = true;
+            }
+            if ((user.getAge() == null || user.getAge() == 0) && info.getAge() != null) {
+                user.setAge(info.getAge());
+                dirty = true;
+            }
+            if ((user.getGender() == null || user.getGender().isBlank()) && info.getGender() != null) {
+                user.setGender(info.getGender());
+                dirty = true;
+            }
+            if (!user.isVerified() && info.isEmailVerified()) {
+                user.setVerified(true);
+                dirty = true;
+            }
+            // Backfill country only when we don't already have one (never overwrite).
+            if (user.getCountry() == null || user.getCountry().isBlank()) {
+                String detected = detection.getCountry();
+                if (detected != null && !detected.isBlank() && !"Unknown".equalsIgnoreCase(detected)) {
+                    user.setCountry(detected);
+                    dirty = true;
+                }
+            }
+            // Google sign-in also recovers a soft-deleted account (same as password login).
+            if (user.isDeleted()) {
+                user.setDeleted(false);
+                user.setDeletionRequestedAt(null);
+                dirty = true;
+            }
+            if (dirty) {
+                user = userRepository.save(user);
+            }
+        }
+
+        return generateLoginResponse(user, userAgent, detection.getClientIp());
+    }
+
+    /**
+     * Derive a unique username for a social-login account from the email local-part
+     * (or the display name), stripped to safe characters and suffixed on collision.
+     */
+    private String generateUniqueUsername(String email, String name) {
+        String base;
+        if (email != null && email.contains("@")) {
+            base = email.substring(0, email.indexOf('@'));
+        } else if (name != null) {
+            base = name;
+        } else {
+            base = "user";
+        }
+        base = base.toLowerCase().replaceAll("[^a-z0-9._-]", "");
+        if (base.isBlank()) {
+            base = "user";
+        }
+        if (base.length() > 40) {
+            base = base.substring(0, 40);
+        }
+        String candidate = base;
+        while (userRepository.existsByUsername(candidate)) {
+            candidate = base + "_" + Integer.toHexString(SECURE_RANDOM.nextInt(0x10000));
+        }
+        return candidate;
+    }
+
+    @Override
+    @Transactional
     public JwtTokensResponse refresh(String tokenStr, String userAgent, String ip) {
         RefreshToken token = refreshTokenRepository.findByToken(tokenStr)
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token", "TM_026"));
@@ -260,7 +386,18 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         token.setReplacedByToken(newRefreshTokenStr);
-        refreshTokenRepository.save(token);
+        try {
+            // Flush the rotation NOW so a concurrent refresh of the SAME token
+            // (multiple tabs, or a burst of queued requests all firing after the
+            // access token expired) is caught here as an optimistic-lock failure
+            // instead of exploding at commit time with a 500. The request that loses
+            // the race is a benign "already rotated" attempt → give it a clean 401
+            // (TM_026), which the client handles by re-authenticating.
+            refreshTokenRepository.saveAndFlush(token);
+        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+            throw new UnauthorizedException(
+                    "Session was just refreshed by another request. Please log in again.", "TM_026");
+        }
         refreshTokenRepository.save(newRefreshToken);
 
         // Update session active timestamp

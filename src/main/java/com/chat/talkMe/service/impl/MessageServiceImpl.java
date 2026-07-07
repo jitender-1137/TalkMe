@@ -38,6 +38,7 @@ public class MessageServiceImpl implements MessageService {
     private final MessageAttachmentRepository messageAttachmentRepository;
     private final MessageReadReceiptRepository readReceiptRepository;
     private final MessageReactionRepository messageReactionRepository;
+    private final com.chat.talkMe.repository.MessageStarRepository messageStarRepository;
     private final MessageMapper messageMapper;
     private final BlockUserRepository blockUserRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -49,6 +50,7 @@ public class MessageServiceImpl implements MessageService {
     private final ChatExplicitConsentRepository consentRepository;
     private final FriendRepository friendRepository;
     private final UserSettingRepository userSettingRepository;
+    private final com.chat.talkMe.service.GroupAuthzService groupAuthzService;
 
     @Override
     @Transactional
@@ -56,8 +58,40 @@ public class MessageServiceImpl implements MessageService {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
 
+        // A deleted chat (e.g. an owner deleted the group) accepts no new messages.
+        if (chat.isDeleted()) {
+            throw new NotFoundException("This chat no longer exists", "TM_121");
+        }
+
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
+                .filter(m -> !m.isDeleted())
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
+
+        // Former member (left / removed) keeps read-only history but cannot post.
+        if (member.getLeftAt() != null) {
+            throw new ForbiddenException("You are no longer a member of this group", "TM_141");
+        }
+
+        // ── Multi-party (group / channel / room) send authorization ──────────────
+        // Ban/mute, channel read-only (ADMINS_ONLY), and slow mode.
+        if (chat.isMultiParty()) {
+            if (!groupAuthzService.canSend(chat, member)) {
+                boolean isChannel = chat.getChatType() == com.chat.talkMe.enums.ChatType.CHANNEL;
+                throw new ForbiddenException(
+                        isChannel ? "Only admins can post in this channel"
+                                  : "You can't send messages here right now",
+                        isChannel ? "TM_294" : "TM_295");
+            }
+            int slow = chat.getSettings() != null ? chat.getSettings().getSlowModeSeconds() : 0;
+            if (slow > 0 && !member.getRole().atLeast(com.chat.talkMe.enums.MemberRole.ADMIN)) {
+                Message last = messageRepository.findFirstByChatAndSenderOrderByIdDesc(chat, currentUser).orElse(null);
+                if (last != null && last.getCreatedAt() != null
+                        && last.getCreatedAt().plusSeconds(slow).isAfter(Instant.now())) {
+                    throw new com.chat.talkMe.exception.TooManyRequestsException(
+                            "Slow mode is on. Please wait before sending another message.", "TM_296");
+                }
+            }
+        }
 
         // Idempotent send: if the client retried with the same idempotency key,
         // return the already-persisted message instead of creating a duplicate.
@@ -141,10 +175,16 @@ public class MessageServiceImpl implements MessageService {
             }
         }
         if (explicit) {
-            if (chat.getChatType() == com.chat.talkMe.enums.ChatType.GROUP) {
-                throw new com.chat.talkMe.exception.ContentModerationException(
-                        "Your message contains content that violates our community guidelines.");
-            }
+            // Multi-party chats have no 1:1 mutual-consent handshake: a clean group
+            // hard-blocks explicit content, while an age-restricted (18+) group/room
+            // allows it (entry required age confirmation).
+            if (chat.isMultiParty()) {
+                if (!chat.isAllowExplicitContent()) {
+                    throw new com.chat.talkMe.exception.ContentModerationException(
+                            "Your message contains content that violates our community guidelines.");
+                }
+                // Group allows explicit content: allow (fall through, stays CLEAN).
+            } else {
             com.chat.talkMe.enums.ConsentStatus consent = consentRepository.findByChat(chat)
                     .map(ChatExplicitConsent::getStatus)
                     .orElse(com.chat.talkMe.enums.ConsentStatus.NONE);
@@ -154,6 +194,7 @@ public class MessageServiceImpl implements MessageService {
             if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED && !recipientIsBot) {
                 // Saved but withheld from the recipient until consent is granted.
                 moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
+            }
             }
         }
 
@@ -166,8 +207,10 @@ public class MessageServiceImpl implements MessageService {
                 .parentMessage(parentMessage)
                 .isBlocked(isBlocked)
                 .moderationStatus(moderationStatus)
-                // Self-destruct/view-once applies to media only (ignored for TEXT).
-                .selfDestructSeconds(type != MessageType.TEXT ? request.getSelfDestructSeconds() : null)
+                // Self-destruct/view-once applies to media only, 1:1 chats only
+                // (per-member arming is not modeled for groups in MVP).
+                .selfDestructSeconds(type != MessageType.TEXT && !chat.isMultiParty()
+                        ? request.getSelfDestructSeconds() : null)
                 .build();
 
         message = messageRepository.save(message);
@@ -220,6 +263,7 @@ public class MessageServiceImpl implements MessageService {
         // until consent is granted, then it's delivered via the `messages_released` event.
         if (!isBlocked && !held) {
             List<String> recipientUsernames = chat.getMembers().stream()
+                    .filter(m -> m.getLeftAt() == null) // former members get no new messages
                     .map(ChatMember::getUser)
                     .filter(u -> u != null && !u.getId().equals(currentUser.getId()))
                     .map(User::getUsername)
@@ -277,6 +321,7 @@ public class MessageServiceImpl implements MessageService {
         MessageResponse response = messageMapper.toMessageResponse(message);
 
         List<String> recipientUsernames = chat.getMembers().stream()
+                .filter(m -> m.getLeftAt() == null)
                 .map(ChatMember::getUser)
                 .filter(u -> u != null && !u.getId().equals(bot.getId()))
                 .map(User::getUsername)
@@ -301,6 +346,116 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
+    @Transactional
+    public MessageResponse sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser) {
+        Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+
+        Message message = Message.builder()
+                .chat(chat)
+                .sender(actor)
+                .content(contentJson)
+                .messageType(MessageType.SYSTEM)
+                .moderationStatus(com.chat.talkMe.enums.ModerationStatus.CLEAN)
+                .build();
+        message = messageRepository.save(message);
+
+        chatRepository.touchUpdatedAt(chat.getId(), Instant.now());
+
+        MessageResponse response = messageMapper.toMessageResponse(message);
+
+        List<String> recipientUsernames = chat.getMembers().stream()
+                .filter(m -> m.getLeftAt() == null)
+                .map(ChatMember::getUser)
+                .filter(u -> u != null && (currentUser == null || !u.getId().equals(currentUser.getId())))
+                .map(User::getUsername)
+                .toList();
+
+        MessageSentEvent broadcastEvent = MessageSentEvent.builder()
+                .chatUuid(chatUuid)
+                .message(response)
+                .senderUserId(actor.getId())
+                .senderName(actor.getName())
+                .senderProfileImage(actor.getProfileImage())
+                .recipientUsernames(recipientUsernames)
+                .build();
+
+        // Best-effort broadcast (system events are non-critical): outbox + fast path.
+        persistOutbox(response.getId(), broadcastEvent);
+        eventPublisher.publishEvent(broadcastEvent);
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public MessageResponse setMessagePinned(String chatUuid, String messageUuid, boolean pinned, User currentUser) {
+        Message message = loadChatMessage(chatUuid, messageUuid, currentUser);
+        Chat chat = message.getChat();
+        if (chat.isMultiParty()) {
+            ChatMember me = chatMemberRepository.findByChatAndUser(chat, currentUser)
+                    .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
+            if (!me.getRole().atLeast(chat.getSettings().getWhoCanPin())) {
+                throw new ForbiddenException("You can't pin messages in this group", "TM_291");
+            }
+        }
+        message.setPinned(pinned);
+        message.setPinnedAt(pinned ? Instant.now() : null);
+        message.setPinnedBy(pinned ? currentUser.getId() : null);
+        messageRepository.save(message);
+        // Notify subscribers so the pinned banner updates live.
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("chatId", chatUuid);
+            payload.put("messageId", pinned ? messageUuid : null);
+            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            eventWrapper.put("event", pinned ? "message_pinned" : "message_unpinned");
+            eventWrapper.put("payload", payload);
+            messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
+        } catch (Exception e) {
+            log.error("WebSocket pin broadcast failed", e);
+        }
+        return messageMapper.toMessageResponse(message);
+    }
+
+    @Override
+    @Transactional
+    public void setMessageStarred(String chatUuid, String messageUuid, boolean starred, User currentUser) {
+        Message message = loadChatMessage(chatUuid, messageUuid, currentUser);
+        if (starred) {
+            if (messageStarRepository.findByMessageAndUser(message, currentUser).isEmpty()) {
+                messageStarRepository.save(
+                        com.chat.talkMe.domain.MessageStar.builder().message(message).user(currentUser).build());
+            }
+        } else {
+            messageStarRepository.deleteByMessageAndUser(message, currentUser);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MessageResponse> getStarredMessages(User currentUser, int limit) {
+        int safe = limit <= 0 ? 100 : Math.min(limit, 200);
+        List<Message> rows = messageStarRepository.findStarredMessages(currentUser.getId(), PageRequest.of(0, safe));
+        return rows.stream().map(m -> {
+            MessageResponse r = messageMapper.toMessageResponse(m);
+            r.setStarred(true);
+            return r;
+        }).collect(java.util.stream.Collectors.toList());
+    }
+
+    /** Flag {@code starred} on a page of responses for the current user (one query). */
+    private void applyStarredFlags(List<Message> rows, List<MessageResponse> responses, User user) {
+        if (rows.isEmpty()) return;
+        List<Long> ids = rows.stream().map(Message::getId).collect(java.util.stream.Collectors.toList());
+        java.util.Set<Long> starred = new java.util.HashSet<>(
+                messageStarRepository.findStarredMessageIds(user.getId(), ids));
+        if (starred.isEmpty()) return;
+        for (int i = 0; i < rows.size(); i++) {
+            if (starred.contains(rows.get(i).getId())) responses.get(i).setStarred(true);
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public MessagePageResponse getMessages(String chatUuid, Long cursor, int limit, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
@@ -312,7 +467,7 @@ public class MessageServiceImpl implements MessageService {
         int safeLimit = limit <= 0 ? 30 : Math.min(limit, 100);
         // Fetch one extra to detect whether more older messages exist.
         List<Message> rows = messageRepository.findMessagesBeforeCursor(
-                chat, currentUser.getId(), member.getClearedAt(), cursor, PageRequest.of(0, safeLimit + 1));
+                chat, currentUser.getId(), member.getClearedAt(), member.getLeftAt(), cursor, PageRequest.of(0, safeLimit + 1));
 
         boolean hasMore = rows.size() > safeLimit;
         if (hasMore) {
@@ -320,6 +475,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
         List<MessageResponse> items = toResponsesGhostAware(rows, currentUser);
+        applyStarredFlags(rows, items, currentUser);
 
         // rows are DESC (newest first) → the last item is the oldest; its
         // sequenceNumber is the cursor for the next (older) page.
@@ -341,8 +497,10 @@ public class MessageServiceImpl implements MessageService {
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
 
-        List<Message> messages = messageRepository.findMessagesAfter(chat, currentUser.getId(), member.getClearedAt(), afterSequence);
-        return toResponsesGhostAware(messages, currentUser);
+        List<Message> messages = messageRepository.findMessagesAfter(chat, currentUser.getId(), member.getClearedAt(), member.getLeftAt(), afterSequence);
+        List<MessageResponse> out = toResponsesGhostAware(messages, currentUser);
+        applyStarredFlags(messages, out, currentUser);
+        return out;
     }
 
     @Override
@@ -414,7 +572,7 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
 
         // Only chat members may delete within a chat (in either direction).
-        chatMemberRepository.findByChatAndUser(chat, currentUser)
+        ChatMember callerMember = chatMemberRepository.findByChatAndUser(chat, currentUser)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
 
         Message message = messageRepository.findByUuid(UUID.fromString(messageUuid))
@@ -425,7 +583,10 @@ public class MessageServiceImpl implements MessageService {
         }
 
         boolean isSender = message.getSender().getId().equals(currentUser.getId());
-        if (isSender) {
+        // Group/channel admins & owners can delete anyone's message for everyone (moderation).
+        boolean isGroupAdminDelete = !isSender && chat.isMultiParty()
+                && callerMember.getRole().atLeast(com.chat.talkMe.enums.MemberRole.ADMIN);
+        if (isSender || isGroupAdminDelete) {
             // Sender deletes their own message → delete for EVERYONE. Tombstone it
             // globally and broadcast so any ONLINE recipient's view updates in real
             // time ("This message was deleted").

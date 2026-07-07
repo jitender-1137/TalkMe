@@ -3,7 +3,6 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.exception.FileStorageException;
 import com.chat.talkMe.service.StorageService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,17 +18,14 @@ public class StorageServiceImpl implements StorageService {
 
     private static final Path STORAGE_PATH = Paths.get("/opt/media/talkMe");
 
-    /**
-     * Path to the ffmpeg binary. Defaults to "ffmpeg" (resolved via PATH).
-     * Override with `media.ffmpeg-path` (e.g. /usr/bin/ffmpeg) in config.
-     */
-    @Value("${media.ffmpeg-path:ffmpeg}")
-    private String ffmpegPath;
+    /** Resolves the ffmpeg binary (bundled with the app by default). */
+    private final FfmpegSupport ffmpeg;
 
     /** Max wall-clock time for a single transcode before we give up. */
     private static final long TRANSCODE_TIMEOUT_MINUTES = 5;
 
-    public StorageServiceImpl() {
+    public StorageServiceImpl(FfmpegSupport ffmpeg) {
+        this.ffmpeg = ffmpeg;
         try {
             Files.createDirectories(STORAGE_PATH);
         } catch (IOException e) {
@@ -151,15 +147,16 @@ public class StorageServiceImpl implements StorageService {
      */
     private boolean transcodeVideo(Path input, Path output) {
         // -vf scale=-2:'min(720,ih)'  → cap height at 720p, width auto-even, never upscale.
-        // -crf 28 / preset veryfast   → strong size reduction at good quality, reasonable speed.
-        // +faststart                  → move moov atom to the front for instant web playback.
+        // libopenh264 (bundled, cross-platform) — libx264 isn't in the bundled build.
+        // openh264 targets a bitrate rather than -crf/-preset; ~1.5 Mbps @ ≤720p is a
+        // good size/quality balance. +faststart moves the moov atom up for instant play.
         List<String> command = List.of(
-                ffmpegPath, "-y",
+                ffmpeg.path(), "-y",
                 "-i", input.toString(),
                 "-vf", "scale=-2:'min(720,ih)'",
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-crf", "28",
+                "-c:v", "libopenh264",
+                "-b:v", "1500k",
+                "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
                 "-b:a", "128k",
                 "-movflags", "+faststart",
@@ -187,7 +184,7 @@ public class StorageServiceImpl implements StorageService {
             return true;
         } catch (IOException e) {
             // ffmpeg not installed / not on PATH — degrade gracefully.
-            log.warn("ffmpeg not available ('{}'); storing video uncompressed. {}", ffmpegPath, e.getMessage());
+            log.warn("ffmpeg not available ('{}'); storing video uncompressed. {}", ffmpeg.path(), e.getMessage());
             return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

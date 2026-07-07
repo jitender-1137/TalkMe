@@ -30,6 +30,7 @@ public class StoryServiceImpl implements StoryService {
     private final UserMapper userMapper;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
     private final UserSettingRepository userSettingRepository;
+    private final PhotoMusicMuxer photoMusicMuxer;
 
     @Override
     @Transactional
@@ -40,10 +41,24 @@ public class StoryServiceImpl implements StoryService {
             throw new com.chat.talkMe.exception.ContentModerationException(
                     "Your story caption contains content that violates our community guidelines.");
         }
+        // Photo + music story → merge into an auto-playing video (Instagram-style) so
+        // the sound plays with the story like a video. Skip if the media is already a
+        // video; fall back to the plain image if muxing is unavailable.
+        String mediaUrl = request.getMediaUrl();
+        var audioReq = request.getAudio();
+        boolean alreadyVideo = mediaUrl != null && mediaUrl.toLowerCase().contains(".mp4");
+        if (audioReq != null && audioReq.getAudioUrl() != null && mediaUrl != null && !alreadyVideo) {
+            int start = audioReq.getAudioStartSec() == null ? 0 : audioReq.getAudioStartSec();
+            int clip = audioReq.getAudioClipSeconds() == null ? 15 : audioReq.getAudioClipSeconds();
+            String video = photoMusicMuxer.muxPhotoWithMusic(mediaUrl, audioReq.getAudioUrl(), start, clip);
+            if (video != null) mediaUrl = video;
+        }
+
         Story story = Story.builder()
                 .user(currentUser)
-                .mediaUrl(request.getMediaUrl())
+                .mediaUrl(mediaUrl)
                 .caption(request.getCaption())
+                .audio(request.getAudio() != null ? request.getAudio().toEntity() : null)
                 .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
                 .build();
 
@@ -129,6 +144,7 @@ public class StoryServiceImpl implements StoryService {
                 .expiresAt(story.getExpiresAt().toString())
                 .createdAt(story.getCreatedAt().toString())
                 .viewedByMe(viewed)
+                .audio(com.chat.talkMe.dto.response.AudioTrackDto.from(story.getAudio()))
                 .build();
     }
 }

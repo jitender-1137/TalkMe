@@ -29,4 +29,7 @@ public class ChatResponse {
     private boolean isBlockedByMe;
     @JsonProperty("hasBlockedMe")
     private boolean hasBlockedMe;
+
+    /** Present only for multi-party chats (GROUP/CHANNEL/ROOM); null for 1:1. */
+    private GroupInfoResponse group;
 }

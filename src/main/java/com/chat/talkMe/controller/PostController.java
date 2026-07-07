@@ -37,6 +37,15 @@ public class PostController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Post created successfully", "TM_210"));
     }
 
+    @PostMapping("/{id}/poll/vote")
+    public ResponseEntity<ResponseDto<PostResponse>> votePoll(
+            @PathVariable("id") String postUuid,
+            @Valid @RequestBody com.chat.talkMe.dto.request.PollVoteRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        PostResponse response = postService.votePoll(postUuid, request.getOptionId(), userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Vote recorded", "TM_229"));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ResponseDto<PostResponse>> getPost(
             @PathVariable("id") String postUuid,

@@ -127,4 +127,28 @@ public class Message extends BaseEntity {
     @Column(name = "self_destruct_expired", nullable = false)
     @Builder.Default
     private boolean selfDestructExpired = false;
+
+    // ── Group message pinning ──────────────────────────────────────────────────
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(name = "pinned", nullable = false)
+    @Builder.Default
+    private boolean pinned = false;
+
+    @Column(name = "pinned_at")
+    private java.time.Instant pinnedAt;
+
+    @Column(name = "pinned_by")
+    private Long pinnedBy;
+
+    /**
+     * @-mention target user ids (groups). Stored as a side collection; drives
+     * targeted notification even when the group is muted.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "message_mentions",
+            joinColumns = @JoinColumn(name = "message_id"),
+            indexes = @Index(name = "idx_message_mentions_user", columnList = "mentioned_user_id"))
+    @Column(name = "mentioned_user_id", nullable = false)
+    @Builder.Default
+    private Set<Long> mentionedUserIds = new HashSet<>();
 }

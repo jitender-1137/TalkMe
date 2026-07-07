@@ -18,6 +18,15 @@ public interface AuthService {
     LoginResponse login(LoginRequest request, String userAgent, String ip, jakarta.servlet.http.HttpServletRequest httpRequest);
     LoginResponse signup(SignupRequest request, String userAgent, jakarta.servlet.http.HttpServletRequest httpRequest);
     LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, jakarta.servlet.http.HttpServletRequest httpRequest);
+
+    /**
+     * Create or link a full account from an external identity provider (Google) and
+     * issue a session. Links by provider id first, then by email, otherwise creates a
+     * new verified user. Profile image / name / age / gender are backfilled from the
+     * provider when the local account is missing them.
+     */
+    LoginResponse oauthLogin(com.chat.talkMe.dto.OAuthUserInfo info, String userAgent,
+                             jakarta.servlet.http.HttpServletRequest httpRequest);
     JwtTokensResponse refresh(String refreshToken, String userAgent, String ip);
     void logout(String refreshToken);
     List<SessionResponse> getSessions(User currentUser);

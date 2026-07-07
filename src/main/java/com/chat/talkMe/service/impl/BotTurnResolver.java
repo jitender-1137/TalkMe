@@ -78,7 +78,7 @@ public class BotTurnResolver {
 
         // Recent conversation from the bot's perspective (visibility-filtered), newest first.
         List<Message> recent = messageRepository.findMessagesBeforeCursor(
-                chat, bot.getId(), botMember.getClearedAt(), null,
+                chat, bot.getId(), botMember.getClearedAt(), null, null,
                 PageRequest.of(0, Math.max(2, contextMessages)));
 
         // Chronological [role, text] turns. The bot's own past messages are the OpenAI

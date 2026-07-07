@@ -17,4 +17,5 @@ public class StoryResponse {
     private String expiresAt;
     private String createdAt;
     private boolean viewedByMe;
+    private AudioTrackDto audio; // non-null only when a soundtrack is attached
 }

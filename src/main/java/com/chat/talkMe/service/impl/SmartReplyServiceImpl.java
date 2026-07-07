@@ -130,7 +130,7 @@ public class SmartReplyServiceImpl implements SmartReplyService {
 
         // Newest-first, visibility-filtered (cleared/blocked/held already excluded).
         List<Message> recent = messageRepository.findMessagesBeforeCursor(
-                chat, currentUser.getId(), member.getClearedAt(), null,
+                chat, currentUser.getId(), member.getClearedAt(), member.getLeftAt(), null,
                 PageRequest.of(0, Math.max(2, contextMessages)));
 
         // Build chronological text-only turns.

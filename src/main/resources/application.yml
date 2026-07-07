@@ -1,3 +1,14 @@
+# Behind the reverse proxy (Nginx Proxy Manager) TLS is terminated at the proxy and
+# requests reach this backend over plain http (http://<host>:8080). Honour the
+# X-Forwarded-Proto/Host headers the proxy sends so Spring builds correct absolute
+# URLs — critically the OAuth2 redirect_uri as https://talkme.fun/login/oauth2/code/google
+# (NOT http://…), which must byte-match the Authorised redirect URI in Google or the
+# flow fails with redirect_uri_mismatch. Applies to every profile (prod runs on 8080).
+# Safe locally: with no proxy there are no X-Forwarded-* headers, so the real request
+# is used unchanged. Assumes the backend port is reachable only via the proxy.
+server:
+  forward-headers-strategy: framework
+
 spring:
   # Load secrets/overrides from a local .env file (git-ignored). It's parsed as a
   # .properties source, so lines are KEY=VALUE — e.g. AI_API_KEY, BOT_GROQ_API_KEYS.
@@ -10,6 +21,23 @@ spring:
     active: local
   application:
     name: talkMe
+  # Google social login (OAuth2 / OIDC). INACTIVE until GOOGLE_CLIENT_ID +
+  # GOOGLE_CLIENT_SECRET are set — while blank Spring creates no client registration
+  # and the app runs password/guest-only (SecurityConfig only wires oauth2Login when
+  # a ClientRegistrationRepository exists). Register this authorized redirect URI in
+  # the Google Cloud console:  <public-origin>/login/oauth2/code/google
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            # Default scopes give email, name and picture. To also read age/gender
+            # append the People-API scopes (requires Google app verification in prod):
+            #   ,https://www.googleapis.com/auth/user.birthday.read,https://www.googleapis.com/auth/user.gender.read
+            scope: ${GOOGLE_OAUTH_SCOPES:openid,profile,email}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
   # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.
   # This is the GLOBAL multipart limit, so it must be the LARGEST allowed media:
   # videos = 30MB. The stricter per-type image cap (2MB) is enforced in

@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 
 public interface PostService {
     PostResponse createPost(PostRequest request, User currentUser);
+    PostResponse votePoll(String postUuid, String optionUuid, User currentUser);
     PostResponse getPost(String postUuid, User currentUser);
     PostResponse getPostByShortCode(String shortCode, User currentUser);
     PostResponse updatePost(String postUuid, PostRequest request, User currentUser);

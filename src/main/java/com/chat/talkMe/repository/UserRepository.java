@@ -18,6 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     // Batch lookup for fan-out (avoids N+1 when notifying all chat recipients).
     List<User> findByUsernameIn(java.util.Collection<String> usernames);
     Optional<User> findByEmail(String email);
+    Optional<User> findByGoogleId(String googleId);
     Optional<User> findByUuid(UUID uuid);
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);

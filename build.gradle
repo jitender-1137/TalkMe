@@ -20,6 +20,8 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    // Google (and other) social login via the OAuth2 / OIDC authorization-code flow.
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
@@ -41,6 +43,22 @@ dependencies {
     implementation 'io.github.resilience4j:resilience4j-micrometer:2.2.0'
 
     runtimeOnly 'org.postgresql:postgresql'
+
+    // Bundled ffmpeg (Bytedeco) — ships the ffmpeg executable inside the app so
+    // photo+music → mp4 muxing, video transcoding and frame moderation work with
+    // NO manual ffmpeg install. Only the platforms we deploy on are bundled to keep
+    // the jar size in check (add classifiers here for other targets):
+    //   macosx-arm64  = dev Macs (Apple Silicon)
+    //   linux-x86_64  = typical x64 servers
+    //   linux-arm64   = arm64 servers
+    implementation 'org.bytedeco:javacpp:1.5.11'
+    runtimeOnly 'org.bytedeco:javacpp:1.5.11:macosx-arm64'
+    runtimeOnly 'org.bytedeco:javacpp:1.5.11:linux-x86_64'
+    runtimeOnly 'org.bytedeco:javacpp:1.5.11:linux-arm64'
+    implementation 'org.bytedeco:ffmpeg:7.1-1.5.11'
+    runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:macosx-arm64'
+    runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:linux-x86_64'
+    runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:linux-arm64'
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'

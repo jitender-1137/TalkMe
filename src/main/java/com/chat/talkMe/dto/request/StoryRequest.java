@@ -14,4 +14,7 @@ public class StoryRequest {
     private String mediaUrl;
 
     private String caption;
+
+    // Optional soundtrack.
+    private com.chat.talkMe.dto.response.AudioTrackDto audio;
 }
