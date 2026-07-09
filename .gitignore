@@ -44,3 +44,7 @@ src/main/resources/static/
 
 # Local secrets — never commit
 .env
+
+### macOS ###
+.DS_Store
+**/.DS_Store

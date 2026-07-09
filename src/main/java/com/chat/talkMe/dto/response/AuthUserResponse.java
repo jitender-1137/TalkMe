@@ -14,6 +14,10 @@ public class AuthUserResponse {
     private String id; // maps to user.uuid in response payloads for frontend compatibility
     private String name;
     private String username;
+    // The signed-in user's own email — this DTO is only ever returned for the
+    // authenticated user (/auth/me), so exposing it here is safe (unlike UserResponse,
+    // which is also used to view OTHER users). Drives the Settings → Account email row.
+    private String email;
     private String avatar;
     private int age;
     private String gender;

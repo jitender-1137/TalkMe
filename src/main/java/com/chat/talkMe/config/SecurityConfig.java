@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -46,7 +47,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
@@ -61,9 +62,9 @@ public class SecurityConfig {
             ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository,
             HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository,
             OAuth2LoginSuccessHandler oauth2LoginSuccessHandler,
-            OAuth2LoginFailureHandler oauth2LoginFailureHandler) throws Exception {
+            OAuth2LoginFailureHandler oauth2LoginFailureHandler) {
         // Swagger / OpenAPI docs are reachable without auth only in non-prod profiles.
-        // In prod they require authentication (effectively off, since the browser
+        // In prod, they require authentication (effectively off, since the browser
         // Swagger UI has no Bearer token to present) — see the authorize rules below.
         boolean docsPublic = !environment.acceptsProfiles(Profiles.of("prod"));
         http
@@ -72,7 +73,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         // Anti-clickjacking
-                        .frameOptions(frame -> frame.deny())
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
                         // Force HTTPS for a year incl. subdomains
                         .httpStrictTransportSecurity(hsts -> hsts
                                 .includeSubDomains(true)
@@ -98,7 +99,7 @@ public class SecurityConfig {
                     // otherwise fall through to anyRequest().permitAll() and be exposed
                     // unauthenticated. These MUST come before the /api/** and anyRequest rules.
                     // Liveness/readiness probes stay public (health show-details=when_authorized,
-                    // so anonymous callers see only UP/DOWN); metrics, prometheus, info and the
+                    // so anonymous callers see only UP/DOWN); metrics, Prometheus, info and the
                     // rest require authentication. authenticated() — not hasRole("ADMIN") — because
                     // no user is ever granted ROLE_ADMIN, so admin-only would lock out everyone.
                     auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
@@ -166,6 +167,10 @@ public class SecurityConfig {
                 "/api/v1/auth/refresh", "/auth/refresh",
                 "/api/v1/auth/forgot-password", "/auth/forgot-password",
                 "/api/v1/auth/reset-password", "/auth/reset-password",
+                // Email verification link is clicked from the email, possibly while
+                // logged out, so the confirm endpoint must be public. (resend-verification
+                // is NOT here — it requires an authenticated, still-unverified user.)
+                "/api/v1/auth/verify-email", "/auth/verify-email",
                 // WebSocket handshake: auth happens on the STOMP CONNECT frame (token in
                 // the frame), not the HTTP handshake, so the handshake must be public.
                 "/api/v1/ws/**", "/ws/**",

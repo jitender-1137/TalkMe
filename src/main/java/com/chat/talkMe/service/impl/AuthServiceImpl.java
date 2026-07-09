@@ -18,6 +18,7 @@ import com.chat.talkMe.dto.response.SessionResponse;
 import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.mapper.SessionMapper;
 import com.chat.talkMe.mapper.UserMapper;
@@ -45,6 +46,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -69,6 +71,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final com.chat.talkMe.service.WebPushService webPushService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -82,6 +85,9 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.auth.password-reset-token-ttl-minutes:30}")
     private long passwordResetTtlMinutes;
 
+    @Value("${app.auth.email-verification-token-ttl-minutes:1440}")
+    private long emailVerificationTtlMinutes;
+
     @Value("${app.auth.account-deletion-window-days:30}")
     private long accountDeletionWindowDays;
 
@@ -90,6 +96,8 @@ public class AuthServiceImpl implements AuthService {
 
     /** Redis key prefix for one-time password-reset tokens (value = user UUID). */
     private static final String PWRESET_KEY_PREFIX = "pwreset:token:";
+    /** Redis key prefix for one-time email-verification tokens (value = user UUID). */
+    private static final String EMAILVERIFY_KEY_PREFIX = "emailverify:token:";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Override
@@ -155,6 +163,9 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
+        // Fire a new-sign-in security alert (best-effort, async, user-controllable).
+        maybeSendLoginAlert(user, userAgent, ip);
+
         return generateLoginResponse(user, userAgent, ip);
     }
 
@@ -192,8 +203,12 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         user = userRepository.save(user);
-        log.info("User registered successfully: {}. Country detected: {} (Source: {}, IP: {})", 
+        log.info("User registered successfully: {}. Country detected: {} (Source: {}, IP: {})",
                 username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
+
+        // Send the verification email first. The welcome email is sent later, only once
+        // the address is actually confirmed via verifyEmail().
+        sendVerificationEmail(user);
 
         return generateLoginResponse(user, userAgent, detectionResult.getClientIp());
     }
@@ -237,6 +252,7 @@ public class AuthServiceImpl implements AuthService {
         // 1. Match an existing account: by provider id first, then by email (links the
         //    Google identity onto a pre-existing password account with the same email).
         User user = null;
+        boolean newlyProvisioned = false;
         if (info.getProviderId() != null && !info.getProviderId().isBlank()) {
             user = userRepository.findByGoogleId(info.getProviderId()).orElse(null);
         }
@@ -264,6 +280,7 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             try {
                 user = userRepository.save(newUser);
+                newlyProvisioned = true;
                 log.info("New Google user provisioned: {} (email: {}, country: {}, source: {})",
                         user.getUsername(), info.getEmail(), detection.getCountry(), detection.getSource());
             } catch (org.springframework.dao.DataIntegrityViolationException e) {
@@ -320,6 +337,17 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
+        if (newlyProvisioned) {
+            // Google has already verified the email, so there's no verification step —
+            // send the welcome email straight away (mirrors verifyEmail() for password signup).
+            String openLink = frontendBaseUrl.replaceAll("/+$", "") + "/";
+            emailService.sendWelcomeEmail(user.getEmail(), user.getName(), openLink);
+        } else {
+            // Returning sign-in (or linking Google to an existing account) → new-sign-in
+            // alert, honouring the user's emailLoginAlerts preference.
+            maybeSendLoginAlert(user, userAgent, detection.getClientIp());
+        }
+
         return generateLoginResponse(user, userAgent, detection.getClientIp());
     }
 
@@ -331,11 +359,7 @@ public class AuthServiceImpl implements AuthService {
         String base;
         if (email != null && email.contains("@")) {
             base = email.substring(0, email.indexOf('@'));
-        } else if (name != null) {
-            base = name;
-        } else {
-            base = "user";
-        }
+        } else base = Objects.requireNonNullElse(name, "user");
         base = base.toLowerCase().replaceAll("[^a-z0-9._-]", "");
         if (base.isBlank()) {
             base = "user";
@@ -508,6 +532,120 @@ public class AuthServiceImpl implements AuthService {
         // Revoke all sessions/tokens — a reset should sign the user out everywhere.
         refreshTokenRepository.revokeAllUserTokens(user);
         log.info("Password reset completed for user '{}'", user.getUsername());
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(String token) {
+        if (token == null || token.isBlank()) {
+            throw new UnauthorizedException("Verification token invalid or expired", "TM_403");
+        }
+        String key = EMAILVERIFY_KEY_PREFIX + token;
+        String userUuid = redisTemplate.opsForValue().get(key);
+        if (userUuid == null) {
+            throw new UnauthorizedException("Verification token invalid or expired", "TM_403");
+        }
+
+        User user;
+        try {
+            user = userRepository.findByUuid(UUID.fromString(userUuid))
+                    .orElseThrow(() -> new UnauthorizedException("Verification token invalid or expired", "TM_403"));
+        } catch (IllegalArgumentException e) {
+            throw new UnauthorizedException("Verification token invalid or expired", "TM_403");
+        }
+
+        // One-time use: consume the token immediately.
+        redisTemplate.delete(key);
+
+        // Idempotent: re-verifying an already-verified account is a no-op (no duplicate welcome).
+        if (user.isVerified()) {
+            log.info("Email already verified for user '{}'", user.getUsername());
+            return;
+        }
+
+        user.setVerified(true);
+        userRepository.save(user);
+        log.info("Email verified for user '{}'", user.getUsername());
+
+        // Now — and only now — send the welcome email.
+        String openLink = frontendBaseUrl.replaceAll("/+$", "") + "/";
+        emailService.sendWelcomeEmail(user.getEmail(), user.getName(), openLink);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void resendVerificationEmail(User currentUser) {
+        if (currentUser == null || currentUser.isGuest() || currentUser.getEmail() == null) {
+            return;
+        }
+        if (currentUser.isVerified()) {
+            throw new BadRequestException("Your email is already verified.", "TM_404");
+        }
+        sendVerificationEmail(currentUser);
+    }
+
+    /** Mints a one-time verification token, stores it in Redis, and emails the link. */
+    private void sendVerificationEmail(User user) {
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+        String token = generateSecureToken();
+        redisTemplate.opsForValue().set(
+                EMAILVERIFY_KEY_PREFIX + token,
+                user.getUuid().toString(),
+                Duration.ofMinutes(emailVerificationTtlMinutes));
+        String verifyLink = frontendBaseUrl.replaceAll("/+$", "") + "/verify-email?token=" + token;
+        emailService.sendVerificationEmail(user.getEmail(), user.getName(), verifyLink, emailVerificationTtlMinutes);
+        log.info("Verification email sent for user '{}'", user.getUsername());
+    }
+
+    /** Sends a new-sign-in alert if the user hasn't opted out. Best-effort, never throws. */
+    private void maybeSendLoginAlert(User user, String userAgent, String ip) {
+        try {
+            if (user.getEmail() == null || user.getEmail().isBlank()) {
+                return;
+            }
+            boolean alertsOn = userSettingRepository.findByUser(user)
+                    .map(com.chat.talkMe.domain.UserSetting::isEmailLoginAlerts)
+                    .orElse(true);
+            if (!alertsOn) {
+                return;
+            }
+            String when = java.time.format.DateTimeFormatter
+                    .ofPattern("d MMM yyyy, HH:mm 'UTC'")
+                    .withZone(java.time.ZoneOffset.UTC)
+                    .format(Instant.now());
+            String device = friendlyDevice(userAgent);
+            String secureLink = frontendBaseUrl.replaceAll("/+$", "") + "/forgot-password";
+            emailService.sendLoginAlertEmail(user.getEmail(), user.getName(), device, ip, when, secureLink);
+        } catch (Exception e) {
+            log.warn("Login-alert email skipped for '{}': {}", user.getUsername(), e.getMessage());
+        }
+    }
+
+    /** Best-effort friendly device label from a raw User-Agent string. */
+    private static String friendlyDevice(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) {
+            return null;
+        }
+        String os = userAgent.contains("Windows") ? "Windows"
+                : userAgent.contains("iPhone") ? "iPhone"
+                : userAgent.contains("iPad") ? "iPad"
+                : userAgent.contains("Android") ? "Android"
+                : (userAgent.contains("Mac OS") || userAgent.contains("Macintosh")) ? "Mac"
+                : userAgent.contains("Linux") ? "Linux" : null;
+        String browser = userAgent.contains("Edg") ? "Edge"
+                : userAgent.contains("OPR") || userAgent.contains("Opera") ? "Opera"
+                : userAgent.contains("Chrome") ? "Chrome"
+                : userAgent.contains("Firefox") ? "Firefox"
+                : userAgent.contains("Safari") ? "Safari" : null;
+        if (os == null && browser == null) {
+            return userAgent.length() > 60 ? userAgent.substring(0, 60) + "…" : userAgent;
+        }
+        if (os != null && browser != null) {
+            return browser + " on " + os;
+        }
+        return os != null ? os : browser;
     }
 
     @Override

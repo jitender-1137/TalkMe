@@ -18,4 +18,9 @@ public class UserSettingResponse {
     private boolean soundEnabled;
     /** "EVERYONE" or "FRIENDS_ONLY". */
     private String messagingPrivacy;
+
+    // ── Transactional-email preferences ─────────────────────────────────────────
+    private boolean emailLoginAlerts;
+    private boolean emailUnreadMessages;
+    private boolean emailAnnouncements;
 }

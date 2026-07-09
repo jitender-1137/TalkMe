@@ -56,6 +56,15 @@ public class UserSettingServiceImpl implements UserSettingService {
         if (request.getMessagingPrivacy() != null) {
             settings.setMessagingPrivacy(parsePrivacy(request.getMessagingPrivacy()));
         }
+        if (request.getEmailLoginAlerts() != null) {
+            settings.setEmailLoginAlerts(request.getEmailLoginAlerts());
+        }
+        if (request.getEmailUnreadMessages() != null) {
+            settings.setEmailUnreadMessages(request.getEmailUnreadMessages());
+        }
+        if (request.getEmailAnnouncements() != null) {
+            settings.setEmailAnnouncements(request.getEmailAnnouncements());
+        }
 
         settings = userSettingRepository.save(settings);
         log.info("Settings updated successfully for user: {}", currentUser.getUsername());
@@ -92,6 +101,9 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .safeModeEnabled(true)
                 .soundEnabled(true)
                 .messagingPrivacy(MessagingPrivacy.EVERYONE)
+                .emailLoginAlerts(true)
+                .emailUnreadMessages(true)
+                .emailAnnouncements(true)
                 .build();
         return userSettingRepository.save(defaultSettings);
     }
@@ -107,6 +119,9 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .messagingPrivacy(setting.getMessagingPrivacy() != null
                         ? setting.getMessagingPrivacy().name()
                         : MessagingPrivacy.EVERYONE.name())
+                .emailLoginAlerts(setting.isEmailLoginAlerts())
+                .emailUnreadMessages(setting.isEmailUnreadMessages())
+                .emailAnnouncements(setting.isEmailAnnouncements())
                 .build();
     }
 }

@@ -37,7 +37,7 @@ public class User extends BaseEntity {
     @Column(name = "email", unique = true, length = 100)
     private String email;
 
-    @Column(name = "password_hash", length = 255)
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Column(name = "name", nullable = false, length = 100)
@@ -56,6 +56,14 @@ public class User extends BaseEntity {
     @Column(name = "is_verified", nullable = false)
     @Builder.Default
     private boolean isVerified = false;
+
+    /**
+     * Highest message id already covered by an "unread messages" digest email. The daily
+     * digest job only emails when the user's newest unread message id exceeds this, so the
+     * same still-unread messages never trigger a second email. Null ⇒ never sent a digest.
+     */
+    @Column(name = "last_unread_digest_message_id")
+    private Long lastUnreadDigestMessageId;
 
     @Column(name = "profile_image", length = 512)
     private String profileImage;
@@ -102,7 +110,7 @@ public class User extends BaseEntity {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
-    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "user")
     private UserPresence presence;
 
     @Formula("COALESCE((SELECT CASE WHEN p.status = 'ONLINE' AND p.invisible_mode_enabled = false THEN 1 ELSE 0 END FROM user_presences p WHERE p.user_id = id), 0)")
@@ -129,10 +137,10 @@ public class User extends BaseEntity {
     private java.time.Instant deletionRequestedAt;
 
     /**
-     * True for AI bot accounts (Sonal / Ruchi / Annu …). Bots are ordinary {@code User}
+     * True for AI bot accounts (Sonal / Ru chi / Annu …). Bots are ordinary {@code User}
      * rows so they look identical to humans everywhere (chat list, profile, avatar,
      * presence), but they can't log in and the server auto-replies on their behalf.
-     * Also the guard for "bots must never talk to each other": a reply is only ever
+     * Also, the guard for "bots must never talk to each other": a reply is only ever
      * generated for a message whose sender is NOT a bot.
      */
     @Column(name = "is_bot", nullable = false, columnDefinition = "boolean default false")

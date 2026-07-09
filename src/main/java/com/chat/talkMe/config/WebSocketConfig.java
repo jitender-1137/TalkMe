@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import com.chat.talkMe.security.WebSocketChannelInterceptor;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -38,7 +39,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private String relayPasscode;
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
+    public void configureMessageBroker(@NonNull MessageBrokerRegistry config) {
         if (relayEnabled) {
             // PRIMARY: relay /topic and /queue through RabbitMQ's STOMP plugin, so
             // every broadcast (messages, presence, typing, calls, notifications)

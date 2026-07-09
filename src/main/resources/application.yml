@@ -1,5 +1,5 @@
 # Behind the reverse proxy (Nginx Proxy Manager) TLS is terminated at the proxy and
-# requests reach this backend over plain http (http://<host>:8080). Honour the
+# requests reach this backend over plain http (http://<host>:8080). Honor the
 # X-Forwarded-Proto/Host headers the proxy sends so Spring builds correct absolute
 # URLs — critically the OAuth2 redirect_uri as https://talkme.fun/login/oauth2/code/google
 # (NOT http://…), which must byte-match the Authorised redirect URI in Google or the
@@ -10,34 +10,12 @@ server:
   forward-headers-strategy: framework
 
 spring:
-  # Load secrets/overrides from a local .env file (git-ignored). It's parsed as a
-  # .properties source, so lines are KEY=VALUE — e.g. AI_API_KEY, BOT_GROQ_API_KEYS.
-  # "optional:" means the app still starts if the file is absent (e.g. in prod, where
-  # real env vars are injected instead). Values here satisfy the ${...} placeholders
-  # below. NEVER commit .env — see .gitignore.
   config:
     import: optional:file:.env[.properties]
   profiles:
     active: local
   application:
     name: talkMe
-  # Google social login (OAuth2 / OIDC). INACTIVE until GOOGLE_CLIENT_ID +
-  # GOOGLE_CLIENT_SECRET are set — while blank Spring creates no client registration
-  # and the app runs password/guest-only (SecurityConfig only wires oauth2Login when
-  # a ClientRegistrationRepository exists). Register this authorized redirect URI in
-  # the Google Cloud console:  <public-origin>/login/oauth2/code/google
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID:}
-            client-secret: ${GOOGLE_CLIENT_SECRET:}
-            # Default scopes give email, name and picture. To also read age/gender
-            # append the People-API scopes (requires Google app verification in prod):
-            #   ,https://www.googleapis.com/auth/user.birthday.read,https://www.googleapis.com/auth/user.gender.read
-            scope: ${GOOGLE_OAUTH_SCOPES:openid,profile,email}
-            redirect-uri: "{baseUrl}/login/oauth2/code/google"
   # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.
   # This is the GLOBAL multipart limit, so it must be the LARGEST allowed media:
   # videos = 30MB. The stricter per-type image cap (2MB) is enforced in
@@ -50,28 +28,15 @@ spring:
     web:
       pageable:
         serialization-mode: via-dto
-  # SMTP for transactional email (password reset). When MAIL_HOST is unset the
-  # autoconfigured sender still exists but app.mail.enabled gates real sending —
-  # see EmailServiceImpl, which logs the link instead of failing when disabled.
-  mail:
-    host: ${MAIL_HOST:localhost}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: ${MAIL_SMTP_AUTH:true}
-          starttls:
-            enable: ${MAIL_SMTP_STARTTLS:true}
-        connecttimeout: 5000
-        timeout: 5000
-        writetimeout: 5000
+  # NOTE: SMTP connection (spring.mail.*) is the final fallback in the mail chain
+  # (Resend → Brevo → SMTP) and is environment-specific, so it lives in the profile
+  # files (application-{local,dev,prod}.yml). Local points at Mailpit; prod at the
+  # real relay. JavaMailSender is injected via ObjectProvider, so the app still boots
+  # in any profile that omits it.
+  # RabbitMQ CONNECTION (host/port/credentials) is environment-specific → set per
+  # profile (application-{local,dev,prod}.yml). The publish/consume TUNING below is
+  # shared across all environments.
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:talkme}
-    password: ${RABBITMQ_PASS:talkme_dev_pass}
     # Treat a publish as accepted only after the broker confirms it (lets the
     # producer fall back to a direct broadcast if RabbitMQ is unreachable).
     publisher-confirm-type: correlated
@@ -138,10 +103,8 @@ management:
     tracing:
       endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
 
-  #### session base auth ####
-auth:
-  username: ${AUTH_USERNAME:admin}
-  password: ${AUTH_PASSWORD:#Admin$321}
+# NOTE: session base-auth creds (auth.username/password) are environment-specific
+# and live per profile (application-{local,dev,prod}.yml).
 
 app:
   geo:
@@ -153,36 +116,52 @@ app:
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}
-  broker:
-    # OFF BY DEFAULT so the app runs on the in-memory STOMP broker with NO external
-    # dependency. ONLY enable these where RabbitMQ (with the STOMP plugin on :61613)
-    # is actually deployed and reachable — otherwise the relay throws "Message broker
-    # not active" on every /topic broadcast and WS connections drop. Local dev turns
-    # them on in application-local.yml (docker-compose RabbitMQ).
-    #
-    # relay-enabled: relay /topic + /user/queue through RabbitMQ for multi-instance
-    # fan-out (RabbitDestinationInterceptor rewrites /topic/a/b/c -> /topic/a.b.c).
-    relay-enabled: ${BROKER_RELAY_ENABLED:false}
-    relay-host: ${BROKER_RELAY_HOST:localhost}
-    relay-port: ${BROKER_RELAY_PORT:61613}
-    relay-login: ${BROKER_RELAY_LOGIN:talkme}
-    relay-passcode: ${BROKER_RELAY_PASSCODE:talkme_dev_pass}
-    # amqp-events-enabled: route message fan-out through the AMQP work plane
-    # (durable queue + retry + DLQ). When false, MessageServiceImpl broadcasts
-    # directly in-request (and the RabbitMQ consumer/topology are not created).
-    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
-  # Public base URL of the web app — used to build links in transactional emails
-  # (e.g. the password-reset page). Override per environment.
-  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  # NOTE: STOMP broker relay (app.broker.*) and the public web-app URL
+  # (app.frontend-base-url) are environment-specific → set per profile
+  # (application-{local,dev,prod}.yml). Broker relay stays OFF unless a profile/env
+  # enables it and RabbitMQ (STOMP plugin on :61613) is reachable, else the relay
+  # throws "Message broker not active" on every /topic broadcast.
+  #
+  # Transactional email, three-link chain: Resend (HTTP, free ~100/day) → Brevo
+  # (HTTP, free ~300/day) → SMTP (JavaMailSender). Only the SHARED, non-secret
+  # defaults live here — the environment-specific switches (app.mail.enabled,
+  # app.mail.from, provider API keys, app.mail.smtp.enabled and spring.mail.*) are
+  # set per profile in application-{local,dev,prod}.yml. When a profile leaves mail
+  # off / keys empty, EmailServiceImpl logs the link instead of sending.
   mail:
-    # Gate real SMTP sending. OFF by default so dev never fails on missing SMTP
-    # creds — EmailServiceImpl logs the reset link instead. Turn ON in prod.
-    enabled: ${MAIL_ENABLED:false}
-    from: ${MAIL_FROM:TalkMe <noreply@talkme.app>}
+    timeout-ms: ${MAIL_TIMEOUT_MS:10000}
+    # Deliverability gate (EmailServiceImpl): when true, TRANSACTIONAL emails (login
+    # alerts, unread digests, password-changed, support) go ONLY to verified addresses.
+    # Verification/welcome/reset and announcements are exempt. Saves provider quota.
+    require-verification: ${MAIL_REQUIRE_VERIFICATION:true}
+    # Extra disposable/temp email domains to block, on top of the bundled
+    # disposable-email-domains.txt (comma-separated, e.g. "foo.com,bar.net").
+    disposable-domains: ${MAIL_DISPOSABLE_DOMAINS:}
+    resend:
+      daily-limit: ${RESEND_DAILY_LIMIT:100}
+    brevo:
+      daily-limit: ${BREVO_DAILY_LIMIT:300}
+    # Branding for all transactional email templates (EmailTemplates). Shared across
+    # environments; the visual palette lives in MailTheme (app.mail.theme.*).
+    brand:
+      name: ${MAIL_BRAND_NAME:NeoChatHub}
+      tagline: ${MAIL_BRAND_TAGLINE:Meet new people. Chat. Connect.}
+      support-email: ${MAIL_SUPPORT_EMAIL:support@neochathub.com}
+    # Daily "you have unread messages" digest (UnreadDigestReaper → UnreadDigestService).
+    # Runs at cron/zone below; per-user dedup via user.lastUnreadDigestMessageId means the
+    # same still-unread messages are never mailed twice. Respects app.mail.enabled and the
+    # per-user emailUnreadMessages opt-out.
+    unread-digest:
+      enabled: ${UNREAD_DIGEST_ENABLED:true}
+      cron: ${UNREAD_DIGEST_CRON:0 0 21 * * *}
+      zone: ${UNREAD_DIGEST_ZONE:Asia/Kolkata}
+      max-previews: ${UNREAD_DIGEST_MAX_PREVIEWS:5}
   auth:
     # Password-reset token lifetime and the account-deletion recovery window.
     password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN:30}
     account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS:30}
+    # Email-verification link lifetime (sent at signup; welcome email follows on verify).
+    email-verification-token-ttl-minutes: ${EMAIL_VERIFY_TTL_MIN:1440}
   # Smart-reply suggestions via OpenAI-compatible chat APIs, with a primary →
   # fallback chain. Primary = Groq (free, fast); fallback = Hugging Face router,
   # tried automatically only if Groq errors / rate-limits / times out / returns
@@ -273,32 +252,3 @@ app:
     offline-max: ${BOT_OFFLINE_MAX:7}
     offline-min-ms: ${BOT_OFFLINE_MIN_MS:1800000}
     offline-max-ms: ${BOT_OFFLINE_MAX_MS:3600000}
-
-# Cloudflare Turnstile CAPTCHA. Dev default is Cloudflare's "always passes"
-# TEST secret — set the real TURNSTILE_SECRET_KEY via env in production.
-security:
-  captcha:
-    enabled: ${CAPTCHA_ENABLED:true}
-    secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
-
-# Web Push (VAPID). Override the keys via env in production.
-# Generate a new pair with: openssl / web-push generate-vapid-keys
-webpush:
-  enabled: ${WEBPUSH_ENABLED:true}
-  vapid:
-    public-key: ${VAPID_PUBLIC_KEY:BKCeDr6ImE2uISF6APs0OyMfgoWkXWo-TNpXY1hdnrJyj1CtbH5Joo0tuqRrmXX-Zd1an5Bh7Y4cOQe6hv3yqzQ}
-    private-key: ${VAPID_PRIVATE_KEY:pMHBoMj1sI4zsmg2TIg0g870XZbUPElqR-nkOY-FfnQ}
-    subject: ${VAPID_SUBJECT:mailto:admin@talkme.app}
-
-# Content moderation (free, self-hosted). Text uses bundled multilingual word-lists;
-# images/video are screened by the free nsfwjs sidecar (see docker-compose `nsfw`).
-moderation:
-  enabled: ${MODERATION_ENABLED:true}
-  nsfw:
-    enabled: ${NSFW_ENABLED:true}
-    base-url: ${NSFW_BASE_URL:http://localhost:8081}
-
-NSFW_BASE_URL: http://nsfw.parkarspot.com
-# Smart-reply / Groq key is provided via the AI_API_KEY environment variable
-# (see app.ai.api-key above). NEVER commit a real key here — a committed key is
-# exposed in git history and must be rotated in the Groq console.

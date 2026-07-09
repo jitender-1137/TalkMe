@@ -34,6 +34,16 @@ public interface AuthService {
     void revokeAllSessions(User currentUser);
     void forgotPassword(ForgotPasswordRequest request);
     void resetPassword(ResetPasswordRequest request);
+
+    /**
+     * Confirm an email-verification token: marks the account verified and sends the
+     * welcome email. One-time use; invalid/expired tokens are rejected.
+     */
+    void verifyEmail(String token);
+
+    /** Re-send the verification email to the authenticated (still-unverified) user. */
+    void resendVerificationEmail(User currentUser);
+
     void changePassword(ChangePasswordRequest request, User currentUser);
     com.chat.talkMe.dto.response.AuthUserResponse getCurrentUser(User currentUser);
     com.chat.talkMe.dto.response.AuthUserResponse updateProfile(UpdateProfileRequest request, User currentUser);

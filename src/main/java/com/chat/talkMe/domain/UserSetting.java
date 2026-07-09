@@ -49,4 +49,28 @@ public class UserSetting extends BaseEntity {
     @Column(name = "messaging_privacy", nullable = false, length = 20)
     @Builder.Default
     private MessagingPrivacy messagingPrivacy = MessagingPrivacy.EVERYONE;
+
+    // ── Transactional-email preferences ─────────────────────────────────────────
+    // User-controllable opt-outs for NON-critical emails. Security/verification/reset
+    // emails are always sent and are NOT gated by these. @ColumnDefault('true') gives
+    // existing rows a value when ddl-auto adds the NOT NULL column (do NOT also put a
+    // "default" in columnDefinition — see the messaging_privacy note above).
+
+    /** New-sign-in security alert emails. */
+    @ColumnDefault("true")
+    @Column(name = "email_login_alerts", nullable = false)
+    @Builder.Default
+    private boolean emailLoginAlerts = true;
+
+    /** "You have unread messages" digest emails. */
+    @ColumnDefault("true")
+    @Column(name = "email_unread_messages", nullable = false)
+    @Builder.Default
+    private boolean emailUnreadMessages = true;
+
+    /** Product news / announcement emails. */
+    @ColumnDefault("true")
+    @Column(name = "email_announcements", nullable = false)
+    @Builder.Default
+    private boolean emailAnnouncements = true;
 }

@@ -7,6 +7,7 @@ import com.chat.talkMe.dto.request.LoginRequest;
 import com.chat.talkMe.dto.request.ResetPasswordRequest;
 import com.chat.talkMe.dto.request.SignupRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
+import com.chat.talkMe.dto.request.VerifyEmailRequest;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.JwtTokensResponse;
 import com.chat.talkMe.dto.response.LoginResponse;
@@ -272,5 +273,20 @@ public class AuthController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.changePassword(request, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Password changed successfully", "TM_043"));
+    }
+
+    /** Confirm an email-verification token (from the link in the verification email). */
+    @PostMapping("/verify-email")
+    public ResponseEntity<ResponseDto<Void>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        authService.verifyEmail(request.getToken());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Email verified successfully", "TM_405"));
+    }
+
+    /** Re-send the verification email to the authenticated (still-unverified) user. */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<ResponseDto<Void>> resendVerification(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.resendVerificationEmail(userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Verification email sent", "TM_406"));
     }
 }

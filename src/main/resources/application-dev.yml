@@ -19,7 +19,53 @@ spring:
       host: ${REDIS_HOST:redis-dev}
       port: ${REDIS_PORT:6379}
 
+  #### SMTP fallback — provide MAIL_SMTP_* to point at a real relay on dev.
+  mail:
+    host: ${MAIL_SMTP_HOST:localhost}
+    port: ${MAIL_SMTP_PORT:587}
+    username: ${MAIL_SMTP_USERNAME:}
+    password: ${MAIL_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+        connecttimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
+
+  #### RabbitMQ connection ####
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq-dev}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:talkme}
+    password: ${RABBITMQ_PASS:talkme_dev_pass}
+
+# Session base-auth credentials.
+auth:
+  username: ${AUTH_USERNAME:admin}
+  password: ${AUTH_PASSWORD:#Admin$321}
+
 app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://dev.talkme.app}
+  mail:
+    # OFF unless env supplies provider keys (then Resend → Brevo → SMTP).
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:NeoChatHub <noreply@neochathub.com>}
+    resend:
+      api-key: ${RESEND_API_KEY:}
+    brevo:
+      api-key: ${BREVO_API_KEY:}
+    smtp:
+      enabled: ${MAIL_SMTP_ENABLED:false}
+  broker:
+    relay-enabled: ${BROKER_RELAY_ENABLED:false}
+    relay-host: ${BROKER_RELAY_HOST:rabbitmq-dev}
+    relay-port: ${BROKER_RELAY_PORT:61613}
+    relay-login: ${BROKER_RELAY_LOGIN:talkme}
+    relay-passcode: ${BROKER_RELAY_PASSCODE:talkme_dev_pass}
+    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
   geo:
     # Deployed env: real client IPs arrive via proxy headers; don't geolocate the
     # server's own IP for a private/local address.
@@ -44,6 +90,24 @@ security:
     capacity: 200
     refill-tokens: 20
     refill-period-seconds: 1
+  captcha:
+    enabled: ${CAPTCHA_ENABLED:true}
+    secret-key: ${TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA}
+
+# Web Push (VAPID) — override keys via env.
+webpush:
+  enabled: ${WEBPUSH_ENABLED:true}
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY:BKCeDr6ImE2uISF6APs0OyMfgoWkXWo-TNpXY1hdnrJyj1CtbH5Joo0tuqRrmXX-Zd1an5Bh7Y4cOQe6hv3yqzQ}
+    private-key: ${VAPID_PRIVATE_KEY:pMHBoMj1sI4zsmg2TIg0g870XZbUPElqR-nkOY-FfnQ}
+    subject: ${VAPID_SUBJECT:mailto:admin@talkme.app}
+
+# Content moderation — point NSFW at the deployed sidecar via env.
+moderation:
+  enabled: ${MODERATION_ENABLED:true}
+  nsfw:
+    enabled: ${NSFW_ENABLED:true}
+    base-url: ${NSFW_BASE_URL:http://nsfw-dev:8081}
 
 storage:
   local:

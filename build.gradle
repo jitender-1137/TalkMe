@@ -30,6 +30,7 @@ dependencies {
     // Required by Spring's StompBrokerRelay (TCP STOMP client to RabbitMQ:61613)
     implementation 'io.projectreactor.netty:reactor-netty'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // SMTP — final fallback for transactional email after the Resend/Brevo HTTP APIs.
     implementation 'org.springframework.boot:spring-boot-starter-mail'
 
     // Observability: health/metrics endpoints, Prometheus scrape, distributed tracing
@@ -94,7 +95,7 @@ tasks.named('test') {
 // Task to build frontend static files and copy them to spring resources
 def frontendDir = "$projectDir/../TalkMe-UI"
 
-def getPnpmExecutable() {
+static def getPnpmExecutable() {
     def os = System.getProperty('os.name').toLowerCase()
     if (os.contains('windows')) {
         return 'pnpm.cmd'
@@ -108,18 +109,18 @@ def getPnpmExecutable() {
             if (process.waitFor() == 0) {
                 return path
             }
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             // Ignore and try next
         }
     }
     return 'pnpm' // fallback
 }
 
-task buildFrontend(type: Exec) {
+tasks.register('buildFrontend', Exec) {
     group = 'build'
     description = 'Installs frontend dependencies'
     workingDir frontendDir
-    
+
     def pnpmExec = getPnpmExecutable()
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
         commandLine 'cmd', '/c', "${pnpmExec} install"
@@ -128,14 +129,14 @@ task buildFrontend(type: Exec) {
     }
 }
 
-task buildFrontendProduction(type: Exec) {
+tasks.register('buildFrontendProduction', Exec) {
     group = 'build'
     description = 'Builds frontend static export'
     dependsOn buildFrontend
     workingDir frontendDir
-    
+
     environment 'STATIC_EXPORT', 'true'
-    
+
     def pnpmExec = getPnpmExecutable()
     if (System.getProperty('os.name').toLowerCase().contains('windows')) {
         commandLine 'cmd', '/c', "${pnpmExec} build"
@@ -144,11 +145,11 @@ task buildFrontendProduction(type: Exec) {
     }
 }
 
-task cleanStaticResources(type: Delete) {
+tasks.register('cleanStaticResources', Delete) {
     delete "src/main/resources/static"
 }
 
-task copyFrontendResources(type: Copy) {
+tasks.register('copyFrontendResources', Copy) {
     group = 'build'
     description = 'Copies frontend static export to Spring Boot static resources'
     dependsOn buildFrontendProduction, cleanStaticResources
@@ -162,17 +163,17 @@ task copyFrontendResources(type: Copy) {
         def indexHtml = file("$frontendDir/out/index.html")
         if (!indexHtml.exists()) {
             throw new GradleException(
-                "Frontend export not found at ${indexHtml}. The Next.js static export did not " +
-                "produce output. Run the frontend build (STATIC_EXPORT=true) before packaging, " +
-                "and ensure pnpm/node are available on the build machine.")
+                    "Frontend export not found at ${indexHtml}. The Next.js static export did not " +
+                            "produce output. Run the frontend build (STATIC_EXPORT=true) before packaging, " +
+                            "and ensure pnpm/node are available on the build machine.")
         }
     }
     doLast {
         def copiedIndex = file("$projectDir/src/main/resources/static/index.html")
         if (!copiedIndex.exists()) {
             throw new GradleException(
-                "Frontend export was not copied into static resources (${copiedIndex} missing). " +
-                "Refusing to build a JAR without the bundled UI.")
+                    "Frontend export was not copied into static resources (${copiedIndex} missing). " +
+                            "Refusing to build a JAR without the bundled UI.")
         }
     }
 }

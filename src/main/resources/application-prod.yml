@@ -1,5 +1,4 @@
 server:
-  port: ${SERVER_PORT:8443} # Updated default to 8443 for SSL
   servlet:
     context-path: /
 
@@ -28,7 +27,70 @@ spring:
       password: ${REDIS_PASSWORD}
       enabled: ${REDIS_ENABLED:true}
 
+  #### SMTP — final fallback after the Resend/Brevo HTTP APIs. Configure MAIL_SMTP_*
+  #### (e.g. a Resend/Brevo SMTP relay) to enable the third link.
+  mail:
+    host: ${MAIL_SMTP_HOST:}
+    port: ${MAIL_SMTP_PORT:587}
+    username: ${MAIL_SMTP_USERNAME:}
+    password: ${MAIL_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+        connecttimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
+
+  #### RabbitMQ connection (used only when the broker relay / AMQP events are enabled).
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:talkme}
+    password: ${RABBITMQ_PASS:}
+
+  # Google social login (OAuth2 / OIDC). INACTIVE until GOOGLE_CLIENT_ID +
+  # GOOGLE_CLIENT_SECRET are set
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            # Default scopes give email, name and picture. To also read age/gender
+            # append the People-API scopes (requires Google app verification in prod):
+            #   ,https://www.googleapis.com/auth/user.birthday.read,https://www.googleapis.com/auth/user.gender.read
+            scope: ${GOOGLE_OAUTH_SCOPES:openid,profile,email}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+
+# Session base-auth credentials — REQUIRED via env in prod (no defaults; never ship admin creds).
+auth:
+  username: ${AUTH_USERNAME}
+  password: ${AUTH_PASSWORD}
+
 app:
+  frontend-base-url: ${FRONTEND_BASE_URL:https://talkme.fun}
+  # Transactional email via Resend (primary) → Brevo (fallback) → SMTP. Sender domain
+  # neochathub.com must be DKIM/SPF-verified in both dashboards. Keys via env/secrets.
+  mail:
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:NeoChatHub <noreply@neochathub.com>}
+    resend:
+      api-key: ${RESEND_API_KEY:}
+    brevo:
+      api-key: ${BREVO_API_KEY:}
+    smtp:
+      enabled: ${MAIL_SMTP_ENABLED:false}
+  broker:
+    relay-enabled: ${BROKER_RELAY_ENABLED:false}
+    relay-host: ${BROKER_RELAY_HOST:localhost}
+    relay-port: ${BROKER_RELAY_PORT:61613}
+    relay-login: ${BROKER_RELAY_LOGIN:talkme}
+    relay-passcode: ${BROKER_RELAY_PASSCODE:}
+    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
   geo:
     # Real client IPs arrive via proxy headers in prod; never geolocate the
     # server's own IP for a private/local address.
@@ -58,6 +120,25 @@ security:
     capacity: ${RATE_LIMIT_CAPACITY:100}
     refill-tokens: ${RATE_LIMIT_REFILL:10}
     refill-period-seconds: 1
+  # Cloudflare Turnstile — REQUIRED real secret in prod (no test default).
+  captcha:
+    enabled: ${CAPTCHA_ENABLED:true}
+    secret-key: ${TURNSTILE_SECRET_KEY}
+
+# Web Push (VAPID) — REQUIRED real keys in prod (never ship the shared dev keys).
+webpush:
+  enabled: ${WEBPUSH_ENABLED:true}
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY}
+    private-key: ${VAPID_PRIVATE_KEY}
+    subject: ${VAPID_SUBJECT:mailto:admin@talkme.fun}
+
+# Content moderation — deployed NSFW sidecar.
+moderation:
+  enabled: ${MODERATION_ENABLED:true}
+  nsfw:
+    enabled: ${NSFW_ENABLED:true}
+    base-url: ${NSFW_BASE_URL:http://nsfw.parkarspot.com}
 
 storage:
   local:

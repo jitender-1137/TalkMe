@@ -3,6 +3,9 @@ server:
   servlet:
     context-path: /
 
+# LOCAL profile — values are HARD-CODED literals (not ${ENV} placeholders) on purpose,
+# so local dev is self-contained and can't be broken by stray/empty keys in .env.
+# Real secrets (Google, AI/bot keys) still come from .env; they aren't set here.
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/talkme
@@ -19,25 +22,68 @@ spring:
         format_sql: false
         default_schema: public
 
-  #### Redis Configuration ####
+  #### Redis (docker-compose talkme-redis; password from redis --requirepass). ####
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:talkMeRedis}
+      host: localhost
+      port: 6379
+      password: talkMeRedis
       timeout: 2000
-      enabled: ${REDIS_ENABLED:false}
-  #### Multipart files (image 2MB / video 30MB — enforced in UploadController) ####
-  servlet:
-    multipart:
-      max-file-size: 30MB
-      max-request-size: 35MB
 
-# CORS configurations
+  #### Local mail → Mailpit catcher: docker run -p 1025:1025 -p 8025:8025 axllent/mailpit
+  #### Inbox at http://localhost:8025. No auth/TLS.
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  #### RabbitMQ connection (docker-compose defaults). Broker relay is still opt-in below.
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: talkme
+    password: talkme_dev_pass
+
+  # Google social login — client id/secret come from .env (GOOGLE_CLIENT_ID/SECRET).
+  # Blank ⇒ OAuth simply stays disabled locally.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: ${GOOGLE_OAUTH_SCOPES:openid,profile,email}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+
+# Session base-auth credentials (dev). Quoted because the value starts with '#'.
+auth:
+  username: admin
+  password: "#Admin$321"
+
 app:
+  # Public web-app URL — used to build links in transactional emails.
+  frontend-base-url: http://localhost:8080
+  mail:
+    # ON locally so you see rendered emails in Mailpit. No HTTP provider keys, so the
+    # chain falls through Resend → Brevo → SMTP(Mailpit). Paste keys in .env to test
+    # the real providers instead (blank = skip that provider).
+    enabled: true
+    from: "NeoChatHub <noreply@neochathub.com>"
+    smtp:
+      enabled: true
+    resend:
+      api-key: ${RESEND_API_KEY:}
+    brevo:
+      api-key: ${BREVO_API_KEY:}
   geo:
-    # Dev only: geolocate the server's public IP when the client IP is local
-    # (localhost), so country detection works during development.
+    # Geolocate the server's public IP when the client IP is local, so country
+    # detection works during development.
     geolocate-local-ip: true
   cors:
     allowed-origins: http://localhost:3000, http://10.221.83.139:3000
@@ -46,11 +92,18 @@ app:
     exposed-headers: Set-Cookie
     allow-credentials: true
   cookie:
-    secure: ${COOKIE_SECURE:false}
-    same-site: ${COOKIE_SAME_SITE:Lax}
-  # RabbitMQ is OPT-IN via env (off by default in every profile, see base
-  # application.yml). To use it locally with docker-compose RabbitMQ, run with:
-  #   BROKER_RELAY_ENABLED=true BROKER_AMQP_EVENTS_ENABLED=true
+    # false locally — cookies must be settable over plain http (no https on localhost).
+    secure: false
+    same-site: Lax
+  # STOMP broker relay — OFF locally (runs on the in-memory broker, no RabbitMQ needed).
+  # Flip relay-enabled/amqp-events-enabled to true only with docker-compose RabbitMQ up.
+  broker:
+    relay-enabled: false
+    relay-host: localhost
+    relay-port: 61613
+    relay-login: talkme
+    relay-passcode: talkme_dev_pass
+    amqp-events-enabled: false
 
 # Security JWT details
 security:
@@ -63,6 +116,25 @@ security:
     capacity: 100
     refill-tokens: 10
     refill-period-seconds: 1
+  # Cloudflare Turnstile — Cloudflare's "always passes" TEST secret locally.
+  captcha:
+    enabled: true
+    secret-key: 1x0000000000000000000000000000000AA
+
+# Web Push (VAPID) — shared dev keys. Generate your own with `web-push generate-vapid-keys`.
+webpush:
+  enabled: true
+  vapid:
+    public-key: BKCeDr6ImE2uISF6APs0OyMfgoWkXWo-TNpXY1hdnrJyj1CtbH5Joo0tuqRrmXX-Zd1an5Bh7Y4cOQe6hv3yqzQ
+    private-key: pMHBoMj1sI4zsmg2TIg0g870XZbUPElqR-nkOY-FfnQ
+    subject: mailto:admin@talkme.app
+
+# Content moderation — NSFW sidecar at localhost:8081 (docker-compose `nsfw`).
+moderation:
+  enabled: true
+  nsfw:
+    enabled: true
+    base-url: http://localhost:8081
 
 # WebSocket Configuration
 websocket:

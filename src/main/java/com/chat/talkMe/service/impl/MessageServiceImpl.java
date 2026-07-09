@@ -51,6 +51,7 @@ public class MessageServiceImpl implements MessageService {
     private final FriendRepository friendRepository;
     private final UserSettingRepository userSettingRepository;
     private final com.chat.talkMe.service.GroupAuthzService groupAuthzService;
+    private final com.chat.talkMe.repository.UserRepository userRepository;
 
     @Override
     @Transactional
@@ -212,6 +213,22 @@ public class MessageServiceImpl implements MessageService {
                 .selfDestructSeconds(type != MessageType.TEXT && !chat.isMultiParty()
                         ? request.getSelfDestructSeconds() : null)
                 .build();
+
+        // @mentions (multi-party only): resolve the mentioned member UUIDs → user ids.
+        if (chat.isMultiParty() && request.getMentionedUserIds() != null
+                && !request.getMentionedUserIds().isEmpty()) {
+            java.util.Set<Long> mentionIds = new java.util.HashSet<>();
+            for (String uuid : request.getMentionedUserIds()) {
+                if (uuid == null || uuid.isBlank()) continue;
+                try {
+                    userRepository.findByUuid(UUID.fromString(uuid.trim()))
+                            .ifPresent(u -> mentionIds.add(u.getId()));
+                } catch (IllegalArgumentException ignored) {
+                    // skip malformed uuid
+                }
+            }
+            if (!mentionIds.isEmpty()) message.setMentionedUserIds(mentionIds);
+        }
 
         message = messageRepository.save(message);
         final boolean held = moderationStatus == com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
@@ -479,7 +496,7 @@ public class MessageServiceImpl implements MessageService {
 
         // rows are DESC (newest first) → the last item is the oldest; its
         // sequenceNumber is the cursor for the next (older) page.
-        Long nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getSequenceNumber();
+        Long nextCursor = items.isEmpty() ? null : items.getLast().getSequenceNumber();
 
         return MessagePageResponse.builder()
                 .items(items)
@@ -863,8 +880,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * Writes the transactional outbox row for a sent message. Runs inside the caller's
-     * @Transactional, so the row commits atomically with the message — there is no
+     * Writes the transactional outbox row for a send message. Runs inside the caller's
+     * {@code @Transactional,} so the row commits atomically with the message — there is no
      * window where a message exists without a durable delivery record.
      */
     private void persistOutbox(String messageId, MessageSentEvent event) {

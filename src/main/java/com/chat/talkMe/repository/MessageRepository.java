@@ -95,4 +95,39 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     /** Messages held pending consent in a chat (released when consent is granted). */
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT ORDER BY m.id ASC")
     List<Message> findHeldForConsent(Chat chat);
+
+    // ── Daily "unread messages" digest (see UnreadDigestService) ────────────────
+    // The unread definition mirrors countTotalUnreadForUser: 1:1 (PRIVATE/STRANGER)
+    // uses read-receipts, GROUP uses the lastReadMessageId watermark. The digest adds
+    // a per-user dedup watermark (user.lastUnreadDigestMessageId) so already-notified
+    // messages don't re-trigger a mail.
+
+    /**
+     * Distinct ids of users who have at least one NEW unread message — unread AND newer
+     * (by message id) than their last digest watermark. Eligibility (non-guest, not deleted,
+     * verified, has email) is filtered HERE so ineligible users never become candidates and
+     * we don't run the expensive per-user queries for them. This is the candidate set the
+     * daily job iterates.
+     */
+    @Query("SELECT DISTINCT cm.user.id FROM ChatMember cm, Message m " +
+           "WHERE m.chat = cm.chat AND cm.isDeleted = false AND cm.leftAt IS NULL " +
+           "AND cm.user.isGuest = false AND cm.user.isDeleted = false AND cm.user.isVerified = true AND cm.user.email IS NOT NULL " +
+           "AND m.sender.id <> cm.user.id AND m.isDeleted = false AND m.isBlocked = false " +
+           "AND cm.user.id NOT MEMBER OF m.deletedForUserIds " +
+           "AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT " +
+           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM " +
+           "AND m.id > COALESCE(cm.user.lastUnreadDigestMessageId, 0) " +
+           "AND ( (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) " +
+           "        AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = cm.user.id AND r.status = 'READ')) " +
+           "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP " +
+           "        AND m.id > COALESCE(cm.lastReadMessageId, 0)) )")
+    List<Long> findUserIdsWithNewUnread();
+
+    /** Most-recent unread messages for a user (newest first) — source of digest preview rows. */
+    @Query("SELECT m FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM " +
+           "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
+           "AND ( (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
+           "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP AND m.id > COALESCE((SELECT cm2.lastReadMessageId FROM ChatMember cm2 WHERE cm2.chat = m.chat AND cm2.user.id = :userId), 0)) ) " +
+           "ORDER BY m.id DESC")
+    List<Message> findRecentUnreadForUser(Long userId, Pageable pageable);
 }
