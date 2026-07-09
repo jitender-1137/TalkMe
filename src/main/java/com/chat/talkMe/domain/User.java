@@ -116,6 +116,15 @@ public class User extends BaseEntity {
     @Formula("COALESCE((SELECT CASE WHEN p.status = 'ONLINE' AND p.invisible_mode_enabled = false THEN 1 ELSE 0 END FROM user_presences p WHERE p.user_id = id), 0)")
     private int onlineSortWeight;
 
+    /**
+     * Durable last-seen time as a scalar subquery, so listings can ORDER BY it
+     * reliably. (Ordering by the inverse {@link #presence} association in a Criteria
+     * query is not emitted by Hibernate; a @Formula scalar is — same pattern as
+     * {@link #onlineSortWeight}.) NULL when the user has no presence row yet.
+     */
+    @Formula("(SELECT p.last_seen_at FROM user_presences p WHERE p.user_id = id)")
+    private java.time.Instant presenceLastSeenAt;
+
     /** How the user most recently accessed the app — drives push vs WS-only delivery. */
     @Enumerated(EnumType.STRING)
     @Column(name = "installation_type", length = 20)

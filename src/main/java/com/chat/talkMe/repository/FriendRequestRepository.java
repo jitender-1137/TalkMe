@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface FriendRequestRepository extends JpaRepository<FriendRequest, Long> {
     Optional<FriendRequest> findByUuid(UUID uuid);
     Optional<FriendRequest> findBySenderAndReceiver(User sender, User receiver);
-    List<FriendRequest> findByReceiverAndStatus(User receiver, FriendRequestStatus status);
-    List<FriendRequest> findBySenderAndStatus(User sender, FriendRequestStatus status);
+    // Newest requests first, so the list shows the most recent at the top.
+    List<FriendRequest> findByReceiverAndStatusOrderByCreatedAtDesc(User receiver, FriendRequestStatus status);
+    List<FriendRequest> findBySenderAndStatusOrderByCreatedAtDesc(User sender, FriendRequestStatus status);
 }

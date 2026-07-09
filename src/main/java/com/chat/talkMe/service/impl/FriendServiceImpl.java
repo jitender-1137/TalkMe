@@ -200,7 +200,7 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional(readOnly = true)
     public List<FriendRequestResponse> getFriendRequests(User currentUser) {
-        return friendRequestRepository.findByReceiverAndStatus(currentUser, FriendRequestStatus.PENDING).stream()
+        return friendRequestRepository.findByReceiverAndStatusOrderByCreatedAtDesc(currentUser, FriendRequestStatus.PENDING).stream()
                 .map(friendRequestMapper::toResponse)
                 .collect(Collectors.toList());
     }

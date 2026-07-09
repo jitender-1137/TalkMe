@@ -76,6 +76,14 @@ public interface PresenceService {
      */
     java.util.Set<String> getOnlineUsernames();
 
+    /**
+     * Usernames of every user who is currently APPARENT-AWAY — live status IDLE
+     * (the amber "Away" state) and NOT in Invisible mode. Read straight from Redis.
+     * Used together with {@link #getOnlineUsernames()} to rank listings (e.g.
+     * Discover) as ONLINE → AWAY → offline at the DB layer, across pagination.
+     */
+    java.util.Set<String> getAwayUsernames();
+
     /** The user's TRUE status, unmasked by Invisible mode — for the owner's own view. Redis-first. */
     PresenceStatus getRawStatus(User user);
 

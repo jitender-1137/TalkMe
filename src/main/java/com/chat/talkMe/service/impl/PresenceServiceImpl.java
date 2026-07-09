@@ -413,27 +413,47 @@ public class PresenceServiceImpl implements PresenceService {
 
     @Override
     public java.util.Set<String> getOnlineUsernames() {
-        // Candidate live users (ONLINE seeds the heartbeat set; OFFLINE removes it).
+        return liveUsernamesWithStatus(java.util.EnumSet.of(PresenceStatus.ONLINE));
+    }
+
+    @Override
+    public java.util.Set<String> getAwayUsernames() {
+        // "Away" = IDLE. (AWAY is included defensively, though only IDLE is written
+        // to live presence today.)
+        return liveUsernamesWithStatus(java.util.EnumSet.of(PresenceStatus.IDLE, PresenceStatus.AWAY));
+    }
+
+    /**
+     * Usernames among the live heartbeat set whose apparent status is one of
+     * {@code wanted} (Invisible mode masked to OFFLINE, so excluded). Backs both
+     * {@link #getOnlineUsernames()} and {@link #getAwayUsernames()}.
+     */
+    private java.util.Set<String> liveUsernamesWithStatus(java.util.Set<PresenceStatus> wanted) {
+        // Candidate live users (ONLINE seeds the heartbeat set; IDLE stays in it;
+        // OFFLINE removes it).
         java.util.Set<String> live = redisTemplate.opsForZSet().range(HEARTBEAT_ZSET, 0, -1);
         if (live == null || live.isEmpty()) {
             return java.util.Collections.emptySet();
         }
-        java.util.Set<String> online = new java.util.HashSet<>();
+        java.util.Set<String> result = new java.util.HashSet<>();
         for (String username : live) {
             Map<Object, Object> presence = redisTemplate.opsForHash().entries(REDIS_KEY_PREFIX + username);
             if (presence == null || presence.isEmpty()) {
                 continue;
             }
-            // Mirror getStatus(): Invisible mode is masked to OFFLINE, and only a
-            // literal ONLINE status counts (IDLE/AWAY users are not "online").
+            // Mirror getStatus(): Invisible mode is masked to OFFLINE.
             if (Boolean.parseBoolean((String) presence.get("invisibleModeEnabled"))) {
                 continue;
             }
-            if (PresenceStatus.ONLINE.name().equals(presence.get("status"))) {
-                online.add(username);
+            Object status = presence.get("status");
+            for (PresenceStatus s : wanted) {
+                if (s.name().equals(status)) {
+                    result.add(username);
+                    break;
+                }
             }
         }
-        return online;
+        return result;
     }
 
     @Override
