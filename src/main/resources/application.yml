@@ -7,13 +7,16 @@
 # Safe locally: with no proxy there are no X-Forwarded-* headers, so the real request
 # is used unchanged. Assumes the backend port is reachable only via the proxy.
 server:
+  port: 8080
   forward-headers-strategy: framework
+  servlet:
+    context-path: /
 
 spring:
   config:
     import: optional:file:.env[.properties]
   profiles:
-    active: local
+    active: ${ACTIVE_PROFILE:local}
   application:
     name: talkMe
   # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.

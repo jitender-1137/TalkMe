@@ -1,6 +1,5 @@
 server:
-  servlet:
-    context-path: /
+  port: 8080
 
 spring:
   datasource:
@@ -18,12 +17,15 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+    properties:
+      hibernate:
+        default_schema: public
 
   #### REDIS CONFIGURATION ####
   data:
     redis:
       host: ${REDIS_HOST}
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
       enabled: ${REDIS_ENABLED:true}
 
@@ -46,10 +48,10 @@ spring:
 
   #### RabbitMQ connection (used only when the broker relay / AMQP events are enabled).
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:talkme}
-    password: ${RABBITMQ_PASS:}
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
 
   # Google social login (OAuth2 / OIDC). INACTIVE until GOOGLE_CLIENT_ID +
   # GOOGLE_CLIENT_SECRET are set
@@ -58,8 +60,8 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:}
-            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
             # Default scopes give email, name and picture. To also read age/gender
             # append the People-API scopes (requires Google app verification in prod):
             #   ,https://www.googleapis.com/auth/user.birthday.read,https://www.googleapis.com/auth/user.gender.read
@@ -72,7 +74,7 @@ auth:
   password: ${AUTH_PASSWORD}
 
 app:
-  frontend-base-url: ${FRONTEND_BASE_URL:https://talkme.fun}
+  frontend-base-url: ${FRONTEND_BASE_URL:https://neochathub.com}
   # Transactional email via Resend (primary) → Brevo (fallback) → SMTP. Sender domain
   # neochathub.com must be DKIM/SPF-verified in both dashboards. Keys via env/secrets.
   mail:
@@ -86,10 +88,10 @@ app:
       enabled: ${MAIL_SMTP_ENABLED:false}
   broker:
     relay-enabled: ${BROKER_RELAY_ENABLED:false}
-    relay-host: ${BROKER_RELAY_HOST:localhost}
-    relay-port: ${BROKER_RELAY_PORT:61613}
-    relay-login: ${BROKER_RELAY_LOGIN:talkme}
-    relay-passcode: ${BROKER_RELAY_PASSCODE:}
+    relay-host: ${BROKER_RELAY_HOST}
+    relay-port: ${BROKER_RELAY_PORT}
+    relay-login: ${BROKER_RELAY_LOGIN}
+    relay-passcode: ${BROKER_RELAY_PASSCODE}
     amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
   geo:
     # Real client IPs arrive via proxy headers in prod; never geolocate the
@@ -97,7 +99,7 @@ app:
     geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:false}
   cors:
     # Locked to known origins (comma-separated). Override via env for extra domains.
-    allowed-origins: ${ALLOWED_ORIGINS:https://talkme.fun,https://www.talkme.fun}
+    allowed-origins: ${ALLOWED_ORIGINS}
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
@@ -108,7 +110,7 @@ app:
 
 # WebSocket Configuration
 websocket:
-  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:https://talkme.fun,https://www.talkme.fun}
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS}
 
 security:
   jwt:
