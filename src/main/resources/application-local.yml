@@ -26,7 +26,14 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:talkMeRedis}
       enabled: ${REDIS_ENABLED:true}
-      timeout: 2000
+      # Command timeout. 2s is fine for a Redis on localhost, but local dev here talks
+      # to a REMOTE Redis over the internet, where WAN latency/jitter easily exceeds 2s
+      # and trips every scheduled reaper. Default 6s; override with REDIS_TIMEOUT_MS.
+      timeout: ${REDIS_TIMEOUT_MS:6000}
+      lettuce:
+        # Keep the multiplexed connection alive + reconnect fast after a laptop sleep
+        # or a dropped WAN link, so commands don't pile up against a dead socket.
+        shutdown-timeout: 200ms
 
   #### Local mail → Mailpit catcher: docker run -p 1025:1025 -p 8025:8025 axllent/mailpit
   #### Inbox at http://localhost:8025. No auth/TLS.

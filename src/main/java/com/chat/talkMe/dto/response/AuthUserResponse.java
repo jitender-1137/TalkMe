@@ -36,4 +36,7 @@ public class AuthUserResponse {
     /** True when this user restricts messaging to friends — drives the avatar lock badge. */
     @JsonProperty("messagingFriendsOnly")
     private Boolean messagingFriendsOnly;
+    /** Granted role names — kept in sync with UserResponse so the /admin guard works
+     *  even from the /auth/me-seeded profile cache (before /users/me refetches). */
+    private java.util.List<String> roles;
 }

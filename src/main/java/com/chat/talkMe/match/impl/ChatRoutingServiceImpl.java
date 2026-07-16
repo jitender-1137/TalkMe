@@ -34,22 +34,11 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
     private final StringRedisTemplate redisTemplate;
     private final NotificationDispatchService notificationDispatchService;
     private final MatchMessageBufferService matchMessageBuffer;
-    private final com.chat.talkMe.service.BotRegistry botRegistry;
-    private final BotMatchService botMatchService;
 
     @Override
     public void relayMessage(String sender, String content, String clientId) {
         MatchSession session = sessionService.getSessionByUser(sender)
                 .orElseThrow(() -> new IllegalArgumentException("No active session found for user: " + sender));
-
-        // If the peer is an AI bot, generate & relay its reply instead of routing to a
-        // (non-existent) peer socket. The bot persona is a consenting adult, so the
-        // explicit-consent hold below is skipped for bot sessions.
-        String peer = session.getUserA().equals(sender) ? session.getUserB() : session.getUserA();
-        if (botRegistry.isBot(peer)) {
-            botMatchService.onHumanMessage(session, sender, peer, content);
-            return;
-        }
 
         // Explicit text requires per-session 18+ consent. Until the peer has GRANTED,
         // the message is held (never relayed): we auto-ask the peer and flag the

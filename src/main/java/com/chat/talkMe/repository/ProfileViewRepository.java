@@ -14,6 +14,8 @@ import java.util.Optional;
 
 @Repository
 public interface ProfileViewRepository extends JpaRepository<ProfileView, Long> {
+    @org.springframework.data.jpa.repository.Query("SELECT v.createdAt FROM ProfileView v WHERE v.createdAt >= :since")
+    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
 
     Optional<ProfileView> findByViewerAndViewed(User viewer, User viewed);
 

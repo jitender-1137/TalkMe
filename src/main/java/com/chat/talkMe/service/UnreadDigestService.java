@@ -42,6 +42,7 @@ public class UnreadDigestService {
     private final UserRepository userRepository;
     private final UserSettingRepository userSettingRepository;
     private final EmailService emailService;
+    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
 
     @Value("${app.mail.unread-digest.enabled:true}")
     private boolean enabled;
@@ -141,9 +142,11 @@ public class UnreadDigestService {
         return new ArrayList<>(bySender.values());
     }
 
-    /** Plain-text preview; media/blank messages fall back to a generic label. */
+    /** Plain-text preview; media/blank messages fall back to a generic label.
+     *  Decrypts here (email leaves the app, so there's no client to decrypt). */
     private String snippet(Message m) {
-        String content = m.getContent();
+        Long chatId = m.getChat() != null ? m.getChat().getId() : null;
+        String content = messageCryptoService.decrypt(chatId, m.getContent());
         return (content != null && !content.isBlank()) ? content : "Sent you a message";
     }
 

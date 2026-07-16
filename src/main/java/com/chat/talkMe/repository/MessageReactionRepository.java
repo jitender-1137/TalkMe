@@ -10,5 +10,7 @@ import java.util.Optional;
 
 @Repository
 public interface MessageReactionRepository extends JpaRepository<MessageReaction, Long> {
+    @org.springframework.data.jpa.repository.Query("SELECT r.createdAt FROM MessageReaction r WHERE r.createdAt >= :since")
+    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
     Optional<MessageReaction> findByMessageAndUserAndEmoji(Message message, User user, String emoji);
 }

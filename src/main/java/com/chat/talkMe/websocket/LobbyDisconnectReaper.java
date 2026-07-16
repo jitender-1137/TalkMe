@@ -1,5 +1,7 @@
 package com.chat.talkMe.websocket;
 
+import com.chat.talkMe.util.BackgroundTaskErrors;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -67,7 +69,7 @@ public class LobbyDisconnectReaper {
                 }
             }
         } catch (Exception e) {
-            log.error("[Lobby] leave reaper run failed", e);
+            BackgroundTaskErrors.log(log, "[Lobby] leave reaper", e);
         }
     }
 }

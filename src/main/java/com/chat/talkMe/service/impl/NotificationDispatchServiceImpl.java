@@ -25,6 +25,8 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
 
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
+    private final com.chat.talkMe.repository.ChatRepository chatRepository;
+    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
     private final SimpMessagingTemplate messagingTemplate;
     private final WebPushService webPushService;
     private final WebPushProperties webPushProperties;
@@ -120,8 +122,20 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
     }
 
     private String preview(MessageResponse m) {
+        // Wire payloads are ciphertext; a push body leaves the app (no client to
+        // decrypt), so decrypt here. m.getChatId() is the chat UUID → resolve to id.
         String content = m.getContent();
-        if (content == null || content.isBlank()) {
+        if (content != null && content.startsWith(com.chat.talkMe.crypto.MessageCryptoService.MARKER)
+                && m.getChatId() != null) {
+            try {
+                Long chatId = chatRepository.findByUuid(java.util.UUID.fromString(m.getChatId()))
+                        .map(com.chat.talkMe.domain.Chat::getId).orElse(null);
+                if (chatId != null) content = messageCryptoService.decrypt(chatId, content);
+            } catch (Exception ignored) {
+                // Best-effort preview; fall through to the attachment label below.
+            }
+        }
+        if (content == null || content.isBlank() || content.startsWith(com.chat.talkMe.crypto.MessageCryptoService.MARKER)) {
             return "📎 Attachment";
         }
         return content.length() > 120 ? content.substring(0, 117) + "…" : content;

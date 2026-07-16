@@ -119,6 +119,14 @@ public class SecurityConfig {
                     }
 
                     auth.requestMatchers(unSecured()).permitAll()
+                        // Admin API — SUPER_ADMIN only (defense-in-depth; the controller
+                        // also carries @PreAuthorize). ONLY the /api/v1-prefixed API path:
+                        // @RestControllers are served under /api/v1 (WebMvcConfig), so the
+                        // AdminController is /api/v1/admin/**. The bare /admin (and /admin/user,
+                        // /admin/audit, …) is the STATIC frontend page — it must fall through
+                        // to permitAll below and be served as admin.html by the SPA resource
+                        // handler, so it is deliberately NOT matched here.
+                        .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/**").authenticated() // Require auth for API endpoints
                         .anyRequest().permitAll(); // Allow static SPA resources and frontend routes
                 });

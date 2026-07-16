@@ -17,16 +17,18 @@ public class MessageAttachment extends BaseEntity {
     @JoinColumn(name = "message_id", nullable = false)
     private Message message;
 
-    @Column(name = "file_name", nullable = false, length = 255)
+    // TEXT (not length-capped): these hold AES-GCM ciphertext (base64 iv‖ct‖tag)
+    // when per-chat encryption is on, which overflows the old 255/512 caps.
+    @Column(name = "file_name", nullable = false, columnDefinition = "TEXT")
     private String fileName;
 
     @Column(name = "file_size", nullable = false)
     private Long fileSize;
 
-    @Column(name = "file_url", nullable = false, length = 512)
+    @Column(name = "file_url", nullable = false, columnDefinition = "TEXT")
     private String fileUrl;
 
-    @Column(name = "thumbnail_url", length = 512)
+    @Column(name = "thumbnail_url", columnDefinition = "TEXT")
     private String thumbnailUrl;
 
     @Column(name = "mime_type", length = 100)

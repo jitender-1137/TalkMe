@@ -47,6 +47,17 @@ public class ChatController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /** Per-conversation encryption key — participant-only; held in client memory only. */
+    @GetMapping("/{id}/key")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.ChatKeyResponse>> getChatKey(
+            @PathVariable("id") String uuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        com.chat.talkMe.dto.response.ChatKeyResponse response =
+                chatService.getChatKey(uuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
     @PutMapping("/{id}/archive")
     public ResponseEntity<ResponseDto<Void>> archiveChat(
             @PathVariable("id") String uuid,

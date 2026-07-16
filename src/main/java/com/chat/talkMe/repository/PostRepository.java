@@ -16,6 +16,8 @@ import java.util.UUID;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
+    @org.springframework.data.jpa.repository.Query("SELECT p.createdAt FROM Post p WHERE p.createdAt >= :since")
+    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
     Optional<Post> findByUuid(UUID uuid);
     Optional<Post> findByShortCode(String shortCode);
     boolean existsByShortCode(String shortCode);

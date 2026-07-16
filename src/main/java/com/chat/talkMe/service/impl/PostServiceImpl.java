@@ -69,9 +69,17 @@ public class PostServiceImpl implements PostService {
             audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
         }
 
+        if (request.getCaption() != null && !request.getCaption().isBlank()
+                && moderationService.moderateText(request.getCaption()).isExplicit()) {
+            throw new com.chat.talkMe.exception.ContentModerationException(
+                    "Your post contains content that violates our community guidelines.");
+        }
+
         Post post = Post.builder()
                 .user(currentUser)
                 .content(request.getContent())
+                .richContent(request.getRichContent())
+                .caption(request.getCaption())
                 .audience(audience)
                 .shortCode(com.chat.talkMe.util.ShortCodes.unique(c -> !postRepository.existsByShortCode(c)))
                 .build();
@@ -131,6 +139,11 @@ public class PostServiceImpl implements PostService {
                         .mediaUrl(mediaReq.getMediaUrl())
                         .mediaType(mediaReq.getMediaType())
                         .orderIndex(order++)
+                        .trimStartSec(mediaReq.getTrimStartSec())
+                        .trimEndSec(mediaReq.getTrimEndSec())
+                        .muted(mediaReq.getMuted())
+                        .coverImageUrl(mediaReq.getCoverImageUrl())
+                        .filterName(mediaReq.getFilterName())
                         .build();
                 postMediaRepository.save(media);
                 post.getMedia().add(media);
@@ -268,7 +281,24 @@ public class PostServiceImpl implements PostService {
             throw new ForbiddenException("Cannot edit post of another user", "TM_103");
         }
 
-        post.setContent(request.getContent());
+        // Update only the field the client sent: media/background captions live in
+        // `content`; a text post's caption is the separate `caption` field (its
+        // formatted body is left untouched on edit).
+        if (request.getContent() != null) {
+            if (moderationService.moderateText(request.getContent()).isExplicit()) {
+                throw new com.chat.talkMe.exception.ContentModerationException(
+                        "Your post contains content that violates our community guidelines.");
+            }
+            post.setContent(request.getContent());
+        }
+        if (request.getCaption() != null) {
+            if (!request.getCaption().isBlank()
+                    && moderationService.moderateText(request.getCaption()).isExplicit()) {
+                throw new com.chat.talkMe.exception.ContentModerationException(
+                        "Your post contains content that violates our community guidelines.");
+            }
+            post.setCaption(request.getCaption());
+        }
         post = postRepository.save(post);
         log.info("Post {} caption updated by {}", postUuid, currentUser.getUsername());
         return mapToPostResponse(post, currentUser);
@@ -544,6 +574,11 @@ public class PostServiceImpl implements PostService {
                         .id(m.getUuid().toString())
                         .mediaUrl(m.getMediaUrl())
                         .mediaType(m.getMediaType())
+                        .trimStartSec(m.getTrimStartSec())
+                        .trimEndSec(m.getTrimEndSec())
+                        .muted(m.getMuted())
+                        .coverImageUrl(m.getCoverImageUrl())
+                        .filterName(m.getFilterName())
                         .build())
                 .collect(Collectors.toList());
 
@@ -562,6 +597,8 @@ public class PostServiceImpl implements PostService {
                 .shortCode(post.getShortCode())
                 .user(author)
                 .content(post.getContent())
+                .richContent(post.getRichContent())
+                .caption(post.getCaption())
                 .media(mediaRes)
                 .likesCount(post.getLikes().size())
                 .commentsCount(commentsRes.size())

@@ -15,9 +15,9 @@ public class OpenApiConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("TalkMe Social Messaging API")
+                        .title("NeoChatHub Social Messaging API")
                         .version("1.0.0")
-                        .description("Complete API specifications for the TalkMe social messaging application backend."))
+                        .description("Complete API specifications for the NeoChatHub social messaging application backend."))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth",

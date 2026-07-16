@@ -198,14 +198,13 @@ public class UserServiceImpl implements UserService {
 
         Specification<User> spec = (root, q, cb) -> {
             String pattern = "%" + query.toLowerCase() + "%";
-            return cb.and(
-                cb.notEqual(root.get("id"), currentUser.getId()),
-                cb.or(
+            List<jakarta.persistence.criteria.Predicate> preds = new java.util.ArrayList<>();
+            preds.add(cb.notEqual(root.get("id"), currentUser.getId()));
+            preds.add(cb.or(
                     cb.like(cb.lower(root.get("username")), pattern),
                     cb.like(cb.lower(root.get("name")), pattern),
-                    cb.like(cb.lower(root.get("email")), pattern)
-                )
-            );
+                    cb.like(cb.lower(root.get("email")), pattern)));
+            return cb.and(preds.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
 
         Page<User> userPage = userRepository.findAll(spec, pageable);

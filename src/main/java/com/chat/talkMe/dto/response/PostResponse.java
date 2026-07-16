@@ -15,6 +15,8 @@ public class PostResponse {
     private String shortCode; // for shareable /post/{shortCode} links
     private AuthUserResponse user;
     private String content;
+    private String richContent; // optional rich-text JSON for formatted text posts
+    private String caption; // optional separate caption for text posts
     private List<PostMediaResponse> media;
     private int likesCount;
     private int commentsCount;

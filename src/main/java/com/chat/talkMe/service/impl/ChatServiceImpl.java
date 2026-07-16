@@ -47,6 +47,8 @@ public class ChatServiceImpl implements ChatService {
     private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
+    private final com.chat.talkMe.crypto.ChatKeyService chatKeyService;
+    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -253,6 +255,27 @@ public class ChatServiceImpl implements ChatService {
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
         return mapToChatResponse(chat, managedUser);
+    }
+
+    @Override
+    @Transactional
+    public com.chat.talkMe.dto.response.ChatKeyResponse getChatKey(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Only a participant of this chat may fetch its key.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        if (!messageCryptoService.isEnabled()) {
+            return com.chat.talkMe.dto.response.ChatKeyResponse.builder().enabled(false).build();
+        }
+        return com.chat.talkMe.dto.response.ChatKeyResponse.builder()
+                .enabled(true)
+                .key(chatKeyService.getRawKeyBase64(chat.getId()))
+                .algo("AES-256-GCM")
+                .version(1)
+                .build();
     }
 
     @Override

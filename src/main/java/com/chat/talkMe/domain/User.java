@@ -146,20 +146,11 @@ public class User extends BaseEntity {
     private java.time.Instant deletionRequestedAt;
 
     /**
-     * True for AI bot accounts (Sonal / Ru chi / Annu …). Bots are ordinary {@code User}
-     * rows so they look identical to humans everywhere (chat list, profile, avatar,
-     * presence), but they can't log in and the server auto-replies on their behalf.
-     * Also, the guard for "bots must never talk to each other": a reply is only ever
-     * generated for a message whose sender is NOT a bot.
+     * Admin-imposed suspension (distinct from the user-initiated soft-delete above).
+     * A banned account cannot authenticate (enforced in CustomUserDetails + login).
+     * Toggled only from the SuperAdmin dashboard.
      */
-    @Column(name = "is_bot", nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "banned", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
-    private boolean isBot = false;
-
-    /**
-     * The bot's personality / system prompt (name, age, vibe, how it should talk).
-     * Fed to the AI model on every turn. Null for human users.
-     */
-    @Column(name = "bot_persona", length = 4000)
-    private String botPersona;
+    private boolean banned = false;
 }

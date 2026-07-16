@@ -52,4 +52,7 @@ public class UserResponse {
     private long followersCount;
     private long followingCount;
     private long postsCount;
+
+    /** Granted role names (e.g. ["ROLE_USER","ROLE_SUPER_ADMIN"]) — drives the admin UI guard. */
+    private java.util.List<String> roles;
 }

@@ -15,14 +15,6 @@ import java.util.List;
 public interface MessageService {
     MessageResponse sendMessage(String chatUuid, SendMessageRequest request, User currentUser);
 
-    /**
-     * Server-originated reply from an AI bot. Persists a TEXT message as {@code bot},
-     * then delivers it through the same guaranteed-delivery path (outbox + broadcast)
-     * as a human send — so the human on the other side receives it in real time.
-     * Skips the human-oriented guards (moderation / blocking / friends-only) because
-     * the content is generated server-side and trusted.
-     */
-    MessageResponse sendBotMessage(String chatUuid, String content, User bot);
 
     /**
      * Persists a SYSTEM message (group event like "X added Y") authored by

@@ -15,6 +15,11 @@ import java.util.UUID;
 
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Long> {
+
+    // ── Admin analytics ──────────────────────────────────────────────────────
+    @Query("SELECT c.chatType, COUNT(c) FROM Chat c WHERE c.isDeleted = false GROUP BY c.chatType")
+    java.util.List<Object[]> countGroupedByType();
+
     Optional<Chat> findByUuid(UUID uuid);
 
     @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.members m LEFT JOIN FETCH m.user WHERE c.uuid = :uuid")

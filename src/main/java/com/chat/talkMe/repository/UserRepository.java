@@ -23,9 +23,39 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
 
-    /** All AI bot accounts (used by the presence heartbeat that keeps them "online"). */
-    @Query("SELECT u FROM User u WHERE u.isBot = true AND u.isDeleted = false")
-    List<User> findAllBots();
+    // ── Case-insensitive lookups ─────────────────────────────────────────────
+    // Email is treated case-insensitively (users type it in any case); usernames
+    // too, for login. These repair already-stored mixed-case rows without a data
+    // migration and prevent duplicate accounts differing only by letter case.
+    Optional<User> findByUsernameIgnoreCase(String username);
+    Optional<User> findByEmailIgnoreCase(String email);
+    boolean existsByEmailIgnoreCase(String email);
+    boolean existsByUsernameIgnoreCase(String username);
+
+    // ── Admin dashboard counters ─────────────────────────────────────────────
+    long countByIsVerifiedTrue();
+    long countByIsGuestTrue();
+    long countByCreatedAtAfter(java.time.Instant since);
+    /** Signup timestamps since a cutoff — bucketed by day in the service for charts. */
+    @Query("SELECT u.createdAt FROM User u WHERE u.createdAt >= :since")
+    List<java.time.Instant> findSignupTimesSince(@Param("since") java.time.Instant since);
+    long countByBannedTrue();
+    /** One-time correction: guests must never be verified. Returns rows fixed. */
+    @Modifying
+    @Query("UPDATE User u SET u.isVerified = false WHERE u.isGuest = true AND u.isVerified = true")
+    int unverifyAllGuests();
+    /** Users seen since a cutoff — "active" counts for the analytics dashboard. */
+    long countByPresenceLastSeenAtAfter(java.time.Instant since);
+    /** Accounts soft-deleted and awaiting purge (grace window), newest request first. */
+    List<User> findByIsDeletedTrueAndDeletionRequestedAtIsNotNullOrderByDeletionRequestedAtDesc();
+    @Query("SELECT u.gender, COUNT(u) FROM User u WHERE u.isGuest = false GROUP BY u.gender")
+    List<Object[]> countGroupedByGender();
+    @Query("SELECT u.country, COUNT(u) FROM User u WHERE u.isGuest = false AND u.country IS NOT NULL GROUP BY u.country ORDER BY COUNT(u) DESC")
+    List<Object[]> countGroupedByCountry();
+    // Paginated search over name/username/email for the admin user list.
+    org.springframework.data.domain.Page<User>
+        findByUsernameContainingIgnoreCaseOrNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+            String username, String name, String email, org.springframework.data.domain.Pageable pageable);
 
     @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u " +
            "WHERE up.status = 'ONLINE' " +

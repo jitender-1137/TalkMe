@@ -1,5 +1,7 @@
 package com.chat.talkMe.websocket;
 
+import com.chat.talkMe.util.BackgroundTaskErrors;
+
 import com.chat.talkMe.service.PresenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +38,7 @@ public class PresenceWatchdog {
                 log.debug("[Presence] Watchdog reaped {} timed-out user(s)", reaped);
             }
         } catch (Exception e) {
-            log.error("[Presence] Watchdog run failed", e);
+            BackgroundTaskErrors.log(log, "[Presence] Watchdog", e);
         }
     }
 }

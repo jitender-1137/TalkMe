@@ -1,5 +1,3 @@
-version: '3.8'
-
 # All configuration is driven by variables from the .env file (see .env.example).
 # Secrets use `${VAR:?message}` so the stack REFUSES to start if they are unset —
 # there are no weak built-in fallbacks. BIND_HOST defaults to 127.0.0.1 so nothing
@@ -9,6 +7,9 @@ services:
   postgres:
     image: postgres:${POSTGRES_VERSION:-16-alpine}
     container_name: talkme-postgres
+    # Auto-recover after a Docker/host restart or sleep (matches nsfw). Without this
+    # the container stays Exited and the app hammers a dead DB/cache with timeouts.
+    restart: unless-stopped
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
@@ -26,6 +27,7 @@ services:
   rabbitmq:
     image: rabbitmq:${RABBITMQ_VERSION:-3.13-management}
     container_name: talkme-rabbitmq
+    restart: unless-stopped
     ports:
       - "${RABBITMQ_AMQP_PORT:-5672}:5672"       # AMQP work plane
       - "${RABBITMQ_MGMT_PORT:-15672}:15672"     # management UI
@@ -47,6 +49,7 @@ services:
   redis:
     image: redis:${REDIS_VERSION:-7-alpine}
     container_name: talkme-redis
+    restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:

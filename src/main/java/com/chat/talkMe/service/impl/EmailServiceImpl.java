@@ -84,7 +84,7 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.mail.require-verification:true}")
     private boolean requireVerification;
 
-    @Value("${app.mail.from:TalkMe <noreply@neochathub.com>}")
+    @Value("${app.mail.from:NeoChatHub <noreply@neochathub.com>}")
     private String from;
 
     @Value("${app.mail.timeout-ms:10000}")
@@ -269,7 +269,8 @@ public class EmailServiceImpl implements EmailService {
     /** Whether the account behind this address exists and has a verified email. */
     private boolean isVerifiedRecipient(String toEmail) {
         try {
-            return userRepository.findByEmail(toEmail).map(User::isVerified).orElse(false);
+            return userRepository.findByEmailIgnoreCase(toEmail == null ? "" : toEmail.trim())
+                    .map(User::isVerified).orElse(false);
         } catch (Exception e) {
             // On lookup error, fail closed for transactional mail (don't spend quota blindly).
             log.debug("[Mail] verification lookup failed for {}: {}", toEmail, e.getMessage());

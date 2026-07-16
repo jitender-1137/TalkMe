@@ -25,6 +25,17 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     Page<Message> findByChatAndIsDeletedFalse(Chat chat, Pageable pageable);
 
+    // ── Admin dashboard counters ─────────────────────────────────────────────
+    long countBySenderId(Long senderId);
+    long countByChat(Chat chat);
+
+    // ── Admin analytics ──────────────────────────────────────────────────────
+    @Query("SELECT m.messageType, COUNT(m) FROM Message m WHERE m.isDeleted = false GROUP BY m.messageType")
+    java.util.List<Object[]> countGroupedByType();
+
+    @Query("SELECT m.createdAt FROM Message m WHERE m.isDeleted = false AND m.createdAt >= :since")
+    java.util.List<java.time.Instant> findMessageTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
+
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (m.isBlocked = false OR m.sender.id = :userId) AND :userId NOT MEMBER OF m.deletedForUserIds AND (m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT OR m.sender.id = :userId)")
     Page<Message> findMessagesForUser(Chat chat, Long userId, Instant clearedAt, Pageable pageable);
 

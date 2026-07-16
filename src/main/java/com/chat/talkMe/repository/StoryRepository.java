@@ -13,6 +13,8 @@ import java.util.UUID;
 
 @Repository
 public interface StoryRepository extends JpaRepository<Story, Long> {
+    @org.springframework.data.jpa.repository.Query("SELECT s.createdAt FROM Story s WHERE s.createdAt >= :since")
+    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
     Optional<Story> findByUuid(UUID uuid);
 
     @Query("SELECT s FROM Story s WHERE s.expiresAt > :now AND s.isDeleted = false ORDER BY s.createdAt DESC")

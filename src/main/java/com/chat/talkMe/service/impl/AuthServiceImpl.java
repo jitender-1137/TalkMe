@@ -103,13 +103,15 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest) {
-        String identifier = request.getEmail();
+        // Email / username are case-insensitive; trim + normalize so login works
+        // regardless of the case the user typed (matches how signup stores email).
+        String identifier = request.getEmail() == null ? "" : request.getEmail().trim();
 
         // Brute-force guard: reject if this account/IP is locked out.
         loginAttemptService.assertNotBlocked(identifier, ip);
 
-        User user = userRepository.findByUsername(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
+        User user = userRepository.findByUsernameIgnoreCase(identifier)
+                .or(() -> userRepository.findByEmailIgnoreCase(identifier))
                 .orElse(null);
 
         if (user == null) {
@@ -119,6 +121,11 @@ public class AuthServiceImpl implements AuthService {
 
         if (user.isGuest()) {
             throw new ForbiddenException("Guest accounts must use Guest Login flow", "TM_029");
+        }
+
+        if (user.isBanned()) {
+            loginAttemptService.recordFailure(identifier, ip);
+            throw new ForbiddenException("This account has been suspended.", "TM_030");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -172,7 +179,11 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        // Canonicalize the email to lower-case (trimmed) so it's stored one way and
+        // login matches regardless of the case the user types. The uniqueness check
+        // is case-insensitive so "John@x.com" and "john@x.com" can't both register.
+        String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("TM_047");
         }
 
@@ -191,7 +202,7 @@ public class AuthServiceImpl implements AuthService {
 
         User user = User.builder()
                 .name(request.getName())
-                .email(request.getEmail())
+                .email(email)
                 .username(username)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .isGuest(false)
@@ -227,7 +238,7 @@ public class AuthServiceImpl implements AuthService {
                 .age(request.getAge())
                 .gender(request.getGender())
                 .isGuest(true)
-                .isVerified(true)
+                .isVerified(false) // guests are NOT verified users
                 .roles(Set.of(guestRole))
                 .country(detectionResult.getCountry())
                 .build();
@@ -249,6 +260,11 @@ public class AuthServiceImpl implements AuthService {
         // (IP → proxy headers → server public IP fallback; see CountryDetectionService).
         CountryDetectionResult detection = countryDetectionService.detectCountry(httpRequest);
 
+        // Canonical lower-case email (matches password-signup storage), so a Google
+        // login links to the pre-existing password account regardless of case.
+        String oauthEmail = (info.getEmail() == null || info.getEmail().isBlank())
+                ? null : info.getEmail().trim().toLowerCase();
+
         // 1. Match an existing account: by provider id first, then by email (links the
         //    Google identity onto a pre-existing password account with the same email).
         User user = null;
@@ -256,8 +272,8 @@ public class AuthServiceImpl implements AuthService {
         if (info.getProviderId() != null && !info.getProviderId().isBlank()) {
             user = userRepository.findByGoogleId(info.getProviderId()).orElse(null);
         }
-        if (user == null && info.getEmail() != null && !info.getEmail().isBlank()) {
-            user = userRepository.findByEmail(info.getEmail()).orElse(null);
+        if (user == null && oauthEmail != null) {
+            user = userRepository.findByEmailIgnoreCase(oauthEmail).orElse(null);
         }
 
         if (user == null) {
@@ -267,7 +283,7 @@ public class AuthServiceImpl implements AuthService {
             String name = (info.getName() != null && !info.getName().isBlank()) ? info.getName() : "User";
             User newUser = User.builder()
                     .name(name)
-                    .email(info.getEmail())
+                    .email(oauthEmail)
                     .username(generateUniqueUsername(info.getEmail(), name))
                     .googleId(info.getProviderId())
                     .isGuest(false)
@@ -288,8 +304,8 @@ public class AuthServiceImpl implements AuthService {
                 // email constraint rejected the duplicate. Reuse the row that won the
                 // race so the same Google account always maps to one user id.
                 user = userRepository.findByGoogleId(info.getProviderId())
-                        .or(() -> (info.getEmail() != null && !info.getEmail().isBlank())
-                                ? userRepository.findByEmail(info.getEmail())
+                        .or(() -> oauthEmail != null
+                                ? userRepository.findByEmailIgnoreCase(oauthEmail)
                                 : java.util.Optional.empty())
                         .orElseThrow(() -> e);
                 log.info("Reused existing Google user after create race: {}", user.getUsername());
@@ -489,7 +505,8 @@ public class AuthServiceImpl implements AuthService {
     public void forgotPassword(ForgotPasswordRequest request) {
         // Never reveal whether the email exists (anti-enumeration): always return
         // success to the controller. Only real, non-guest, active accounts get a link.
-        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        String email = request.getEmail() == null ? "" : request.getEmail().trim();
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
         if (user == null || user.isGuest() || user.isDeleted()) {
             return;
         }

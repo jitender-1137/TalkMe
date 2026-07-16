@@ -12,6 +12,13 @@ public class PostMediaRequest {
     private String mediaUrl;
     private String mediaType; // IMAGE, VIDEO
 
+    // ── Optional video edit metadata (null for images / un-edited videos) ──
+    private Double trimStartSec;
+    private Double trimEndSec;
+    private Boolean muted;
+    private String coverImageUrl;
+    private String filterName;
+
     @JsonCreator
     public static PostMediaRequest fromString(String mediaUrl) {
         String mediaType = "IMAGE";
@@ -21,7 +28,10 @@ public class PostMediaRequest {
                 mediaType = "VIDEO";
             }
         }
-        return new PostMediaRequest(mediaUrl, mediaType);
+        PostMediaRequest req = new PostMediaRequest();
+        req.mediaUrl = mediaUrl;
+        req.mediaType = mediaType;
+        return req;
     }
 }
 

@@ -16,4 +16,5 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     boolean existsByPostAndUser(Post post, User user);
     /** Page of likes for a post — used to list who liked it. */
     Page<PostLike> findByPost(Post post, Pageable pageable);
+    long countByPost(Post post);
 }

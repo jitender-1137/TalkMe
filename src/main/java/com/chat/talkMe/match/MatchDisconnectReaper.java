@@ -1,5 +1,7 @@
 package com.chat.talkMe.match;
 
+import com.chat.talkMe.util.BackgroundTaskErrors;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,7 +32,7 @@ public class MatchDisconnectReaper {
                 log.debug("[Match] disconnect reaper tore down {} expired session(s)", reaped);
             }
         } catch (Exception e) {
-            log.error("[Match] disconnect reaper run failed", e);
+            BackgroundTaskErrors.log(log, "[Match] disconnect reaper", e);
         }
     }
 }

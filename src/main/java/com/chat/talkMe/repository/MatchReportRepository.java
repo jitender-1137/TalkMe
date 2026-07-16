@@ -6,4 +6,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface MatchReportRepository extends JpaRepository<MatchReport, Long> {
+    @org.springframework.data.jpa.repository.Query("SELECT r.createdAt FROM MatchReport r WHERE r.createdAt >= :since")
+    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
 }

@@ -1,4 +1,4 @@
-// Free, self-hosted NSFW image classifier for TalkMe.
+// Free, self-hosted NSFW image classifier for NeoChatHub.
 //
 // The Java backend POSTs an image (path on a shared volume, or raw bytes) and gets
 // back a verdict. Runs nsfwjs on the pure-JS tfjs CPU backend — no paid APIs, no

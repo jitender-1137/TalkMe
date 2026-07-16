@@ -1,5 +1,7 @@
 package com.chat.talkMe.websocket;
 
+import com.chat.talkMe.util.BackgroundTaskErrors;
+
 import com.chat.talkMe.service.PresenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +37,7 @@ public class IdleReaper {
                 log.debug("[Presence] Idle reaper flipped {} user(s) to OFFLINE", reaped);
             }
         } catch (Exception e) {
-            log.error("[Presence] Idle reaper run failed", e);
+            BackgroundTaskErrors.log(log, "[Presence] Idle reaper", e);
         }
     }
 
@@ -52,7 +54,7 @@ public class IdleReaper {
                 log.debug("[Presence] Away reaper flipped {} backgrounded user(s) to IDLE", reaped);
             }
         } catch (Exception e) {
-            log.error("[Presence] Away reaper run failed", e);
+            BackgroundTaskErrors.log(log, "[Presence] Away reaper", e);
         }
     }
 }

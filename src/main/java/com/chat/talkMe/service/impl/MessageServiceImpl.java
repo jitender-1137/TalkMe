@@ -52,6 +52,7 @@ public class MessageServiceImpl implements MessageService {
     private final UserSettingRepository userSettingRepository;
     private final com.chat.talkMe.service.GroupAuthzService groupAuthzService;
     private final com.chat.talkMe.repository.UserRepository userRepository;
+    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
 
     @Override
     @Transactional
@@ -125,7 +126,6 @@ public class MessageServiceImpl implements MessageService {
 
         // Check blocking logic
         boolean isBlocked = false;
-        boolean recipientIsBot = false;
         if (chat.getChatType() == com.chat.talkMe.enums.ChatType.PRIVATE || chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER) {
             User otherUser = chat.getMembers().stream()
                     .map(ChatMember::getUser)
@@ -134,7 +134,6 @@ public class MessageServiceImpl implements MessageService {
                     .orElse(null);
 
             if (otherUser != null) {
-                recipientIsBot = otherUser.isBot();
                 if (blockUserRepository.existsByUserAndBlocked(currentUser, otherUser)) {
                     throw new ForbiddenException("You blocked this contact. Unblock to send a message", "TM_142");
                 }
@@ -168,9 +167,13 @@ public class MessageServiceImpl implements MessageService {
         // held pending mutual consent in 1:1 (PRIVATE/STRANGER) chats. (NSFW media is
         // screened at upload time.)
         com.chat.talkMe.enums.ModerationStatus moderationStatus = com.chat.talkMe.enums.ModerationStatus.CLEAN;
-        boolean explicit = moderationService.moderateText(request.getContent()).isExplicit();
-        if (!explicit && type != MessageType.TEXT && request.getFileUrl() != null && !request.getFileUrl().isBlank()) {
-            java.nio.file.Path mediaPath = resolveStoredMedia(request.getFileUrl());
+        // The client encrypts before sending, so decrypt here to moderate the real
+        // text/path (decrypt is a passthrough for plaintext / disabled encryption).
+        String plainContent = messageCryptoService.decrypt(chat.getId(), request.getContent());
+        String plainFileUrl = messageCryptoService.decrypt(chat.getId(), request.getFileUrl());
+        boolean explicit = moderationService.moderateText(plainContent).isExplicit();
+        if (!explicit && type != MessageType.TEXT && plainFileUrl != null && !plainFileUrl.isBlank()) {
+            java.nio.file.Path mediaPath = resolveStoredMedia(plainFileUrl);
             if (mediaPath != null) {
                 explicit = moderationService.moderateMedia(mediaPath, type).isExplicit();
             }
@@ -189,10 +192,8 @@ public class MessageServiceImpl implements MessageService {
             com.chat.talkMe.enums.ConsentStatus consent = consentRepository.findByChat(chat)
                     .map(ChatExplicitConsent::getStatus)
                     .orElse(com.chat.talkMe.enums.ConsentStatus.NONE);
-            // Bots are consenting adult personas — never hold explicit text destined for a
-            // bot, so the message reaches it and it can reply in kind. Human-to-human 1:1
-            // still requires the normal mutual-consent handshake.
-            if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED && !recipientIsBot) {
+            // 1:1 explicit text requires the normal mutual-consent handshake.
+            if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED) {
                 // Saved but withheld from the recipient until consent is granted.
                 moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
             }
@@ -202,7 +203,9 @@ public class MessageServiceImpl implements MessageService {
         Message message = Message.builder()
                 .chat(chat)
                 .sender(currentUser)
-                .content(request.getContent())
+                // Encrypt text at rest (no-op when encryption disabled). Moderation
+                // above already ran on the plaintext request.
+                .content(messageCryptoService.encrypt(chat.getId(), request.getContent()))
                 .clientId(hasClientId ? clientId : null)
                 .messageType(type)
                 .parentMessage(parentMessage)
@@ -237,9 +240,12 @@ public class MessageServiceImpl implements MessageService {
         if (type != MessageType.TEXT && request.getFileUrl() != null) {
             MessageAttachment attachment = MessageAttachment.builder()
                     .message(message)
-                    .fileName(request.getFileName() != null ? request.getFileName() : "file")
+                    // Media path + filename encrypted at rest (the file bytes on disk
+                    // are not encrypted in this pass — only the reference to them).
+                    .fileName(messageCryptoService.encrypt(chat.getId(),
+                            request.getFileName() != null ? request.getFileName() : "file"))
                     .fileSize(request.getFileSize() != null ? request.getFileSize() : 0L)
-                    .fileUrl(request.getFileUrl())
+                    .fileUrl(messageCryptoService.encrypt(chat.getId(), request.getFileUrl()))
                     .mimeType(request.getMimeType())
                     .duration(request.getDuration())
                     .build();
@@ -301,63 +307,6 @@ public class MessageServiceImpl implements MessageService {
             // 2. Fast path: delivered after commit by MessageBroadcastListener.
             eventPublisher.publishEvent(broadcastEvent);
         }
-
-        return response;
-    }
-
-    @Override
-    @Transactional
-    public MessageResponse sendBotMessage(String chatUuid, String content, User bot) {
-        Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
-                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
-        chatMemberRepository.findByChatAndUser(chat, bot)
-                .orElseThrow(() -> new ForbiddenException("Bot is not a member of this chat", "TM_141"));
-
-        Message message = Message.builder()
-                .chat(chat)
-                .sender(bot)
-                .content(content)
-                .messageType(MessageType.TEXT)
-                .moderationStatus(com.chat.talkMe.enums.ModerationStatus.CLEAN)
-                .build();
-        message = messageRepository.save(message);
-
-        // Bot has "read" its own message (mirrors the human send path).
-        MessageReadReceipt receipt = MessageReadReceipt.builder()
-                .message(message)
-                .user(bot)
-                .status("READ")
-                .readAt(Instant.now())
-                .deliveredAt(Instant.now())
-                .build();
-        readReceiptRepository.save(receipt);
-        message.getReadReceipts().add(receipt);
-
-        chatRepository.touchUpdatedAt(chat.getId(), Instant.now());
-
-        MessageResponse response = messageMapper.toMessageResponse(message);
-
-        List<String> recipientUsernames = chat.getMembers().stream()
-                .filter(m -> m.getLeftAt() == null)
-                .map(ChatMember::getUser)
-                .filter(u -> u != null && !u.getId().equals(bot.getId()))
-                .map(User::getUsername)
-                .toList();
-
-        MessageSentEvent broadcastEvent = MessageSentEvent.builder()
-                .chatUuid(chatUuid)
-                .message(response)
-                .senderUserId(bot.getId())
-                .senderName(bot.getName())
-                .senderProfileImage(bot.getProfileImage())
-                .recipientUsernames(recipientUsernames)
-                .build();
-
-        // Same guaranteed-delivery pattern as sendMessage: durable outbox row in this
-        // transaction + post-commit broadcast. The event re-fires the bot listener, but
-        // its human-sender guard drops it immediately (a bot never replies to a bot).
-        persistOutbox(response.getId(), broadcastEvent);
-        eventPublisher.publishEvent(broadcastEvent);
 
         return response;
     }

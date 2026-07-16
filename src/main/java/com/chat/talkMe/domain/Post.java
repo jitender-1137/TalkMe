@@ -21,6 +21,19 @@ public class Post extends BaseEntity {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
+    // Optional rich-text formatting for text posts: a JSON document of styled
+    // blocks ({font, blocks:[{text,size,align,bold,italic}]}). `content` above
+    // stays the PLAIN-TEXT version (used for moderation, search, sharing); this
+    // is purely presentational and rendered by the client when present.
+    @Column(name = "rich_content", columnDefinition = "TEXT")
+    private String richContent;
+
+    // Optional caption for a TEXT post — a separate line shown under the post
+    // body (whereas media posts keep their caption in `content`). Editing a text
+    // post updates this, leaving the formatted body untouched.
+    @Column(name = "caption", columnDefinition = "TEXT")
+    private String caption;
+
     // Opaque, URL-safe code for shareable post links (Instagram-style /post/{code}).
     @Column(name = "short_code", unique = true, length = 16)
     private String shortCode;

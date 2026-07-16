@@ -17,6 +17,7 @@ public interface UserMapper {
     @Mapping(target = "presence", ignore = true)
     @Mapping(target = "lastSeen", ignore = true)
     @Mapping(target = "messagingFriendsOnly", ignore = true)
+    @Mapping(target = "roles", expression = "java(mapRoleNames(user))")
     AuthUserResponse toAuthUserResponse(User user);
 
     @Mapping(target = "isVerified", source = "verified")
@@ -35,7 +36,15 @@ public interface UserMapper {
     @Mapping(target = "followersCount", ignore = true)
     @Mapping(target = "followingCount", ignore = true)
     @Mapping(target = "postsCount", ignore = true)
+    @Mapping(target = "roles", expression = "java(mapRoleNames(user))")
     UserResponse toUserResponse(User user);
+
+    default java.util.List<String> mapRoleNames(User user) {
+        if (user.getRoles() == null) return java.util.Collections.emptyList();
+        return user.getRoles().stream()
+                .map(com.chat.talkMe.domain.Role::getName)
+                .collect(java.util.stream.Collectors.toList());
+    }
 
     default java.util.Set<String> mapInterestsToStringSet(java.util.Set<com.chat.talkMe.enums.Interest> interests) {
         if (interests == null) return java.util.Collections.emptySet();

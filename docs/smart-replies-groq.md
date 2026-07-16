@@ -14,7 +14,7 @@ suggestions with **no model to run on your server**.
 ## How it fits together
 
 ```
-Browser ──► TalkMe backend ──HTTPS──► Groq  (POST /openai/v1/chat/completions)
+Browser ──► NeoChatHub backend ──HTTPS──► Groq  (POST /openai/v1/chat/completions)
             GET /api/v1/chats/{id}/smart-replies
 ```
 

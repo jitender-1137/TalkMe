@@ -12,6 +12,8 @@ import java.util.UUID;
 
 @Repository
 public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
+    @org.springframework.data.jpa.repository.Query("SELECT f.createdAt FROM UserFollow f WHERE f.createdAt >= :since")
+    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
     Optional<UserFollow> findByUuid(UUID uuid);
     Optional<UserFollow> findByFollowerAndFollowingAndIsDeletedFalse(User follower, User following);
     

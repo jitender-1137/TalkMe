@@ -31,4 +31,11 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     @Query("SELECT COUNT(c) FROM PostComment c WHERE c.parent = :parent AND c.isDeleted = false")
     long countReplies(PostComment parent);
+
+    // ── Admin news view: all comments (incl. replies) of a post ───────────────
+    @Query("SELECT c FROM PostComment c WHERE c.post = :post AND c.isDeleted = false ORDER BY c.createdAt DESC")
+    Page<PostComment> findAllForPost(Post post, Pageable pageable);
+
+    @Query("SELECT COUNT(c) FROM PostComment c WHERE c.post = :post AND c.isDeleted = false")
+    long countForPost(Post post);
 }

@@ -10,6 +10,10 @@ import java.util.List;
 @AllArgsConstructor
 public class PostRequest {
     private String content;
+    // Optional rich-text JSON for formatted text posts (see Post.richContent).
+    private String richContent;
+    // Optional separate caption for text posts (see Post.caption).
+    private String caption;
     private List<PostMediaRequest> media;
 
     // Optional: when present, this post is created as a poll.
