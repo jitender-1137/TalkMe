@@ -19,6 +19,7 @@ public interface ChatService {
     void clearChat(String uuid, User currentUser);
     void deleteChat(String uuid, User currentUser);
     void markRead(String uuid, User currentUser);
+    void markUnread(String uuid, User currentUser);
     void markDelivered(String uuid, User currentUser);
     void markAllChatsDelivered(User currentUser);
 }

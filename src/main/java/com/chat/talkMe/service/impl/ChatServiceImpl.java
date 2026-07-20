@@ -32,6 +32,9 @@ public class ChatServiceImpl implements ChatService {
 
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
+    private final com.chat.talkMe.cache.MemberCountCache memberCountCache;
+    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
+    private final com.chat.talkMe.cache.BlockCache blockCache;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final MessageReadReceiptRepository readReceiptRepository;
@@ -395,10 +398,31 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public void markUnread(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+        if (!member.isManuallyUnread()) {
+            member.setManuallyUnread(true);
+            chatMemberRepository.save(member);
+        }
+    }
+
+    @Transactional
     public void markRead(String uuid, User currentUser) {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+
+        // Opening/reading the chat clears any manual "unread" flag.
+        chatMemberRepository.findByChatAndUser(chat, managedUser).ifPresent(m -> {
+            if (m.isManuallyUnread()) {
+                m.setManuallyUnread(false);
+                chatMemberRepository.save(m);
+            }
+        });
 
         Instant now = Instant.now();
 
@@ -617,10 +641,7 @@ public class ChatServiceImpl implements ChatService {
                     java.time.Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
                     otherUserDto.setLastSeen(lastSeen != null ? lastSeen.toString() : null);
                 }
-                otherUserDto.setMessagingFriendsOnly(
-                        userSettingRepository.findByUser(otherUser)
-                                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
-                                .orElse(false));
+                otherUserDto.setMessagingFriendsOnly(userSettingsCache.isMessagingFriendsOnly(otherUser));
                 response.setOtherUser(otherUserDto);
                 // Avatar mappings
                 response.setAvatar(null);
@@ -631,9 +652,9 @@ public class ChatServiceImpl implements ChatService {
                         .orElse(false);
                 response.setFriend(isFriend);
 
-                // Blocking Check
-                boolean isBlockedByMe = blockUserRepository.existsByUserAndBlocked(currentUser, otherUser);
-                boolean hasBlockedMe = blockUserRepository.existsByUserAndBlocked(otherUser, currentUser);
+                // Blocking Check (cached per-user blocked set — avoids 2 DB hits per 1:1 chat).
+                boolean isBlockedByMe = blockCache.hasBlocked(currentUser, otherUser.getId());
+                boolean hasBlockedMe = blockCache.hasBlocked(otherUser, currentUser.getId());
                 response.setBlockedByMe(isBlockedByMe);
                 response.setHasBlockedMe(hasBlockedMe);
 
@@ -666,6 +687,11 @@ public class ChatServiceImpl implements ChatService {
         } else {
             unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
         }
+        // "Mark as unread" from the chat list — force the badge on even with no
+        // genuinely-unread messages. Cleared when the user opens/reads the chat.
+        if (unreadCount == 0 && memberSelf != null && memberSelf.isManuallyUnread()) {
+            unreadCount = 1;
+        }
         response.setUnreadCount((int) unreadCount);
         response.setTypingUsers(new ArrayList<>());
 
@@ -694,7 +720,7 @@ public class ChatServiceImpl implements ChatService {
                 .allowExplicitContent(chat.isAllowExplicitContent())
                 .allowNonFriends(chat.isAllowNonFriends())
                 .memberLimit(chat.getMemberLimit())
-                .memberCount((int) chatMemberRepository.countActiveMembers(chat))
+                .memberCount(memberCountCache.get(chat))
                 .description(chat.getDescription())
                 .imageUrl(chat.getImageUrl())
                 .publicUsername(chat.getSlug())

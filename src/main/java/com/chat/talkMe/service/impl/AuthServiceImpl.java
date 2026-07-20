@@ -152,28 +152,35 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
-        // Backfill country from IP on login ONLY when the user has none set.
-        // An existing country is never overwritten. Best-effort: a detection
-        // failure must not block login.
-        if (user.getCountry() == null || user.getCountry().isBlank()) {
-            try {
-                CountryDetectionResult detection = countryDetectionService.detectCountry(httpRequest);
-                String detected = detection != null ? detection.getCountry() : null;
-                if (detected != null && !detected.isBlank() && !"Unknown".equalsIgnoreCase(detected)) {
-                    user.setCountry(detected);
-                    userRepository.save(user);
-                    log.info("Backfilled country '{}' for {} on login (source: {}, IP: {})",
-                            detected, identifier, detection.getSource(), detection.getClientIp());
-                }
-            } catch (Exception e) {
-                log.warn("Country backfill on login failed for {}: {}", identifier, e.getMessage());
+        // Resolve the client's country + closest location (city/area) from the request
+        // IP once, and reuse it for: (a) one-time country backfill, (b) the session +
+        // user activity-location record, and (c) the new-sign-in alert email. Best-effort
+        // — a detection failure must never block login.
+        CountryDetectionResult detection;
+        try {
+            detection = countryDetectionService.detectCountry(httpRequest);
+        } catch (Exception e) {
+            log.warn("Location detection on login failed for {}: {}", identifier, e.getMessage());
+            detection = null;
+        }
+
+        // Backfill country ONLY when the user has none set; an existing country is
+        // never overwritten.
+        if (detection != null && (user.getCountry() == null || user.getCountry().isBlank())) {
+            String detected = detection.getCountry();
+            if (detected != null && !detected.isBlank() && !"Unknown".equalsIgnoreCase(detected)) {
+                user.setCountry(detected);
+                userRepository.save(user);
+                log.info("Backfilled country '{}' for {} on login (source: {}, IP: {})",
+                        detected, identifier, detection.getSource(), detection.getClientIp());
             }
         }
 
-        // Fire a new-sign-in security alert (best-effort, async, user-controllable).
-        maybeSendLoginAlert(user, userAgent, ip);
+        // Fire a new-sign-in security alert with full device + location (best-effort,
+        // async email, user-controllable).
+        maybeSendLoginAlert(user, userAgent, detection);
 
-        return generateLoginResponse(user, userAgent, ip);
+        return generateLoginResponse(user, userAgent, detection);
     }
 
     @Override
@@ -221,7 +228,7 @@ public class AuthServiceImpl implements AuthService {
         // the address is actually confirmed via verifyEmail().
         sendVerificationEmail(user);
 
-        return generateLoginResponse(user, userAgent, detectionResult.getClientIp());
+        return generateLoginResponse(user, userAgent, detectionResult);
     }
 
     @Override
@@ -244,10 +251,10 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         guest = userRepository.save(guest);
-        log.info("Guest user logged in: {}. Country detected: {} (Source: {}, IP: {})", 
+        log.info("Guest user logged in: {}. Country detected: {} (Source: {}, IP: {})",
                 username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
 
-        return generateLoginResponse(guest, userAgent, detectionResult.getClientIp());
+        return generateLoginResponse(guest, userAgent, detectionResult);
     }
 
     @Override
@@ -361,10 +368,10 @@ public class AuthServiceImpl implements AuthService {
         } else {
             // Returning sign-in (or linking Google to an existing account) → new-sign-in
             // alert, honouring the user's emailLoginAlerts preference.
-            maybeSendLoginAlert(user, userAgent, detection.getClientIp());
+            maybeSendLoginAlert(user, userAgent, detection);
         }
 
-        return generateLoginResponse(user, userAgent, detection.getClientIp());
+        return generateLoginResponse(user, userAgent, detection);
     }
 
     /**
@@ -617,7 +624,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /** Sends a new-sign-in alert if the user hasn't opted out. Best-effort, never throws. */
-    private void maybeSendLoginAlert(User user, String userAgent, String ip) {
+    private void maybeSendLoginAlert(User user, String userAgent, CountryDetectionResult detection) {
         try {
             if (user.getEmail() == null || user.getEmail().isBlank()) {
                 return;
@@ -633,8 +640,10 @@ public class AuthServiceImpl implements AuthService {
                     .withZone(java.time.ZoneOffset.UTC)
                     .format(Instant.now());
             String device = friendlyDevice(userAgent);
+            String location = detection != null ? detection.getDisplayLocation() : null;
+            String ip = detection != null ? detection.getClientIp() : null;
             String secureLink = frontendBaseUrl.replaceAll("/+$", "") + "/forgot-password";
-            emailService.sendLoginAlertEmail(user.getEmail(), user.getName(), device, ip, when, secureLink);
+            emailService.sendLoginAlertEmail(user.getEmail(), user.getName(), device, location, ip, when, secureLink);
         } catch (Exception e) {
             log.warn("Login-alert email skipped for '{}': {}", user.getUsername(), e.getMessage());
         }
@@ -756,7 +765,9 @@ public class AuthServiceImpl implements AuthService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private LoginResponse generateLoginResponse(User user, String userAgent, String ip) {
+    private LoginResponse generateLoginResponse(User user, String userAgent, CountryDetectionResult detection) {
+        String ip = detection != null ? detection.getClientIp() : null;
+        String location = detection != null ? detection.getDisplayLocation() : null;
         // Single-device policy: invalidate any existing refresh tokens so a new
         // login signs the user out everywhere else. The previously-logged-in device
         // will get a 401 on its next refresh and be sent to the login page.
@@ -785,14 +796,27 @@ public class AuthServiceImpl implements AuthService {
 
         refreshTokenRepository.save(refreshToken);
 
-        // Save session
+        // Save session (with the resolved "closest location" when known).
         Session session = Session.builder()
                 .user(user)
                 .userAgent(userAgent)
                 .ipAddress(ip)
+                .location(location)
                 .isCurrent(true)
                 .build();
         sessionRepository.save(session);
+
+        // Record the latest activity location on the user for the admin dashboard.
+        // Best-effort: only update when we actually resolved something useful, so a
+        // failed geo-lookup never wipes a previously-known location.
+        if (ip != null && !ip.isBlank()) {
+            user.setLastLoginIp(ip);
+        }
+        if (location != null && !location.isBlank()) {
+            user.setLastLocation(location);
+        }
+        user.setLastLocationAt(Instant.now());
+        userRepository.save(user);
 
         AuthUserResponse authUser = userMapper.toAuthUserResponse(user);
 

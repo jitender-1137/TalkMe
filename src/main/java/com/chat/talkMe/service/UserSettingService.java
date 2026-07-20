@@ -10,4 +10,5 @@ public interface UserSettingService {
 
     /** Update only the "who can message me" preference. */
     UserSettingResponse updateMessagingPrivacy(String value, User currentUser);
+    UserSettingResponse updateGroupAddPrivacy(String value, User currentUser);
 }

@@ -94,17 +94,26 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
             // For a local IP in dev mode, omit the IP so ip-api geolocates the
             // requester (this server's public IP) — the developer's location.
             String lookupIp = localIp ? "" : clientIp;
-            String url = "http://ip-api.com/json/" + lookupIp;
+            // Request the finer-grained fields too (city/region/lat/lon) so callers can
+            // record the "closest location / area", not just the country.
+            String url = "http://ip-api.com/json/" + lookupIp
+                    + "?fields=status,country,countryCode,regionName,city,lat,lon";
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response != null && "success".equals(response.get("status"))) {
                 String country = (String) response.get("country");
                 if (country != null && !country.isBlank()) {
-                    log.debug("Country detected via GeoIP lookup for IP {}: {}", clientIp, country);
+                    log.debug("Location detected via GeoIP for IP {}: {}, {}, {}",
+                            clientIp, response.get("city"), response.get("regionName"), country);
                     return CountryDetectionResult.builder()
                             .country(country)
                             .source("GeoIP")
                             .clientIp(clientIp)
+                            .city((String) response.get("city"))
+                            .region((String) response.get("regionName"))
+                            .countryCode((String) response.get("countryCode"))
+                            .lat(asDouble(response.get("lat")))
+                            .lon(asDouble(response.get("lon")))
                             .build();
                 }
             }
@@ -137,6 +146,14 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         }
 
         return request.getRemoteAddr();
+    }
+
+    /** ip-api returns lat/lon as JSON numbers, which Jackson may map to Double or Integer. */
+    private static Double asDouble(Object v) {
+        if (v instanceof Number n) {
+            return n.doubleValue();
+        }
+        return null;
     }
 
     private String getCountryNameFromCode(String countryCode) {

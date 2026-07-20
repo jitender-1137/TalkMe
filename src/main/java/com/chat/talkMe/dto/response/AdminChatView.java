@@ -16,6 +16,7 @@ public class AdminChatView {
     private long messageCount;
     private String lastMessageAt;
     private String createdAt;
+    private boolean deleted;       // soft-deleted chat (admin sees it flagged)
 
     @Data
     @Builder

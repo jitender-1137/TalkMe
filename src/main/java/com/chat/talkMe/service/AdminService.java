@@ -19,6 +19,10 @@ public interface AdminService {
     /** Decrypted messages for a chat. adminUsername is logged for the access trail. */
     PaginatedResponse<AdminMessageView> getChatMessages(String chatUuid, int page, int size, String adminUsername);
 
+    /** Admin: page ALL chats (optional type filter + search over name/members). Audited. */
+    PaginatedResponse<AdminChatView> listChats(
+        String query, String type, boolean includeDeleted, int page, int size, String adminUsername);
+
     // ── Phase 2: moderation mutations (all audited) ───────────────────────────
     AdminUserView setBanned(String uuid, boolean banned, String adminUsername);
     AdminUserView setVerified(String uuid, boolean verified, String adminUsername);
@@ -51,12 +55,32 @@ public interface AdminService {
      * adminUsername is logged for the access trail.
      */
     PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView> getAttachments(
-        String userUuid, String type, int page, int size, String adminUsername);
+        String userUuid, String type, boolean includeDeleted, int page, int size, String adminUsername);
+
+    /**
+     * Storage-truth listing for the Attachments gallery: lists physical objects in the
+     * media store and reconciles them against DB attachments, tagging orphans (in
+     * storage, no DB row). Counts are storage-accurate. {@code kind} = image/video/
+     * audio/file; {@code category} filters by top-level folder; {@code onlyOrphans}
+     * restricts to unreferenced chat-media.
+     */
+    com.chat.talkMe.dto.response.AdminStorageListResponse getStorageObjects(
+        String prefix, String category, String kind, boolean onlyOrphans,
+        String search, String sort, int page, int size, String adminUsername);
+
+    /** Delete a single physical object (by key) from the media store. Audited. */
+    void deleteStorageObject(String key, String adminUsername);
 
     // ── News / feed ───────────────────────────────────────────────────────────
     PaginatedResponse<com.chat.talkMe.dto.response.AdminPostView> listPosts(int page, int size);
     PaginatedResponse<com.chat.talkMe.dto.response.AdminPostLikeView> getPostLikes(String postUuid, int page, int size);
     PaginatedResponse<com.chat.talkMe.dto.response.AdminPostCommentView> getPostComments(String postUuid, int page, int size);
+
+    // ── Moderation report review portal ───────────────────────────────────────
+    PaginatedResponse<com.chat.talkMe.dto.response.AdminReportView> listReports(String status, int page, int size);
+    com.chat.talkMe.dto.response.AdminReportView getReport(String reportUuid);
+    /** action = DISMISS | RESOLVE | BAN_REPORTED. Records reviewer + note; audited. */
+    com.chat.talkMe.dto.response.AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername);
 
     /**
      * One metric's time series with a caller-chosen window and interval.

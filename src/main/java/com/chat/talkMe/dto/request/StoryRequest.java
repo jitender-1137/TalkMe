@@ -15,6 +15,9 @@ public class StoryRequest {
 
     private String caption;
 
+    // Audience: "EVERYONE" (default) or "FRIENDS" (followers & following only).
+    private String audience;
+
     // Optional soundtrack.
     private com.chat.talkMe.dto.response.AudioTrackDto audio;
 }

@@ -25,6 +25,14 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     Page<Message> findByChatAndIsDeletedFalse(Chat chat, Pageable pageable);
 
+    /**
+     * ADMIN-ONLY: every message in the chat, INCLUDING soft-deleted / blocked /
+     * pending-consent ones. Never use this on a normal user path — the user-facing
+     * queries deliberately hide those. The admin view badges deleted rows via
+     * {@code AdminMessageView.deleted}.
+     */
+    Page<Message> findByChat(Chat chat, Pageable pageable);
+
     // ── Admin dashboard counters ─────────────────────────────────────────────
     long countBySenderId(Long senderId);
     long countByChat(Chat chat);

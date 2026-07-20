@@ -37,13 +37,13 @@ public interface EmailService {
     void sendPasswordChangedEmail(String toEmail, String recipientName);
 
     /**
-     * New-sign-in security alert. {@code device}, {@code location} and {@code when} may each
-     * be null/blank and are simply omitted from the email when absent.
+     * New-sign-in security alert. {@code device}, {@code location}, {@code ip} and
+     * {@code when} may each be null/blank and are simply omitted from the email when absent.
      *
      * @param secureLink deep-link to the change-password / security screen
      */
     void sendLoginAlertEmail(String toEmail, String recipientName, String device,
-                             String location, String when, String secureLink);
+                             String location, String ip, String when, String secureLink);
 
     /** Acknowledgement that a support request was received. */
     void sendSupportReceivedEmail(String toEmail, String recipientName, String ticketId, String subjectLine);

@@ -212,7 +212,7 @@ public class DiscoverServiceImpl implements DiscoverService {
                     boolean liked = discoverLikeRepository.existsByUserAndLikedUser(currentUser, u);
                     boolean isFriend = friendRepository.findByUserAndFriend(currentUser, u).isPresent();
 
-                    java.util.Optional<FriendRequest> reqOpt = friendRequestRepository.findBySenderAndReceiver(currentUser, u);
+                    java.util.Optional<FriendRequest> reqOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, u);
                     boolean requestSent = false;
                     String pendingReqId = null;
                     if (reqOpt.isPresent() && reqOpt.get().getStatus() == FriendRequestStatus.PENDING) {

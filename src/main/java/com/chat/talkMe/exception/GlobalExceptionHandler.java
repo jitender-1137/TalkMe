@@ -95,7 +95,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ResponseDto<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
-        log.warn("Resource not found: {}", ex.getMessage());
+        // Almost always automated vulnerability scanners probing for leaked files
+        // (/.env, /.git, /wp-login, …). These are harmless 404s — log at DEBUG so they
+        // don't spam production logs (and don't drive noise into the throwable-logging
+        // path). Bump to `debug` visibility only when investigating.
+        log.debug("Resource not found: {}", ex.getMessage());
         String localizedMessage = getLocalizedMessage("TM_004", "Resource Not Found");
         ResponseDto<Void> response = ResponseDto.error(localizedMessage, "TM_004");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);

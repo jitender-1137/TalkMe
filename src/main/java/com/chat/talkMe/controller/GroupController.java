@@ -123,6 +123,24 @@ public class GroupController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Joined", "TM_282"));
     }
 
+    /** Accept a pending group invitation (join the group). */
+    @PostMapping("/{id}/invite/accept")
+    public ResponseEntity<ResponseDto<ChatResponse>> acceptInvite(
+            @PathVariable("id") String uuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        ChatResponse response = groupService.acceptGroupInvite(uuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Invite accepted", "TM_283"));
+    }
+
+    /** Decline a pending group invitation. */
+    @PostMapping("/{id}/invite/decline")
+    public ResponseEntity<ResponseDto<Void>> declineInvite(
+            @PathVariable("id") String uuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        groupService.declineGroupInvite(uuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Invite declined", "TM_284"));
+    }
+
     /** Report a group/channel/room. */
     @PostMapping("/{id}/report")
     public ResponseEntity<ResponseDto<Void>> report(

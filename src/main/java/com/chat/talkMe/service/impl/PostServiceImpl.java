@@ -47,6 +47,7 @@ public class PostServiceImpl implements PostService {
     private final NotificationService notificationService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
     private final PhotoMusicMuxer photoMusicMuxer;
+    private final com.chat.talkMe.storage.MediaStorage mediaStorage;
     private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
 
     @Override
@@ -102,10 +103,11 @@ public class PostServiceImpl implements PostService {
             boolean isImage = !"VIDEO".equalsIgnoreCase(only.getMediaType());
             if (isImage) {
                 // Moderate the still image up front (public feed hard-blocks NSFW).
-                java.nio.file.Path imgPath = resolveStoredMedia(only.getMediaUrl());
-                if (imgPath != null && moderationService.moderateMedia(imgPath, com.chat.talkMe.enums.MessageType.IMAGE).isExplicit()) {
-                    throw new com.chat.talkMe.exception.ContentModerationException(
-                            "Your post contains media that violates our community guidelines.");
+                try (var local = mediaStorage.localCopy(only.getMediaUrl()).orElse(null)) {
+                    if (local != null && moderationService.moderateMedia(local.path(), com.chat.talkMe.enums.MessageType.IMAGE).isExplicit()) {
+                        throw new com.chat.talkMe.exception.ContentModerationException(
+                                "Your post contains media that violates our community guidelines.");
+                    }
                 }
                 var a = request.getAudio();
                 int start = a.getAudioStartSec() == null ? 0 : a.getAudioStartSec();
@@ -125,13 +127,16 @@ public class PostServiceImpl implements PostService {
                 // Public feed → NSFW media is hard-blocked. Skip our own muxed output
                 // (its source image was already moderated above).
                 boolean isMuxedOutput = mediaReq.getMediaUrl() != null && mediaReq.getMediaUrl().equals(muxedMediaUrl);
-                java.nio.file.Path mediaPath = isMuxedOutput ? null : resolveStoredMedia(mediaReq.getMediaUrl());
-                if (mediaPath != null) {
-                    boolean isVideo = "VIDEO".equalsIgnoreCase(mediaReq.getMediaType());
-                    var mt = isVideo ? com.chat.talkMe.enums.MessageType.VIDEO : com.chat.talkMe.enums.MessageType.IMAGE;
-                    if (moderationService.moderateMedia(mediaPath, mt).isExplicit()) {
-                        throw new com.chat.talkMe.exception.ContentModerationException(
-                                "Your post contains media that violates our community guidelines.");
+                if (!isMuxedOutput) {
+                    try (var local = mediaStorage.localCopy(mediaReq.getMediaUrl()).orElse(null)) {
+                        if (local != null) {
+                            boolean isVideo = "VIDEO".equalsIgnoreCase(mediaReq.getMediaType());
+                            var mt = isVideo ? com.chat.talkMe.enums.MessageType.VIDEO : com.chat.talkMe.enums.MessageType.IMAGE;
+                            if (moderationService.moderateMedia(local.path(), mt).isExplicit()) {
+                                throw new com.chat.talkMe.exception.ContentModerationException(
+                                        "Your post contains media that violates our community guidelines.");
+                            }
+                        }
                     }
                 }
                 PostMedia media = PostMedia.builder()
@@ -196,6 +201,22 @@ public class PostServiceImpl implements PostService {
         }
 
         log.info("Post created successfully by {}", currentUser.getUsername());
+
+        // Instagram-style: tell the author's whole network (followers + following) that
+        // they shared a new post. Best-effort — a notification failure must not fail the
+        // post creation.
+        try {
+            notificationService.notifyFollowersAndFollowing(
+                    currentUser,
+                    "New post",
+                    currentUser.getName() + " shared a new post.",
+                    "POST",
+                    post.getUuid().toString(),
+                    firstThumb(post));
+        } catch (Exception e) {
+            log.warn("Failed to fan out new-post notification for {}", currentUser.getUsername(), e);
+        }
+
         return mapToPostResponse(post, currentUser);
     }
 
@@ -231,6 +252,18 @@ public class PostServiceImpl implements PostService {
                     .option(option)
                     .user(currentUser)
                     .build());
+            // Notify the poll owner of a NEW vote (not on toggle-off / switch), with the
+            // voter + chosen option — Instagram-style detail. Skip self-votes.
+            if (!post.getUser().getId().equals(currentUser.getId())) {
+                notificationService.createNotification(
+                        post.getUser(),
+                        "New poll vote",
+                        currentUser.getName() + " voted “" + option.getText() + "” on your poll.",
+                        "POLL",
+                        post.getUuid().toString(),
+                        currentUser,
+                        firstThumb(post));
+            }
         }
 
         return mapToPostResponse(post, currentUser);
@@ -263,6 +296,18 @@ public class PostServiceImpl implements PostService {
      * ACCEPTED follow in either direction); EVERYONE posts are viewable by all.
      * Non-viewers get a 404 (don't reveal the post exists).
      */
+    /** First displayable thumbnail for a post (video cover preferred), or null for
+     *  a text-only post. Used as the Instagram-style thumbnail on notifications. */
+    private String firstThumb(Post post) {
+        if (post.getMedia() == null || post.getMedia().isEmpty()) {
+            return null;
+        }
+        var m = post.getMedia().get(0);
+        return m.getCoverImageUrl() != null && !m.getCoverImageUrl().isBlank()
+                ? m.getCoverImageUrl()
+                : m.getMediaUrl();
+    }
+
     private boolean canViewPost(Post post, User viewer) {
         if (post.getAudience() != com.chat.talkMe.enums.PostAudience.FRIENDS) return true;
         if (viewer == null) return false;
@@ -307,7 +352,10 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional(readOnly = true)
     public Page<PostResponse> getFeed(Pageable pageable, User currentUser) {
-        Page<Post> posts = postRepository.findByIsDeletedFalse(pageable);
+        // Followers-only (FRIENDS) posts must not leak into the global explore feed:
+        // only the author + accepted followers/following see them; EVERYONE posts show
+        // to all. The feed endpoint is authenticated, so currentUser is present.
+        Page<Post> posts = postRepository.findVisibleFeedFor(currentUser, pageable);
         return posts.map(post -> mapToPostResponse(post, currentUser));
     }
 
@@ -358,10 +406,12 @@ public class PostServiceImpl implements PostService {
         if (!post.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
                 post.getUser(),
-                "New Like",
-                currentUser.getUsername() + " liked your post.",
+                "New like",
+                currentUser.getName() + " liked your post.",
                 "LIKE",
-                post.getUuid().toString()
+                post.getUuid().toString(),
+                currentUser,
+                firstThumb(post)
             );
         }
     }
@@ -413,14 +463,38 @@ public class PostServiceImpl implements PostService {
                 .build();
 
         comment = postCommentRepository.save(comment);
-        
+
+        String snippet = request.getContent() == null ? "" : request.getContent().trim();
+        if (snippet.length() > 80) snippet = snippet.substring(0, 80) + "…";
+        String quoted = snippet.isBlank() ? "." : ": “" + snippet + "”";
+
+        // Notify the post owner (Instagram-style, with the commenter + a snippet). Skip
+        // self-comments.
         if (!post.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
                 post.getUser(),
-                "New Comment",
-                currentUser.getUsername() + " commented on your post.",
+                "New comment",
+                currentUser.getName() + " commented on your post" + quoted,
                 "COMMENT",
-                post.getUuid().toString()
+                post.getUuid().toString(),
+                currentUser,
+                firstThumb(post)
+            );
+        }
+
+        // If this is a reply, also notify the parent comment's author (unless they're the
+        // commenter or the post owner already notified above).
+        if (parent != null && parent.getUser() != null
+                && !parent.getUser().getId().equals(currentUser.getId())
+                && !parent.getUser().getId().equals(post.getUser().getId())) {
+            notificationService.createNotification(
+                parent.getUser(),
+                "New reply",
+                currentUser.getName() + " replied to your comment" + quoted,
+                "COMMENT",
+                post.getUuid().toString(),
+                currentUser,
+                firstThumb(post)
             );
         }
 
@@ -457,10 +531,12 @@ public class PostServiceImpl implements PostService {
         if (!comment.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
                 comment.getUser(),
-                "New Like",
-                currentUser.getUsername() + " liked your comment.",
+                "New like",
+                currentUser.getName() + " liked your comment.",
                 "LIKE",
-                comment.getPost().getUuid().toString()
+                comment.getPost().getUuid().toString(),
+                currentUser,
+                firstThumb(comment.getPost())
             );
         }
     }
@@ -512,53 +588,6 @@ public class PostServiceImpl implements PostService {
 
         postBookmarkRepository.findByPostAndUser(post, currentUser)
                 .ifPresent(postBookmarkRepository::delete);
-    }
-
-    /** Resolve a stored media URL to an on-disk path for moderation (path-traversal safe). */
-    private java.nio.file.Path resolveStoredMedia(String mediaUrl) {
-        try {
-            String candidate = extractStoredPath(mediaUrl);
-            if (candidate == null || candidate.isBlank()) return null;
-            java.nio.file.Path base = java.nio.file.Paths.get("/opt/media/talkMe").toRealPath();
-            java.nio.file.Path real = java.nio.file.Paths.get(candidate).normalize().toRealPath();
-            return real.startsWith(base) ? real : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /**
-     * Recover the on-disk path from a media URL. The web client rewrites stored
-     * paths to "{base}/uploads/media?path={url-encoded absolute path}", so the URL
-     * is normally NOT a raw path. Prefer the {@code path=} query parameter; else
-     * accept an absolute media path, or resolve a bare filename under the root.
-     */
-    private String extractStoredPath(String mediaUrl) {
-        if (mediaUrl == null || mediaUrl.isBlank()) {
-            return null;
-        }
-        int idx = mediaUrl.indexOf("path=");
-        if (idx >= 0) {
-            String raw = mediaUrl.substring(idx + "path=".length());
-            int amp = raw.indexOf('&');
-            if (amp >= 0) {
-                raw = raw.substring(0, amp);
-            }
-            return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
-        }
-        if (mediaUrl.startsWith("/opt/media/")) {
-            return mediaUrl;
-        }
-        String name = mediaUrl;
-        int q = name.indexOf('?');
-        if (q >= 0) {
-            name = name.substring(0, q);
-        }
-        int slash = name.lastIndexOf('/');
-        if (slash >= 0) {
-            name = name.substring(slash + 1);
-        }
-        return name.isBlank() ? null : "/opt/media/talkMe/" + name;
     }
 
     /** Whether a user restricts messaging to friends (drives the avatar lock badge). */

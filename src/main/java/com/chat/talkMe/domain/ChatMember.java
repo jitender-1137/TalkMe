@@ -90,6 +90,16 @@ public class ChatMember extends BaseEntity {
     private Long lastReadMessageId;
 
     /**
+     * User explicitly marked this chat as unread (from the chat-list menu). Sticky
+     * until they open/read the chat again. When true it forces the unread badge on
+     * even if there are no unread messages. Cleared by {@code markRead}.
+     */
+    @Column(name = "manually_unread", nullable = false)
+    @ColumnDefault("false")
+    @lombok.Builder.Default
+    private boolean manuallyUnread = false;
+
+    /**
      * Set the role and keep the legacy {@code isAdmin} flag in sync. Use this
      * everywhere instead of setting either field directly.
      */

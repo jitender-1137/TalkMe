@@ -9,7 +9,9 @@ import lombok.Data;
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
 public class AdminStatsResponse {
-    private long totalUsers;
+    private long totalUsers;      // all accounts (active + soft-deleted)
+    private long activeUsers;     // not soft-deleted
+    private long deletedUsers;    // soft-deleted (is_deleted = true)
     private long verifiedUsers;
     private long guestUsers;
     private long newUsersLast7d;

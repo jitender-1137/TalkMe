@@ -58,6 +58,19 @@ public class AdminController {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUserChats(uuid)));
     }
 
+    @GetMapping("/chats")
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminChatView>>> chats(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "type", required = false) String type,
+            // Admin sees the FULL picture by default — soft-deleted chats included (flagged).
+            @RequestParam(value = "includeDeleted", defaultValue = "true") boolean includeDeleted,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "25") int size) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.listChats(query, type, includeDeleted, page, size, name(admin))));
+    }
+
     @GetMapping("/chats/{uuid}/messages")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminMessageView>>> chatMessages(
             @PathVariable("uuid") String uuid,
@@ -178,10 +191,34 @@ public class AdminController {
             @AuthenticationPrincipal CustomUserDetails admin,
             @RequestParam(value = "userId", required = false) String userId,
             @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "includeDeleted", defaultValue = "false") boolean includeDeleted,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "30") int size) {
         return ResponseEntity.ok(SuccessResponseDto.success(
-                adminService.getAttachments(userId, type, page, size, name(admin))));
+                adminService.getAttachments(userId, type, includeDeleted, page, size, name(admin))));
+    }
+
+    @GetMapping("/storage/objects")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminStorageListResponse>> storageObjects(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @RequestParam(value = "prefix", required = false) String prefix,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "kind", required = false) String kind,
+            @RequestParam(value = "onlyOrphans", defaultValue = "false") boolean onlyOrphans,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "sort", required = false) String sort,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "40") int size) {
+        return ResponseEntity.ok(SuccessResponseDto.success(adminService.getStorageObjects(
+                prefix, category, kind, onlyOrphans, search, sort, page, size, name(admin))));
+    }
+
+    @DeleteMapping("/storage/object")
+    public ResponseEntity<ResponseDto<Void>> deleteStorageObject(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @RequestParam("key") String key) {
+        adminService.deleteStorageObject(key, name(admin));
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Object deleted", "TM_281"));
     }
 
     @GetMapping("/posts")
@@ -205,6 +242,29 @@ public class AdminController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getPostComments(uuid, page, size)));
+    }
+
+    @GetMapping("/moderation/reports")
+    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminReportView>>> reports(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(SuccessResponseDto.success(adminService.listReports(status, page, size)));
+    }
+
+    @GetMapping("/moderation/reports/{uuid}")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminReportView>> report(@PathVariable String uuid) {
+        return ResponseEntity.ok(SuccessResponseDto.success(adminService.getReport(uuid)));
+    }
+
+    @PostMapping("/moderation/reports/{uuid}/review")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminReportView>> reviewReport(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @PathVariable String uuid,
+            @RequestParam("action") String action,
+            @RequestParam(value = "note", required = false) String note) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.reviewReport(uuid, action, note, name(admin))));
     }
 
     @GetMapping("/social/friends")

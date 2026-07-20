@@ -31,6 +31,8 @@ public class StoryServiceImpl implements StoryService {
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
     private final UserSettingRepository userSettingRepository;
     private final PhotoMusicMuxer photoMusicMuxer;
+    private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
+    private final com.chat.talkMe.service.NotificationService notificationService;
 
     @Override
     @Transactional
@@ -54,16 +56,36 @@ public class StoryServiceImpl implements StoryService {
             if (video != null) mediaUrl = video;
         }
 
+        com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+        if (request.getAudience() != null && "FRIENDS".equalsIgnoreCase(request.getAudience().trim())) {
+            audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
+        }
+
         Story story = Story.builder()
                 .user(currentUser)
                 .mediaUrl(mediaUrl)
                 .caption(request.getCaption())
+                .audience(audience)
                 .audio(request.getAudio() != null ? request.getAudio().toEntity() : null)
                 .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
                 .build();
 
         story = storyRepository.save(story);
         log.info("Story posted successfully by {}", currentUser.getUsername());
+
+        // Instagram-style: tell the author's whole network (followers + following) they
+        // posted a new story. Best-effort — never fails the story creation.
+        try {
+            notificationService.notifyFollowersAndFollowing(
+                    currentUser,
+                    "New story",
+                    currentUser.getName() + " added to their story.",
+                    "STORY",
+                    story.getUuid().toString(),
+                    story.getMediaUrl());
+        } catch (Exception e) {
+            log.warn("Failed to fan out new-story notification for {}", currentUser.getUsername(), e);
+        }
 
         return mapToStoryResponse(story, currentUser);
     }
@@ -73,8 +95,21 @@ public class StoryServiceImpl implements StoryService {
     public List<StoryResponse> getActiveStories(User currentUser) {
         List<Story> activeStories = storyRepository.findActiveStories(Instant.now());
         return activeStories.stream()
+                .filter(story -> canViewStory(story, currentUser))
                 .map(story -> mapToStoryResponse(story, currentUser))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * A FRIENDS story is visible to its author or an accepted follower/following (an
+     * ACCEPTED follow in either direction); EVERYONE stories are visible to all.
+     */
+    private boolean canViewStory(Story story, User viewer) {
+        if (story.getAudience() != com.chat.talkMe.enums.PostAudience.FRIENDS) return true;
+        if (viewer == null) return false;
+        if (story.getUser().getId().equals(viewer.getId())) return true;
+        return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, story.getUser(), "ACCEPTED")
+                || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(story.getUser(), viewer, "ACCEPTED");
     }
 
     @Override
@@ -144,6 +179,7 @@ public class StoryServiceImpl implements StoryService {
                 .expiresAt(story.getExpiresAt().toString())
                 .createdAt(story.getCreatedAt().toString())
                 .viewedByMe(viewed)
+                .audience(story.getAudience() != null ? story.getAudience().name() : "EVERYONE")
                 .audio(com.chat.talkMe.dto.response.AudioTrackDto.from(story.getAudio()))
                 .build();
     }

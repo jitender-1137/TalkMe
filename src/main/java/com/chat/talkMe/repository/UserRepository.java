@@ -40,6 +40,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("SELECT u.createdAt FROM User u WHERE u.createdAt >= :since")
     List<java.time.Instant> findSignupTimesSince(@Param("since") java.time.Instant since);
     long countByBannedTrue();
+    /** Soft-deleted (is_deleted = true) vs active account counts for the dashboard. */
+    long countByIsDeletedTrue();
+    long countByIsDeletedFalse();
     /** One-time correction: guests must never be verified. Returns rows fixed. */
     @Modifying
     @Query("UPDATE User u SET u.isVerified = false WHERE u.isGuest = true AND u.isVerified = true")

@@ -40,6 +40,8 @@ public interface MessageMapper {
         if (message.isSelfDestructExpired()) {
             response.setAttachments(java.util.Collections.emptyList());
         }
+        // Explicit (MapStruct doesn't auto-map the boolean is-prefixed field reliably).
+        response.setForwarded(message.isForwarded());
     }
 
     default String resolveMessageStatus(Message message) {

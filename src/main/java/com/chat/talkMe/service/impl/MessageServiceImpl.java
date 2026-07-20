@@ -53,6 +53,7 @@ public class MessageServiceImpl implements MessageService {
     private final com.chat.talkMe.service.GroupAuthzService groupAuthzService;
     private final com.chat.talkMe.repository.UserRepository userRepository;
     private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
+    private final com.chat.talkMe.storage.MediaStorage mediaStorage;
 
     @Override
     @Transactional
@@ -173,9 +174,12 @@ public class MessageServiceImpl implements MessageService {
         String plainFileUrl = messageCryptoService.decrypt(chat.getId(), request.getFileUrl());
         boolean explicit = moderationService.moderateText(plainContent).isExplicit();
         if (!explicit && type != MessageType.TEXT && plainFileUrl != null && !plainFileUrl.isBlank()) {
-            java.nio.file.Path mediaPath = resolveStoredMedia(plainFileUrl);
-            if (mediaPath != null) {
-                explicit = moderationService.moderateMedia(mediaPath, type).isExplicit();
+            // Materialize the stored media to a local file (in place on disk, or a temp
+            // download from OCI) so the ffmpeg/NSFW moderator can read it, then clean up.
+            try (var local = mediaStorage.localCopy(plainFileUrl).orElse(null)) {
+                if (local != null) {
+                    explicit = moderationService.moderateMedia(local.path(), type).isExplicit();
+                }
             }
         }
         if (explicit) {
@@ -209,6 +213,7 @@ public class MessageServiceImpl implements MessageService {
                 .clientId(hasClientId ? clientId : null)
                 .messageType(type)
                 .parentMessage(parentMessage)
+                .isForwarded(request.isForwarded())
                 .isBlocked(isBlocked)
                 .moderationStatus(moderationStatus)
                 // Self-destruct/view-once applies to media only, 1:1 chats only
@@ -646,6 +651,58 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /** Load a message and verify the caller is a member of the chat it belongs to. */
+    @Override
+    @Transactional
+    public MessageResponse editMessage(String chatUuid, String messageUuid, String content, User currentUser) {
+        Message message = loadChatMessage(chatUuid, messageUuid, currentUser);
+        // Only the sender may edit — never a received message.
+        if (message.getSender() == null || !message.getSender().getId().equals(currentUser.getId())) {
+            throw new ForbiddenException("You can only edit your own messages", "TM_163");
+        }
+        if (message.isDeleted()) {
+            throw new com.chat.talkMe.exception.BadRequestException("This message was deleted and can't be edited", "TM_164");
+        }
+        if (message.getMessageType() != MessageType.TEXT) {
+            throw new com.chat.talkMe.exception.BadRequestException("Only text messages can be edited", "TM_165");
+        }
+        if (content == null || content.isBlank()) {
+            throw new com.chat.talkMe.exception.BadRequestException("Message can't be empty", "TM_166");
+        }
+
+        Long chatId = message.getChat().getId();
+        // Client sends ciphertext (encrypted chats) or plaintext — decrypt for moderation
+        // (passthrough when plaintext / encryption off), then re-check like a fresh send.
+        String plain = messageCryptoService.decrypt(chatId, content);
+        if (moderationService.moderateText(plain).isExplicit()) {
+            Chat chat = message.getChat();
+            boolean allowedExplicit = chat.isMultiParty() && chat.isAllowExplicitContent();
+            if (!allowedExplicit) {
+                throw new com.chat.talkMe.exception.ContentModerationException(
+                        "Your message contains content that violates our community guidelines.");
+            }
+        }
+
+        message.setContent(content); // store as received (already encrypted for encrypted chats)
+        message.setEdited(true);
+        messageRepository.save(message);
+
+        // Live update for all participants.
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("chatId", chatUuid);
+            payload.put("messageId", messageUuid);
+            payload.put("content", message.getContent());
+            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            eventWrapper.put("event", "message_edited");
+            eventWrapper.put("payload", payload);
+            messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
+        } catch (Exception e) {
+            log.error("WebSocket edit broadcast failed", e);
+        }
+
+        return messageMapper.toMessageResponse(message);
+    }
+
     private Message loadChatMessage(String chatUuid, String messageUuid, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
@@ -662,9 +719,18 @@ public class MessageServiceImpl implements MessageService {
     /** Destroy the media forever: delete files from disk, drop attachment rows, flag expired, broadcast. */
     private void expireSelfDestruct(Message message) {
         if (message.isSelfDestructExpired()) return; // idempotent
+        // Attachment fileUrl/thumbnailUrl are stored ENCRYPTED at rest — decrypt to the
+        // real storage reference before deleting. decrypt() is a passthrough when the
+        // value is plaintext / encryption is disabled, so encrypted and unencrypted
+        // chats both delete correctly.
+        Long chatId = message.getChat().getId();
         for (MessageAttachment att : message.getAttachments()) {
-            deleteMediaFileQuietly(att.getFileUrl());
-            deleteMediaFileQuietly(att.getThumbnailUrl());
+            if (att.getFileUrl() != null) {
+                deleteMediaFileQuietly(messageCryptoService.decrypt(chatId, att.getFileUrl()));
+            }
+            if (att.getThumbnailUrl() != null) {
+                deleteMediaFileQuietly(messageCryptoService.decrypt(chatId, att.getThumbnailUrl()));
+            }
         }
         message.getAttachments().clear(); // orphanRemoval deletes the attachment rows
         message.setSelfDestructExpired(true);
@@ -676,8 +742,9 @@ public class MessageServiceImpl implements MessageService {
 
     private void deleteMediaFileQuietly(String fileUrl) {
         try {
-            java.nio.file.Path p = resolveStoredMedia(fileUrl);
-            if (p != null) java.nio.file.Files.deleteIfExists(p);
+            if (fileUrl != null && !fileUrl.isBlank()) {
+                mediaStorage.delete(fileUrl);
+            }
         } catch (Exception e) {
             log.warn("[self-destruct] failed to delete media file {}", fileUrl, e);
         }
@@ -695,61 +762,6 @@ public class MessageServiceImpl implements MessageService {
         } catch (Exception e) {
             log.error("WebSocket media-expired broadcast failed", e);
         }
-    }
-
-    /**
-     * Resolve a stored media fileUrl to an on-disk path for moderation, guarding
-     * against path traversal — only files under the media root are returned.
-     */
-    private java.nio.file.Path resolveStoredMedia(String fileUrl) {
-        try {
-            String candidate = extractStoredPath(fileUrl);
-            if (candidate == null || candidate.isBlank()) {
-                return null;
-            }
-            java.nio.file.Path base = java.nio.file.Paths.get("/opt/media/talkMe").toRealPath();
-            java.nio.file.Path real = java.nio.file.Paths.get(candidate).normalize().toRealPath();
-            return real.startsWith(base) ? real : null;
-        } catch (Exception e) {
-            return null; // not a local path / missing file — skip media moderation
-        }
-    }
-
-    /**
-     * Recover the on-disk path from a message's fileUrl. The web client's response
-     * interceptor rewrites stored paths to "{base}/uploads/media?path={url-encoded
-     * absolute path}", so the fileUrl we receive is normally NOT a raw path. Prefer
-     * the {@code path=} query parameter (url-decoded); otherwise accept an absolute
-     * media path as-is, or resolve a bare filename under the media root. The caller
-     * still enforces the path-traversal guard.
-     */
-    private String extractStoredPath(String fileUrl) {
-        if (fileUrl == null || fileUrl.isBlank()) {
-            return null;
-        }
-        int idx = fileUrl.indexOf("path=");
-        if (idx >= 0) {
-            String raw = fileUrl.substring(idx + "path=".length());
-            int amp = raw.indexOf('&');
-            if (amp >= 0) {
-                raw = raw.substring(0, amp);
-            }
-            return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
-        }
-        if (fileUrl.startsWith("/opt/media/")) {
-            return fileUrl; // already an absolute path under the media root
-        }
-        // Bare filename or other URL form → resolve its last segment under the root.
-        String name = fileUrl;
-        int q = name.indexOf('?');
-        if (q >= 0) {
-            name = name.substring(0, q);
-        }
-        int slash = name.lastIndexOf('/');
-        if (slash >= 0) {
-            name = name.substring(slash + 1);
-        }
-        return name.isBlank() ? null : "/opt/media/talkMe/" + name;
     }
 
     @Override
@@ -833,6 +845,47 @@ public class MessageServiceImpl implements MessageService {
      * {@code @Transactional,} so the row commits atomically with the message — there is no
      * window where a message exists without a durable delivery record.
      */
+    @Override
+    @Transactional
+    public void releaseHeldMessages(Chat chat) {
+        List<Message> held = messageRepository.findHeldForConsent(chat);
+        if (held.isEmpty()) return;
+        String chatUuid = chat.getUuid().toString();
+
+        for (Message message : held) {
+            // Flip to RELEASED so history queries now return it to BOTH parties.
+            message.setModerationStatus(com.chat.talkMe.enums.ModerationStatus.RELEASED);
+            messageRepository.save(message);
+
+            MessageResponse response = messageMapper.toMessageResponse(message);
+
+            // Recipients = every current member except the original sender (in a 1:1
+            // that's the user who just granted consent). Deliver through the SAME
+            // durable pipeline a normal message uses: outbox row (atomic with this
+            // transaction) + after-commit broadcast to the chat topic + per-user queue
+            // + notifications — so the receiver actually gets it now.
+            User sender = message.getSender();
+            List<String> recipientUsernames = chat.getMembers().stream()
+                    .filter(m -> m.getLeftAt() == null)
+                    .map(ChatMember::getUser)
+                    .filter(u -> u != null && !u.getId().equals(sender.getId()))
+                    .map(User::getUsername)
+                    .toList();
+
+            MessageSentEvent broadcastEvent = MessageSentEvent.builder()
+                    .chatUuid(chatUuid)
+                    .message(response)
+                    .senderUserId(sender.getId())
+                    .senderName(sender.getName())
+                    .senderProfileImage(sender.getProfileImage())
+                    .recipientUsernames(recipientUsernames)
+                    .build();
+
+            persistOutbox(response.getId(), broadcastEvent);
+            eventPublisher.publishEvent(broadcastEvent);
+        }
+    }
+
     private void persistOutbox(String messageId, MessageSentEvent event) {
         try {
             String payload = objectMapper.writeValueAsString(event);

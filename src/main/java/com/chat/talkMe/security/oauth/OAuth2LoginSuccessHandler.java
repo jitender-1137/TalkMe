@@ -77,8 +77,11 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                     if (client != null && client.getAccessToken() != null) {
                         GoogleProfileService.Extended ext =
                                 googleProfileService.fetch(client.getAccessToken().getTokenValue());
-                        age = ext.age() == null ? 18 : ext.age();
-                        gender = ext.gender() == null ? "MALE" : ext.gender();
+                        // Leave null when Google doesn't share them — the app forces the
+                        // user to pick age (18–99) + gender on first entry, so we must NOT
+                        // fabricate defaults here.
+                        age = ext.age();
+                        gender = ext.gender();
                     }
                 }
             }

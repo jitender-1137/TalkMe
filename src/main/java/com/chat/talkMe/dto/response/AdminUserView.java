@@ -26,6 +26,10 @@ public class AdminUserView {
     private String gender;
     private String country;
     private String city;
+    // Latest activity location (closest city/area) derived from the login IP.
+    private String lastLocation;
+    private String lastLoginIp;
+    private String lastLocationAt;
     private String occupation;
     private String education;
     private java.util.Set<String> interests;

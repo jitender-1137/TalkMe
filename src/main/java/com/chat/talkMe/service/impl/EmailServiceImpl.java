@@ -189,13 +189,13 @@ public class EmailServiceImpl implements EmailService {
     @Async
     @Override
     public void sendLoginAlertEmail(String toEmail, String recipientName, String device,
-                                    String location, String when, String secureLink) {
+                                    String location, String ip, String when, String secureLink) {
         if (!deliveryConfigured()) {
             log.warn("[Mail] disabled or unconfigured — skipping login alert to {}", toEmail);
             return;
         }
         deliver(toEmail, recipientName, "New sign-in to your NeoChatHub account",
-                templates.loginAlert(recipientName, device, location, when, secureLink), MailCategory.TRANSACTIONAL);
+                templates.loginAlert(recipientName, device, location, ip, when, secureLink), MailCategory.TRANSACTIONAL);
     }
 
     @Async

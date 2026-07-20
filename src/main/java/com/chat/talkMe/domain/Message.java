@@ -60,6 +60,11 @@ public class Message extends BaseEntity {
     @JoinColumn(name = "parent_message_id")
     private Message parentMessage;
 
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(name = "is_forwarded", nullable = false)
+    @Builder.Default
+    private boolean isForwarded = false;
+
     @Column(name = "is_edited", nullable = false)
     @Builder.Default
     private boolean isEdited = false;

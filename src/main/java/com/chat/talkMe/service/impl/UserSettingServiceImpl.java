@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserSettingServiceImpl implements UserSettingService {
 
     private final UserSettingRepository userSettingRepository;
+    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
 
     @Override
     @Transactional
@@ -56,6 +57,9 @@ public class UserSettingServiceImpl implements UserSettingService {
         if (request.getMessagingPrivacy() != null) {
             settings.setMessagingPrivacy(parsePrivacy(request.getMessagingPrivacy()));
         }
+        if (request.getGroupAddPrivacy() != null) {
+            settings.setGroupAddPrivacy(parseGroupAddPrivacy(request.getGroupAddPrivacy()));
+        }
         if (request.getEmailLoginAlerts() != null) {
             settings.setEmailLoginAlerts(request.getEmailLoginAlerts());
         }
@@ -67,6 +71,7 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
 
         settings = userSettingRepository.save(settings);
+        userSettingsCache.evict(currentUser.getId());
         log.info("Settings updated successfully for user: {}", currentUser.getUsername());
         return mapToResponse(settings);
     }
@@ -78,8 +83,22 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .orElseGet(() -> createDefaultSettings(currentUser));
         settings.setMessagingPrivacy(parsePrivacy(value));
         settings = userSettingRepository.save(settings);
+        userSettingsCache.evict(currentUser.getId());
         log.info("Messaging privacy set to {} for user: {}",
                 settings.getMessagingPrivacy(), currentUser.getUsername());
+        return mapToResponse(settings);
+    }
+
+    @Override
+    @Transactional
+    public UserSettingResponse updateGroupAddPrivacy(String value, User currentUser) {
+        UserSetting settings = userSettingRepository.findByUser(currentUser)
+                .orElseGet(() -> createDefaultSettings(currentUser));
+        settings.setGroupAddPrivacy(parseGroupAddPrivacy(value));
+        settings = userSettingRepository.save(settings);
+        userSettingsCache.evict(currentUser.getId());
+        log.info("Group-add privacy set to {} for user: {}",
+                settings.getGroupAddPrivacy(), currentUser.getUsername());
         return mapToResponse(settings);
     }
 
@@ -92,6 +111,15 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
     }
 
+    private com.chat.talkMe.enums.GroupAddPrivacy parseGroupAddPrivacy(String value) {
+        try {
+            return com.chat.talkMe.enums.GroupAddPrivacy.valueOf(value.trim().toUpperCase());
+        } catch (Exception e) {
+            throw new BadRequestException(
+                    "groupAddPrivacy must be EVERYONE, FRIENDS_ONLY or NOBODY", "TM_068");
+        }
+    }
+
     private UserSetting createDefaultSettings(User user) {
         UserSetting defaultSettings = UserSetting.builder()
                 .user(user)
@@ -101,6 +129,7 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .safeModeEnabled(true)
                 .soundEnabled(true)
                 .messagingPrivacy(MessagingPrivacy.EVERYONE)
+                .groupAddPrivacy(com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE)
                 .emailLoginAlerts(true)
                 .emailUnreadMessages(true)
                 .emailAnnouncements(true)
@@ -119,6 +148,9 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .messagingPrivacy(setting.getMessagingPrivacy() != null
                         ? setting.getMessagingPrivacy().name()
                         : MessagingPrivacy.EVERYONE.name())
+                .groupAddPrivacy(setting.getGroupAddPrivacy() != null
+                        ? setting.getGroupAddPrivacy().name()
+                        : com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE.name())
                 .emailLoginAlerts(setting.isEmailLoginAlerts())
                 .emailUnreadMessages(setting.isEmailUnreadMessages())
                 .emailAnnouncements(setting.isEmailAnnouncements())

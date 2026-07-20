@@ -27,6 +27,8 @@ public class UpdateSettingRequest {
     @Size(max = 20, message = "Invalid messaging privacy value")
     private String messagingPrivacy;
 
+    private String groupAddPrivacy;
+
     // ── Transactional-email preferences (null ⇒ unchanged) ──────────────────────
     /** New-sign-in security alert emails. */
     private Boolean emailLoginAlerts;

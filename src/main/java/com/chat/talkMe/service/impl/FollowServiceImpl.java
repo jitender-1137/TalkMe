@@ -56,10 +56,12 @@ public class FollowServiceImpl implements FollowService {
         
         notificationService.createNotification(
             targetUser,
-            "New Follower",
-            currentUser.getUsername() + " started following you.",
+            "New follower",
+            currentUser.getName() + " started following you.",
             "FOLLOW",
-            currentUser.getUuid().toString()
+            currentUser.getUuid().toString(),
+            currentUser,
+            null
         );
     }
 

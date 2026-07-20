@@ -10,13 +10,13 @@ import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.StorageService;
+import com.chat.talkMe.storage.MediaStorage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
 
 import java.nio.file.Files;
@@ -29,14 +29,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UploadController {
 
-    /** Root of all stored media. Files are NEVER served from outside this tree. */
-    private static final String MEDIA_ROOT = "/opt/media/talkMe";
-
     /** Per-type upload caps. The global multipart limit is the larger of these (30MB). */
     private static final long MAX_IMAGE_BYTES = 2L * 1024 * 1024;   // 2 MB
     private static final long MAX_VIDEO_BYTES = 30L * 1024 * 1024;  // 30 MB
 
     private final StorageService storageService;
+    private final MediaStorage mediaStorage;
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
     private final ContentModerationService moderationService;
@@ -95,30 +93,20 @@ public class UploadController {
     @GetMapping("/media")
     public ResponseEntity<Resource> getMedia(@RequestParam("path") String path) {
         try {
-            Path base = Paths.get(MEDIA_ROOT).toRealPath();
-            Path requested;
-            try {
-                requested = Paths.get(path).normalize().toRealPath();
-            } catch (Exception notFound) {
-                return ResponseEntity.notFound().build();
-            }
-            // Only ever serve files that live UNDER the media root. Without this an
-            // attacker could read arbitrary files via ?path=/etc/passwd.
-            if (!requested.startsWith(base)) {
-                return ResponseEntity.notFound().build();
-            }
-
-            Resource resource = new UrlResource(requested.toUri());
-            if (resource.exists() && resource.isReadable()) {
-                String contentType = Files.probeContentType(requested);
-                if (contentType == null) {
-                    contentType = "application/octet-stream";
-                }
-                return ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType(contentType))
-                        .body(resource);
-            }
-            return ResponseEntity.notFound().build();
+            // Delegate to the active storage backend (disk in local/dev, OCI bucket in
+            // prod). The backend enforces the "under the media root" traversal guard, so
+            // ?path=/etc/passwd still resolves to nothing.
+            return mediaStorage.open(path)
+                    .map(mc -> {
+                        String contentType = mc.contentType() != null ? mc.contentType() : "application/octet-stream";
+                        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
+                                .contentType(MediaType.parseMediaType(contentType));
+                        if (mc.contentLength() >= 0) {
+                            builder.contentLength(mc.contentLength());
+                        }
+                        return builder.body(mc.resource());
+                    })
+                    .orElseGet(() -> ResponseEntity.notFound().build());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

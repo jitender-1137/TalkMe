@@ -63,6 +63,7 @@ public class UserServiceImpl implements UserService {
     private final UserFollowRepository userFollowRepository;
     private final PostRepository postRepository;
     private final ContentModerationService moderationService;
+    private final com.chat.talkMe.service.NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -108,6 +109,9 @@ public class UserServiceImpl implements UserService {
         if (request.getAge() != null) {
             user.setAge(request.getAge());
         }
+        if (request.getGender() != null && !request.getGender().isBlank()) {
+            user.setGender(request.getGender());
+        }
         if (request.getBio() != null) {
             user.setBio(request.getBio());
         }
@@ -145,8 +149,26 @@ public class UserServiceImpl implements UserService {
 
         // Avatars live under profiles/<userUuid> (server-derived id → traversal-safe).
         String avatarUrl = storageService.storeFile(file, "avatar", "profiles/" + user.getUuid());
+        boolean isNewPhoto = user.getProfileImage() == null || !user.getProfileImage().equals(avatarUrl);
         user.setProfileImage(avatarUrl);
         userRepository.save(user);
+
+        // Tell the user's friends they updated their profile photo (only real accounts
+        // do this — guests have no friends graph). Removal is handled by removeAvatar,
+        // which intentionally sends NO notification. Best-effort; never blocks the upload.
+        if (isNewPhoto && !user.isGuest()) {
+            try {
+                notificationService.notifyFriends(
+                        user,
+                        "New profile photo",
+                        user.getName() + " updated their profile photo.",
+                        "PROFILE_PHOTO",
+                        user.getUuid().toString(),
+                        avatarUrl);
+            } catch (Exception e) {
+                log.warn("Failed to notify friends of profile-photo change for {}", user.getUsername(), e);
+            }
+        }
 
         return Map.of("avatarUrl", avatarUrl);
     }
@@ -200,6 +222,10 @@ public class UserServiceImpl implements UserService {
             String pattern = "%" + query.toLowerCase() + "%";
             List<jakarta.persistence.criteria.Predicate> preds = new java.util.ArrayList<>();
             preds.add(cb.notEqual(root.get("id"), currentUser.getId()));
+            // Never surface soft-deleted / deletion-requested accounts (both carry
+            // isDeleted=true) or guest sessions in people search / discover.
+            preds.add(cb.equal(root.get("isDeleted"), false));
+            preds.add(cb.equal(root.get("isGuest"), false));
             preds.add(cb.or(
                     cb.like(cb.lower(root.get("username")), pattern),
                     cb.like(cb.lower(root.get("name")), pattern),
@@ -259,6 +285,15 @@ public class UserServiceImpl implements UserService {
     public void reportUser(String userId, String reason, String description, User currentUser) {
         User targetUser = userRepository.findByUuid(UUID.fromString(userId))
                 .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+
+        // One OPEN report per (reporter → reported): don't let the same person pile up
+        // duplicate pending reports. Once a moderator resolves/dismisses it, they can
+        // report again if the behaviour recurs.
+        if (matchReportRepository.existsByReporterIdAndReportedIdAndStatus(
+                currentUser.getId(), targetUser.getId(), "PENDING")) {
+            throw new com.chat.talkMe.exception.ConflictException(
+                    "You've already reported this user — it's under review.", "TM_182");
+        }
 
         MatchReport report = MatchReport.builder()
                 .reporter(currentUser)

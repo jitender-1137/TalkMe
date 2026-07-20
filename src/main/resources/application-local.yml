@@ -147,6 +147,8 @@ websocket:
 
 # Storage Engine (Local)
 storage:
+  # Local dev writes media under the home dir (/media isn't creatable on a laptop).
+  media-root: ${FILE_BASE_DIR:${user.home}/neochathub-media}
   local:
     directory: ${FILE_BASE_DIR:/Users/jitenderyadav/Development/chat/backend/talkMe/uploads}
 

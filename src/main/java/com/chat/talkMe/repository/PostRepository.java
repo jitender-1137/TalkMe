@@ -30,6 +30,19 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findFeedForUser(@Param("currentUser") User currentUser, Pageable pageable);
 
     /**
+     * The public/explore feed as seen by {@code viewer}: EVERYONE posts always show;
+     * FRIENDS (followers &amp; following) posts only when the viewer is the author or has
+     * an ACCEPTED follow relationship in either direction. Keeps followers-only posts
+     * out of the global explore grid for people who shouldn't see them.
+     */
+    @Query("SELECT p FROM Post p WHERE p.isDeleted = false AND (" +
+           "p.audience = com.chat.talkMe.enums.PostAudience.EVERYONE OR p.user = :viewer OR " +
+           "EXISTS (SELECT 1 FROM UserFollow f WHERE f.status = 'ACCEPTED' AND f.isDeleted = false AND " +
+           "((f.follower = :viewer AND f.following = p.user) OR (f.follower = p.user AND f.following = :viewer)))" +
+           ")")
+    Page<Post> findVisibleFeedFor(@Param("viewer") User viewer, Pageable pageable);
+
+    /**
      * A user's profile feed as seen by {@code viewer}: EVERYONE posts always show;
      * FRIENDS posts only when the viewer is the author or an accepted friend (an
      * ACCEPTED UserFollow in either direction).

@@ -9,6 +9,8 @@ import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.AdminChatView;
 import com.chat.talkMe.dto.response.AdminMessageView;
+import com.chat.talkMe.dto.response.AdminStorageObjectView;
+import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.dto.response.AdminStatsResponse;
 import com.chat.talkMe.dto.response.AdminUserView;
 import com.chat.talkMe.dto.response.PaginatedResponse;
@@ -47,6 +49,7 @@ public class AdminServiceImpl implements AdminService {
     private final com.chat.talkMe.mapper.MessageMapper messageMapper;
     private final com.chat.talkMe.repository.RoleRepository roleRepository;
     private final com.chat.talkMe.repository.AdminAuditLogRepository auditRepository;
+    private final AdminAuditLogger auditLogger;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     // ── Analytics-only dependencies ───────────────────────────────────────────
     private final com.chat.talkMe.repository.MessageAttachmentRepository attachmentRepository;
@@ -64,6 +67,9 @@ public class AdminServiceImpl implements AdminService {
     private final com.chat.talkMe.repository.UserPresenceRepository userPresenceRepository;
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    // ── Storage reconciliation (Attachments gallery: storage ⇄ DB) ────────────
+    private final com.chat.talkMe.storage.MediaStorage mediaStorage;
+    private final com.chat.talkMe.storage.StorageProperties storageProperties;
 
     /**
      * Redis-backed read-through cache for the expensive analytics aggregates, so the
@@ -115,6 +121,8 @@ public class AdminServiceImpl implements AdminService {
         Instant now = Instant.now();
         return AdminStatsResponse.builder()
                 .totalUsers(userRepository.count())
+                .activeUsers(userRepository.countByIsDeletedFalse())
+                .deletedUsers(userRepository.countByIsDeletedTrue())
                 .verifiedUsers(userRepository.countByIsVerifiedTrue())
                 .guestUsers(userRepository.countByIsGuestTrue())
                 .newUsersLast7d(userRepository.countByCreatedAtAfter(now.minus(7, ChronoUnit.DAYS)))
@@ -178,6 +186,16 @@ public class AdminServiceImpl implements AdminService {
             if (f.getGuest() != null) ps.add(cb.equal(root.get("isGuest"), f.getGuest()));
             if (f.getBanned() != null) ps.add(cb.equal(root.get("banned"), f.getBanned()));
             if (f.getDeleted() != null) ps.add(cb.equal(root.get("isDeleted"), f.getDeleted()));
+            if (f.getOnline() != null) {
+                // Presence is Redis-authoritative; restrict by the live online-username set
+                // (bounded), so the "online now" cohort paginates correctly at the DB layer.
+                Set<String> onlineNow = presenceService.getOnlineUsernames();
+                if (f.getOnline()) {
+                    ps.add(onlineNow.isEmpty() ? cb.disjunction() : root.get("username").in(onlineNow));
+                } else if (!onlineNow.isEmpty()) {
+                    ps.add(cb.not(root.get("username").in(onlineNow)));
+                }
+            }
             if (f.getGender() != null && !f.getGender().isBlank())
                 ps.add(cb.equal(cb.lower(root.get("gender")), f.getGender().trim().toLowerCase()));
             if (f.getCountries() != null && !f.getCountries().isBlank()) {
@@ -251,6 +269,9 @@ public class AdminServiceImpl implements AdminService {
         account.put("gender", u.getGender());
         account.put("country", u.getCountry());
         account.put("city", u.getCity());
+        account.put("lastLocation", u.getLastLocation());
+        account.put("lastLoginIp", u.getLastLoginIp());
+        account.put("lastLocationAt", u.getLastLocationAt() != null ? u.getLastLocationAt().toString() : null);
         account.put("bio", u.getBio());
         account.put("occupation", u.getOccupation());
         account.put("education", u.getEducation());
@@ -302,7 +323,41 @@ public class AdminServiceImpl implements AdminService {
     public List<AdminChatView> getUserChats(String uuid) {
         User u = userRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
-        return chatRepository.findChatsByUser(u).stream().map(this::toChatView).collect(Collectors.toList());
+        // Admin view = the full history, including soft-deleted chats (flagged in the DTO).
+        return chatRepository.findAllChatsByUserForAdmin(u).stream()
+                .map(this::toChatView).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminChatView> listChats(
+            String query, String type, boolean includeDeleted, int page, int size, String adminUsername) {
+        audit(adminUsername, "VIEW_CHATS", "CHAT", "all",
+                "type=" + type + " q=" + query + " page=" + page);
+
+        com.chat.talkMe.enums.ChatType chatType = null;
+        if (type != null && !type.isBlank() && !type.equalsIgnoreCase("all")) {
+            try { chatType = com.chat.talkMe.enums.ChatType.valueOf(type.trim().toUpperCase()); }
+            catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
+        }
+        String q = (query == null || query.isBlank()) ? null : "%" + query.trim().toLowerCase() + "%";
+
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+                Sort.by(Sort.Direction.DESC, "updatedAt"));
+        Page<Chat> result = chatRepository.findForAdmin(chatType, q, includeDeleted, pageable);
+
+        List<AdminChatView> items = result.getContent().stream()
+                .map(this::toChatView).collect(Collectors.toList());
+
+        return PaginatedResponse.<AdminChatView>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .build())
+                .build();
     }
 
     @Override
@@ -316,7 +371,8 @@ public class AdminServiceImpl implements AdminService {
 
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 200),
                 Sort.by(Sort.Direction.DESC, "id"));
-        Page<Message> result = messageRepository.findByChatAndIsDeletedFalse(chat, pageable);
+        // Admin sees the FULL history — deleted messages included (badged via .deleted).
+        Page<Message> result = messageRepository.findByChat(chat, pageable);
         Long chatId = chat.getId();
 
         List<AdminMessageView> items = result.getContent().stream().map(m -> {
@@ -464,10 +520,9 @@ public class AdminServiceImpl implements AdminService {
 
     private void audit(String admin, String action, String targetType, String targetId, String detail) {
         try {
-            auditRepository.save(com.chat.talkMe.domain.AdminAuditLog.builder()
-                    .adminUsername(admin != null ? admin : "unknown")
-                    .action(action).targetType(targetType).targetId(targetId).detail(detail)
-                    .build());
+            // Written in a SEPARATE (REQUIRES_NEW) transaction so a VIEW_* audit INSERT
+            // never aborts a readOnly caller's transaction — see AdminAuditLogger.
+            auditLogger.write(admin, action, targetType, targetId, detail);
         } catch (Exception e) {
             log.warn("[AdminAudit] failed to persist audit {}/{}: {}", action, targetId, e.getMessage());
         }
@@ -887,7 +942,8 @@ public class AdminServiceImpl implements AdminService {
     public PaginatedResponse<com.chat.talkMe.dto.response.AdminPostView> listPosts(int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "id"));
-        Page<com.chat.talkMe.domain.Post> result = postRepository.findByIsDeletedFalse(pageable);
+        // Admin sees ALL posts, including soft-deleted ones (flagged in the DTO).
+        Page<com.chat.talkMe.domain.Post> result = postRepository.findAll(pageable);
         List<com.chat.talkMe.dto.response.AdminPostView> items =
                 result.getContent().stream().map(this::toPostView).collect(Collectors.toList());
         return page(items, result, page);
@@ -960,6 +1016,148 @@ public class AdminServiceImpl implements AdminService {
                 .hasAudio(p.getAudio() != null)
                 .media(media)
                 .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
+                .deleted(p.isDeleted())
+                .build();
+    }
+
+    // ── Moderation report review portal ───────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<com.chat.talkMe.dto.response.AdminReportView> listReports(String status, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+                Sort.by(Sort.Direction.DESC, "id"));
+        String s = status == null ? "" : status.trim().toUpperCase();
+        Page<com.chat.talkMe.domain.MatchReport> result =
+                (s.isEmpty() || "ALL".equals(s))
+                        ? matchReportRepository.findAll(pageable)
+                        : matchReportRepository.findByStatus(s, pageable);
+        List<com.chat.talkMe.dto.response.AdminReportView> items =
+                result.getContent().stream().map(r -> toReportView(r, true)).collect(Collectors.toList());
+        return page(items, result, page);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.chat.talkMe.dto.response.AdminReportView getReport(String reportUuid) {
+        com.chat.talkMe.domain.MatchReport r = matchReportRepository.findByUuid(UUID.fromString(reportUuid))
+                .orElseThrow(() -> new NotFoundException("Report not found", "TM_181"));
+        com.chat.talkMe.dto.response.AdminReportView view = toReportView(r, true);
+
+        User reported = r.getReported();
+        User reporter = r.getReporter();
+        if (reported != null) {
+            view.setReportedSummary(com.chat.talkMe.dto.response.AdminReportView.ReportedSummary.builder()
+                    .joined(reported.getCreatedAt() != null ? reported.getCreatedAt().toString() : null)
+                    .verified(reported.isVerified())
+                    .guest(reported.isGuest())
+                    .banned(reported.isBanned())
+                    .messageCount(messageRepository.countBySenderId(reported.getId()))
+                    .chatCount(chatRepository.findChatsByUser(reported).size())
+                    .build());
+
+            // Full report history against the reported user (most recent 25).
+            view.setHistory(matchReportRepository
+                    .findByReportedId(reported.getId(), PageRequest.of(0, 25, Sort.by(Sort.Direction.DESC, "id")))
+                    .getContent().stream()
+                    .map(h -> com.chat.talkMe.dto.response.AdminReportView.HistoryItem.builder()
+                            .id(h.getUuid() != null ? h.getUuid().toString() : String.valueOf(h.getId()))
+                            .reason(h.getReason())
+                            .reporterUsername(h.getReporter() != null ? h.getReporter().getUsername() : null)
+                            .status(h.getStatus())
+                            .createdAt(h.getCreatedAt() != null ? h.getCreatedAt().toString() : null)
+                            .build())
+                    .collect(Collectors.toList()));
+        }
+
+        // Evidence: a persisted conversation between the two parties, if one exists.
+        if (reporter != null && reported != null) {
+            chatRepository.findPrivateChatBetweenUsers(reporter.getId(), reported.getId()).stream()
+                    .findFirst()
+                    .filter(c -> c.getUuid() != null)
+                    .ifPresent(c -> view.setRelatedChatId(c.getUuid().toString()));
+        }
+        return view;
+    }
+
+    @Override
+    @Transactional
+    public com.chat.talkMe.dto.response.AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername) {
+        com.chat.talkMe.domain.MatchReport r = matchReportRepository.findByUuid(UUID.fromString(reportUuid))
+                .orElseThrow(() -> new NotFoundException("Report not found", "TM_181"));
+        String a = action == null ? "" : action.trim().toUpperCase();
+        switch (a) {
+            case "DISMISS" -> {
+                r.setStatus("DISMISSED");
+                r.setActionTaken("NONE");
+            }
+            case "RESOLVE" -> {
+                r.setStatus("ACTION_TAKEN");
+                r.setActionTaken("REVIEWED");
+            }
+            case "BAN_REPORTED" -> {
+                User reported = r.getReported();
+                if (reported != null) {
+                    reported.setBanned(true);
+                    userRepository.save(reported);
+                }
+                r.setStatus("ACTION_TAKEN");
+                r.setActionTaken("BANNED_REPORTED");
+            }
+            default -> throw new com.chat.talkMe.exception.BadRequestException("Unknown review action: " + a, "TM_071");
+        }
+        r.setReviewedBy(adminUsername);
+        r.setReviewedAt(Instant.now());
+        if (note != null && !note.isBlank()) r.setResolutionNote(note.trim());
+        matchReportRepository.save(r);
+        audit(adminUsername, "REVIEW_REPORT", "REPORT", reportUuid,
+                a + (r.getReported() != null ? " → @" + r.getReported().getUsername() : ""));
+        return toReportView(r, true);
+    }
+
+    private com.chat.talkMe.dto.response.AdminReportView toReportView(com.chat.talkMe.domain.MatchReport r, boolean withCounts) {
+        User reporter = r.getReporter();
+        User reported = r.getReported();
+        com.chat.talkMe.domain.MatchSession session = r.getSession();
+
+        com.chat.talkMe.dto.response.AdminReportView.Session sessionView = session == null ? null
+                : com.chat.talkMe.dto.response.AdminReportView.Session.builder()
+                    .id(session.getUuid() != null ? session.getUuid().toString() : null)
+                    .hostUsername(session.getHost() != null ? session.getHost().getUsername() : null)
+                    .peerUsername(session.getPeer() != null ? session.getPeer().getUsername() : null)
+                    .active(session.isActive())
+                    .endedAt(session.getEndedAt() != null ? session.getEndedAt().toString() : null)
+                    .build();
+
+        return com.chat.talkMe.dto.response.AdminReportView.builder()
+                .id(r.getUuid() != null ? r.getUuid().toString() : String.valueOf(r.getId()))
+                .reason(r.getReason())
+                .details(r.getDetails())
+                .status(r.getStatus())
+                .actionTaken(r.getActionTaken())
+                .reviewedBy(r.getReviewedBy())
+                .reviewedAt(r.getReviewedAt() != null ? r.getReviewedAt().toString() : null)
+                .resolutionNote(r.getResolutionNote())
+                .createdAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null)
+                .reporter(party(reporter))
+                .reported(party(reported))
+                .session(sessionView)
+                .reportsAgainstReported(withCounts && reported != null ? matchReportRepository.countByReportedId(reported.getId()) : 0)
+                .reportsByReporter(withCounts && reporter != null ? matchReportRepository.countByReporterId(reporter.getId()) : 0)
+                .duplicateCount(withCounts && reporter != null && reported != null
+                        ? matchReportRepository.countByReporterIdAndReportedId(reporter.getId(), reported.getId()) : 0)
+                .build();
+    }
+
+    private com.chat.talkMe.dto.response.AdminReportView.Party party(User u) {
+        if (u == null) return null;
+        return com.chat.talkMe.dto.response.AdminReportView.Party.builder()
+                .id(u.getUuid() != null ? u.getUuid().toString() : null)
+                .username(u.getUsername())
+                .name(u.getName())
+                .avatar(u.getProfileImage())
+                .country(u.getCountry())
+                .banned(u.isBanned())
                 .build();
     }
 
@@ -989,7 +1187,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional // NOT readOnly: writes an admin audit row + decrypts URLs
     public PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView> getAttachments(
-            String userUuid, String type, int page, int size, String adminUsername) {
+            String userUuid, String type, boolean includeDeleted, int page, int size, String adminUsername) {
         Long senderId = null;
         if (userUuid != null && !userUuid.isBlank()) {
             senderId = requireUser(userUuid).getId();
@@ -1003,7 +1201,7 @@ public class AdminServiceImpl implements AdminService {
                 userUuid != null ? userUuid : "all", "type=" + type + " page=" + page);
 
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
-        Page<MessageAttachment> result = attachmentRepository.findForAdmin(senderId, mt, pageable);
+        Page<MessageAttachment> result = attachmentRepository.findForAdmin(senderId, mt, includeDeleted, pageable);
 
         List<com.chat.talkMe.dto.response.AdminAttachmentView> items = result.getContent().stream()
                 .map(this::toAttachmentView)
@@ -1060,6 +1258,270 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    // ── Storage reconciliation (storage-truth Attachments gallery) ─────────────
+
+    /** Chat-media top-level folders — an unreferenced object here is a true orphan. */
+    private static final Set<String> CHAT_MEDIA_CATEGORIES = Set.of("conversations", "lobby", "strangers");
+
+    /** Cached reconcile of one storage prefix (OCI list can be slow — TTL-guarded). */
+    private record StorageSnapshot(long builtAtMs, List<AdminStorageObjectView> objects) {}
+    private final java.util.concurrent.ConcurrentHashMap<String, StorageSnapshot> storageCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long STORAGE_CACHE_TTL_MS = 60_000L;
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public com.chat.talkMe.dto.response.AdminStorageListResponse getStorageObjects(
+            String prefix, String category, String kind, boolean onlyOrphans,
+            String search, String sort, int page, int size, String adminUsername) {
+
+        audit(adminUsername, "VIEW_STORAGE", "STORAGE", prefix != null ? prefix : "all",
+                "category=" + category + " kind=" + kind + " orphans=" + onlyOrphans + " page=" + page);
+
+        List<AdminStorageObjectView> reconciled = reconcileStorage(prefix);
+
+        // ── base filter (category + orphan + search, but NOT kind) ─────────────
+        // Kind chips must show per-kind totals within the current context, so counts
+        // are computed over this base — before the active kind filter is applied.
+        String q = search == null ? "" : search.trim().toLowerCase();
+        java.util.stream.Stream<AdminStorageObjectView> stream = reconciled.stream();
+        if (category != null && !category.isBlank() && !category.equalsIgnoreCase("all")) {
+            String c = category.trim().toLowerCase();
+            stream = stream.filter(o -> c.equals(o.getCategory()));
+        }
+        if (onlyOrphans) stream = stream.filter(AdminStorageObjectView::isOrphan);
+        if (!q.isEmpty()) {
+            stream = stream.filter(o ->
+                    contains(o.getKey(), q) || contains(o.getFileName(), q)
+                    || contains(o.getSenderUsername(), q) || contains(o.getSenderName(), q)
+                    || contains(o.getChatName(), q));
+        }
+        List<AdminStorageObjectView> base = stream.collect(Collectors.toList());
+
+        // ── counts over the base set (storage-accurate, kind-independent) ──────
+        com.chat.talkMe.dto.response.AdminStorageListResponse.Counts counts =
+                com.chat.talkMe.dto.response.AdminStorageListResponse.Counts.builder()
+                        .all(base.size())
+                        .image(base.stream().filter(o -> "image".equals(o.getKind())).count())
+                        .video(base.stream().filter(o -> "video".equals(o.getKind())).count())
+                        .voice(base.stream().filter(o -> "voice".equals(o.getKind())).count())
+                        .audio(base.stream().filter(o -> "audio".equals(o.getKind())).count())
+                        .file(base.stream().filter(o -> "file".equals(o.getKind())).count())
+                        .linked(base.stream().filter(AdminStorageObjectView::isLinked).count())
+                        .orphan(base.stream().filter(AdminStorageObjectView::isOrphan).count())
+                        .bytes(base.stream().mapToLong(AdminStorageObjectView::getSize).sum())
+                        .build();
+
+        // ── apply the active kind filter for the page itself ───────────────────
+        List<AdminStorageObjectView> filtered = base;
+        if (kind != null && !kind.isBlank() && !kind.equalsIgnoreCase("all")) {
+            String k = kind.trim().toLowerCase();
+            filtered = base.stream().filter(o -> k.equals(o.getKind())).collect(Collectors.toList());
+        }
+
+        // ── sort ────────────────────────────────────────────────────────────────
+        java.util.Comparator<AdminStorageObjectView> cmp = switch (sort == null ? "newest" : sort) {
+            case "oldest" -> java.util.Comparator.comparing(
+                    AdminStorageObjectView::getLastModified,
+                    java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()));
+            case "largest" -> java.util.Comparator.comparingLong(AdminStorageObjectView::getSize).reversed();
+            case "smallest" -> java.util.Comparator.comparingLong(AdminStorageObjectView::getSize);
+            case "name" -> java.util.Comparator.comparing(
+                    o -> o.getFileName() != null ? o.getFileName() : o.getKey(),
+                    String.CASE_INSENSITIVE_ORDER);
+            default -> java.util.Comparator.comparing( // newest
+                    AdminStorageObjectView::getLastModified,
+                    java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())).reversed();
+        };
+        filtered.sort(cmp);
+
+        // ── paginate ──────────────────────────────────────────────────────────
+        int p = Math.max(0, page);
+        int s = Math.min(Math.max(1, size), 200);
+        int from = Math.min(p * s, filtered.size());
+        int to = Math.min(from + s, filtered.size());
+        List<AdminStorageObjectView> pageItems = filtered.subList(from, to);
+
+        return com.chat.talkMe.dto.response.AdminStorageListResponse.builder()
+                .items(pageItems)
+                .counts(counts)
+                .page(p)
+                .size(s)
+                .total(filtered.size())
+                .hasNext(to < filtered.size())
+                .build();
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void deleteStorageObject(String key, String adminUsername) {
+        if (key == null || !com.chat.talkMe.storage.MediaKeys.isSafeKey(key)) {
+            throw new com.chat.talkMe.exception.BadRequestException("Invalid object key", "TM_071");
+        }
+        String reference = storageProperties.getMediaRoot() + "/" + key;
+        mediaStorage.delete(reference);
+        storageCache.clear(); // reconcile is now stale
+        audit(adminUsername, "DELETE_STORAGE_OBJECT", "STORAGE", key, "reference=" + reference);
+    }
+
+    /** List + DB-reconcile a prefix, TTL-cached (OCI ListObjects is expensive). */
+    private List<AdminStorageObjectView> reconcileStorage(String prefix) {
+        String cacheKey = prefix == null ? "" : prefix;
+        StorageSnapshot cached = storageCache.get(cacheKey);
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cached.builtAtMs() < STORAGE_CACHE_TTL_MS) {
+            return cached.objects();
+        }
+
+        String mediaRoot = storageProperties.getMediaRoot();
+
+        // Reference maps built from every chat attachment (fileUrl decrypted per chat).
+        // key → attachment for enrichment; a separate set of thumbnail keys so a video's
+        // poster frame doesn't show up as its own tile.
+        java.util.Map<String, MessageAttachment> byKey = new java.util.HashMap<>();
+        java.util.Set<String> thumbKeys = new java.util.HashSet<>();
+        for (MessageAttachment a : attachmentRepository.findAll()) {
+            try {
+                Message m = a.getMessage();
+                Long chatId = m != null && m.getChat() != null ? m.getChat().getId() : null;
+                String fileRef = messageCryptoService.decrypt(chatId, a.getFileUrl());
+                String k = com.chat.talkMe.storage.MediaKeys.key(fileRef, mediaRoot);
+                if (k != null) byKey.putIfAbsent(k, a);
+                if (a.getThumbnailUrl() != null) {
+                    String tk = com.chat.talkMe.storage.MediaKeys.key(
+                            messageCryptoService.decrypt(chatId, a.getThumbnailUrl()), mediaRoot);
+                    if (tk != null) thumbKeys.add(tk);
+                }
+            } catch (RuntimeException ignored) { /* skip un-decryptable row */ }
+        }
+
+        List<MediaStorage.StoredObject> stored = mediaStorage.list(prefix);
+        List<AdminStorageObjectView> out = new java.util.ArrayList<>(stored.size());
+        for (MediaStorage.StoredObject o : stored) {
+            String key = o.key();
+            if (thumbKeys.contains(key)) continue; // fold thumbnails into their parent
+            String cat = categoryOf(key);
+            MessageAttachment att = byKey.get(key);
+            boolean linked = att != null;
+            boolean orphan = !linked && CHAT_MEDIA_CATEGORIES.contains(cat);
+
+            AdminStorageObjectView.AdminStorageObjectViewBuilder b = AdminStorageObjectView.builder()
+                    .key(key)
+                    .reference(o.reference())
+                    .url("/api/v1/uploads/media?path=" + java.net.URLEncoder.encode(
+                            o.reference(), java.nio.charset.StandardCharsets.UTF_8))
+                    .category(cat)
+                    .size(o.size())
+                    .contentType(o.contentType())
+                    .lastModified(o.lastModified() != null ? o.lastModified().toString() : null)
+                    .linked(linked)
+                    .orphan(orphan);
+
+            if (att != null) {
+                Message m = att.getMessage();
+                Chat chat = m != null ? m.getChat() : null;
+                Long chatId = chat != null ? chat.getId() : null;
+                User sender = m != null ? m.getSender() : null;
+                String decryptedName = safeDecrypt(chatId, att.getFileName());
+
+                // Receivers = everyone in the chat other than the sender.
+                List<AdminStorageObjectView.SharedUser> receivers =
+                        chat == null || chat.getMembers() == null ? List.of()
+                        : chat.getMembers().stream()
+                            .map(ChatMember::getUser)
+                            .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
+                            .map(mu -> AdminStorageObjectView.SharedUser.builder()
+                                    .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                                    .username(mu.getUsername())
+                                    .name(mu.getName())
+                                    .avatar(mu.getProfileImage())
+                                    .build())
+                            .collect(Collectors.toList());
+
+                // DB is authoritative for linked attachments — classify by message type +
+                // mimeType + name (so a voice note's .webm isn't mistaken for a video).
+                b.kind(kindForLinked(m != null ? m.getMessageType() : null, att.getMimeType(), decryptedName, key))
+                 .attachmentId(att.getUuid() != null ? att.getUuid().toString() : String.valueOf(att.getId()))
+                 .messageId(m != null && m.getUuid() != null ? m.getUuid().toString() : null)
+                 .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
+                 .chatName(chat != null ? chat.getName() : null)
+                 .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
+                 .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
+                 .senderUsername(sender != null ? sender.getUsername() : null)
+                 .senderName(sender != null ? sender.getName() : null)
+                 .senderAvatar(sender != null ? sender.getProfileImage() : null)
+                 .receivers(receivers)
+                 .fileName(decryptedName)
+                 .mimeType(att.getMimeType())
+                 .duration(att.getDuration())
+                 .fileSize(att.getFileSize() != null ? att.getFileSize() : 0L)
+                 .sentAt(m != null && m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                 .createdAt(att.getCreatedAt() != null ? att.getCreatedAt().toString() : null)
+                 .updatedAt(att.getUpdatedAt() != null ? att.getUpdatedAt().toString() : null)
+                 .deleted(m != null && m.isDeleted());
+            } else {
+                // Orphan / non-chat object — best-effort classify from the extension.
+                b.kind(kindOf(key, o.contentType()));
+            }
+            out.add(b.build());
+        }
+
+        storageCache.put(cacheKey, new StorageSnapshot(now, out));
+        return out;
+    }
+
+    private String safeDecrypt(Long chatId, String value) {
+        try { return messageCryptoService.decrypt(chatId, value); }
+        catch (RuntimeException e) { return value; }
+    }
+
+    private static boolean contains(String haystack, String needleLower) {
+        return haystack != null && haystack.toLowerCase().contains(needleLower);
+    }
+
+    private static String categoryOf(String key) {
+        int slash = key.indexOf('/');
+        String top = slash > 0 ? key.substring(0, slash) : key;
+        return switch (top) {
+            case "conversations", "lobby", "strangers", "profiles", "posts", "stories" -> top;
+            default -> "other";
+        };
+    }
+
+    private static String kindOf(String key, String contentType) {
+        String ct = contentType != null ? contentType.toLowerCase() : "";
+        if (ct.startsWith("image/")) return "image";
+        if (ct.startsWith("video/")) return "video";
+        if (ct.startsWith("audio/")) return "audio";
+        String k = key.toLowerCase();
+        if (k.matches(".*\\.(png|jpe?g|gif|webp|avif|bmp|svg|heic|heif)$")) return "image";
+        if (k.matches(".*\\.(mp4|webm|mov|m4v|ogv)$")) return "video";
+        if (k.matches(".*\\.(mp3|m4a|aac|ogg|wav|opus)$")) return "audio";
+        return "file";
+    }
+
+    /**
+     * Authoritative kind for a LINKED attachment. Distinguishes a recorded VOICE note
+     * from an uploaded AUDIO file (both are {@code MessageType.AUDIO}) — voice notes are
+     * sent as {@code voice-message-*.webm}, and {@code .webm} otherwise reads as video,
+     * so classify on message type + mime + name rather than extension alone.
+     */
+    private static String kindForLinked(com.chat.talkMe.enums.MessageType type, String mimeType,
+                                        String fileName, String key) {
+        String mt = mimeType != null ? mimeType.toLowerCase() : "";
+        String fn = fileName != null ? fileName.toLowerCase() : "";
+        boolean isAudioKind = type == com.chat.talkMe.enums.MessageType.AUDIO || mt.startsWith("audio/");
+        if (isAudioKind) {
+            boolean voice = fn.contains("voice-message") || fn.startsWith("voice") || fn.startsWith("ptt")
+                    || mt.equals("audio/webm") || mt.equals("audio/ogg") || mt.equals("audio/opus");
+            return voice ? "voice" : "audio";
+        }
+        if (type == com.chat.talkMe.enums.MessageType.VIDEO || mt.startsWith("video/")) return "video";
+        if (type == com.chat.talkMe.enums.MessageType.IMAGE || mt.startsWith("image/")) return "image";
+        if (type == com.chat.talkMe.enums.MessageType.DOCUMENT) return "file";
+        return kindOf(key, mimeType);
+    }
+
     // ── mappers ──────────────────────────────────────────────────────────────
 
     private AdminUserView toView(User u, Set<String> online, Set<String> away, boolean detail) {
@@ -1077,6 +1539,9 @@ public class AdminServiceImpl implements AdminService {
                 .gender(u.getGender())
                 .country(u.getCountry())
                 .city(u.getCity())
+                .lastLocation(u.getLastLocation())
+                .lastLoginIp(u.getLastLoginIp())
+                .lastLocationAt(u.getLastLocationAt() != null ? u.getLastLocationAt().toString() : null)
                 .occupation(detail ? u.getOccupation() : null)
                 .education(detail ? u.getEducation() : null)
                 .interests(detail && u.getInterests() != null
@@ -1120,6 +1585,7 @@ public class AdminServiceImpl implements AdminService {
                 .messageCount(messageRepository.countByChat(chat))
                 .createdAt(chat.getCreatedAt() != null ? chat.getCreatedAt().toString() : null)
                 .lastMessageAt(chat.getUpdatedAt() != null ? chat.getUpdatedAt().toString() : null)
+                .deleted(chat.isDeleted())
                 .build();
     }
 }

@@ -140,10 +140,11 @@ public class EmailTemplates {
      * New-sign-in security alert (Google-style). {@code device}, {@code location} and
      * {@code when} may each be null/blank and are shown only when present.
      */
-    public String loginAlert(String name, String device, String location, String when, String secureLink) {
+    public String loginAlert(String name, String device, String location, String ip, String when, String secureLink) {
         String rows = detailRow("When", when)
                 + detailRow("Device", device)
-                + detailRow("Location", location);
+                + detailRow("Location", location)
+                + detailRow("IP address", ip);
         String detailBlock = rows.isBlank() ? "" :
                 "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
                         + "style=\"margin:8px 0 4px;border:1px solid " + theme.cardBorder()

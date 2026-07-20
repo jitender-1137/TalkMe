@@ -28,6 +28,7 @@ public class FriendServiceImpl implements FriendService {
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final BlockUserRepository blockUserRepository;
+    private final com.chat.talkMe.cache.BlockCache blockCache;
     private final UserSettingRepository userSettingRepository;
     private final FriendRequestMapper friendRequestMapper;
     private final UserMapper userMapper;
@@ -66,7 +67,7 @@ public class FriendServiceImpl implements FriendService {
         }
 
         // Check existing requests
-        java.util.Optional<FriendRequest> existingRequestOpt = friendRequestRepository.findBySenderAndReceiver(currentUser, receiver);
+        java.util.Optional<FriendRequest> existingRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, receiver);
         if (existingRequestOpt.isPresent()) {
             FriendRequest existingRequest = existingRequestOpt.get();
             if (existingRequest.getStatus() == FriendRequestStatus.ACCEPTED) {
@@ -88,7 +89,7 @@ public class FriendServiceImpl implements FriendService {
         }
 
         // Check if the other user already sent a request to the current user
-        java.util.Optional<FriendRequest> reverseRequestOpt = friendRequestRepository.findBySenderAndReceiver(receiver, currentUser);
+        java.util.Optional<FriendRequest> reverseRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(receiver, currentUser);
         if (reverseRequestOpt.isPresent() && reverseRequestOpt.get().getStatus() == FriendRequestStatus.PENDING) {
             // Auto-accept if the other user already sent one
             acceptFriendRequest(reverseRequestOpt.get().getUuid().toString(), currentUser);
@@ -101,7 +102,18 @@ public class FriendServiceImpl implements FriendService {
                 .status(FriendRequestStatus.PENDING)
                 .build();
 
-        request = friendRequestRepository.save(request);
+        try {
+            // saveAndFlush so the unique (sender_id, receiver_id) constraint is enforced
+            // here, letting us catch a concurrent-duplicate race instead of 500ing.
+            request = friendRequestRepository.saveAndFlush(request);
+        } catch (org.springframework.dao.DataIntegrityViolationException dup) {
+            // A concurrent request created the row first — reuse it (set PENDING) rather
+            // than inserting a duplicate.
+            request = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, receiver)
+                    .orElseThrow(() -> dup);
+            request.setStatus(FriendRequestStatus.PENDING);
+            request = friendRequestRepository.save(request);
+        }
         log.info("Friend request sent from {} to {}", currentUser.getUsername(), receiver.getUsername());
         broadcastFriendEvent(receiver, "friend_request_received");
 
@@ -218,8 +230,8 @@ public class FriendServiceImpl implements FriendService {
         if (f2 != null) friendRepository.delete(f2);
 
         // Clean up any friend requests so they can add each other again cleanly
-        friendRequestRepository.findBySenderAndReceiver(currentUser, friendUser).ifPresent(friendRequestRepository::delete);
-        friendRequestRepository.findBySenderAndReceiver(friendUser, currentUser).ifPresent(friendRequestRepository::delete);
+        friendRequestRepository.deleteAll(friendRequestRepository.findAllBySenderAndReceiver(currentUser, friendUser));
+        friendRequestRepository.deleteAll(friendRequestRepository.findAllBySenderAndReceiver(friendUser, currentUser));
 
         broadcastFriendEvent(currentUser, "friend_removed");
         broadcastFriendEvent(friendUser, "friend_removed");
@@ -244,6 +256,7 @@ public class FriendServiceImpl implements FriendService {
                 .blocked(target)
                 .build();
         blockUserRepository.save(block);
+        blockCache.evict(currentUser.getId());
 
         // Remove friendship if exists
         removeFriend(userUuid, currentUser);
@@ -258,6 +271,7 @@ public class FriendServiceImpl implements FriendService {
         BlockUser block = blockUserRepository.findByUserAndBlocked(currentUser, target).orElse(null);
         if (block != null) {
             blockUserRepository.delete(block);
+            blockCache.evict(currentUser.getId());
         }
     }
 }

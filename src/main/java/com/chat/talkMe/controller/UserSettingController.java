@@ -48,4 +48,14 @@ public class UserSettingController {
                 userSettingService.updateMessagingPrivacy(value, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Settings updated successfully", "TM_066"));
     }
+
+    /** Dedicated, param-based update for the "who can add me to groups/rooms" preference. */
+    @PutMapping("/group-add-privacy")
+    public ResponseEntity<ResponseDto<UserSettingResponse>> updateGroupAddPrivacy(
+            @RequestParam("value") String value,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserSettingResponse response =
+                userSettingService.updateGroupAddPrivacy(value, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Settings updated successfully", "TM_066"));
+    }
 }

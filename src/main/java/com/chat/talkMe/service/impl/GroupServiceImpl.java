@@ -3,6 +3,7 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.ChatSettings;
+import com.chat.talkMe.domain.GroupInvite;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.CreateGroupRequest;
 import com.chat.talkMe.dto.request.UpdateGroupRequest;
@@ -54,6 +55,11 @@ public class GroupServiceImpl implements GroupService {
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final com.chat.talkMe.repository.FriendRepository friendRepository;
     private final com.chat.talkMe.repository.AuditLogRepository auditLogRepository;
+    private final com.chat.talkMe.service.NotificationService notificationService;
+    private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
+    private final com.chat.talkMe.repository.GroupInviteRepository groupInviteRepository;
+    private final com.chat.talkMe.cache.MemberCountCache memberCountCache;
+    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
 
     @Override
     @Transactional
@@ -122,6 +128,7 @@ public class GroupServiceImpl implements GroupService {
             }
         }
 
+        memberCountCache.evict(chat);
         return chatService.getChatByUuid(chat.getUuid().toString(), creator);
     }
 
@@ -203,6 +210,13 @@ public class GroupServiceImpl implements GroupService {
                     throw new ForbiddenException(
                             "This group only allows friends to be added", "TM_306");
                 }
+                // Respect the target's "who can add me to groups" privacy setting. When
+                // they don't allow a direct add (FRIENDS_ONLY / NOBODY), send them a group
+                // invite (notification + chat message) to accept instead of adding them.
+                if (!u.getId().equals(currentUser.getId()) && !allowsDirectAdd(currentUser, u)) {
+                    sendGroupInvite(chat, currentUser, u);
+                    continue;
+                }
                 // Already an ACTIVE member? skip. A former member (left/removed) is
                 // re-activated fresh.
                 ChatMember existing = chatMemberRepository.findByChatAndUser(chat, u).orElse(null);
@@ -220,8 +234,25 @@ public class GroupServiceImpl implements GroupService {
                 count++;
                 systemMessage(chatUuid, currentUser, "member_added", currentUser, u);
                 broadcastGroupEvent(chatUuid, "member_joined", memberEventPayload(chatUuid, u));
+                // Notify the added member (unless they added themselves) that they're now
+                // in the group. Best-effort — a notification failure must not roll back the add.
+                if (!u.getId().equals(currentUser.getId())) {
+                    try {
+                        notificationService.createNotification(
+                                u,
+                                "Added to a group",
+                                currentUser.getName() + " added you to “" + chat.getName() + "”.",
+                                "GROUP_ADDED",
+                                chatUuid,
+                                currentUser,
+                                chat.getImageUrl());
+                    } catch (Exception e) {
+                        log.warn("Failed to notify {} of being added to group {}", u.getUsername(), chatUuid, e);
+                    }
+                }
             }
         }
+        memberCountCache.evict(chatUuid);
         return chatService.getChatByUuid(chatUuid, currentUser);
     }
 
@@ -250,6 +281,7 @@ public class GroupServiceImpl implements GroupService {
         chatMemberRepository.save(targetMember);
         systemMessage(chatUuid, currentUser, "member_removed", currentUser, target);
         broadcastGroupEvent(chatUuid, "member_removed", memberEventPayload(chatUuid, target));
+        memberCountCache.evict(chatUuid);
     }
 
     @Override
@@ -291,6 +323,7 @@ public class GroupServiceImpl implements GroupService {
         chatMemberRepository.save(me);
         systemMessage(chatUuid, currentUser, "member_left", currentUser, currentUser);
         broadcastGroupEvent(chatUuid, "member_left", memberEventPayload(chatUuid, currentUser));
+        memberCountCache.evict(chatUuid);
     }
 
     @Override
@@ -370,6 +403,7 @@ public class GroupServiceImpl implements GroupService {
             addMemberInternal(chat, me);
         }
         broadcastGroupEvent(chatUuid, "member_joined", memberEventPayload(chatUuid, me));
+        memberCountCache.evict(chatUuid);
         return chatService.getChatByUuid(chatUuid, me);
     }
 
@@ -411,6 +445,138 @@ public class GroupServiceImpl implements GroupService {
         return friendRepository.findByUserAndFriend(user, other)
                 .map(f -> !f.isDeleted())
                 .orElse(false);
+    }
+
+    /**
+     * Whether {@code adder} may add {@code target} to a group/room directly, per the
+     * target's "who can add me" setting (EVERYONE / FRIENDS_ONLY / NOBODY). When this is
+     * false the caller sends a group invite instead of a direct add.
+     */
+    private boolean allowsDirectAdd(User adder, User target) {
+        com.chat.talkMe.enums.GroupAddPrivacy privacy = userSettingsCache.getGroupAddPrivacy(target);
+        if (privacy == null || privacy == com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE) {
+            return true;
+        }
+        if (privacy == com.chat.talkMe.enums.GroupAddPrivacy.FRIENDS_ONLY) {
+            return areFriends(adder, target);
+        }
+        return false; // NOBODY
+    }
+
+    /** Message-content sentinel carrying a group-invite payload (mirrors the shared-post
+     *  encoding; the frontend detects this prefix and renders a Join/Decline card). */
+    private static final String INVITE_SENTINEL = "tmginvite";
+
+    /**
+     * Deliver a group invite to {@code invitee}: (1) a PENDING GroupInvite record,
+     * (2) a chat message from the inviter carrying the group info + a join CTA, and
+     * (3) an in-app notification. Idempotent — a still-PENDING invite is not re-sent.
+     */
+    private void sendGroupInvite(Chat chat, User inviter, User invitee) {
+        try {
+            // Don't spam: if there's already a pending invite, leave it as-is.
+            if (groupInviteRepository.existsByChatAndInviteeAndStatus(chat, invitee, "PENDING")) {
+                return;
+            }
+            GroupInvite invite = groupInviteRepository.findByChatAndInvitee(chat, invitee)
+                    .orElse(GroupInvite.builder().chat(chat).invitee(invitee).build());
+            invite.setInviter(inviter);
+            invite.setStatus("PENDING");
+            groupInviteRepository.save(invite);
+
+            // Chat message from the inviter → invitee, carrying the invite card payload.
+            try {
+                String payload = INVITE_SENTINEL + objectMapper.writeValueAsString(Map.of(
+                        "chatId", chat.getUuid().toString(),
+                        "groupName", chat.getName() == null ? "a group" : chat.getName(),
+                        "groupAvatar", chat.getImageUrl() == null ? "" : chat.getImageUrl(),
+                        "inviterName", inviter.getName() == null ? "" : inviter.getName()));
+                com.chat.talkMe.dto.request.CreateChatRequest chatReq =
+                        new com.chat.talkMe.dto.request.CreateChatRequest();
+                chatReq.setRecipientId(invitee.getUuid().toString());
+                com.chat.talkMe.dto.response.ChatResponse dm = chatService.createChat(chatReq, inviter);
+                com.chat.talkMe.dto.request.SendMessageRequest msg =
+                        new com.chat.talkMe.dto.request.SendMessageRequest();
+                msg.setContent(payload);
+                msg.setMessageType("TEXT");
+                messageService.sendMessage(dm.getId(), msg, inviter);
+            } catch (Exception e) {
+                // The notification (below) is the reliable channel; a chat-message failure
+                // (e.g. recipient is friends-only) must not abort the invite.
+                log.warn("Group-invite chat message not delivered from {} to {}: {}",
+                        inviter.getUsername(), invitee.getUsername(), e.getMessage());
+            }
+
+            notificationService.createNotification(
+                    invitee,
+                    "Group invitation",
+                    inviter.getName() + " invited you to join “" + chat.getName() + "”.",
+                    "GROUP_INVITE",
+                    chat.getUuid().toString(),
+                    inviter,
+                    chat.getImageUrl());
+        } catch (Exception e) {
+            log.warn("Failed to send group invite for chat {} to {}", chat.getUuid(), invitee.getUsername(), e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public ChatResponse acceptGroupInvite(String chatUuid, User currentUser) {
+        Chat chat = loadGroup(chatUuid);
+        User me = userRepository.findById(currentUser.getId()).orElse(currentUser);
+        GroupInvite invite = groupInviteRepository.findByChatAndInviteeAndStatus(chat, me, "PENDING")
+                .orElseThrow(() -> new NotFoundException("No pending invite for this group", "TM_307"));
+
+        if (chatMemberRepository.countActiveMembers(chat) >= chat.getMemberLimit()) {
+            throw new BadRequestException("This group is full", "TM_297");
+        }
+
+        ChatMember existing = chatMemberRepository.findByChatAndUser(chat, me).orElse(null);
+        if (existing == null) {
+            addMemberInternal(chat, me);
+        } else if (existing.isDeleted() || existing.getLeftAt() != null) {
+            existing.setDeleted(false);
+            existing.setBanned(false);
+            existing.setLeftAt(null);
+            existing.setRole(MemberRole.MEMBER);
+            existing.setJoinedAt(Instant.now());
+            chatMemberRepository.save(existing);
+        }
+        invite.setStatus("ACCEPTED");
+        groupInviteRepository.save(invite);
+
+        systemMessage(chatUuid, me, "member_added", invite.getInviter(), me);
+        broadcastGroupEvent(chatUuid, "member_joined", memberEventPayload(chatUuid, me));
+
+        // Let the inviter know their invite was accepted.
+        try {
+            if (invite.getInviter() != null && !invite.getInviter().getId().equals(me.getId())) {
+                notificationService.createNotification(
+                        invite.getInviter(),
+                        "Invite accepted",
+                        me.getName() + " joined “" + chat.getName() + "”.",
+                        "GROUP_ADDED",
+                        chatUuid,
+                        me,
+                        chat.getImageUrl());
+            }
+        } catch (Exception ignored) { /* best-effort */ }
+
+        memberCountCache.evict(chatUuid);
+        return chatService.getChatByUuid(chatUuid, me);
+    }
+
+    @Override
+    @Transactional
+    public void declineGroupInvite(String chatUuid, User currentUser) {
+        Chat chat = loadGroup(chatUuid);
+        User me = userRepository.findById(currentUser.getId()).orElse(currentUser);
+        groupInviteRepository.findByChatAndInviteeAndStatus(chat, me, "PENDING")
+                .ifPresent(invite -> {
+                    invite.setStatus("DECLINED");
+                    groupInviteRepository.save(invite);
+                });
     }
 
     private void systemMessage(String chatUuid, User currentUser, String kind, User actor, User target) {

@@ -2,6 +2,7 @@ package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.exception.FileStorageException;
 import com.chat.talkMe.service.StorageService;
+import com.chat.talkMe.storage.MediaStorage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,11 +13,18 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Stores uploads via the pluggable {@link MediaStorage} backend (filesystem in
+ * local/dev, OCI Object Storage in prod). The video transcode pipeline is unchanged —
+ * ffmpeg produces the same compact H.264/AAC MP4 as before, into a temp file, and only
+ * the finished bytes are handed to the storage backend. The returned reference shape
+ * ({@code <MEDIA_ROOT>/<subdir>/<uuid>.<ext>}) is identical to the original.
+ */
 @Slf4j
 @Service
 public class StorageServiceImpl implements StorageService {
 
-    private static final Path STORAGE_PATH = Paths.get("/opt/media/talkMe");
+    private final MediaStorage mediaStorage;
 
     /** Resolves the ffmpeg binary (bundled with the app by default). */
     private final FfmpegSupport ffmpeg;
@@ -24,14 +32,9 @@ public class StorageServiceImpl implements StorageService {
     /** Max wall-clock time for a single transcode before we give up. */
     private static final long TRANSCODE_TIMEOUT_MINUTES = 5;
 
-    public StorageServiceImpl(FfmpegSupport ffmpeg) {
+    public StorageServiceImpl(MediaStorage mediaStorage, FfmpegSupport ffmpeg) {
+        this.mediaStorage = mediaStorage;
         this.ffmpeg = ffmpeg;
-        try {
-            Files.createDirectories(STORAGE_PATH);
-        } catch (IOException e) {
-            throw new FileStorageException(
-                    "Could not create storage directory: " + STORAGE_PATH + e);
-        }
     }
 
     @Override
@@ -41,7 +44,7 @@ public class StorageServiceImpl implements StorageService {
 
     @Override
     public String storeFile(MultipartFile file, String type, String subdir) {
-        Path targetDir = resolveTargetDir(subdir);
+        String cleanSubdir = normalizeSubdir(subdir);
 
         String originalFileName = file.getOriginalFilename();
         String extension = "";
@@ -54,90 +57,88 @@ public class StorageServiceImpl implements StorageService {
                 || (contentType != null && contentType.startsWith("video/"));
 
         if (isVideo) {
-            return storeCompressedVideo(file, extension, targetDir);
+            return storeCompressedVideo(file, extension, cleanSubdir);
         }
 
-        // Non-video: store as-is (images are already compressed on the client).
-        String fileName = UUID.randomUUID() + extension;
+        // Non-video: stage to a temp file, then hand to the storage backend as-is
+        // (images are already compressed on the client).
+        Path temp = null;
         try {
-            Path targetLocation = targetDir.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            log.info("File stored successfully: {}", targetLocation);
-            return targetLocation.toString();
+            temp = Files.createTempFile("talkme-upload-", extension.isEmpty() ? ".tmp" : extension);
+            Files.copy(file.getInputStream(), temp, StandardCopyOption.REPLACE_EXISTING);
+            String key = buildKey(cleanSubdir, UUID.randomUUID() + extension);
+            String ref = mediaStorage.store(temp, key, contentType);
+            log.info("File stored successfully: {}", ref);
+            return ref;
         } catch (IOException e) {
-            throw new FileStorageException("Could not store file " + fileName + e);
+            throw new FileStorageException("Could not store file: " + e);
+        } finally {
+            deleteQuietly(temp);
         }
     }
 
     /**
-     * Resolve a relative subdir under the media root, creating it on demand and
-     * guaranteeing the result can never escape the root (defense-in-depth — callers
-     * already build the subdir from a fixed category + a validated UUID). A blank
-     * subdir stores at the root.
+     * Store a video, transcoding it to a compact H.264/AAC MP4 with ffmpeg — the exact
+     * same command as before. The upload is written to a temp file, then ffmpeg
+     * downscales to ≤720p and re-encodes. If ffmpeg is unavailable, fails, times out, or
+     * the result is not actually smaller, the original is stored untouched — uploads
+     * must never fail because compression failed.
      */
-    private Path resolveTargetDir(String subdir) {
-        Path dir = (subdir == null || subdir.isBlank())
-                ? STORAGE_PATH
-                : STORAGE_PATH.resolve(subdir).normalize();
-        if (!dir.startsWith(STORAGE_PATH)) {
-            throw new FileStorageException("Invalid media subdirectory: " + subdir);
-        }
-        try {
-            Files.createDirectories(dir);
-        } catch (IOException e) {
-            throw new FileStorageException("Could not create media directory: " + dir + " " + e);
-        }
-        return dir;
-    }
-
-    /**
-     * Store a video, transcoding it to a compact H.264/AAC MP4 with ffmpeg.
-     *
-     * The upload is first written to a temp file, then ffmpeg downscales it to
-     * ≤720p and re-encodes at CRF 28 (good quality / much smaller). If ffmpeg is
-     * unavailable, fails, times out, or the result is not actually smaller, we
-     * fall back to storing the original file untouched — uploads must never fail
-     * because compression failed.
-     */
-    private String storeCompressedVideo(MultipartFile file, String extension, Path targetDir) {
+    private String storeCompressedVideo(MultipartFile file, String extension, String subdir) {
         Path tempInput = null;
+        Path compressed = null;
         try {
             tempInput = Files.createTempFile("talkme-upload-", extension.isEmpty() ? ".tmp" : extension);
             Files.copy(file.getInputStream(), tempInput, StandardCopyOption.REPLACE_EXISTING);
             long originalSize = Files.size(tempInput);
 
-            Path compressedTarget = targetDir.resolve(UUID.randomUUID() + ".mp4");
-            boolean transcoded = transcodeVideo(tempInput, compressedTarget);
+            compressed = Files.createTempFile("talkme-transcode-", ".mp4");
+            boolean transcoded = transcodeVideo(tempInput, compressed);
 
             if (transcoded
-                    && Files.exists(compressedTarget)
-                    && Files.size(compressedTarget) > 0
-                    && Files.size(compressedTarget) < originalSize) {
-                long compressedSize = Files.size(compressedTarget);
+                    && Files.exists(compressed)
+                    && Files.size(compressed) > 0
+                    && Files.size(compressed) < originalSize) {
+                long compressedSize = Files.size(compressed);
                 log.info("Video compressed: {} bytes -> {} bytes ({}% smaller)",
                         originalSize, compressedSize,
                         Math.round((1 - (double) compressedSize / originalSize) * 100));
-                return compressedTarget.toString();
+                String key = buildKey(subdir, UUID.randomUUID() + ".mp4");
+                return mediaStorage.store(compressed, key, "video/mp4");
             }
 
             // Compression unavailable or not beneficial → keep the original.
-            Files.deleteIfExists(compressedTarget);
-            Path originalTarget = targetDir.resolve(UUID.randomUUID() + extension);
-            Files.move(tempInput, originalTarget, StandardCopyOption.REPLACE_EXISTING);
-            tempInput = null; // moved
-            log.info("Video stored without compression: {}", originalTarget);
-            return originalTarget.toString();
-
+            String key = buildKey(subdir, UUID.randomUUID() + extension);
+            log.info("Video stored without compression");
+            return mediaStorage.store(tempInput, key, file.getContentType());
         } catch (IOException e) {
             throw new FileStorageException("Could not store video file: " + e);
         } finally {
-            if (tempInput != null) {
-                try {
-                    Files.deleteIfExists(tempInput);
-                } catch (IOException ignored) {
-                    // best-effort temp cleanup
-                }
-            }
+            deleteQuietly(tempInput);
+            deleteQuietly(compressed);
+        }
+    }
+
+    /** Normalize the subdir: trim, drop leading/trailing slashes, reject traversal. */
+    private String normalizeSubdir(String subdir) {
+        if (subdir == null || subdir.isBlank()) return "";
+        String s = subdir.trim().replaceAll("^/+", "").replaceAll("/+$", "");
+        if (s.contains("..") || s.contains("\\")) {
+            throw new FileStorageException("Invalid media subdirectory: " + subdir);
+        }
+        return s;
+    }
+
+    private String buildKey(String subdir, String fileName) {
+        return subdir.isEmpty() ? fileName : subdir + "/" + fileName;
+    }
+
+    private void deleteQuietly(Path p) {
+        if (p == null) return;
+        try {
+            Files.deleteIfExists(p);
+        } catch (IOException ignored) {
+            // best-effort temp cleanup
         }
     }
 

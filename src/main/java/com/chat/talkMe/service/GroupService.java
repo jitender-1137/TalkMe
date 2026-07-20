@@ -38,6 +38,12 @@ public interface GroupService {
     /** Join a public, open-join channel/room. Returns the joined chat. */
     ChatResponse joinChat(String chatUuid, User currentUser);
 
+    /** Accept a pending group invite (join the group). */
+    ChatResponse acceptGroupInvite(String chatUuid, User currentUser);
+
+    /** Decline a pending group invite. */
+    void declineGroupInvite(String chatUuid, User currentUser);
+
     /** Report a group/channel/room for review. */
     void reportChat(String chatUuid, String reason, String details, User currentUser);
 }

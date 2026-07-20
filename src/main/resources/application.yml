@@ -185,3 +185,9 @@ app:
   # is no public promote endpoint — elevation happens only via this trusted list.
   super-admin:
     emails: ${SUPER_ADMIN_EMAILS:}
+
+# Media storage. `media-root` is the single root shared by the OCI object keys and the
+# instance/VM disk (reference shape <media-root>/<key>). Provider defaults to the local
+# filesystem; the prod profile overrides it to OCI. See com.chat.talkMe.storage.
+storage:
+  media-root: ${FILE_BASE_DIR:/media}

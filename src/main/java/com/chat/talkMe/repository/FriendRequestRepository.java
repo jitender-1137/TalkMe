@@ -15,7 +15,14 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, Lo
     @org.springframework.data.jpa.repository.Query("SELECT fr.createdAt FROM FriendRequest fr WHERE fr.createdAt >= :since")
     java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
     Optional<FriendRequest> findByUuid(UUID uuid);
-    Optional<FriendRequest> findBySenderAndReceiver(User sender, User receiver);
+    /**
+     * Latest request for a sender→receiver pair. Uses findFirst (LIMIT 1) so it never
+     * throws NonUniqueResultException even if duplicate rows exist (there should be at
+     * most one — enforced by the unique constraint on the entity).
+     */
+    Optional<FriendRequest> findFirstBySenderAndReceiverOrderByIdDesc(User sender, User receiver);
+    /** All rows for a pair — used to purge duplicates/leftovers on unfriend. */
+    List<FriendRequest> findAllBySenderAndReceiver(User sender, User receiver);
     // Newest requests first, so the list shows the most recent at the top.
     List<FriendRequest> findByReceiverAndStatusOrderByCreatedAtDesc(User receiver, FriendRequestStatus status);
     List<FriendRequest> findBySenderAndStatusOrderByCreatedAtDesc(User sender, FriendRequestStatus status);

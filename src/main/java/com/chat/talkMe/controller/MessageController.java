@@ -63,6 +63,17 @@ public class MessageController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    @PatchMapping("/{messageId}")
+    public ResponseEntity<ResponseDto<MessageResponse>> editMessage(
+            @PathVariable("chatId") String chatUuid,
+            @PathVariable("messageId") String messageUuid,
+            @RequestBody com.chat.talkMe.dto.request.EditMessageRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        MessageResponse response = messageService.editMessage(
+                chatUuid, messageUuid, request.getContent(), userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Message updated", "TM_167"));
+    }
+
     @DeleteMapping("/{messageId}")
     public ResponseEntity<ResponseDto<Void>> deleteMessage(
             @PathVariable("chatId") String chatUuid,

@@ -14,6 +14,15 @@ import java.util.List;
 
 public interface MessageService {
     MessageResponse sendMessage(String chatUuid, SendMessageRequest request, User currentUser);
+    /** Edit a text message's content. Sender-only; re-moderated; sets isEdited + broadcasts. */
+    MessageResponse editMessage(String chatUuid, String messageUuid, String content, User currentUser);
+
+    /**
+     * Release the messages that were held pending explicit-content consent in a
+     * 1:1 chat (marks them RELEASED and delivers them to the recipient through the
+     * normal durable broadcast pipeline). Called when consent is granted.
+     */
+    void releaseHeldMessages(com.chat.talkMe.domain.Chat chat);
 
 
     /**

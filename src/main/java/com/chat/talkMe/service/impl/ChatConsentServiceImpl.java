@@ -44,6 +44,7 @@ public class ChatConsentServiceImpl implements ChatConsentService {
     private final MessageRepository messageRepository;
     private final MessageMapper messageMapper;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.chat.talkMe.service.MessageService messageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -142,13 +143,10 @@ public class ChatConsentServiceImpl implements ChatConsentService {
         consent.setDeclineCount(0); // accepting clears the consecutive-decline cap
         consent = consentRepository.save(consent);
 
-        // Messages sent BEFORE consent are intentionally NOT delivered — only future
-        // messages flow once both sides agree. Discard the pre-consent held messages
-        // so they never surface on either side.
-        List<Message> held = messageRepository.findHeldForConsent(chat);
-        if (!held.isEmpty()) {
-            messageRepository.deleteAll(held);
-        }
+        // Consent granted → RELEASE the pre-consent held messages: mark them
+        // RELEASED and deliver them to the recipient (this granting user) through
+        // the normal durable broadcast pipeline, so both parties now see them.
+        messageService.releaseHeldMessages(chat);
 
         broadcastConsent(chatUuid, "consent_granted", Map.of(
                 "chatId", chatUuid,

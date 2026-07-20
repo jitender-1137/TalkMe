@@ -40,4 +40,20 @@ public class Notification extends BaseEntity {
 
     @Column(name = "reference_id", length = 100)
     private String referenceId;
+
+    // ── Instagram-style rich fields (who did it + a thumbnail of the target) ──
+    // Populated for social notifications (like/comment/follow/post/story/poll) so
+    // the UI can show the actor's avatar and the post/reel thumbnail. Null for
+    // plain system notifications.
+    @Column(name = "actor_id", length = 64)
+    private String actorId; // actor's uuid (for opening their profile)
+
+    @Column(name = "actor_name", length = 150)
+    private String actorName;
+
+    @Column(name = "actor_avatar", length = 512)
+    private String actorAvatar;
+
+    @Column(name = "image_url", length = 512)
+    private String imageUrl; // thumbnail of the related post/story/media
 }

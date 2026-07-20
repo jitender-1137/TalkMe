@@ -23,6 +23,9 @@ public class MessageResponse {
     private String messageType; // MessageType enum representation
     private String createdAt;
     private boolean isEdited;
+    // Force the JSON key to "isForwarded" (Lombok's is-getter would otherwise emit "forwarded").
+    @com.fasterxml.jackson.annotation.JsonProperty("isForwarded")
+    private boolean isForwarded; // true → render a "Forwarded" label
     private boolean isDeleted; // true = deleted for everyone (tombstone)
     private String moderationStatus; // CLEAN | BLOCKED_PENDING_CONSENT | RELEASED
     private List<MessageReactionResponse> reactions;

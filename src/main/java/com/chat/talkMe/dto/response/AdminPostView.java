@@ -23,6 +23,7 @@ public class AdminPostView {
     private boolean hasAudio;
     private List<Media> media;
     private String createdAt;
+    private boolean deleted;       // soft-deleted post (admin sees it flagged)
 
     @Data
     @Builder

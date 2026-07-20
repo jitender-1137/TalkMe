@@ -82,6 +82,18 @@ public class User extends BaseEntity {
     @Column(name = "city", length = 100)
     private String city;
 
+    // ── Latest activity location (derived from the client IP on login/refresh) ──
+    // The "closest location / area" of the user's activity, shown on the admin
+    // dashboard. Best-effort; may be null when geolocation is unavailable.
+    @Column(name = "last_login_ip", length = 45)
+    private String lastLoginIp;
+
+    @Column(name = "last_location", length = 255)
+    private String lastLocation;
+
+    @Column(name = "last_location_at")
+    private java.time.Instant lastLocationAt;
+
     @Column(name = "mobile_number", length = 30)
     private String mobileNumber;
 

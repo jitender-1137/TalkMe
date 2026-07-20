@@ -10,6 +10,7 @@ public class AdminUserFilter {
     private Boolean guest;         // true = guests, false = registered users
     private Boolean banned;
     private Boolean deleted;       // soft-deleted
+    private Boolean online;        // true = currently online (live presence set)
     private String gender;         // MALE / FEMALE / OTHER
     private String countries; // pipe-delimited any-of match (CLDR English names), e.g. "India|United States"
     private String role;           // e.g. ROLE_MODERATOR / ROLE_SUPER_ADMIN
