@@ -14,4 +14,7 @@ public class TypingNotification {
     private String chatUuid;
     private String username;
     private boolean typing;
+    // Fine-grained activity: TYPING, RECORDING_AUDIO, RECORDING_VIDEO, or NONE.
+    // Null on the legacy typing path (clients treat null as TYPING).
+    private String activity;
 }

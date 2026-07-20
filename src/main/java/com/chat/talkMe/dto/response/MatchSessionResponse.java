@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class MatchSessionResponse {
     private String id; // session.uuid
-    private AuthUserResponse partner;
+    private AnonymousPartnerResponse partner; // anonymized — never exposes partner identity
     private String chatId; // stranger chat room uuid
     private boolean isActive;
 }

@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "user_presences")
+@Table(name = "user_presences", indexes = {
+        // "Recently online" / last-seen ordered lookups.
+        @Index(name = "idx_user_presence_last_seen", columnList = "last_seen_at")
+})
 @Getter
 @Setter
 @Builder
@@ -32,4 +35,9 @@ public class UserPresence extends BaseEntity {
     @Column(name = "invisible_mode_enabled", nullable = false)
     @Builder.Default
     private boolean invisibleModeEnabled = false;
+
+    /** When true, other users never see this user's "last seen" timestamp. */
+    @Column(name = "hide_last_seen_enabled", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean hideLastSeenEnabled = false;
 }

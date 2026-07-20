@@ -15,4 +15,5 @@ public class PresenceResponse {
     private String lastSeenAt;
     private boolean ghostModeEnabled;
     private boolean invisibleModeEnabled;
+    private boolean hideLastSeenEnabled;
 }

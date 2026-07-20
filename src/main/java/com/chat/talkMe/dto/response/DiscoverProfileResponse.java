@@ -22,6 +22,8 @@ public class DiscoverProfileResponse {
     private String gender;
     private String bio;
     private String location;
+    private String city;
+    private String country;
     private String distance;
     private Double distanceKm;
     private String occupation;
@@ -44,4 +46,7 @@ public class DiscoverProfileResponse {
     @JsonProperty("isRequestSent")
     private boolean isRequestSent;
     private String pendingRequestId;
+    /** True when this user restricts messaging to friends — drives the avatar lock badge. */
+    @JsonProperty("messagingFriendsOnly")
+    private Boolean messagingFriendsOnly;
 }

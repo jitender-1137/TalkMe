@@ -79,7 +79,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                                     String currentUsername = userDetails.getUsername();
                                     
                                     try {
-                                        java.util.Optional<Chat> chatOpt = chatRepository.findByUuid(java.util.UUID.fromString(chatUuid));
+                                        java.util.Optional<Chat> chatOpt = chatRepository.findByUuidWithMembers(java.util.UUID.fromString(chatUuid));
                                         if (chatOpt.isPresent()) {
                                             Chat chat = chatOpt.get();
                                             if (chat.getChatType() == ChatType.PRIVATE) {

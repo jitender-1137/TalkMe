@@ -47,6 +47,23 @@ public class ChatController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Per-conversation encryption key — participant-only; held in client memory only.
+     * GUESTS are allowed too: they are legitimate members of public rooms (and ephemeral
+     * DMs), whose content is encrypted at rest, so they need the key to read it. Access is
+     * still restricted to actual chat members by {@code getChatKey}'s membership check —
+     * the role gate alone must not block guest room members (was 403-ing them).
+     */
+    @GetMapping("/{id}/key")
+    @PreAuthorize("hasAnyRole('USER','GUEST')")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.ChatKeyResponse>> getChatKey(
+            @PathVariable("id") String uuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        com.chat.talkMe.dto.response.ChatKeyResponse response =
+                chatService.getChatKey(uuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
     @PutMapping("/{id}/archive")
     public ResponseEntity<ResponseDto<Void>> archiveChat(
             @PathVariable("id") String uuid,
@@ -102,6 +119,15 @@ public class ChatController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         chatService.markRead(uuid, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Chat read status updated", "TM_149"));
+    }
+
+    /** Mark a chat as UNREAD (sticky badge until the user opens it again). */
+    @PutMapping("/{id}/unread")
+    public ResponseEntity<ResponseDto<Void>> markUnread(
+            @PathVariable("id") String uuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        chatService.markUnread(uuid, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Chat marked unread", "TM_149"));
     }
 
     @PutMapping("/{id}/delivered")

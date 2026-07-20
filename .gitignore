@@ -38,3 +38,13 @@ out/
 /build/
 /.gradle/
 /.idea/
+src/main/resources/static/
+/.ai/
+/.idea/
+
+# Local secrets — never commit
+.env
+
+### macOS ###
+.DS_Store
+**/.DS_Store

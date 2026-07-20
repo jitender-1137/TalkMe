@@ -18,8 +18,11 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(usernameOrEmail)
-                .or(() -> userRepository.findByEmail(usernameOrEmail))
+        // Username / email are matched case-insensitively (users may type either in
+        // any case). Trim to tolerate stray whitespace from clients.
+        String key = usernameOrEmail == null ? "" : usernameOrEmail.trim();
+        User user = userRepository.findByUsernameIgnoreCase(key)
+                .or(() -> userRepository.findByEmailIgnoreCase(key))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username or email: " + usernameOrEmail));
         return new CustomUserDetails(user);
     }

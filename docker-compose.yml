@@ -1,37 +1,85 @@
-version: '3.8'
+# All configuration is driven by variables from the .env file (see .env.example).
+# Secrets use `${VAR:?message}` so the stack REFUSES to start if they are unset —
+# there are no weak built-in fallbacks. BIND_HOST defaults to 127.0.0.1 so nothing
+# is ever published to the public internet unless you deliberately override it.
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:${POSTGRES_VERSION:-16-alpine}
     container_name: talkme-postgres
+    # Auto-recover after a Docker/host restart or sleep (matches nsfw). Without this
+    # the container stays Exited and the app hammers a dead DB/cache with timeouts.
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_DB: talkMe_prod
-      POSTGRES_USER: talkMe_prod
-      POSTGRES_PASSWORD: TalkMe$9211!
+      POSTGRES_DB: ${POSTGRES_DB:-talkMe_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-talkMe_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-TalkMe$9211!}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d talkMe"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-talkMe_prod} -d ${POSTGRES_DB:-talkMe_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION:-3.13-management}
+    container_name: talkme-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"       # AMQP work plane
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"     # management UI
+      - "${RABBITMQ_STOMP_PORT:-61613}:61613"    # STOMP relay (rabbitmq_stomp plugin)
+    environment:
+      # A user created via DEFAULT_USER is NOT loopback-restricted (unlike guest),
+      # so the app can authenticate over both AMQP and STOMP.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-talkme}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-talkme_dev_pass}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis:${REDIS_VERSION:-7-alpine}
     container_name: talkme-redis
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    # Hardened config (disables REPLICAOF/MODULE/CONFIG/etc.) + password from env.
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass "${REDIS_PASSWORD:-talkMeRedis}"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Free self-hosted NSFW image classifier (nsfwjs). The backend POSTs image bytes
+  # and gets back a verdict — no paid APIs. See moderation.nsfw.base-url.
+  nsfw:
+    build: ./nsfw-service
+    container_name: talkme-nsfw
+    ports:
+      - "${NSFW_PORT:-7999}:8081"
+    environment:
+      NSFW_THRESHOLD: ${NSFW_THRESHOLD:-0.7}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8081/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   redis_data:
+  rabbitmq_data:

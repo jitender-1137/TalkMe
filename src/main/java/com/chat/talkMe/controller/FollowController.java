@@ -50,16 +50,20 @@ public class FollowController {
     @GetMapping("/{userUuid}/followers")
     public ResponseEntity<ResponseDto<Page<AuthUserResponse>>> getFollowers(
             @PathVariable("userUuid") String userUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<AuthUserResponse> followers = followService.getFollowers(userUuid, pageable);
+        String resolvedUuid = "me".equalsIgnoreCase(userUuid) ? userDetails.getUser().getUuid().toString() : userUuid;
+        Page<AuthUserResponse> followers = followService.getFollowers(resolvedUuid, pageable);
         return ResponseEntity.ok(SuccessResponseDto.success(followers));
     }
 
     @GetMapping("/{userUuid}/following")
     public ResponseEntity<ResponseDto<Page<AuthUserResponse>>> getFollowing(
             @PathVariable("userUuid") String userUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<AuthUserResponse> following = followService.getFollowing(userUuid, pageable);
+        String resolvedUuid = "me".equalsIgnoreCase(userUuid) ? userDetails.getUser().getUuid().toString() : userUuid;
+        Page<AuthUserResponse> following = followService.getFollowing(resolvedUuid, pageable);
         return ResponseEntity.ok(SuccessResponseDto.success(following));
     }
 }

@@ -5,7 +5,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "friend_requests")
+@Table(name = "friend_requests",
+       uniqueConstraints = @UniqueConstraint(
+           name = "uk_friend_request_sender_receiver",
+           columnNames = {"sender_id", "receiver_id"}))
 @Getter
 @Setter
 @Builder

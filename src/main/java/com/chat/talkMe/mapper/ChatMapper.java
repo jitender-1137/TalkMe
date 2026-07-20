@@ -18,5 +18,9 @@ public interface ChatMapper {
     @Mapping(target = "otherUser", ignore = true)
     @Mapping(target = "typingUsers", ignore = true)
     @Mapping(target = "avatar", ignore = true)
+    @Mapping(target = "group", ignore = true)
+    @Mapping(target = "isFriend", ignore = true)
+    @Mapping(target = "isBlockedByMe", ignore = true)
+    @Mapping(target = "hasBlockedMe", ignore = true)
     ChatResponse toChatResponse(Chat chat);
 }

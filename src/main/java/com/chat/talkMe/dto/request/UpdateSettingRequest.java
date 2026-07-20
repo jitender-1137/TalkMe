@@ -22,4 +22,20 @@ public class UpdateSettingRequest {
     private Boolean safeModeEnabled;
 
     private Boolean soundEnabled;
+
+    /** "EVERYONE" or "FRIENDS_ONLY"; null leaves it unchanged. */
+    @Size(max = 20, message = "Invalid messaging privacy value")
+    private String messagingPrivacy;
+
+    private String groupAddPrivacy;
+
+    // ── Transactional-email preferences (null ⇒ unchanged) ──────────────────────
+    /** New-sign-in security alert emails. */
+    private Boolean emailLoginAlerts;
+
+    /** "You have unread messages" digest emails. */
+    private Boolean emailUnreadMessages;
+
+    /** Product news / announcement emails. */
+    private Boolean emailAnnouncements;
 }

@@ -1,0 +1,28 @@
+# Hindi (Devanagari) abusive / sexual terms for content moderation.
+# Normalized (lowercase NFKC) at load time.
+चूतिया
+चुतिया
+भोसडीके
+भोसड़ी
+मादरचोद
+बहनचोद
+भेनचोद
+गांड
+गांडू
+लंड
+लौड़ा
+रंडी
+चोद
+चूत
+चुदाई
+कुत्ता
+कुत्ती
+कमीना
+कमीने
+हरामी
+हरामज़ादा
+साला
+साली
+टट्टी
+भड़वा
+भोसड़ा

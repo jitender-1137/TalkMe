@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.request.CreateChatRequest;
 import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.event.StatusUpdateEvent;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.NotFoundException;
@@ -31,6 +32,9 @@ public class ChatServiceImpl implements ChatService {
 
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
+    private final com.chat.talkMe.cache.MemberCountCache memberCountCache;
+    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
+    private final com.chat.talkMe.cache.BlockCache blockCache;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final MessageReadReceiptRepository readReceiptRepository;
@@ -39,8 +43,15 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMapper chatMapper;
     private final PresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
     private final FriendRepository friendRepository;
     private final BlockUserRepository blockUserRepository;
+    private final UserSettingRepository userSettingRepository;
+    private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final OutboxEventRepository outboxEventRepository;
+    private final com.chat.talkMe.crypto.ChatKeyService chatKeyService;
+    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -64,16 +75,32 @@ public class ChatServiceImpl implements ChatService {
             // Check if private chat already exists between these users (active or deleted)
             List<Chat> existingChats = chatRepository.findPrivateChatBetweenUsers(managedUser.getId(), recipient.getId());
             if (!existingChats.isEmpty()) {
-                Chat chat = existingChats.get(0);
-                // Undelete the chat and its members
-                chat.setDeleted(false);
-                chatRepository.save(chat);
-                for (ChatMember m : chat.getMembers()) {
-                    m.setDeleted(false);
-                    m.setPinned(false);
-                    m.setArchived(false);
-                    chatMemberRepository.save(m);
+                // Reuse the existing 1:1 chat instead of minting a new id. Prefer an
+                // ACTIVE chat (deterministic — the query has no ordering); only fall
+                // back to a deleted one, which we then reopen. This is the path hit
+                // when B messages A from the feed / profile explorer.
+                Chat chat = existingChats.stream()
+                        .filter(c -> !c.isDeleted())
+                        .findFirst()
+                        .orElse(existingChats.get(0));
+
+                if (chat.isDeleted()) {
+                    // Reopen a previously-deleted conversation as a FRESH chat:
+                    // undelete the chat + members and stamp clearedAt = now so the
+                    // old (deleted) messages never resurface for either side.
+                    Instant reopenedAt = Instant.now();
+                    chat.setDeleted(false);
+                    chatRepository.save(chat);
+                    for (ChatMember m : chat.getMembers()) {
+                        m.setDeleted(false);
+                        m.setPinned(false);
+                        m.setArchived(false);
+                        m.setClearedAt(reopenedAt);
+                        chatMemberRepository.save(m);
+                    }
                 }
+                // An ACTIVE chat is returned untouched — reusing it must NOT reset
+                // the user's pin / archive / cleared state.
 
                 // Send user chat event to the recipient so their frontend can fetch it and subscribe
                 try {
@@ -129,19 +156,20 @@ public class ChatServiceImpl implements ChatService {
 
             return mapToChatResponse(chat, managedUser);
         } else {
-            // Group Chat
+            // Group Chat (legacy path — new groups should use GroupService.createGroup)
             Chat chat = Chat.builder()
                     .name(request.getName())
                     .chatType(ChatType.GROUP)
+                    .ownerId(managedUser.getId())
                     .build();
             chat = chatRepository.save(chat);
 
             ChatMember adminMember = ChatMember.builder()
                     .chat(chat)
                     .user(managedUser)
-                    .isAdmin(true)
                     .joinedAt(Instant.now())
                     .build();
+            adminMember.setRole(com.chat.talkMe.enums.MemberRole.OWNER);
             chatMemberRepository.save(adminMember);
             chat.getMembers().add(adminMember);
 
@@ -152,9 +180,9 @@ public class ChatServiceImpl implements ChatService {
                         ChatMember groupMember = ChatMember.builder()
                                 .chat(chat)
                                 .user(user)
-                                .isAdmin(false)
                                 .joinedAt(Instant.now())
                                 .build();
+                        groupMember.setRole(com.chat.talkMe.enums.MemberRole.MEMBER);
                         chatMemberRepository.save(groupMember);
                         chat.getMembers().add(groupMember);
                     }
@@ -176,13 +204,16 @@ public class ChatServiceImpl implements ChatService {
 
         for (Chat chat : chats) {
             ChatResponse resp = mapToChatResponse(chat, managedUser);
-            
-            // Filter out non-group chats that have no messages (e.g. cleared)
-            if (!"GROUP".equals(resp.getChatType()) && resp.getLastMessage() == null) {
+
+            boolean isMultiParty = chat.isMultiParty();
+
+            // Filter out 1:1 chats that have no messages (e.g. cleared). Multi-party
+            // chats (group/channel/room) are always shown once joined.
+            if (!isMultiParty && resp.getLastMessage() == null) {
                 continue;
             }
 
-            if (!"GROUP".equals(resp.getChatType())) {
+            if (!isMultiParty) {
                 ChatMember memberOther = chat.getMembers().stream()
                         .filter(m -> !m.getUser().getId().equals(managedUser.getId()))
                         .findFirst()
@@ -227,6 +258,27 @@ public class ChatServiceImpl implements ChatService {
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
         return mapToChatResponse(chat, managedUser);
+    }
+
+    @Override
+    @Transactional
+    public com.chat.talkMe.dto.response.ChatKeyResponse getChatKey(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Only a participant of this chat may fetch its key.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        if (!messageCryptoService.isEnabled()) {
+            return com.chat.talkMe.dto.response.ChatKeyResponse.builder().enabled(false).build();
+        }
+        return com.chat.talkMe.dto.response.ChatKeyResponse.builder()
+                .enabled(true)
+                .key(chatKeyService.getRawKeyBase64(chat.getId()))
+                .algo("AES-256-GCM")
+                .version(1)
+                .build();
     }
 
     @Override
@@ -293,6 +345,13 @@ public class ChatServiceImpl implements ChatService {
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
                 .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
+        // For a group/channel/room, deleting removes it for EVERYONE — only the
+        // owner may do that. (1:1 chats keep the existing per-user delete behavior.)
+        if (chat.isMultiParty() && member.getRole() != com.chat.talkMe.enums.MemberRole.OWNER) {
+            throw new com.chat.talkMe.exception.ForbiddenException(
+                    "Only the group owner can delete the group", "TM_291");
+        }
+
         // Delete all messages in the chat from the database (cascading deletes for read receipts, reactions, and attachments)
         List<Message> messages = messageRepository.findByChat(chat);
         messageRepository.deleteAll(messages);
@@ -308,7 +367,7 @@ public class ChatServiceImpl implements ChatService {
             chatMemberRepository.save(m);
         }
 
-        // Broadcast WS event: chat_deleted to all subscribers of the chat messages topic
+        // Broadcast WS event: chat_deleted to all subscribers of the chat messages topic and other members' personal queues
         try {
             Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", "chat_deleted");
@@ -317,7 +376,21 @@ public class ChatServiceImpl implements ChatService {
             payload.put("chatId", uuid);
 
             eventWrapper.put("payload", payload);
+            
+            // 1. Send to chat topic
             messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
+
+            // 2. Send to other members' personal user queue
+            for (ChatMember memberObj : chat.getMembers()) {
+                User memberUser = memberObj.getUser();
+                if (memberUser != null && !memberUser.getId().equals(currentUser.getId())) {
+                    messagingTemplate.convertAndSendToUser(
+                        memberUser.getUsername(),
+                        "/queue/chats",
+                        eventWrapper
+                    );
+                }
+            }
         } catch (Exception e) {
             log.error("Failed to send chat_deleted WS event", e);
         }
@@ -325,46 +398,69 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public void markUnread(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+        if (!member.isManuallyUnread()) {
+            member.setManuallyUnread(true);
+            chatMemberRepository.save(member);
+        }
+    }
+
+    @Transactional
     public void markRead(String uuid, User currentUser) {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
 
+        // Opening/reading the chat clears any manual "unread" flag.
+        chatMemberRepository.findByChatAndUser(chat, managedUser).ifPresent(m -> {
+            if (m.isManuallyUnread()) {
+                m.setManuallyUnread(false);
+                chatMemberRepository.save(m);
+            }
+        });
+
         Instant now = Instant.now();
+
+        // Multi-party chats use the watermark model (no per-message receipts): advance
+        // this member's lastReadMessageId to the latest message. Cheaper and correct
+        // for N members. "Seen by" is derived from watermarks (deferred feature).
+        if (chat.isMultiParty()) {
+            // Atomic, forward-only watermark advance — see advanceReadWatermark. Avoids
+            // the optimistic-lock race when two mark-read calls (join + chat-open on an
+            // invite link) hit the same ChatMember row concurrently.
+            long maxId = messageRepository.findMaxMessageId(chat);
+            chatMemberRepository.advanceReadWatermark(chat, managedUser, maxId);
+            return;
+        }
 
         // Step 1: Bulk-update all existing non-READ receipts for this user in this chat
         int updatedCount = readReceiptRepository.bulkMarkAsRead(chat, managedUser.getId(), now);
 
-        // Step 2: Create receipts for messages that don't have any receipt for this user
-        List<Message> messagesWithoutReceipt = readReceiptRepository.findMessagesWithoutReceipt(chat, managedUser.getId());
-        for (Message message : messagesWithoutReceipt) {
-            MessageReadReceipt receipt = MessageReadReceipt.builder()
-                    .message(message)
-                    .user(managedUser)
-                    .status("READ")
-                    .readAt(now)
-                    .deliveredAt(now)
-                    .build();
-            readReceiptRepository.save(receipt);
-        }
+        // Step 2: Atomically create READ receipts for messages that have no receipt yet.
+        int insertedCount = readReceiptRepository.insertMissingReceipts(
+                chat.getId(), managedUser.getId(), "READ", now, now, now);
 
-        boolean hasUpdates = updatedCount > 0 || !messagesWithoutReceipt.isEmpty();
+        boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
         if (hasUpdates) {
-            // Broadcast WS event: messages_read
-            try {
-                Map<String, Object> eventWrapper = new HashMap<>();
-                eventWrapper.put("event", "messages_read");
-
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("chatId", uuid);
-                payload.put("readBy", managedUser.getUuid().toString());
-
-                eventWrapper.put("payload", payload);
-                messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
-            } catch (Exception e) {
-                log.error("WebSocket messages_read broadcast failed", e);
-            }
+            // Guaranteed delivery via the transactional outbox: persist a status row in
+            // THIS transaction, then broadcast after commit (StatusBroadcastListener).
+            // If the broadcast is lost, the outbox poller re-drives it. The unread
+            // recompute now runs in the delivery handler (idempotent, from the DB).
+            StatusUpdateEvent event = StatusUpdateEvent.builder()
+                    .eventKey(UUID.randomUUID().toString())
+                    .chatUuid(uuid)
+                    .eventName(StatusUpdateEvent.READ)
+                    .actorUuid(managedUser.getUuid().toString())
+                    .actorUserId(managedUser.getId())
+                    .build();
+            persistStatusOutbox(event);
+            applicationEventPublisher.publishEvent(event);
         }
     }
 
@@ -380,35 +476,48 @@ public class ChatServiceImpl implements ChatService {
         // Step 1: Bulk-update all SENT receipts to DELIVERED (do NOT downgrade READ)
         int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
 
-        // Step 2: Create DELIVERED receipts for messages that don't have any receipt for this user
-        List<Message> messagesWithoutReceipt = readReceiptRepository.findMessagesWithoutReceipt(chat, managedUser.getId());
-        for (Message message : messagesWithoutReceipt) {
-            MessageReadReceipt receipt = MessageReadReceipt.builder()
-                    .message(message)
-                    .user(managedUser)
-                    .status("DELIVERED")
-                    .deliveredAt(now)
-                    .build();
-            readReceiptRepository.save(receipt);
-        }
+        // Step 2: Atomically create DELIVERED receipts for messages that have no receipt yet.
+        int insertedCount = readReceiptRepository.insertMissingReceipts(
+                chat.getId(), managedUser.getId(), "DELIVERED", null, now, now);
 
-        boolean hasUpdates = updatedCount > 0 || !messagesWithoutReceipt.isEmpty();
+        boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
         if (hasUpdates) {
-            // Broadcast WS event: messages_delivered
-            try {
-                Map<String, Object> eventWrapper = new HashMap<>();
-                eventWrapper.put("event", "messages_delivered");
+            // Guaranteed delivery via the transactional outbox (see markRead).
+            StatusUpdateEvent event = StatusUpdateEvent.builder()
+                    .eventKey(UUID.randomUUID().toString())
+                    .chatUuid(uuid)
+                    .eventName(StatusUpdateEvent.DELIVERED)
+                    .actorUuid(managedUser.getUuid().toString())
+                    // actorUserId lets the delivery handler suppress the receipt when the
+                    // recipient (this user) is in Ghost mode — was missing, so ghost
+                    // "delivered" still leaked to the sender.
+                    .actorUserId(managedUser.getId())
+                    .build();
+            persistStatusOutbox(event);
+            applicationEventPublisher.publishEvent(event);
+        }
+    }
 
-                Map<String, Object> payload = new HashMap<>();
-                payload.put("chatId", uuid);
-                payload.put("deliveredBy", managedUser.getUuid().toString());
-
-                eventWrapper.put("payload", payload);
-                messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
-            } catch (Exception e) {
-                log.error("WebSocket messages_delivered broadcast failed", e);
-            }
+    /**
+     * Persists a status-change outbox row in the caller's transaction, so it commits
+     * atomically with the receipt update. {@code StatusBroadcastListener} delivers it
+     * after commit; {@code OutboxPublisherJob} re-drives it if that delivery is lost.
+     */
+    private void persistStatusOutbox(StatusUpdateEvent event) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            OutboxEvent row = OutboxEvent.builder()
+                    .eventKey(event.getEventKey())
+                    .eventType(StatusUpdateEvent.EVENT_TYPE)
+                    .payload(payload)
+                    .status(OutboxEvent.STATUS_PENDING)
+                    .attempts(0)
+                    .createdAt(Instant.now())
+                    .build();
+            outboxEventRepository.save(row);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to persist status outbox event", e);
         }
     }
 
@@ -419,25 +528,21 @@ public class ChatServiceImpl implements ChatService {
         List<Chat> chats = chatRepository.findChatsByUser(managedUser);
         Instant now = Instant.now();
 
+        // Ghost recipient: still record delivery (their unread tracking needs it) but
+        // NEVER tell the senders — suppress the outbound "delivered" broadcast.
+        boolean ghost = presenceService != null && presenceService.isGhost(managedUser);
+
         for (Chat chat : chats) {
             // Step 1: Bulk-update all SENT receipts to DELIVERED
             int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
 
-            // Step 2: Create DELIVERED receipts for messages without any receipt
-            List<Message> messagesWithoutReceipt = readReceiptRepository.findMessagesWithoutReceipt(chat, managedUser.getId());
-            for (Message message : messagesWithoutReceipt) {
-                MessageReadReceipt receipt = MessageReadReceipt.builder()
-                        .message(message)
-                        .user(managedUser)
-                        .status("DELIVERED")
-                        .deliveredAt(now)
-                        .build();
-                readReceiptRepository.save(receipt);
-            }
+            // Step 2: Atomically create DELIVERED receipts for messages without any receipt
+            int insertedCount = readReceiptRepository.insertMissingReceipts(
+                    chat.getId(), managedUser.getId(), "DELIVERED", null, now, now);
 
-            boolean hasUpdates = updatedCount > 0 || !messagesWithoutReceipt.isEmpty();
+            boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
 
-            if (hasUpdates) {
+            if (hasUpdates && !ghost) {
                 try {
                     Map<String, Object> eventWrapper = new HashMap<>();
                     eventWrapper.put("event", "messages_delivered");
@@ -455,6 +560,29 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /** Ids of this chat's members (other than the viewer) who are in Ghost mode. */
+    private java.util.Set<Long> ghostMemberIds(Chat chat, User viewer) {
+        java.util.List<User> others = chat.getMembers().stream()
+                .map(ChatMember::getUser)
+                .filter(u -> u != null && !u.getId().equals(viewer.getId()))
+                .collect(java.util.stream.Collectors.toList());
+        return presenceService.getGhostUserIds(others);
+    }
+
+    /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
+    private String resolveStatusExcludingGhosts(Message m, java.util.Set<Long> ghostIds) {
+        if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
+        boolean delivered = false;
+        for (var rec : m.getReadReceipts()) {
+            Long uid = rec.getUser().getId();
+            if (uid.equals(m.getSender().getId())) continue;
+            if (ghostIds.contains(uid)) continue; // ghost recipient → invisible to sender
+            if ("READ".equals(rec.getStatus())) return "READ";
+            if ("DELIVERED".equals(rec.getStatus())) delivered = true;
+        }
+        return delivered ? "DELIVERED" : "SENT";
+    }
+
     private ChatResponse mapToChatResponse(Chat chat, User currentUser) {
         ChatMember memberSelf = chat.getMembers().stream()
                 .filter(m -> m.getUser().getId().equals(currentUser.getId()))
@@ -469,16 +597,28 @@ public class ChatServiceImpl implements ChatService {
             response.setPinned(memberSelf.isPinned());
         }
 
-        // Last Message
-        Message lastMessage = null;
-        if (memberSelf != null && memberSelf.getClearedAt() != null) {
-            lastMessage = messageRepository.findFirstByChatAndIsDeletedFalseAndCreatedAtGreaterThanOrderByCreatedAtDesc(chat, memberSelf.getClearedAt()).orElse(null);
-        } else {
-            lastMessage = messageRepository.findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(chat).orElse(null);
-        }
+        // Last Message — capped to the viewer's visible window: after clearedAt (if the
+        // chat was cleared) AND at/before leftAt (a former member must keep seeing the
+        // last message from BEFORE they left, never messages sent after their exit).
+        java.time.Instant previewClearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+        java.time.Instant previewLeftAt = memberSelf != null ? memberSelf.getLeftAt() : null;
+        java.util.List<Message> lastList = messageRepository.findLastVisibleMessage(
+                chat, previewClearedAt, previewLeftAt, org.springframework.data.domain.PageRequest.of(0, 1));
+        Message lastMessage = lastList.isEmpty() ? null : lastList.get(0);
 
         if (lastMessage != null) {
-            response.setLastMessage(messageMapper.toMessageResponse(lastMessage));
+            MessageResponse lastMessageDto = messageMapper.toMessageResponse(lastMessage);
+            // Ghost recipients must not reveal delivered/seen to the sender — including
+            // the chat-list preview ticks. For the viewer's OWN last message, recompute
+            // the status ignoring receipts from any ghost member (caps at SENT).
+            if (presenceService != null
+                    && lastMessage.getSender().getId().equals(currentUser.getId())) {
+                java.util.Set<Long> ghostIds = ghostMemberIds(chat, currentUser);
+                if (!ghostIds.isEmpty()) {
+                    lastMessageDto.setStatus(resolveStatusExcludingGhosts(lastMessage, ghostIds));
+                }
+            }
+            response.setLastMessage(lastMessageDto);
         }
 
         // Set dynamic properties based on ChatType
@@ -495,11 +635,13 @@ public class ChatServiceImpl implements ChatService {
                 AuthUserResponse otherUserDto = userMapper.toAuthUserResponse(otherUser);
                 if (presenceService != null) {
                     otherUserDto.setPresence(presenceService.getStatus(otherUser).name().toLowerCase());
-                    UserPresence userPresence = presenceService.getUserPresence(otherUser);
-                    if (userPresence != null && userPresence.getLastSeenAt() != null) {
-                        otherUserDto.setLastSeen(userPresence.getLastSeenAt().toString());
-                    }
+                    // Apparent last-seen: nulled for Invisible / Hide-last-seen (privacy
+                    // rule centralized in PresenceService) so the conversation list never
+                    // leaks a hidden last-seen.
+                    java.time.Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
+                    otherUserDto.setLastSeen(lastSeen != null ? lastSeen.toString() : null);
                 }
+                otherUserDto.setMessagingFriendsOnly(userSettingsCache.isMessagingFriendsOnly(otherUser));
                 response.setOtherUser(otherUserDto);
                 // Avatar mappings
                 response.setAvatar(null);
@@ -510,9 +652,9 @@ public class ChatServiceImpl implements ChatService {
                         .orElse(false);
                 response.setFriend(isFriend);
 
-                // Blocking Check
-                boolean isBlockedByMe = blockUserRepository.existsByUserAndBlocked(currentUser, otherUser);
-                boolean hasBlockedMe = blockUserRepository.existsByUserAndBlocked(otherUser, currentUser);
+                // Blocking Check (cached per-user blocked set — avoids 2 DB hits per 1:1 chat).
+                boolean isBlockedByMe = blockCache.hasBlocked(currentUser, otherUser.getId());
+                boolean hasBlockedMe = blockCache.hasBlocked(otherUser, currentUser.getId());
                 response.setBlockedByMe(isBlockedByMe);
                 response.setHasBlockedMe(hasBlockedMe);
 
@@ -524,15 +666,76 @@ public class ChatServiceImpl implements ChatService {
                 }
             }
         } else {
+            // Multi-party (GROUP / CHANNEL / ROOM)
             response.setName(chat.getName());
-            response.setAvatar(null);
+            response.setAvatar(chat.getImageUrl());
+            response.setGroup(buildGroupInfo(chat, memberSelf));
         }
 
-        // Calculate dynamic unread count
-        long unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
+        // Calculate dynamic unread count.
+        long unreadCount;
+        if (chat.isMultiParty() && (memberSelf == null || memberSelf.getLeftAt() != null)) {
+            // Non-member (discovery preview) or former member → nothing unread.
+            unreadCount = 0;
+        } else if (chat.isMultiParty()) {
+            // Watermark model: cheaper than the per-message read-receipt scan and
+            // correct for N members.
+            Long watermark = memberSelf != null ? memberSelf.getLastReadMessageId() : null;
+            Instant clearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+            unreadCount = messageRepository.countUnreadForWatermark(
+                    chat, currentUser.getId(), watermark != null ? watermark : 0L, clearedAt);
+        } else {
+            unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
+        }
+        // "Mark as unread" from the chat list — force the badge on even with no
+        // genuinely-unread messages. Cleared when the user opens/reads the chat.
+        if (unreadCount == 0 && memberSelf != null && memberSelf.isManuallyUnread()) {
+            unreadCount = 1;
+        }
         response.setUnreadCount((int) unreadCount);
         response.setTypingUsers(new ArrayList<>());
 
         return response;
+    }
+
+    /** Builds the group/channel/room metadata block for a multi-party chat. */
+    private com.chat.talkMe.dto.response.GroupInfoResponse buildGroupInfo(Chat chat, ChatMember memberSelf) {
+        ChatSettings s = chat.getSettings() != null ? chat.getSettings() : ChatSettings.builder().build();
+
+        String ownerUuid = null;
+        if (chat.getOwnerId() != null) {
+            ownerUuid = userRepository.findById(chat.getOwnerId())
+                    .map(u -> u.getUuid().toString())
+                    .orElse(null);
+        }
+
+        String pinnedMessageId = messageRepository.findFirstByChatAndPinnedTrueOrderByPinnedAtDesc(chat)
+                .map(m -> m.getUuid().toString())
+                .orElse(null);
+
+        return com.chat.talkMe.dto.response.GroupInfoResponse.builder()
+                .subtype(chat.getChatType().name().toLowerCase())
+                .visibility(chat.getVisibility().name())
+                .joinPolicy(chat.getJoinPolicy().name())
+                .allowExplicitContent(chat.isAllowExplicitContent())
+                .allowNonFriends(chat.isAllowNonFriends())
+                .memberLimit(chat.getMemberLimit())
+                .memberCount(memberCountCache.get(chat))
+                .description(chat.getDescription())
+                .imageUrl(chat.getImageUrl())
+                .publicUsername(chat.getSlug())
+                .category(chat.getCategory())
+                .tags(chat.getTags() == null ? java.util.List.of()
+                        : chat.getTags().stream().map(Enum::name).collect(Collectors.toList()))
+                .ownerId(ownerUuid)
+                .myRole(memberSelf != null ? memberSelf.getRole().name() : null)
+                .active(memberSelf != null && memberSelf.getLeftAt() == null)
+                .pinnedMessageId(pinnedMessageId)
+                .whoCanSend(s.getWhoCanSend().name())
+                .whoCanAddMembers(s.getWhoCanAddMembers().name())
+                .whoCanEditInfo(s.getWhoCanEditInfo().name())
+                .whoCanPin(s.getWhoCanPin().name())
+                .slowModeSeconds(s.getSlowModeSeconds())
+                .build();
     }
 }

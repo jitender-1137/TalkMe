@@ -26,6 +26,19 @@ public class Story extends BaseEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    // Who can see this story. EVERYONE = public; FRIENDS = only the author's
+    // followers &amp; following (accepted follow in either direction). Backfills
+    // existing rows to EVERYONE.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "audience", length = 16, nullable = false)
+    @org.hibernate.annotations.ColumnDefault("'EVERYONE'")
+    @Builder.Default
+    private com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+
+    // Optional soundtrack.
+    @Embedded
+    private AudioTrack audio;
+
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

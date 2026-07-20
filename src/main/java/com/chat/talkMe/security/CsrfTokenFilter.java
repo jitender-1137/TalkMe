@@ -31,13 +31,17 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
      *  - /api/v1/auth/refresh    — uses HttpOnly refreshToken cookie, not CSRF-dependent
      *  - /api/v1/auth/forgot-password  — public, unauthenticated, no cookie issued yet
      *  - /api/v1/auth/reset-password   — public, unauthenticated, uses one-time token in body
+     *  - /api/v1/push/delivered        — POSTed by the service worker (closed-tab push
+     *      delivery ack); it has no access to the csrf_token cookie/header and is instead
+     *      authorized by the signed delivery token in the body, so CSRF doesn't apply.
      */
     private static final Set<String> EXCLUDED_PATHS = Set.of(
             "/api/v1/auth/login",
             "/api/v1/auth/signup",
             "/api/v1/auth/refresh",
             "/api/v1/auth/forgot-password",
-            "/api/v1/auth/reset-password"
+            "/api/v1/auth/reset-password",
+            "/api/v1/push/delivered"
     );
 
     // Reuse ObjectMapper — it is thread-safe and expensive to construct per-request
@@ -66,10 +70,13 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
     /**
      * Uses startsWith() so that paths with trailing slashes or future sub-paths
      * are still matched correctly against the exclusion list.
+     * Normalizes paths by removing the /api/v1 prefix if present for prefix-agnostic matching.
      */
     private boolean isExcluded(String path) {
+        String normalizedPath = path.startsWith("/api/v1") ? path.substring(7) : path;
         for (String excluded : EXCLUDED_PATHS) {
-            if (path.startsWith(excluded)) {
+            String normalizedExcluded = excluded.startsWith("/api/v1") ? excluded.substring(7) : excluded;
+            if (normalizedPath.startsWith(normalizedExcluded)) {
                 return true;
             }
         }

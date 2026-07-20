@@ -3,20 +3,26 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.BlockUser;
 import com.chat.talkMe.domain.MatchReport;
-import com.chat.talkMe.domain.UserPresence;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.dto.response.UserResponse;
+import com.chat.talkMe.domain.UserSetting;
+import com.chat.talkMe.enums.MessagingPrivacy;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
+import com.chat.talkMe.repository.PostRepository;
 import com.chat.talkMe.service.UserService;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.service.StorageService;
@@ -47,12 +53,17 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
+    private final UserSettingRepository userSettingRepository;
     private final BlockUserRepository blockUserRepository;
     private final MatchReportRepository matchReportRepository;
     private final PresenceService presenceService;
     private final StorageService storageService;
     private final UserMapper userMapper;
     private final StringRedisTemplate redisTemplate;
+    private final UserFollowRepository userFollowRepository;
+    private final PostRepository postRepository;
+    private final ContentModerationService moderationService;
+    private final com.chat.talkMe.service.NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -62,6 +73,7 @@ public class UserServiceImpl implements UserService {
         UserResponse response = userMapper.toUserResponse(user);
         response.setPresence("online");
         response.setLastSeen(Instant.now().toString());
+        populateUserCounts(response, user);
         return response;
     }
 
@@ -72,6 +84,11 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
 
         if (request.getName() != null) {
+            // Display name is publicly visible everywhere — must stay clean.
+            if (moderationService.moderateText(request.getName()).isExplicit()) {
+                throw new ContentModerationException(
+                        "Your display name contains content that violates our community guidelines.");
+            }
             user.setName(request.getName());
         }
         if (request.getProfileImage() != null) {
@@ -92,6 +109,9 @@ public class UserServiceImpl implements UserService {
         if (request.getAge() != null) {
             user.setAge(request.getAge());
         }
+        if (request.getGender() != null && !request.getGender().isBlank()) {
+            user.setGender(request.getGender());
+        }
         if (request.getBio() != null) {
             user.setBio(request.getBio());
         }
@@ -111,6 +131,7 @@ public class UserServiceImpl implements UserService {
         UserResponse response = userMapper.toUserResponse(user);
         response.setPresence("online");
         response.setLastSeen(Instant.now().toString());
+        populateUserCounts(response, user);
         return response;
     }
 
@@ -120,9 +141,34 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
 
-        String avatarUrl = storageService.storeFile(file, "avatar");
+        // Profile photos are publicly visible — reject NSFW before storing.
+        if (moderationService.moderateUpload(file).isExplicit()) {
+            throw new ContentModerationException(
+                    "This profile photo violates our community guidelines and can't be used.");
+        }
+
+        // Avatars live under profiles/<userUuid> (server-derived id → traversal-safe).
+        String avatarUrl = storageService.storeFile(file, "avatar", "profiles/" + user.getUuid());
+        boolean isNewPhoto = user.getProfileImage() == null || !user.getProfileImage().equals(avatarUrl);
         user.setProfileImage(avatarUrl);
         userRepository.save(user);
+
+        // Tell the user's friends they updated their profile photo (only real accounts
+        // do this — guests have no friends graph). Removal is handled by removeAvatar,
+        // which intentionally sends NO notification. Best-effort; never blocks the upload.
+        if (isNewPhoto && !user.isGuest()) {
+            try {
+                notificationService.notifyFriends(
+                        user,
+                        "New profile photo",
+                        user.getName() + " updated their profile photo.",
+                        "PROFILE_PHOTO",
+                        user.getUuid().toString(),
+                        avatarUrl);
+            } catch (Exception e) {
+                log.warn("Failed to notify friends of profile-photo change for {}", user.getUsername(), e);
+            }
+        }
 
         return Map.of("avatarUrl", avatarUrl);
     }
@@ -140,11 +186,17 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUserById(String userId, User currentUser) {
-        User targetUser = userRepository.findByUuid(UUID.fromString(userId))
-                .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+        User targetUser;
+        if ("me".equalsIgnoreCase(userId)) {
+            targetUser = currentUser;
+        } else {
+            targetUser = userRepository.findByUuid(UUID.fromString(userId))
+                    .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+        }
 
         UserResponse response = userMapper.toUserResponse(targetUser);
         populatePresenceAndBlockStatus(response, currentUser, targetUser);
+        populateUserCounts(response, targetUser);
         return response;
     }
 
@@ -168,14 +220,17 @@ public class UserServiceImpl implements UserService {
 
         Specification<User> spec = (root, q, cb) -> {
             String pattern = "%" + query.toLowerCase() + "%";
-            return cb.and(
-                cb.notEqual(root.get("id"), currentUser.getId()),
-                cb.or(
+            List<jakarta.persistence.criteria.Predicate> preds = new java.util.ArrayList<>();
+            preds.add(cb.notEqual(root.get("id"), currentUser.getId()));
+            // Never surface soft-deleted / deletion-requested accounts (both carry
+            // isDeleted=true) or guest sessions in people search / discover.
+            preds.add(cb.equal(root.get("isDeleted"), false));
+            preds.add(cb.equal(root.get("isGuest"), false));
+            preds.add(cb.or(
                     cb.like(cb.lower(root.get("username")), pattern),
                     cb.like(cb.lower(root.get("name")), pattern),
-                    cb.like(cb.lower(root.get("email")), pattern)
-                )
-            );
+                    cb.like(cb.lower(root.get("email")), pattern)));
+            return cb.and(preds.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
 
         Page<User> userPage = userRepository.findAll(spec, pageable);
@@ -184,6 +239,7 @@ public class UserServiceImpl implements UserService {
                 .map(u -> {
                     UserResponse res = userMapper.toUserResponse(u);
                     populatePresenceAndBlockStatus(res, currentUser, u);
+                    populateUserCounts(res, u);
                     return res;
                 })
                 .collect(Collectors.toList());
@@ -229,6 +285,15 @@ public class UserServiceImpl implements UserService {
     public void reportUser(String userId, String reason, String description, User currentUser) {
         User targetUser = userRepository.findByUuid(UUID.fromString(userId))
                 .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
+
+        // One OPEN report per (reporter → reported): don't let the same person pile up
+        // duplicate pending reports. Once a moderator resolves/dismisses it, they can
+        // report again if the behaviour recurs.
+        if (matchReportRepository.existsByReporterIdAndReportedIdAndStatus(
+                currentUser.getId(), targetUser.getId(), "PENDING")) {
+            throw new com.chat.talkMe.exception.ConflictException(
+                    "You've already reported this user — it's under review.", "TM_182");
+        }
 
         MatchReport report = MatchReport.builder()
                 .reporter(currentUser)
@@ -276,20 +341,49 @@ public class UserServiceImpl implements UserService {
         }
         response.setBlocked(isBlocked);
 
-        UserPresence targetPresence = presenceService.getUserPresence(targetUser);
-        PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
+        // "Who can message me": expose whether this user restricts messages to friends
+        // (drives the lock badge on their avatar), and whether the viewer specifically
+        // can message them. canMessage mirrors the hard enforcement in
+        // MessageServiceImpl.sendMessage: blocked only when friends-only AND not a friend.
+        MessagingPrivacy privacy = userSettingRepository.findByUser(targetUser)
+                .map(UserSetting::getMessagingPrivacy)
+                .orElse(MessagingPrivacy.EVERYONE);
+        boolean friendsOnly = privacy == MessagingPrivacy.FRIENDS_ONLY;
+        response.setMessagingFriendsOnly(friendsOnly);
 
+        boolean canMessage = true;
+        if (friendsOnly && currentUser != null && !currentUser.getId().equals(targetUser.getId())) {
+            canMessage = friendRepository.findByUserAndFriend(currentUser, targetUser)
+                    .map(f -> !f.isDeleted())
+                    .orElse(false);
+        }
+        response.setCanMessage(canMessage);
+
+        // Live status + last-seen come from Redis (the DB values are stale by design —
+        // only written on OFFLINE). Status is Invisible-masked via getStatus.
+        PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
         response.setPresence(apparentStatus.name().toLowerCase());
 
         if (currentUser != null && currentUser.getId().equals(targetUser.getId())) {
-            response.setLastSeen(targetPresence.getLastSeenAt() != null ? targetPresence.getLastSeenAt().toString() : null);
+            // Owner sees their own real last-seen.
+            java.time.Instant own = presenceService.getLastSeen(targetUser);
+            response.setLastSeen(own != null ? own.toString() : null);
         } else {
-            if (targetPresence.isGhostModeEnabled() || targetPresence.isInvisibleModeEnabled()) {
-                response.setLastSeen(null);
-            } else {
-                response.setLastSeen(targetPresence.getLastSeenAt() != null ? targetPresence.getLastSeenAt().toString() : null);
-            }
+            // Others: apparent last-seen, nulled for Invisible / Hide-last-seen
+            // (single privacy rule in PresenceService — previously this missed
+            // hide-last-seen, leaking the timestamp).
+            java.time.Instant apparent = presenceService.getApparentLastSeen(targetUser);
+            response.setLastSeen(apparent != null ? apparent.toString() : null);
         }
+    }
+
+    private void populateUserCounts(UserResponse response, User user) {
+        long followers = userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        long following = userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        long posts = postRepository.countByUserAndIsDeletedFalse(user);
+        response.setFollowersCount(followers);
+        response.setFollowingCount(following);
+        response.setPostsCount(posts);
     }
 
     @Override
@@ -305,6 +399,7 @@ public class UserServiceImpl implements UserService {
                 .map(u -> {
                     UserResponse res = userMapper.toUserResponse(u);
                     populatePresenceAndBlockStatus(res, currentUser, u);
+                    populateUserCounts(res, u);
                     return res;
                 })
                 .collect(Collectors.toList());

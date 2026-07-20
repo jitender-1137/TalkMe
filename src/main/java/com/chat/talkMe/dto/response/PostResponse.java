@@ -12,12 +12,19 @@ import java.util.List;
 @AllArgsConstructor
 public class PostResponse {
     private String id; // maps uuid
+    private String shortCode; // for shareable /post/{shortCode} links
     private AuthUserResponse user;
     private String content;
+    private String richContent; // optional rich-text JSON for formatted text posts
+    private String caption; // optional separate caption for text posts
     private List<PostMediaResponse> media;
     private int likesCount;
+    private int commentsCount;
     private boolean likedByMe;
     private boolean bookmarkedByMe;
     private String createdAt;
     private List<PostCommentResponse> comments;
+    private PollResponse poll; // non-null only for poll posts
+    private AudioTrackDto audio; // non-null only when a soundtrack is attached
+    private String audience; // EVERYONE | FRIENDS
 }

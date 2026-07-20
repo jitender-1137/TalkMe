@@ -1,6 +1,8 @@
 package com.chat.talkMe.dto.request;
 
 import com.chat.talkMe.enums.Interest;
+import com.chat.talkMe.validator.ValidAge;
+import com.chat.talkMe.validator.ValidGender;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,7 +34,11 @@ public class UpdateProfileRequest {
     @Size(max = 30, message = "Phone must not exceed 30 characters")
     private String phone;
 
+    @ValidAge
     private Integer age;
+
+    @ValidGender
+    private String gender;
 
     @Size(max = 500, message = "Bio must not exceed 500 characters")
     private String bio;

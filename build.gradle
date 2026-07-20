@@ -1,56 +1,215 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '4.0.6'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'java'
+    id 'org.springframework.boot' version '4.0.6'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.chat'
 version = '0.0.1-SNAPSHOT'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
-	}
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
+}
+
+// The OCI SDK http-client provider (oci-java-sdk-common-httpclient-jersey3:3.45.0) is
+// built against Jersey 3.0.8 / JAX-RS 3.0. Spring Boot 4's dependency-management BOM
+// otherwise bumps the managed Jersey artifacts (jersey-common/client/media/inject) to
+// 4.0.2 while leaving OCI's jersey-apache-connector at 3.0.8 — a Jersey 3+4 mix that
+// fails at runtime. Pin the whole Jersey island (isolated: nothing else here uses
+// JAX-RS) back to the coherent 3.0.8 / JAX-RS 3.0 set.
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group.startsWith('org.glassfish.jersey')) {
+            details.useVersion '3.0.8'
+            details.because 'Match the Jersey version the OCI SDK http-client provider ships with.'
+        }
+        if (details.requested.group == 'jakarta.ws.rs'
+                && details.requested.name == 'jakarta.ws.rs-api') {
+            details.useVersion '3.0.0'
+            details.because 'JAX-RS API that Jersey 3.0.8 targets (Spring Boot 4 BOM forces 4.0.0).'
+        }
+    }
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-	implementation 'org.springframework.boot:spring-boot-starter-websocket'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-mail'
-	
-	runtimeOnly 'org.postgresql:postgresql'
-	
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
-	
-	// JWT
-	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
-	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
-	
-	// MapStruct & Lombok
-	compileOnly 'org.projectlombok:lombok:1.18.40'
-	annotationProcessor 'org.projectlombok:lombok:1.18.40'
-	
-	implementation 'org.mapstruct:mapstruct:1.6.3'
-	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
-	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // Google (and other) social login via the OAuth2 / OIDC authorization-code flow.
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    // RabbitMQ: AMQP work plane (durable queues, DLQ, retry) + STOMP relay backbone
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    // Required by Spring's StompBrokerRelay (TCP STOMP client to RabbitMQ:61613)
+    implementation 'io.projectreactor.netty:reactor-netty'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // SMTP — final fallback for transactional email after the Resend/Brevo HTTP APIs.
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
 
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
-	testImplementation 'org.springframework.security:spring-security-test'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	testImplementation 'com.h2database:h2'
+    // Observability: health/metrics endpoints, Prometheus scrape, distributed tracing
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+
+    // Circuit breaker (core lib, used programmatically — Spring-Boot-version agnostic)
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-micrometer:2.2.0'
+
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Bundled ffmpeg (Bytedeco) — ships the ffmpeg executable inside the app so
+    // photo+music → mp4 muxing, video transcoding and frame moderation work with
+    // NO manual ffmpeg install. Only the platforms we deploy on are bundled to keep
+    // the jar size in check (add classifiers here for other targets):
+    //   macosx-arm64  = dev Macs (Apple Silicon)
+    //   linux-x86_64  = typical x64 servers
+    //   linux-arm64   = arm64 servers
+    implementation 'org.bytedeco:javacpp:1.5.11'
+    runtimeOnly 'org.bytedeco:javacpp:1.5.11:macosx-arm64'
+    runtimeOnly 'org.bytedeco:javacpp:1.5.11:linux-x86_64'
+    runtimeOnly 'org.bytedeco:javacpp:1.5.11:linux-arm64'
+    implementation 'org.bytedeco:ffmpeg:7.1-1.5.11'
+    runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:macosx-arm64'
+    runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:linux-x86_64'
+    runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:linux-arm64'
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
+
+    // Oracle Cloud Infrastructure (OCI) Object Storage — prod-only media backend
+    // (shared bucket instead of per-VM disk). The client bean is gated on
+    // `storage.provider=oci`, so the SDK is inert in local/dev.
+    implementation 'com.oracle.oci.sdk:oci-java-sdk-objectstorage:3.45.0'
+    // The OCI SDK needs a pluggable HTTP-client provider at runtime; without one the
+    // ObjectStorageClient fails to build ("No http provider available"). Jersey 3
+    // (jakarta.*) matches Spring Boot 4. NOTE: the Jersey versions are force-pinned to
+    // 3.0.8 below — Spring Boot 4's BOM otherwise bumps jersey-common to 4.0.2 while the
+    // OCI apache-connector stays 3.0.8, mixing Jersey 3 + 4 and breaking at runtime.
+    runtimeOnly 'com.oracle.oci.sdk:oci-java-sdk-common-httpclient-jersey3:3.45.0'
+
+    // Web Push (VAPID) — background notifications for installed PWAs (Android / desktop / iOS 16.4+ Home Screen)
+    implementation 'nl.martijndwars:web-push:5.1.1'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // MapStruct & Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.40'
+    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'com.h2database:h2'
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+    useJUnitPlatform()
 }
+
+// Task to build frontend static files and copy them to spring resources
+def frontendDir = "$projectDir/../TalkMe-UI"
+
+static def getPnpmExecutable() {
+    def os = System.getProperty('os.name').toLowerCase()
+    if (os.contains('windows')) {
+        return 'pnpm.cmd'
+    }
+    
+    // Check common locations for pnpm
+    def paths = ['/opt/homebrew/bin/pnpm', '/usr/local/bin/pnpm', '/usr/bin/pnpm', 'pnpm']
+    for (path in paths) {
+        try {
+            def process = new ProcessBuilder(path, '--version').start()
+            if (process.waitFor() == 0) {
+                return path
+            }
+        } catch (Exception ignored) {
+            // Ignore and try next
+        }
+    }
+    return 'pnpm' // fallback
+}
+
+tasks.register('buildFrontend', Exec) {
+    group = 'build'
+    description = 'Installs frontend dependencies'
+    workingDir frontendDir
+
+    def pnpmExec = getPnpmExecutable()
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', "${pnpmExec} install"
+    } else {
+        commandLine pnpmExec, 'install'
+    }
+}
+
+tasks.register('buildFrontendProduction', Exec) {
+    group = 'build'
+    description = 'Builds frontend static export'
+    dependsOn buildFrontend
+    workingDir frontendDir
+
+    environment 'STATIC_EXPORT', 'true'
+
+    def pnpmExec = getPnpmExecutable()
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine 'cmd', '/c', "${pnpmExec} build"
+    } else {
+        commandLine pnpmExec, 'build'
+    }
+}
+
+tasks.register('cleanStaticResources', Delete) {
+    delete "src/main/resources/static"
+}
+
+tasks.register('copyFrontendResources', Copy) {
+    group = 'build'
+    description = 'Copies frontend static export to Spring Boot static resources'
+    dependsOn buildFrontendProduction, cleanStaticResources
+    from "$frontendDir/out"
+    into "$projectDir/src/main/resources/static"
+
+    // Fail loudly if the export is missing/empty — otherwise a build machine without a
+    // working frontend export would silently ship a JAR with no UI (no index.html / sw.js),
+    // which surfaces only at runtime as FileNotFoundException spam for every '/' and '/sw.js'.
+    doFirst {
+        def indexHtml = file("$frontendDir/out/index.html")
+        if (!indexHtml.exists()) {
+            throw new GradleException(
+                    "Frontend export not found at ${indexHtml}. The Next.js static export did not " +
+                            "produce output. Run the frontend build (STATIC_EXPORT=true) before packaging, " +
+                            "and ensure pnpm/node are available on the build machine.")
+        }
+    }
+    doLast {
+        def copiedIndex = file("$projectDir/src/main/resources/static/index.html")
+        if (!copiedIndex.exists()) {
+            throw new GradleException(
+                    "Frontend export was not copied into static resources (${copiedIndex} missing). " +
+                            "Refusing to build a JAR without the bundled UI.")
+        }
+    }
+}
+
+// Hook copyFrontendResources task into processResources so it runs automatically on build
+processResources.dependsOn copyFrontendResources
+clean.dependsOn cleanStaticResources
 

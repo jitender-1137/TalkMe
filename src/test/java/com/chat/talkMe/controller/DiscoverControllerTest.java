@@ -92,11 +92,41 @@ public class DiscoverControllerTest {
 
     @Test
     void testGetDiscover() throws Exception {
-        mockMvc.perform(get("/discover"))
+        mockMvc.perform(get("/api/v1/discover"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.items[0].username").value("discoverable"))
                 .andExpect(jsonPath("$.data.items[0].name").value("Discoverable User"));
+    }
+
+    @Test
+    void testGetDiscoverSorting() throws Exception {
+        Role userRole = roleRepository.findByName("ROLE_USER").orElseThrow();
+        
+        User onlineUser = User.builder()
+                .username("onlineuser")
+                .email("onlineuser@example.com")
+                .name("Online User")
+                .isGuest(false)
+                .isVerified(true)
+                .roles(Set.of(userRole))
+                .build();
+        onlineUser = userRepository.save(onlineUser);
+
+        com.chat.talkMe.domain.UserPresence presence = com.chat.talkMe.domain.UserPresence.builder()
+                .user(onlineUser)
+                .status("ONLINE")
+                .invisibleModeEnabled(false)
+                .build();
+        userPresenceRepository.save(presence);
+
+        mockMvc.perform(get("/api/v1/discover"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.items[0].username").value("onlineuser"))
+                .andExpect(jsonPath("$.data.items[0].name").value("Online User"))
+                .andExpect(jsonPath("$.data.items[1].username").value("discoverable"))
+                .andExpect(jsonPath("$.data.items[1].name").value("Discoverable User"));
     }
 
     @Test
@@ -105,7 +135,7 @@ public class DiscoverControllerTest {
         String likedUserUuid = discoverableUser.getUuid().toString();
 
         // 1. Like profile
-        mockMvc.perform(post("/discover/" + likedUserUuid + "/like")
+        mockMvc.perform(post("/api/v1/discover/" + likedUserUuid + "/like")
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
@@ -113,7 +143,7 @@ public class DiscoverControllerTest {
                 .andExpect(jsonPath("$.message").value("User profile liked"));
 
         // 2. Unlike profile
-        mockMvc.perform(delete("/discover/" + likedUserUuid + "/like")
+        mockMvc.perform(delete("/api/v1/discover/" + likedUserUuid + "/like")
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())

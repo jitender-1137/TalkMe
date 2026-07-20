@@ -65,7 +65,8 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return !user.isDeleted();
+        // A banned account is locked out of authentication.
+        return !user.isDeleted() && !user.isBanned();
     }
 
     @Override
@@ -75,6 +76,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return !user.isDeleted();
+        return !user.isDeleted() && !user.isBanned();
     }
 }

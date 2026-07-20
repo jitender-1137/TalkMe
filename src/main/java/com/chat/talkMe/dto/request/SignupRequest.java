@@ -3,6 +3,7 @@ package com.chat.talkMe.dto.request;
 import com.chat.talkMe.validator.ValidAge;
 import com.chat.talkMe.validator.ValidGender;
 import com.chat.talkMe.validator.ValidPassword;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true) // tolerate client-only fields (e.g. confirmPassword)
 public class SignupRequest {
 
     @NotBlank(message = "Name is required")
@@ -33,4 +35,10 @@ public class SignupRequest {
 
     @ValidGender
     private String gender;
+
+    /** Cloudflare Turnstile token (verified server-side). */
+    private String captchaToken;
+
+    /** Honeypot — must stay empty; bots tend to fill every field. */
+    private String website;
 }

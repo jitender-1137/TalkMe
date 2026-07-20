@@ -1,13 +1,13 @@
 server:
   port: 8080
   servlet:
-    context-path: /api/v1
+    context-path: /
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/talkme
-    username: postgres
-    password: postgres
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/talkme}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -17,41 +17,102 @@ spring:
     properties:
       hibernate:
         format_sql: false
-#        default_schema: talkMe2
+        default_schema: public
+
+  #### Redis (docker-compose talkme-redis; password from redis --requirepass). ####
   data:
     redis:
-      host: localhost
-      port: 6379
-      timeout: 2000
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:talkMeRedis}
+      enabled: ${REDIS_ENABLED:true}
+      # Command timeout. 2s is fine for a Redis on localhost, but local dev here talks
+      # to a REMOTE Redis over the internet, where WAN latency/jitter easily exceeds 2s
+      # and trips every scheduled reaper. Default 6s; override with REDIS_TIMEOUT_MS.
+      timeout: ${REDIS_TIMEOUT_MS:6000}
+      lettuce:
+        # Keep the multiplexed connection alive + reconnect fast after a laptop sleep
+        # or a dropped WAN link, so commands don't pile up against a dead socket.
+        shutdown-timeout: 200ms
+
+  #### Local mail → Mailpit catcher: docker run -p 1025:1025 -p 8025:8025 axllent/mailpit
+  #### Inbox at http://localhost:8025. No auth/TLS.
   mail:
     host: localhost
-    port: 1025 # Mailpit standard local port
-    username: ""
-    password: ""
+    port: 1025
     properties:
       mail:
         smtp:
           auth: false
           starttls:
             enable: false
-  servlet:
-    multipart:
-      max-file-size: 100MB
-      max-request-size: 110MB
 
-# CORS configurations
+  #### RabbitMQ connection (docker-compose defaults). Broker relay is still opt-in below.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:talkme}
+    password: ${RABBITMQ_PASS:talkme_dev_pass}
+
+  # Google social login — client id/secret come from .env (GOOGLE_CLIENT_ID/SECRET).
+  # Blank ⇒ OAuth simply stays disabled locally.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: ${GOOGLE_OAUTH_SCOPES:openid,profile,email}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+
+# Session base-auth credentials (dev). Quoted because the value starts with '#'.
+auth:
+  username: ${AUTH_USERNAME:admin}
+  password: ${AUTH_PASSWORD:-"#Admin$321"}
+
 app:
+  # Public web-app URL — used to build links in transactional emails.
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:8080}
+  mail:
+    # ON locally so you see rendered emails in Mailpit. No HTTP provider keys, so the
+    # chain falls through Resend → Brevo → SMTP(Mailpit). Paste keys in .env to test
+    # the real providers instead (blank = skip that provider).
+    enabled: true
+    from: "NeoChatHub <noreply@neochathub.com>"
+    smtp:
+      enabled: true
+    resend:
+      api-key: ${RESEND_API_KEY:}
+    brevo:
+      api-key: ${BREVO_API_KEY:}
+  geo:
+    # Geolocate the server's public IP when the client IP is local, so country
+    # detection works during development.
+    geolocate-local-ip: true
   cors:
     allowed-origins: http://localhost:3000, http://10.221.83.139:3000
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept
     exposed-headers: Set-Cookie
     allow-credentials: true
+  cookie:
+    # false locally — cookies must be settable over plain http (no https on localhost).
+    secure: false
+    same-site: Lax
+  # STOMP broker relay — OFF locally (runs on the in-memory broker, no RabbitMQ needed).
+  # Flip relay-enabled/amqp-events-enabled to true only with docker-compose RabbitMQ up.
+  broker:
+    relay-enabled: ${BROKER_RELAY_ENABLED:false}
+    relay-host: ${BROKER_RELAY_HOST:localhost}
+    relay-port: ${BROKER_RELAY_PORT:61613}
+    relay-login: ${BROKER_RELAY_LOGIN:talkme}
+    relay-passcode: ${BROKER_RELAY_PASSCODE:talkme_dev_pass}
+    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
 
 # Security JWT details
 security:
   jwt:
-    # 256-bit key base64 encoded: 'c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5'
     secret-key: c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5c2VjdXJla2V5
     access-token-expiration-ms: 900000 # 15 minutes (15 * 60 * 1000)
     refresh-token-expiration-ms: 2592000000 # 30 days (30 * 24 * 60 * 60 * 1000)
@@ -60,24 +121,40 @@ security:
     capacity: 100
     refill-tokens: 10
     refill-period-seconds: 1
+  # Cloudflare Turnstile — Cloudflare's "always passes" TEST secret locally.
+  captcha:
+    enabled: true
+    secret-key: 1x0000000000000000000000000000000AA
 
-# Storage Engine (Local)
-storage:
-  local:
-    directory: /Users/jitenderyadav/Development/chat/backend/talkMe/uploads
-  s3:
-    enabled: false
-    bucket-name: talkme-uploads
-    region: us-east-1
-    endpoint: http://localhost:4566
+# Web Push (VAPID) — shared dev keys. Generate your own with `web-push generate-vapid-keys`.
+webpush:
+  enabled: true
+  vapid:
+    public-key: BKCeDr6ImE2uISF6APs0OyMfgoWkXWo-TNpXY1hdnrJyj1CtbH5Joo0tuqRrmXX-Zd1an5Bh7Y4cOQe6hv3yqzQ
+    private-key: pMHBoMj1sI4zsmg2TIg0g870XZbUPElqR-nkOY-FfnQ
+    subject: mailto:admin@talkme.app
+
+# Content moderation — NSFW sidecar at localhost:8081 (docker-compose `nsfw`).
+moderation:
+  enabled: true
+  nsfw:
+    enabled: true
+    base-url: http://localhost:8081
 
 # WebSocket Configuration
 websocket:
-  allowed-origins: http://localhost:3000
+  allowed-origins: '*'
+
+# Storage Engine (Local)
+storage:
+  # Local dev writes media under the home dir (/media isn't creatable on a laptop).
+  media-root: ${FILE_BASE_DIR:${user.home}/neochathub-media}
+  local:
+    directory: ${FILE_BASE_DIR:/Users/jitenderyadav/Development/chat/backend/talkMe/uploads}
 
 logging:
   level:
     root: INFO
     com.chat.talkMe: DEBUG
     org.springframework.security: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: WARN

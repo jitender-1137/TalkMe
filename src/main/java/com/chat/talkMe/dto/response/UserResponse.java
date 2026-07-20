@@ -34,8 +34,25 @@ public class UserResponse {
     
     @JsonProperty("isBlocked")
     private boolean isBlocked;
+    /**
+     * Whether the requesting user is currently allowed to message this user
+     * (false only when this user restricts messages to friends and the
+     * requester is not a friend). Null/absent means "allowed".
+     */
+    @JsonProperty("canMessage")
+    private Boolean canMessage;
+    /** True when this user restricts messaging to friends — drives the avatar lock badge. */
+    @JsonProperty("messagingFriendsOnly")
+    private Boolean messagingFriendsOnly;
     private String presence; // "online", "idle", "offline"
     private String lastSeen; // ISO 8601 string or null
     private String createdAt;
     private String updatedAt;
+    
+    private long followersCount;
+    private long followingCount;
+    private long postsCount;
+
+    /** Granted role names (e.g. ["ROLE_USER","ROLE_SUPER_ADMIN"]) — drives the admin UI guard. */
+    private java.util.List<String> roles;
 }

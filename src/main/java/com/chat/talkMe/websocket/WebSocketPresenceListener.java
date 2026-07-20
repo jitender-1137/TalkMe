@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.PresenceService;
+import com.chat.talkMe.match.DisconnectHandlerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -24,6 +25,7 @@ public class WebSocketPresenceListener {
 
     private final PresenceService presenceService;
     private final StringRedisTemplate redisTemplate;
+    private final DisconnectHandlerService disconnectHandlerService;
 
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
     private static final Duration SESSION_TTL = Duration.ofDays(1);
@@ -54,6 +56,14 @@ public class WebSocketPresenceListener {
 
         // Update status to ONLINE
         presenceService.setStatus(user, PresenceStatus.ONLINE);
+
+        // Reconnected within the match grace window? Abort the pending teardown and
+        // resume the session (peer is told STRANGER_RECONNECTED). No-op otherwise.
+        try {
+            disconnectHandlerService.cancelDisconnect(username);
+        } catch (Exception e) {
+            log.error("Failed to cancel pending match disconnect on reconnect for {}", username, e);
+        }
     }
 
     @EventListener
@@ -86,9 +96,23 @@ public class WebSocketPresenceListener {
             }
         }
 
-        // Set OFFLINE only if this is the last session remaining
+        // Last session gone (tab closed / navigated away / OS suspended a
+        // backgrounded tab). Don't drop straight to OFFLINE — show IDLE for a
+        // 5-minute grace and let the idle reaper flip OFFLINE afterwards. A quick
+        // reconnect (refresh, brief network blip) re-fires CONNECT → ONLINE and
+        // cancels the pending offline. markDisconnected defers to an in-progress
+        // staged background transition (intentional minimize) so the ONLINE grace
+        // and frozen last-seen are preserved rather than collapsing to IDLE now.
         if (isLastSession) {
-            presenceService.setStatus(user, PresenceStatus.OFFLINE);
+            presenceService.markDisconnected(user, Duration.ofMinutes(5));
+            try {
+                // Don't tear the match down immediately — hold it for a grace window so a
+                // backgrounded/blipped client can reconnect and resume (peer sees
+                // "reconnecting…"). MatchDisconnectReaper finalizes it if grace expires.
+                disconnectHandlerService.scheduleDisconnect(username);
+            } catch (Exception e) {
+                log.error("Failed to schedule matchmaking disconnect grace", e);
+            }
         }
     }
 

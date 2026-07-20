@@ -29,10 +29,15 @@ public class DiscoverController {
             @RequestParam(value = "isOnline", required = false) Boolean isOnline,
             @RequestParam(value = "cursor", required = false) String cursor,
             @RequestParam(value = "limit", defaultValue = "20") int limit,
+            @RequestParam(value = "minAge", required = false) Integer minAge,
+            @RequestParam(value = "maxAge", required = false) Integer maxAge,
+            @RequestParam(value = "gender", required = false) String gender,
+            @RequestParam(value = "country", required = false) String country,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         PaginatedResponse<DiscoverProfileResponse> response = discoverService.getDiscover(
-                query, interests, distance, verified, isOnline, cursor, limit, userDetails.getUser());
+                query, interests, distance, verified, isOnline, cursor, limit,
+                minAge, maxAge, gender, country, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 

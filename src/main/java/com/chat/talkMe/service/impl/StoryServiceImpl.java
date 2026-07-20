@@ -28,19 +28,64 @@ public class StoryServiceImpl implements StoryService {
     private final StoryRepository storyRepository;
     private final StoryViewRepository storyViewRepository;
     private final UserMapper userMapper;
+    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final UserSettingRepository userSettingRepository;
+    private final PhotoMusicMuxer photoMusicMuxer;
+    private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
+    private final com.chat.talkMe.service.NotificationService notificationService;
 
     @Override
     @Transactional
     public StoryResponse createStory(StoryRequest request, User currentUser) {
+        // Stories are publicly visible — the caption must be clean. (The media image
+        // is hard-blocked at upload time for the "story" context in UploadController.)
+        if (moderationService.moderateText(request.getCaption()).isExplicit()) {
+            throw new com.chat.talkMe.exception.ContentModerationException(
+                    "Your story caption contains content that violates our community guidelines.");
+        }
+        // Photo + music story → merge into an auto-playing video (Instagram-style) so
+        // the sound plays with the story like a video. Skip if the media is already a
+        // video; fall back to the plain image if muxing is unavailable.
+        String mediaUrl = request.getMediaUrl();
+        var audioReq = request.getAudio();
+        boolean alreadyVideo = mediaUrl != null && mediaUrl.toLowerCase().contains(".mp4");
+        if (audioReq != null && audioReq.getAudioUrl() != null && mediaUrl != null && !alreadyVideo) {
+            int start = audioReq.getAudioStartSec() == null ? 0 : audioReq.getAudioStartSec();
+            int clip = audioReq.getAudioClipSeconds() == null ? 15 : audioReq.getAudioClipSeconds();
+            String video = photoMusicMuxer.muxPhotoWithMusic(mediaUrl, audioReq.getAudioUrl(), start, clip);
+            if (video != null) mediaUrl = video;
+        }
+
+        com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+        if (request.getAudience() != null && "FRIENDS".equalsIgnoreCase(request.getAudience().trim())) {
+            audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
+        }
+
         Story story = Story.builder()
                 .user(currentUser)
-                .mediaUrl(request.getMediaUrl())
+                .mediaUrl(mediaUrl)
                 .caption(request.getCaption())
+                .audience(audience)
+                .audio(request.getAudio() != null ? request.getAudio().toEntity() : null)
                 .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
                 .build();
 
         story = storyRepository.save(story);
         log.info("Story posted successfully by {}", currentUser.getUsername());
+
+        // Instagram-style: tell the author's whole network (followers + following) they
+        // posted a new story. Best-effort — never fails the story creation.
+        try {
+            notificationService.notifyFollowersAndFollowing(
+                    currentUser,
+                    "New story",
+                    currentUser.getName() + " added to their story.",
+                    "STORY",
+                    story.getUuid().toString(),
+                    story.getMediaUrl());
+        } catch (Exception e) {
+            log.warn("Failed to fan out new-story notification for {}", currentUser.getUsername(), e);
+        }
 
         return mapToStoryResponse(story, currentUser);
     }
@@ -50,8 +95,21 @@ public class StoryServiceImpl implements StoryService {
     public List<StoryResponse> getActiveStories(User currentUser) {
         List<Story> activeStories = storyRepository.findActiveStories(Instant.now());
         return activeStories.stream()
+                .filter(story -> canViewStory(story, currentUser))
                 .map(story -> mapToStoryResponse(story, currentUser))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * A FRIENDS story is visible to its author or an accepted follower/following (an
+     * ACCEPTED follow in either direction); EVERYONE stories are visible to all.
+     */
+    private boolean canViewStory(Story story, User viewer) {
+        if (story.getAudience() != com.chat.talkMe.enums.PostAudience.FRIENDS) return true;
+        if (viewer == null) return false;
+        if (story.getUser().getId().equals(viewer.getId())) return true;
+        return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, story.getUser(), "ACCEPTED")
+                || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(story.getUser(), viewer, "ACCEPTED");
     }
 
     @Override
@@ -108,14 +166,21 @@ public class StoryServiceImpl implements StoryService {
     private StoryResponse mapToStoryResponse(Story story, User currentUser) {
         boolean viewed = storyViewRepository.existsByStoryAndUser(story, currentUser);
 
+        AuthUserResponse owner = userMapper.toAuthUserResponse(story.getUser());
+        owner.setMessagingFriendsOnly(userSettingRepository.findByUser(story.getUser())
+                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
+                .orElse(false));
+
         return StoryResponse.builder()
                 .id(story.getUuid().toString())
-                .user(userMapper.toAuthUserResponse(story.getUser()))
+                .user(owner)
                 .mediaUrl(story.getMediaUrl())
                 .caption(story.getCaption())
                 .expiresAt(story.getExpiresAt().toString())
                 .createdAt(story.getCreatedAt().toString())
                 .viewedByMe(viewed)
+                .audience(story.getAudience() != null ? story.getAudience().name() : "EVERYONE")
+                .audio(com.chat.talkMe.dto.response.AudioTrackDto.from(story.getAudio()))
                 .build();
     }
 }

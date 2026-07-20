@@ -1,13 +1,193 @@
+# Behind the reverse proxy (Nginx Proxy Manager) TLS is terminated at the proxy and
+# requests reach this backend over plain http (http://<host>:8080). Honor the
+# X-Forwarded-Proto/Host headers the proxy sends so Spring builds correct absolute
+# URLs — critically the OAuth2 redirect_uri as https://talkme.fun/login/oauth2/code/google
+# (NOT http://…), which must byte-match the Authorised redirect URI in Google or the
+# flow fails with redirect_uri_mismatch. Applies to every profile (prod runs on 8080).
+# Safe locally: with no proxy there are no X-Forwarded-* headers, so the real request
+# is used unchanged. Assumes the backend port is reachable only via the proxy.
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  servlet:
+    context-path: /
+
 spring:
+  config:
+    import: optional:file:.env[.properties]
   profiles:
-    active: local
+    active: ${ACTIVE_PROFILE:local}
   application:
     name: talkMe
+  # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.
+  # This is the GLOBAL multipart limit, so it must be the LARGEST allowed media:
+  # videos = 30MB. The stricter per-type image cap (2MB) is enforced in
+  # UploadController; anything over 30MB is rejected with HTTP 413.
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 35MB
   data:
     web:
       pageable:
         serialization-mode: via-dto
+  # NOTE: SMTP connection (spring.mail.*) is the final fallback in the mail chain
+  # (Resend → Brevo → SMTP) and is environment-specific, so it lives in the profile
+  # files (application-{local,dev,prod}.yml). Local points at Mailpit; prod at the
+  # real relay. JavaMailSender is injected via ObjectProvider, so the app still boots
+  # in any profile that omits it.
+  # RabbitMQ CONNECTION (host/port/credentials) is environment-specific → set per
+  # profile (application-{local,dev,prod}.yml). The publish/consume TUNING below is
+  # shared across all environments.
+  rabbitmq:
+    # Treat a publish as accepted only after the broker confirms it (lets the
+    # producer fall back to a direct broadcast if RabbitMQ is unreachable).
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        # Failed deliveries dead-letter instead of requeueing forever (no poison loop).
+        default-requeue-rejected: false
+        prefetch: 20
+        retry:
+          enabled: true
+          initial-interval: 1000ms
+          max-attempts: 4
+          multiplier: 2.0
+          max-interval: 10000ms
+  jpa:
+    properties:
+      hibernate:
+        # Batch lazy association loads: when a page of messages is mapped to DTOs,
+        # their senders/receipts/reactions/attachments are fetched in grouped IN
+        # queries (≈ size per round-trip) instead of one query per row (N+1).
+        default_batch_fetch_size: 50
+        jdbc:
+          # Group multi-row writes within a transaction into batched round-trips.
+          batch_size: 30
+          # Sort statements so same-table writes batch together instead of
+          # alternating tables and breaking the batch.
+          order_inserts: true
+          order_updates: true
+          # Required for batching to apply to @Version (optimistic-lock) entities,
+          # which every entity is (BaseEntity has @Version).
+          batch_versioned_data: true
+        # Fail fast in dev if a query accidentally pages in memory.
+        query:
+          fail_on_pagination_over_collection_fetch: true
 
-server:
-  address: 0.0.0.0
-  port: 8080
+# Observability. Endpoints live under /actuator (outside /api, so reachable);
+# RESTRICT /actuator to an internal network / scrape user in production.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    # Only health-check RabbitMQ when we actually use it; otherwise readiness
+    # probes would keep failing to connect on hosts without RabbitMQ.
+    rabbit:
+      enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
+  metrics:
+    tags:
+      application: talkMe
+  tracing:
+    # Sample 10% of traces by default; set TRACING_SAMPLING=0 to disable export
+    # (e.g. dev with no OTLP collector running).
+    sampling:
+      probability: ${TRACING_SAMPLING:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+
+# NOTE: session base-auth creds (auth.username/password) are environment-specific
+# and live per profile (application-{local,dev,prod}.yml).
+
+app:
+  geo:
+    # Default ON for local dev: when the client IP is local/private (localhost),
+    # geolocate the server's own public IP so country detection still works.
+    # Deployed profiles (prod/dev) override this to false — there real client IPs
+    # arrive via proxy headers and a private IP would be a misconfiguration.
+    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:true}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:Lax}
+  # NOTE: STOMP broker relay (app.broker.*) and the public web-app URL
+  # (app.frontend-base-url) are environment-specific → set per profile
+  # (application-{local,dev,prod}.yml). Broker relay stays OFF unless a profile/env
+  # enables it and RabbitMQ (STOMP plugin on :61613) is reachable, else the relay
+  # throws "Message broker not active" on every /topic broadcast.
+  #
+  # Transactional email, three-link chain: Resend (HTTP, free ~100/day) → Brevo
+  # (HTTP, free ~300/day) → SMTP (JavaMailSender). Only the SHARED, non-secret
+  # defaults live here — the environment-specific switches (app.mail.enabled,
+  # app.mail.from, provider API keys, app.mail.smtp.enabled and spring.mail.*) are
+  # set per profile in application-{local,dev,prod}.yml. When a profile leaves mail
+  # off / keys empty, EmailServiceImpl logs the link instead of sending.
+  mail:
+    timeout-ms: ${MAIL_TIMEOUT_MS:10000}
+    # Deliverability gate (EmailServiceImpl): when true, TRANSACTIONAL emails (login
+    # alerts, unread digests, password-changed, support) go ONLY to verified addresses.
+    # Verification/welcome/reset and announcements are exempt. Saves provider quota.
+    require-verification: ${MAIL_REQUIRE_VERIFICATION:true}
+    # Extra disposable/temp email domains to block, on top of the bundled
+    # disposable-email-domains.txt (comma-separated, e.g. "foo.com,bar.net").
+    disposable-domains: ${MAIL_DISPOSABLE_DOMAINS:}
+    resend:
+      daily-limit: ${RESEND_DAILY_LIMIT:100}
+    brevo:
+      daily-limit: ${BREVO_DAILY_LIMIT:300}
+    # Branding for all transactional email templates (EmailTemplates). Shared across
+    # environments; the visual palette lives in MailTheme (app.mail.theme.*).
+    brand:
+      name: ${MAIL_BRAND_NAME:NeoChatHub}
+      tagline: ${MAIL_BRAND_TAGLINE:Meet new people. Chat. Connect.}
+      support-email: ${MAIL_SUPPORT_EMAIL:support@neochathub.com}
+    # Daily "you have unread messages" digest (UnreadDigestReaper → UnreadDigestService).
+    # Runs at cron/zone below; per-user dedup via user.lastUnreadDigestMessageId means the
+    # same still-unread messages are never mailed twice. Respects app.mail.enabled and the
+    # per-user emailUnreadMessages opt-out.
+    unread-digest:
+      enabled: ${UNREAD_DIGEST_ENABLED:true}
+      cron: ${UNREAD_DIGEST_CRON:0 0 21 * * *}
+      zone: ${UNREAD_DIGEST_ZONE:Asia/Kolkata}
+      max-previews: ${UNREAD_DIGEST_MAX_PREVIEWS:5}
+  auth:
+    # Password-reset token lifetime and the account-deletion recovery window.
+    password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN:30}
+    account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS:30}
+    # Email-verification link lifetime (sent at signup; welcome email follows on verify).
+    email-verification-token-ttl-minutes: ${EMAIL_VERIFY_TTL_MIN:1440}
+  # Per-conversation message encryption (AES-256-GCM). Each chat gets one data key,
+  # stored wrapped by the master key below and handed to authorized participants to
+  # encrypt/decrypt client-side. Server-mediated (NOT end-to-end): the server can
+  # decrypt for push/email previews. Text content + media PATHS are encrypted at rest.
+  crypto:
+    chat-encryption:
+      # Master switch. Even when true, encryption stays OFF until master-key is set.
+      enabled: ${CHAT_ENCRYPTION_ENABLED:true}
+    # Base64 of 32 random bytes (AES-256). Generate: `openssl rand -base64 32`.
+    # Keep OUT of the database/VCS — supply via env/secret. Blank ⇒ encryption disabled
+    # (messages stored plaintext), so existing deploys are unaffected until you set it.
+    # ⚠️ Losing/rotating this key makes every wrapped chat key — and thus all encrypted
+    # messages — unrecoverable. Back it up.
+    #Generate BY - `echo -n "REPLACE_WITH_CUSTOM_NAME" | openssl dgst -sha256 -binary | base64`
+    master-key: ${CRYPTO_MASTER_KEY:}
+  # SuperAdmin bootstrap: comma-separated emails of accounts granted ROLE_SUPER_ADMIN
+  # on boot (SuperAdminSeeder). The account must already exist (sign up first). There
+  # is no public promote endpoint — elevation happens only via this trusted list.
+  super-admin:
+    emails: ${SUPER_ADMIN_EMAILS:}
+
+# Media storage. `media-root` is the single root shared by the OCI object keys and the
+# instance/VM disk (reference shape <media-root>/<key>). Provider defaults to the local
+# filesystem; the prod profile overrides it to OCI. See com.chat.talkMe.storage.
+storage:
+  media-root: ${FILE_BASE_DIR:/media}
