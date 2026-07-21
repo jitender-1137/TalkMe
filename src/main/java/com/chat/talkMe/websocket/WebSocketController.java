@@ -1,25 +1,25 @@
 package com.chat.talkMe.websocket;
 
+import com.chat.talkMe.domain.User;
+import com.chat.talkMe.dto.response.UserResponse;
+import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Controller;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-import com.chat.talkMe.security.CustomUserDetails;
-import com.chat.talkMe.service.UserService;
-import com.chat.talkMe.repository.UserRepository;
-import com.chat.talkMe.dto.response.UserResponse;
-
 import java.security.Principal;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @Controller
@@ -32,12 +32,20 @@ public class WebSocketController {
     private final UserRepository userRepository;
     private final com.chat.talkMe.service.PresenceService presenceService;
     private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
+    private final com.chat.talkMe.repository.ChatRepository chatRepository;
+    private final com.chat.talkMe.repository.ChatMemberRepository chatMemberRepository;
 
-    /** Deadline ZSET for grace-evicting lobby members whose socket dropped. */
+    /**
+     * Deadline ZSET for grace-evicting lobby members whose socket dropped.
+     */
     private static final String LOBBY_LEAVE_ZSET = "lobby:leave-deadlines";
-    /** Same Redis set the presence listener maintains: non-empty ⇒ a live socket. */
+    /**
+     * Same Redis set the presence listener maintains: non-empty ⇒ a live socket.
+     */
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
-    /** Deep link a lobby-chat notification opens. */
+    /**
+     * Deep link a lobby-chat notification opens.
+     */
     private static final String LOBBY_DEEP_LINK = "/#match/lobby";
     /**
      * Grace after a socket drop before evicting from the lobby. A tab-switch or brief
@@ -89,21 +97,58 @@ public class WebSocketController {
         }
     }
 
+    /**
+     * Membership check for the typing/activity hot path, Redis-cached for 60 s so it
+     * doesn't hit the DB on every keystroke. Fail-OPEN on a transient error (never
+     * break typing), but a genuinely-missing chat/membership returns false.
+     */
+    private boolean isChatMember(String chatUuid, com.chat.talkMe.domain.User user) {
+        if (user == null || chatUuid == null || chatUuid.isBlank()) return false;
+        String key = "ws:member:" + user.getUuid() + ":" + chatUuid;
+        try {
+            String cached = redisTemplate.opsForValue().get(key);
+            if ("1".equals(cached)) return true;
+            if ("0".equals(cached)) return false;
+        } catch (Exception ignored) {
+            // fall through to DB
+        }
+        boolean member;
+        try {
+            member = chatRepository.findByUuid(java.util.UUID.fromString(chatUuid))
+                    .flatMap(c -> chatMemberRepository.findByChatAndUser(c, user))
+                    .isPresent();
+        } catch (IllegalArgumentException badUuid) {
+            return false;
+        } catch (Exception e) {
+            return true; // transient DB issue → don't break the typing indicator
+        }
+        try {
+            redisTemplate.opsForValue().set(key, member ? "1" : "0", java.time.Duration.ofSeconds(60));
+        } catch (Exception ignored) {
+            // cache is best-effort
+        }
+        return member;
+    }
+
     @MessageMapping("/chat/{chatUuid}/typing")
     public void handleTypingNotification(
             @DestinationVariable("chatUuid") String chatUuid,
             @Payload boolean typing,
             Principal principal) {
-        
+
         if (principal == null) return;
         String username = principal.getName();
-        
+
         String userId = "";
+        com.chat.talkMe.domain.User user = null;
         if (principal instanceof UsernamePasswordAuthenticationToken auth) {
             if (auth.getPrincipal() instanceof CustomUserDetails userDetails) {
-                userId = userDetails.getUser().getUuid().toString();
+                user = userDetails.getUser();
+                userId = user.getUuid().toString();
             }
         }
+        // Authorization: only a member may emit typing into a chat's topic.
+        if (!isChatMember(chatUuid, user)) return;
 
         TypingNotification notification = TypingNotification.builder()
                 .userId(userId)
@@ -137,11 +182,15 @@ public class WebSocketController {
         String username = principal.getName();
 
         String userId = "";
+        User user = null;
         if (principal instanceof UsernamePasswordAuthenticationToken auth) {
             if (auth.getPrincipal() instanceof CustomUserDetails userDetails) {
-                userId = userDetails.getUser().getUuid().toString();
+                user = userDetails.getUser();
+                userId = user.getUuid().toString();
             }
         }
+        // Authorization: only a member may emit activity into a chat's topic.
+        if (!isChatMember(chatUuid, user)) return;
 
         String normalized = activity == null ? "NONE" : activity.trim().toUpperCase();
         boolean active = !"NONE".equals(normalized);
@@ -172,7 +221,7 @@ public class WebSocketController {
         // Fetch user response
         userRepository.findByUsername(username).ifPresent(user -> {
             UserResponse response = userService.getUserById(user.getUuid().toString(), user);
-            
+
             // Broadcast join event
             Map<String, Object> payload = new HashMap<>();
             payload.put("action", "JOIN");

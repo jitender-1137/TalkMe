@@ -11,6 +11,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -98,5 +99,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureClientInboundChannel(ChannelRegistration registration) {
         // JWT auth first, then rewrite client SUBSCRIBE/SEND destinations for RabbitMQ.
         registration.interceptors(channelInterceptor, rabbitDestinationInterceptor);
+    }
+
+    @Override
+    public void configureWebSocketTransport(@NonNull WebSocketTransportRegistration registration) {
+        // Bound per-connection resource use to prevent memory-exhaustion DoS from a
+        // malicious/slow client: cap inbound STOMP frame size, the time a single send
+        // may block, and the outbound buffer that backs up behind a stuck consumer.
+        registration
+                .setMessageSizeLimit(64 * 1024)        // 64 KB max inbound STOMP message
+                .setSendTimeLimit(20 * 1000)           // 20s to flush a send before abort
+                .setSendBufferSizeLimit(512 * 1024);   // 512 KB outbound buffer per session
     }
 }

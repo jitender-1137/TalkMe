@@ -105,7 +105,7 @@ app:
     exposed-headers: Set-Cookie
     allow-credentials: true
   cookie:
-    secure: ${COOKIE_SECURE:false}
+    secure: ${COOKIE_SECURE:true}
     same-site: ${COOKIE_SAME_SITE:Lax}
 
 # WebSocket Configuration
@@ -140,7 +140,7 @@ moderation:
   enabled: ${MODERATION_ENABLED:true}
   nsfw:
     enabled: ${NSFW_ENABLED:true}
-    base-url: ${NSFW_BASE_URL:http://nsfw.parkarspot.com}
+    base-url: ${NSFW_BASE_URL:}
 
 storage:
   local:

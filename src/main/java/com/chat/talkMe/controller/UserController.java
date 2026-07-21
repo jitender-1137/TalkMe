@@ -1,5 +1,6 @@
 package com.chat.talkMe.controller;
 
+import com.chat.talkMe.dto.request.DeleteAccountRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
@@ -73,8 +74,11 @@ public class UserController {
      * anonymized by the scheduled purge job.
      */
     @DeleteMapping("/me")
-    public ResponseEntity<ResponseDto<Void>> deleteAccount(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        authService.requestAccountDeletion(userDetails.getUser());
+    public ResponseEntity<ResponseDto<Void>> deleteAccount(
+            @RequestBody(required = false) DeleteAccountRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.requestAccountDeletion(userDetails.getUser(),
+                request != null ? request.getPassword() : null);
         return ResponseEntity.ok(SuccessResponseDto.success(
                 null, "Account scheduled for deletion. Log in again within the recovery window to restore it.",
                 "TM_USER_003"));

@@ -6,7 +6,6 @@ import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.event.StatusUpdateEvent;
 import com.chat.talkMe.enums.ChatType;
-import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.ChatMapper;
 import com.chat.talkMe.mapper.MessageMapper;
@@ -43,10 +42,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMapper chatMapper;
     private final PresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
     private final FriendRepository friendRepository;
-    private final BlockUserRepository blockUserRepository;
-    private final UserSettingRepository userSettingRepository;
     private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
@@ -82,7 +78,7 @@ public class ChatServiceImpl implements ChatService {
                 Chat chat = existingChats.stream()
                         .filter(c -> !c.isDeleted())
                         .findFirst()
-                        .orElse(existingChats.get(0));
+                        .orElse(existingChats.getFirst());
 
                 if (chat.isDeleted()) {
                     // Reopen a previously-deleted conversation as a FRESH chat:
@@ -257,6 +253,10 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Only a participant may read a chat — otherwise any authenticated user could
+        // fetch another conversation's participant PII + last-message preview by UUID.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
         return mapToChatResponse(chat, managedUser);
     }
 
@@ -415,6 +415,10 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Membership guard — otherwise any user with a chat UUID could forge READ
+        // receipts (which then broadcast to the real participants).
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
         // Opening/reading the chat clears any manual "unread" flag.
         chatMemberRepository.findByChatAndUser(chat, managedUser).ifPresent(m -> {
@@ -432,7 +436,7 @@ public class ChatServiceImpl implements ChatService {
         if (chat.isMultiParty()) {
             // Atomic, forward-only watermark advance — see advanceReadWatermark. Avoids
             // the optimistic-lock race when two mark-read calls (join + chat-open on an
-            // invite link) hit the same ChatMember row concurrently.
+            // invitation link) hit the same ChatMember row concurrently.
             long maxId = messageRepository.findMaxMessageId(chat);
             chatMemberRepository.advanceReadWatermark(chat, managedUser, maxId);
             return;
@@ -470,6 +474,9 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Membership guard — prevent forging DELIVERED receipts for a chat you're not in.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
         Instant now = Instant.now();
 
@@ -604,7 +611,7 @@ public class ChatServiceImpl implements ChatService {
         java.time.Instant previewLeftAt = memberSelf != null ? memberSelf.getLeftAt() : null;
         java.util.List<Message> lastList = messageRepository.findLastVisibleMessage(
                 chat, previewClearedAt, previewLeftAt, org.springframework.data.domain.PageRequest.of(0, 1));
-        Message lastMessage = lastList.isEmpty() ? null : lastList.get(0);
+        Message lastMessage = lastList.isEmpty() ? null : lastList.getFirst();
 
         if (lastMessage != null) {
             MessageResponse lastMessageDto = messageMapper.toMessageResponse(lastMessage);
@@ -635,7 +642,7 @@ public class ChatServiceImpl implements ChatService {
                 AuthUserResponse otherUserDto = userMapper.toAuthUserResponse(otherUser);
                 if (presenceService != null) {
                     otherUserDto.setPresence(presenceService.getStatus(otherUser).name().toLowerCase());
-                    // Apparent last-seen: nulled for Invisible / Hide-last-seen (privacy
+                    // Apparent last-seen: null for Invisible / Hide-last-seen (privacy
                     // rule centralized in PresenceService) so the conversation list never
                     // leaks a hidden last-seen.
                     java.time.Instant lastSeen = presenceService.getApparentLastSeen(otherUser);

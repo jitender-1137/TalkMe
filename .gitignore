@@ -40,11 +40,11 @@ out/
 /.idea/
 src/main/resources/static/
 /.ai/
-/.idea/
-
-# Local secrets — never commit
-.env
 
 ### macOS ###
 .DS_Store
 **/.DS_Store
+
+# Environment files with secrets (never commit)
+.env.*
+!.env.example

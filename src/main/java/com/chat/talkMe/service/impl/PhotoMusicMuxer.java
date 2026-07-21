@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -14,7 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Merges a still photo + a trimmed music clip into an auto-playing MP4 — the way
+ * Merges a still photo + a trimmed music clip into an autoplaying MP4 — the way
  * Instagram turns a photo-with-music post/story into a video whose sound plays
  * automatically. Reuses the server's already-installed ffmpeg (see
  * {@code media.ffmpeg-path}), so no new dependency.
@@ -22,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * <p>The ffmpeg command is unchanged; only the input/output plumbing goes through
  * {@link MediaStorage} so it works whether media lives on disk (local/dev) or in OCI
  * (prod). Every failure path returns null so the caller can gracefully fall back to
- * the "image + separate audio track" behaviour instead of failing the post.
+ * the "image + separate audio track" behavior instead of failing the post.
  */
 @Slf4j
 @Component
@@ -60,9 +59,7 @@ public class PhotoMusicMuxer {
 
             // Audio: an internal stored file, or an external http(s) preview URL.
             Path audioPath;
-            MediaStorage.LocalFile internalAudio = null;
-            try {
-                internalAudio = mediaStorage.localCopy(audioRef).orElse(null);
+            try (MediaStorage.LocalFile internalAudio = mediaStorage.localCopy(audioRef).orElse(null)) {
                 if (internalAudio != null && Files.exists(internalAudio.path())) {
                     audioPath = internalAudio.path();
                 } else if (audioRef != null && audioRef.startsWith("http")) {
@@ -91,8 +88,6 @@ public class PhotoMusicMuxer {
                 String ref = mediaStorage.store(output, key, "video/mp4");
                 log.info("Photo+music muxed → {}", ref);
                 return ref;
-            } finally {
-                if (internalAudio != null) internalAudio.close();
             }
         } catch (Exception e) {
             log.warn("Photo+music mux error: {}", e.getMessage());
@@ -103,7 +98,9 @@ public class PhotoMusicMuxer {
         }
     }
 
-    /** Run ffmpeg to loop the image over the trimmed audio, producing an iOS-safe H.264/AAC MP4. */
+    /**
+     * Run ffmpeg to loop the image over the trimmed audio, producing an iOS-safe H.264/AAC MP4.
+     */
     private boolean runFfmpeg(Path image, Path audio, int start, int clip, Path output) {
         List<String> command = List.of(
                 ffmpeg.path(), "-y",
@@ -147,15 +144,20 @@ public class PhotoMusicMuxer {
             return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            if (process != null) process.destroyForcibly();
+            process.destroyForcibly();
             return false;
         }
     }
 
-    /** Download an external audio URL to a temp file for ffmpeg (avoids relying on ffmpeg's network/TLS). */
+    /**
+     * Download an external audio URL to a temp file for ffmpeg (avoids relying on ffmpeg's network/TLS).
+     */
     private Path downloadToTemp(String url) throws java.io.IOException {
+        // SSRF guard: the only legitimate external audio is a public preview URL.
+        // Reject anything resolving to loopback/link-local (incl. cloud metadata)/
+        // private hosts, and don't follow redirects into them.
         Path tmp = Files.createTempFile("talkme-music-", ".audio");
-        try (InputStream in = URI.create(url).toURL().openStream()) {
+        try (InputStream in = com.chat.talkMe.util.SsrfGuard.openStream(url)) {
             Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
         }
         return tmp;

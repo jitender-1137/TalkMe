@@ -11,6 +11,7 @@ import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.StorageService;
 import com.chat.talkMe.storage.MediaStorage;
+import com.chat.talkMe.util.UploadValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -54,6 +55,10 @@ public class UploadController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         validateSize(file, type);
+
+        // Verify the REAL content type from magic bytes (never trust the client's
+        // Content-Type) — rejects polyglots / disguised files and scriptable SVGs.
+        UploadValidator.validate(file, type);
 
         // Publicly-visible images/videos (profile photos, feed posts, stories) must be
         // clean — reject NSFW uploads up-front, before the file is ever stored. 1:1 /
@@ -100,7 +105,17 @@ public class UploadController {
                     .map(mc -> {
                         String contentType = mc.contentType() != null ? mc.contentType() : "application/octet-stream";
                         ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
-                                .contentType(MediaType.parseMediaType(contentType));
+                                .contentType(MediaType.parseMediaType(contentType))
+                                .header("X-Content-Type-Options", "nosniff");
+                        // Neutralize scriptable types (SVG/HTML/XML): a stored file must
+                        // not execute as a document on our own origin if opened directly.
+                        // <img>/<video> ignore Content-Disposition, so display is unaffected;
+                        // only top-level navigation is forced to download + sandboxed.
+                        String lower = contentType.toLowerCase();
+                        if (lower.contains("svg") || lower.contains("html") || lower.contains("xml")) {
+                            builder.header("Content-Disposition", "attachment");
+                            builder.header("Content-Security-Policy", "default-src 'none'; sandbox");
+                        }
                         if (mc.contentLength() >= 0) {
                             builder.contentLength(mc.contentLength());
                         }
