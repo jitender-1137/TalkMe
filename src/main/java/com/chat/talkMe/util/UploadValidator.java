@@ -53,6 +53,15 @@ public final class UploadValidator {
 
         Category detected = detect(head);
         if (detected != expected) {
+            // Browser MediaRecorder records AUDIO inside a WebM (EBML) or ISO-BMFF container whose
+            // magic bytes are byte-identical to the VIDEO form (Chrome/Firefox → audio/webm;opus;
+            // Safari → audio/mp4 with an isom/mp42 brand). There is no signature that separates
+            // audio-only from video for a shared container, so for the AUDIO category we accept a
+            // detection of VIDEO: it is still a legitimate media container (the sniff already ruled
+            // out disguised executables/HTML/SVG polyglots, which is this validator's actual job).
+            if (expected == Category.AUDIO && detected == Category.VIDEO) {
+                return;
+            }
             throw new ServiceException(415,
                     "File content does not match its type (expected " + expected.name().toLowerCase(Locale.ROOT) + ").",
                     "TM_495");

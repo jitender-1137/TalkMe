@@ -84,4 +84,34 @@ public class UserSetting extends BaseEntity {
     @Column(name = "email_announcements", nullable = false)
     @Builder.Default
     private boolean emailAnnouncements = true;
+
+    // ── Night Owl Mode preferences (feature #1) ─────────────────────────────────
+    // The AUTO/ON/OFF decision + the hour window are stored here; the client resolves
+    // "is it night now" from local time (the server can't know the user's wall-clock).
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'AUTO'")
+    @Column(name = "night_owl_mode", nullable = false, length = 10)
+    @Builder.Default
+    private com.chat.talkMe.enums.NightOwlMode nightOwlMode = com.chat.talkMe.enums.NightOwlMode.AUTO;
+
+    /** Local hour Night Owl auto-activates (0–23). */
+    @ColumnDefault("22")
+    @Column(name = "night_start_hour", nullable = false)
+    @Builder.Default
+    private int nightStartHour = 22;
+
+    /** Local hour Night Owl auto-deactivates (0–23), wrapping past midnight. */
+    @ColumnDefault("5")
+    @Column(name = "night_end_hour", nullable = false)
+    @Builder.Default
+    private int nightEndHour = 5;
+
+    /** Optional ambient-sound preset id for the night experience (null = none). */
+    @Column(name = "night_ambient_sound", length = 30)
+    private String nightAmbientSound;
+
+    /** Optional night accent hex (e.g. "#8b74ff"); null = use the default night accent. */
+    @Column(name = "night_accent", length = 9)
+    private String nightAccent;
 }

@@ -9,6 +9,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.MapKeyColumn;
+import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.OneToOne;
@@ -112,6 +114,61 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private Set<com.chat.talkMe.enums.Interest> interests = new java.util.HashSet<>();
+
+    // ── Late-Night Social profile attributes ────────────────────────────────────
+    // All nullable objects (never primitives) so "not set" is distinguishable — the
+    // matching/compatibility engines treat null as "no preference".
+
+    /** Current mood / intent (feature #4), updatable any time. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mood", length = 30)
+    private com.chat.talkMe.enums.Mood mood;
+
+    @Column(name = "mood_updated_at")
+    private java.time.Instant moodUpdatedAt;
+
+    /** Conversation vibe (feature #5). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "conversation_energy", length = 20)
+    private com.chat.talkMe.enums.ConversationEnergy conversationEnergy;
+
+    /** Languages spoken (feature #3 filter + compatibility). */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_languages", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "language")
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Set<com.chat.talkMe.enums.Language> languages = new java.util.HashSet<>();
+
+    /** What the user is looking for (feature #29). */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_looking_for", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "tag")
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Set<com.chat.talkMe.enums.LookingForTag> lookingFor = new java.util.HashSet<>();
+
+    /** Compact personality trait scores (0–100) for cosine compatibility. Lazy — off the hot path. */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "user_personality", joinColumns = @JoinColumn(name = "user_id"))
+    @MapKeyColumn(name = "trait")
+    @MapKeyEnumerated(EnumType.STRING)
+    @Column(name = "score")
+    @Builder.Default
+    private java.util.Map<com.chat.talkMe.enums.PersonalityTrait, Integer> personality = new java.util.HashMap<>();
+
+    /** Async voice introduction (feature #16) — 15–30s clip stored via MediaStorage. */
+    @Column(name = "voice_intro_url", length = 512)
+    private String voiceIntroUrl;
+
+    @Column(name = "voice_intro_duration_ms")
+    private Integer voiceIntroDurationMs;
+
+    /** Cached profile-completion percentage (0–100), recomputed on profile writes. Feeds gamification. */
+    @Column(name = "profile_completion", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    @Builder.Default
+    private int profileCompletion = 0;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

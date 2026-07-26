@@ -49,6 +49,13 @@ public class PostServiceImpl implements PostService {
     private final PhotoMusicMuxer photoMusicMuxer;
     private final com.chat.talkMe.storage.MediaStorage mediaStorage;
     private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
+    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
+
+    /** Temporary-post TTL bounds (feature #22): 5 minutes … 7 days. */
+    private static final long TEMP_POST_MIN_SECONDS = 300L;
+    private static final long TEMP_POST_MAX_SECONDS = 7L * 24 * 60 * 60;
+    /** Reaper page size — bound the per-tick work like OutboxPublisherJob. */
+    private static final int EXPIRY_REAP_BATCH = 200;
 
     @Override
     @Transactional
@@ -70,6 +77,17 @@ public class PostServiceImpl implements PostService {
             audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
         }
 
+        // Temporary post (feature #22): opt-in TTL, gated + clamped server-side.
+        java.time.Instant expiresAt = null;
+        if (request.getExpiresInSeconds() != null && request.getExpiresInSeconds() > 0) {
+            if (!featureAccessService.hasAccess(currentUser, com.chat.talkMe.enums.FeatureKey.TEMPORARY_POSTS)) {
+                throw new com.chat.talkMe.exception.FeatureLockedException();
+            }
+            long ttl = Math.max(TEMP_POST_MIN_SECONDS,
+                    Math.min(TEMP_POST_MAX_SECONDS, request.getExpiresInSeconds()));
+            expiresAt = java.time.Instant.now().plusSeconds(ttl);
+        }
+
         if (request.getCaption() != null && !request.getCaption().isBlank()
                 && moderationService.moderateText(request.getCaption()).isExplicit()) {
             throw new com.chat.talkMe.exception.ContentModerationException(
@@ -82,6 +100,7 @@ public class PostServiceImpl implements PostService {
                 .richContent(request.getRichContent())
                 .caption(request.getCaption())
                 .audience(audience)
+                .expiresAt(expiresAt)
                 .shortCode(com.chat.talkMe.util.ShortCodes.unique(c -> !postRepository.existsByShortCode(c)))
                 .build();
 
@@ -274,7 +293,7 @@ public class PostServiceImpl implements PostService {
     public PostResponse getPost(String postUuid, User currentUser) {
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
-        if (post.isDeleted() || !canViewPost(post, currentUser)) {
+        if (post.isDeleted() || post.isExpired() || !canViewPost(post, currentUser)) {
             throw new NotFoundException("Post not found", "TM_211");
         }
         return mapToPostResponse(post, currentUser);
@@ -285,7 +304,7 @@ public class PostServiceImpl implements PostService {
     public PostResponse getPostByShortCode(String shortCode, User currentUser) {
         Post post = postRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_211"));
-        if (post.isDeleted() || !canViewPost(post, currentUser)) {
+        if (post.isDeleted() || post.isExpired() || !canViewPost(post, currentUser)) {
             throw new NotFoundException("Post not found", "TM_211");
         }
         return mapToPostResponse(post, currentUser);
@@ -388,6 +407,23 @@ public class PostServiceImpl implements PostService {
 
         post.setDeleted(true);
         postRepository.save(post);
+    }
+
+    @Override
+    @Transactional
+    public int reapExpiredPosts(java.time.Instant now) {
+        // Soft-delete expired temporary posts (consistent with deletePost). The feed queries
+        // already hide them the instant expiresAt passes; this frees them from every listing
+        // and count. Bounded per tick; a backlog drains over successive runs.
+        List<Post> expired = postRepository.findExpiredActive(
+                now, org.springframework.data.domain.PageRequest.of(0, EXPIRY_REAP_BATCH));
+        for (Post post : expired) {
+            post.setDeleted(true);
+        }
+        if (!expired.isEmpty()) {
+            postRepository.saveAll(expired);
+        }
+        return expired.size();
     }
 
     @Override
@@ -638,6 +674,7 @@ public class PostServiceImpl implements PostService {
                 .poll(mapToPollResponse(post.getPoll(), currentUser))
                 .audio(AudioTrackDto.from(post.getAudio()))
                 .audience(post.getAudience() != null ? post.getAudience().name() : "EVERYONE")
+                .expiresAt(post.getExpiresAt() != null ? post.getExpiresAt().toString() : null)
                 .build();
     }
 

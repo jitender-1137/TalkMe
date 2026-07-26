@@ -31,6 +31,14 @@ public class AuthUserResponse {
     private String city;
     private String mobileNumber;
     private java.util.Set<String> interests;
+    // ── Late-Night Social attributes ──
+    private String mood;
+    private String conversationEnergy;
+    private java.util.Set<String> languages;
+    private java.util.Set<String> lookingFor;
+    private String voiceIntroUrl;
+    private Integer voiceIntroDurationMs;
+    private int profileCompletion;
     private String presence; // "online", "idle", "offline"
     private String lastSeen;
     /** True when this user restricts messaging to friends — drives the avatar lock badge. */
@@ -39,4 +47,10 @@ public class AuthUserResponse {
     /** Granted role names — kept in sync with UserResponse so the /admin guard works
      *  even from the /auth/me-seeded profile cache (before /users/me refetches). */
     private java.util.List<String> roles;
+    /**
+     * Effective feature wire-names this user may use. Self-only: populated ONLY on the
+     * authenticated-user paths (login / /auth/me / updateProfile) and never in the mapper,
+     * so third-party views (post likes, story viewers, chat peers) never leak entitlements.
+     */
+    private java.util.Set<String> features;
 }

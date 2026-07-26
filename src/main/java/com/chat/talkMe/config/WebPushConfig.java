@@ -23,9 +23,18 @@ public class WebPushConfig {
             Security.addProvider(new BouncyCastleProvider());
         }
         WebPushProperties.Vapid vapid = props.getVapid();
-        if (vapid.getPublicKey() == null || vapid.getPrivateKey() == null) {
-            log.warn("[WebPush] VAPID keys are not configured — Web Push will fail until set.");
+        // Build a keyless PushService when VAPID keys are absent instead of passing nulls to the
+        // 3-arg constructor (which Base64-decodes them and NPEs). This lets the app boot in any
+        // keyless environment (tests / dev / CI) — Web Push is best-effort and simply no-ops/logs
+        // until keys are configured. Keys are applied only when both are present.
+        PushService pushService = new PushService();
+        if (vapid.getPublicKey() != null && vapid.getPrivateKey() != null) {
+            pushService.setPublicKey(vapid.getPublicKey());
+            pushService.setPrivateKey(vapid.getPrivateKey());
+            pushService.setSubject(vapid.getSubject());
+        } else {
+            log.warn("[WebPush] VAPID keys are not configured — Web Push will no-op until set.");
         }
-        return new PushService(vapid.getPublicKey(), vapid.getPrivateKey(), vapid.getSubject());
+        return pushService;
     }
 }

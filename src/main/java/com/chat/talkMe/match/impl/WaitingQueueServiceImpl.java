@@ -41,6 +41,34 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     }
 
     @Override
+    public java.util.List<String> peekCandidates(int max, String exclude) {
+        // The queue is a LIST filled via leftPush, so index 0 is newest; read the TAIL
+        // range (oldest-first) to favour users who've waited longest.
+        Long size = redisTemplate.opsForList().size(QUEUE_KEY);
+        if (size == null || size == 0) return java.util.List.of();
+        java.util.List<String> all = redisTemplate.opsForList().range(QUEUE_KEY, 0, -1);
+        if (all == null || all.isEmpty()) return java.util.List.of();
+        java.util.Collections.reverse(all); // oldest-first
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String u : all) {
+            if (u == null || u.equals(exclude)) continue;
+            out.add(u);
+            if (out.size() >= max) break;
+        }
+        return out;
+    }
+
+    @Override
+    public boolean claim(String username) {
+        synchronized (this) {
+            // LREM returns the number of elements actually removed; >0 means WE claimed them.
+            Long removed = redisTemplate.opsForList().remove(QUEUE_KEY, 1, username);
+            redisTemplate.opsForSet().remove(SET_KEY, username);
+            return removed != null && removed > 0;
+        }
+    }
+
+    @Override
     public Optional<String> pollNext(String excludeUsername) {
         synchronized (this) {
             String peer = redisTemplate.opsForList().rightPop(QUEUE_KEY);

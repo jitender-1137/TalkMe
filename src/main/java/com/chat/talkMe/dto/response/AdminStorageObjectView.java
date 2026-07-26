@@ -48,6 +48,18 @@ public class AdminStorageObjectView {
     private Double duration;       // seconds — audio/voice/video
     private long fileSize;         // DB-recorded size (may differ from physical `size`)
 
+    private String thumbnailUrl;   // DECRYPTED thumbnail reference (image/video), if any
+
+    // Message context — the message this file was sent in
+    private String caption;            // DECRYPTED text sent alongside the media (may be empty)
+    private String messageType;        // IMAGE / VIDEO / VOICE / AUDIO / FILE / ...
+    private boolean forwarded;         // the message was forwarded
+    private boolean edited;            // the message was edited after sending
+    private String moderationStatus;   // CLEAN / HELD / BLOCKED …
+    private int reactionCount;         // number of reactions on the message
+    private Integer selfDestructSeconds; // view-once / timed media (null = normal)
+    private boolean selfDestructExpired; // the media has already self-destructed
+
     // Timestamps
     private String sentAt;         // when the message was sent (message.createdAt)
     private String createdAt;      // attachment row created

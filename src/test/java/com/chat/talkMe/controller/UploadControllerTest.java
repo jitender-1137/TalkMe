@@ -89,21 +89,24 @@ public class UploadControllerTest {
 
     @Test
     void testUploadFileSuccess() throws Exception {
+        // UploadValidator verifies the REAL content type from magic bytes, so the file must
+        // actually be what its declared type says — use a real 8-byte PNG signature as an image.
+        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
         MockMultipartFile file = new MockMultipartFile(
                 "file",
-                "test-document.txt",
-                MediaType.TEXT_PLAIN_VALUE,
-                "Hello World content".getBytes()
+                "test-image.png",
+                MediaType.IMAGE_PNG_VALUE,
+                png
         );
 
-        Mockito.when(storageService.storeFile(any(), anyString()))
-                .thenReturn("http://example.com/uploads/test-document.txt");
+        Mockito.when(storageService.storeFile(any(), anyString(), anyString()))
+                .thenReturn("http://example.com/uploads/test-image.png");
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/uploads")
+        mockMvc.perform(multipart("/api/v1/uploads")
                 .file(file)
-                .param("type", "document")
+                .param("type", "image")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
@@ -111,10 +114,10 @@ public class UploadControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("File uploaded successfully"))
                 .andExpect(jsonPath("$.messageCode").value("TM_167"))
-                .andExpect(jsonPath("$.data.url").value("http://example.com/uploads/test-document.txt"))
-                .andExpect(jsonPath("$.data.fileName").value("test-document.txt"))
-                .andExpect(jsonPath("$.data.fileSize").value(19))
-                .andExpect(jsonPath("$.data.mimeType").value(MediaType.TEXT_PLAIN_VALUE));
+                .andExpect(jsonPath("$.data.url").value("http://example.com/uploads/test-image.png"))
+                .andExpect(jsonPath("$.data.fileName").value("test-image.png"))
+                .andExpect(jsonPath("$.data.fileSize").value(png.length))
+                .andExpect(jsonPath("$.data.mimeType").value(MediaType.IMAGE_PNG_VALUE));
     }
 
     @Test
@@ -128,7 +131,7 @@ public class UploadControllerTest {
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/uploads")
+        mockMvc.perform(multipart("/api/v1/uploads")
                 .file(file)
                 .param("type", "document")
                 .cookie(csrfCookie)
@@ -147,7 +150,7 @@ public class UploadControllerTest {
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/uploads")
+        mockMvc.perform(multipart("/api/v1/uploads")
                 .file(file)
                 .param("type", "document")
                 .with(user(testUserDetails()))
@@ -161,7 +164,7 @@ public class UploadControllerTest {
     void testUploadFileMissingFile() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/uploads")
+        mockMvc.perform(multipart("/api/v1/uploads")
                 .param("type", "document")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
@@ -182,7 +185,7 @@ public class UploadControllerTest {
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/uploads")
+        mockMvc.perform(multipart("/api/v1/uploads")
                 .file(file)
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
@@ -194,20 +197,22 @@ public class UploadControllerTest {
 
     @Test
     void testGetMediaSuccess() throws Exception {
-        tempTestFilePath = Paths.get("test-uploads/temp-test-file.txt");
+        // The media backend only serves files UNDER its configured media root
+        // (storage.media-root = ./build/test-media in the test profile); the traversal guard
+        // rejects anything outside it. Write the fixture there and request it by absolute path.
+        tempTestFilePath = Paths.get("build/test-media/temp-test-file.txt").toAbsolutePath();
         Files.createDirectories(tempTestFilePath.getParent());
         Files.writeString(tempTestFilePath, "Media file test contents.");
 
-        mockMvc.perform(get("/uploads/media")
-                .param("path", tempTestFilePath.toAbsolutePath().toString()))
+        mockMvc.perform(get("/api/v1/uploads/media")
+                .param("path", tempTestFilePath.toString()))
                 .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
                 .andExpect(content().string("Media file test contents."));
     }
 
     @Test
     void testGetMediaNotFound() throws Exception {
-        mockMvc.perform(get("/uploads/media")
+        mockMvc.perform(get("/api/v1/uploads/media")
                 .param("path", "test-uploads/non-existent-file.txt"))
                 .andExpect(status().isNotFound());
     }

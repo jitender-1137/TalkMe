@@ -27,4 +27,8 @@ public class AnonymousPartnerResponse {
 
     /** Country display name (e.g. "India"). Coarse location only — no city/region. */
     private String country;
+
+    /** Anonymous mask alias for Mask chat, e.g. "Moon #247". Null for non-mask sessions.
+     *  Still non-identifying — a generated label, never the real name/username. */
+    private String alias;
 }

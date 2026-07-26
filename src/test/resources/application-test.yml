@@ -35,16 +35,23 @@ security:
     capacity: 100
     refill-tokens: 10
     refill-period-seconds: 1
-
-# Storage Engine (Local test uploads)
-storage:
-  local:
-    directory: ./test-uploads
-  s3:
+  # CAPTCHA (Cloudflare Turnstile) defaults to enabled=true in CaptchaProperties. Disable it in
+  # tests so signup/login flows don't require a Turnstile token (the human-gate is exercised
+  # directly in AuthControllerUnitTest via a mocked CaptchaService).
+  captcha:
     enabled: false
-    bucket-name: talkme-uploads
-    region: us-east-1
-    endpoint: http://localhost:4566
+
+# Media storage — LocalMediaStorage binds `storage.media-root` (the legacy
+# storage.local.directory / storage.s3.* keys are no longer read). Point it at a
+# writable, build-local dir so the context boots in tests (the default /media is not
+# writable in CI / on dev machines and previously failed context load).
+storage:
+  provider: local
+  media-root: ./build/test-media
+  # WebMvcConfig still binds @Value("${storage.local.directory}") to serve /talkMe/** —
+  # keep it defined (writable, build-local) so the context resolves the placeholder.
+  local:
+    directory: ./build/test-uploads
 
 # WebSocket Configuration
 websocket:

@@ -77,6 +77,9 @@ public class AuthServiceImpl implements AuthService {
     private final com.chat.talkMe.service.WebPushService webPushService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
     private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
+    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
+    private final com.chat.talkMe.cache.FeatureAccessCache featureAccessCache;
+    private final com.chat.talkMe.service.ReputationRecorder reputationRecorder;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -616,6 +619,8 @@ public class AuthServiceImpl implements AuthService {
 
         user.setVerified(true);
         userRepository.save(user);
+        // Verification unlocks verified-gated features — drop the stale entitlement cache.
+        featureAccessCache.evict(user.getId());
         log.info("Email verified for user '{}'", user.getUsername());
 
         // Now — and only now — send the welcome email.
@@ -895,7 +900,11 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLocationAt(Instant.now());
         userRepository.save(user);
 
+        // Login may have just flipped verified/age (OAuth backfill) — recompute the
+        // entitlement set fresh rather than serving a pre-login cached value.
+        featureAccessCache.evict(user.getId());
         AuthUserResponse authUser = userMapper.toAuthUserResponse(user);
+        authUser.setFeatures(featureAccessService.effectiveWireNames(user));
 
         JwtTokensResponse jwtTokens = JwtTokensResponse.builder()
                 .accessToken(accessToken)
@@ -919,7 +928,9 @@ public class AuthServiceImpl implements AuthService {
     public AuthUserResponse getCurrentUser(User currentUser) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
-        return userMapper.toAuthUserResponse(user);
+        AuthUserResponse res = userMapper.toAuthUserResponse(user);
+        res.setFeatures(featureAccessService.effectiveWireNames(user));
+        return res;
     }
 
     @Override
@@ -962,9 +973,50 @@ public class AuthServiceImpl implements AuthService {
             user.getInterests().clear();
             user.getInterests().addAll(request.getInterests());
         }
+        // ── Late-Night Social attributes ──
+        if (request.getMood() != null) {
+            user.setMood(request.getMood());
+            user.setMoodUpdatedAt(Instant.now());
+        }
+        if (request.getConversationEnergy() != null) {
+            user.setConversationEnergy(request.getConversationEnergy());
+        }
+        if (request.getLanguages() != null) {
+            user.getLanguages().clear();
+            user.getLanguages().addAll(request.getLanguages());
+        }
+        if (request.getLookingFor() != null) {
+            user.getLookingFor().clear();
+            user.getLookingFor().addAll(request.getLookingFor());
+        }
+        if (request.getPersonality() != null) {
+            user.getPersonality().clear();
+            for (var e : request.getPersonality().entrySet()) {
+                if (e.getKey() != null && e.getValue() != null) {
+                    user.getPersonality().put(e.getKey(), Math.max(0, Math.min(100, e.getValue())));
+                }
+            }
+        }
+        if (request.getVoiceIntroUrl() != null) {
+            user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+        }
+        if (request.getVoiceIntroDurationMs() != null) {
+            user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());
+        }
+        // Recompute the cached completion score from the merged state.
+        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
 
         user = userRepository.save(user);
+        if (user.getProfileCompletion() >= 100) {
+            reputationRecorder.record(user.getId(),
+                    com.chat.talkMe.enums.ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
+        }
         log.info("User profile updated successfully for: {}", user.getUsername());
-        return userMapper.toAuthUserResponse(user);
+        // Age (and later verification) can change entitlement — evict so the returned
+        // feature set is recomputed fresh rather than served from a stale cache.
+        featureAccessCache.evict(user.getId());
+        AuthUserResponse res = userMapper.toAuthUserResponse(user);
+        res.setFeatures(featureAccessService.effectiveWireNames(user));
+        return res;
     }
 }

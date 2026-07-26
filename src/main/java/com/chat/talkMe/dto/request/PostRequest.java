@@ -25,4 +25,8 @@ public class PostRequest {
 
     // Who can see the post: "EVERYONE" (default) or "FRIENDS".
     private String audience;
+
+    // Optional TTL for a temporary post (feature #22): seconds until it expires and is
+    // reaped. null/<=0 = permanent. Server clamps to [MIN, MAX]. Requires TEMPORARY_POSTS.
+    private Integer expiresInSeconds;
 }

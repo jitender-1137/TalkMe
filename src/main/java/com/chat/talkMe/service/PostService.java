@@ -18,6 +18,9 @@ public interface PostService {
     Page<PostResponse> getFeed(Pageable pageable, User currentUser);
     Page<PostResponse> getProfileFeed(String userUuid, Pageable pageable, User currentUser);
     void deletePost(String postUuid, User currentUser);
+
+    /** Soft-delete temporary posts whose TTL has elapsed; returns how many were reaped. */
+    int reapExpiredPosts(java.time.Instant now);
     void likePost(String postUuid, User currentUser);
     void unlikePost(String postUuid, User currentUser);
     Page<AuthUserResponse> getPostLikes(String postUuid, Pageable pageable, User currentUser);

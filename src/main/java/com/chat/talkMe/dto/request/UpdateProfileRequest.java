@@ -1,6 +1,11 @@
 package com.chat.talkMe.dto.request;
 
+import com.chat.talkMe.enums.ConversationEnergy;
 import com.chat.talkMe.enums.Interest;
+import com.chat.talkMe.enums.Language;
+import com.chat.talkMe.enums.LookingForTag;
+import com.chat.talkMe.enums.Mood;
+import com.chat.talkMe.enums.PersonalityTrait;
 import com.chat.talkMe.validator.ValidAge;
 import com.chat.talkMe.validator.ValidGender;
 import jakarta.validation.constraints.Size;
@@ -9,6 +14,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
 import java.util.Set;
 
 @Data
@@ -50,4 +56,17 @@ public class UpdateProfileRequest {
     private String education;
 
     private Set<Interest> interests;
+
+    // ── Late-Night Social attributes (null ⇒ leave unchanged; collections replace) ──
+    private Mood mood;
+    private ConversationEnergy conversationEnergy;
+    private Set<Language> languages;
+    private Set<LookingForTag> lookingFor;
+    /** Personality trait → 0..100 score. Out-of-range values are clamped server-side. */
+    private Map<PersonalityTrait, Integer> personality;
+
+    /** Async voice-introduction clip (feature #16): URL from the upload endpoint + duration. */
+    @Size(max = 512, message = "Voice intro URL must not exceed 512 characters")
+    private String voiceIntroUrl;
+    private Integer voiceIntroDurationMs;
 }

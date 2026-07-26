@@ -204,6 +204,13 @@ public class MessageServiceImpl implements MessageService {
             }
         }
 
+        // Non-recorded rooms (#26/#27 Sleep Companion / Someone Is Listening): the message is
+        // delivered live to the room but NEVER persisted (no DB row, no attachment/receipt/outbox).
+        // Handled as a fully self-contained branch so the normal persistence path is untouched.
+        if (chat.getRoomMode() != null && chat.getRoomMode().isEphemeral()) {
+            return sendEphemeralRoomMessage(chat, chatUuid, currentUser, request, type, parentMessage, isBlocked);
+        }
+
         Message message = Message.builder()
                 .chat(chat)
                 .sender(currentUser)
@@ -220,6 +227,8 @@ public class MessageServiceImpl implements MessageService {
                 // (per-member arming is not modeled for groups in MVP).
                 .selfDestructSeconds(type != MessageType.TEXT && !chat.isMultiParty()
                         ? request.getSelfDestructSeconds() : null)
+                // Download permission: media only (meaningless for text), any chat type.
+                .allowDownload(type != MessageType.TEXT && request.isAllowDownload())
                 .build();
 
         // @mentions (multi-party only): resolve the mentioned member UUIDs → user ids.
@@ -313,6 +322,76 @@ public class MessageServiceImpl implements MessageService {
             eventPublisher.publishEvent(broadcastEvent);
         }
 
+        return response;
+    }
+
+    /**
+     * Deliver a message in a non-recorded room (SLEEP_COMPANION / LISTENING) without EVER
+     * persisting it: no Message/attachment/receipt/outbox rows. The message is built transiently
+     * (in-memory uuid + timestamp), broadcast best-effort to the room topic and to each present
+     * member's personal queue for live viewing, then discarded. Because nothing is stored, delivery
+     * is real-time-only (no history, no guaranteed re-drive) — which is exactly the privacy promise
+     * of these rooms. A hard-blocked message is returned to the sender but not broadcast.
+     */
+    private MessageResponse sendEphemeralRoomMessage(Chat chat, String chatUuid, User currentUser,
+                                                     SendMessageRequest request, MessageType type,
+                                                     Message parentMessage, boolean isBlocked) {
+        Message message = Message.builder()
+                .chat(chat)
+                .sender(currentUser)
+                .content(messageCryptoService.encrypt(chat.getId(), request.getContent()))
+                .clientId(request.getClientId())
+                .messageType(type)
+                .parentMessage(parentMessage)
+                .isForwarded(request.isForwarded())
+                .isBlocked(isBlocked)
+                .moderationStatus(com.chat.talkMe.enums.ModerationStatus.CLEAN)
+                .allowDownload(type != MessageType.TEXT && request.isAllowDownload())
+                .build();
+        // Transient identity so the response looks like a real message to clients, without a row.
+        message.setUuid(UUID.randomUUID());
+        message.setCreatedAt(Instant.now());
+        message.setUpdatedAt(Instant.now());
+
+        if (type != MessageType.TEXT && request.getFileUrl() != null) {
+            MessageAttachment attachment = MessageAttachment.builder()
+                    .message(message)
+                    .fileName(messageCryptoService.encrypt(chat.getId(),
+                            request.getFileName() != null ? request.getFileName() : "file"))
+                    .fileSize(request.getFileSize() != null ? request.getFileSize() : 0L)
+                    .fileUrl(messageCryptoService.encrypt(chat.getId(), request.getFileUrl()))
+                    .mimeType(request.getMimeType())
+                    .duration(request.getDuration())
+                    .build();
+            attachment.setUuid(UUID.randomUUID());
+            attachment.setCreatedAt(Instant.now());
+            attachment.setUpdatedAt(Instant.now());
+            message.getAttachments().add(attachment);
+        }
+
+        MessageResponse response = messageMapper.toMessageResponse(message);
+
+        // Live-only fan-out (no notifications, no unread badges — nothing is retained).
+        if (!isBlocked) {
+            try {
+                messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) response);
+                java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+                eventWrapper.put("event", "message_received");
+                java.util.Map<String, Object> eventPayload = new java.util.HashMap<>();
+                eventPayload.put("chatId", chatUuid);
+                eventPayload.put("message", response);
+                eventWrapper.put("payload", eventPayload);
+                chat.getMembers().stream()
+                        .filter(m -> m.getLeftAt() == null)
+                        .map(ChatMember::getUser)
+                        .filter(u -> u != null && !u.getId().equals(currentUser.getId()))
+                        .map(User::getUsername)
+                        .forEach(username ->
+                                messagingTemplate.convertAndSendToUser(username, "/queue/chats", eventWrapper));
+            } catch (Exception e) {
+                log.debug("[ephemeral-room] live broadcast failed for {}: {}", chatUuid, e.getMessage());
+            }
+        }
         return response;
     }
 

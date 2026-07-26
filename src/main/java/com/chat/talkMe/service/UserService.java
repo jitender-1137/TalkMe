@@ -13,9 +13,13 @@ import java.util.Map;
 public interface UserService {
     UserResponse getCurrentUser(User currentUser);
     UserResponse updateProfile(UpdateProfileRequest request, User currentUser);
+    /** Fast, dedicated update for the hot "change my mood" action (feature #4). */
+    UserResponse updateMood(String moodValue, User currentUser);
     Map<String, String> uploadAvatar(MultipartFile file, User currentUser);
     void removeAvatar(User currentUser);
     UserResponse getUserById(String userId, User currentUser);
+    /** At-a-glance "smart card" (feature #20) with late-night attributes + compatibility. */
+    com.chat.talkMe.dto.response.SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser);
     PaginatedResponse<UserResponse> searchUsers(String query, int limit, String cursor, User currentUser);
     PaginatedResponse<BlockedUserResponse> getBlockedUsers(User currentUser);
     void reportUser(String userId, String reason, String description, User currentUser);

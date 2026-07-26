@@ -38,6 +38,10 @@ public class SendMessageRequest {
     // 5/10/30 = destroy N seconds after the receiver opens it.
     private Integer selfDestructSeconds;
 
+    // Media download permission (media only): false (default) = receiver cannot
+    // download/save; true = sender opted to let the receiver download THIS media.
+    private boolean allowDownload;
+
     // UUIDs of members @mentioned (group/room/channel messages).
     private List<String> mentionedUserIds;
 }

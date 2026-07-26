@@ -69,4 +69,18 @@ public class Post extends BaseEntity {
     @org.hibernate.annotations.ColumnDefault("'EVERYONE'")
     @Builder.Default
     private com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+
+    /**
+     * Optional expiry for a temporary post (feature #22). {@code null} = permanent (the default
+     * for every existing/normal post). When set, the post is hidden from feeds once past and is
+     * hard-deleted by {@code PostExpiryReaper}.
+     */
+    @Column(name = "expires_at")
+    private java.time.Instant expiresAt;
+
+    /** Whether this post has a TTL and that TTL has elapsed. */
+    @Transient
+    public boolean isExpired() {
+        return expiresAt != null && java.time.Instant.now().isAfter(expiresAt);
+    }
 }

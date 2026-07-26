@@ -18,11 +18,20 @@ public class MatchWebSocketController {
     private final ImagePermissionService imagePermissionService;
     private final MatchConsentService matchConsentService;
     private final com.chat.talkMe.match.impl.MatchMessageBufferService matchMessageBuffer;
+    private final RevealService revealService;
+    private final MatchTimerService matchTimerService;
 
     @MessageMapping("/match/start")
-    public void startMatching(Principal principal) {
+    public void startMatching(
+            @Payload(required = false) com.chat.talkMe.dto.request.MatchStartRequest filters,
+            Principal principal) {
         if (principal == null) return;
-        matchmakingService.startMatching(principal.getName());
+        // No body → legacy blind quick-match; a body → preference-aware match.
+        if (filters == null) {
+            matchmakingService.startMatching(principal.getName());
+        } else {
+            matchmakingService.startMatching(principal.getName(), filters);
+        }
     }
 
     /**
@@ -94,6 +103,47 @@ public class MatchWebSocketController {
         if (principal == null || payload == null) return;
         Map<String, Object> media = (Map<String, Object>) payload.get("media");
         chatRoutingService.relayImage(principal.getName(), media);
+    }
+
+    // ── Anonymous Mask reveal handshake (features #6/#15/#16) ──
+    @MessageMapping("/match/reveal-request")
+    public void revealRequest(@Payload Map<String, Object> payload, Principal principal) {
+        if (principal == null || payload == null) return;
+        revealService.requestReveal(principal.getName(), parseChannel(payload));
+    }
+
+    @MessageMapping("/match/reveal-accept")
+    public void revealAccept(@Payload Map<String, Object> payload, Principal principal) {
+        if (principal == null || payload == null) return;
+        revealService.acceptReveal(principal.getName(), parseChannel(payload));
+    }
+
+    @MessageMapping("/match/reveal-decline")
+    public void revealDecline(@Payload Map<String, Object> payload, Principal principal) {
+        if (principal == null || payload == null) return;
+        revealService.declineReveal(principal.getName(), parseChannel(payload));
+    }
+
+    private com.chat.talkMe.enums.RevealChannel parseChannel(Map<String, Object> payload) {
+        Object c = payload.get("channel");
+        return com.chat.talkMe.enums.RevealChannel.valueOf(String.valueOf(c).trim().toUpperCase());
+    }
+
+    // ── Coffee/Chemistry post-timer actions (features #7/#14) ──
+    @MessageMapping("/match/timed-action")
+    public void timedAction(@Payload Map<String, Object> payload, Principal principal) {
+        if (principal == null || payload == null) return;
+        String action = String.valueOf(payload.get("action")).trim().toUpperCase();
+        String name = principal.getName();
+        switch (action) {
+            case "END" -> matchmakingService.handleExit(name);
+            case "REMATCH" -> matchmakingService.handleNewChat(name);
+            // Exchanging profiles / adding a friend is a consent-gated PROFILE reveal.
+            case "EXCHANGE_PROFILES", "ADD_FRIEND" ->
+                    revealService.requestReveal(name, com.chat.talkMe.enums.RevealChannel.PROFILE);
+            case "CONTINUE" -> matchTimerService.continueRequest(name);
+            default -> { /* ignore unknown */ }
+        }
     }
 
     @MessageMapping("/match/exit")

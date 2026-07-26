@@ -31,7 +31,7 @@ public interface AdminService {
     AdminUserView revokeRole(String uuid, String roleName, String adminUsername);
 
     com.chat.talkMe.dto.response.PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView>
-        listAudit(int page, int size);
+        listAudit(String action, String targetType, String admin, String from, String to, int page, int size);
 
     // ── Phase 3: create / edit / delete + charts ──────────────────────────────
     AdminUserView createUser(com.chat.talkMe.dto.request.AdminCreateUserRequest req, String adminUsername);
@@ -81,6 +81,12 @@ public interface AdminService {
     com.chat.talkMe.dto.response.AdminReportView getReport(String reportUuid);
     /** action = DISMISS | RESOLVE | BAN_REPORTED. Records reviewer + note; audited. */
     com.chat.talkMe.dto.response.AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername);
+
+    // ── User feedback ─────────────────────────────────────────────────────────
+    /** Paginated feedback list; type/status are optional filters ("ALL"/blank = no filter). */
+    PaginatedResponse<com.chat.talkMe.dto.response.AdminFeedbackView> listFeedback(String type, String status, int page, int size);
+    /** Move a feedback entry to NEW | REVIEWED | ARCHIVED; audited. */
+    com.chat.talkMe.dto.response.AdminFeedbackView updateFeedbackStatus(String feedbackUuid, String status, String adminUsername);
 
     /**
      * One metric's time series with a caller-chosen window and interval.

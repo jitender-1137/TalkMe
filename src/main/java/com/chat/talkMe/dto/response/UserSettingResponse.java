@@ -24,4 +24,11 @@ public class UserSettingResponse {
     private boolean emailLoginAlerts;
     private boolean emailUnreadMessages;
     private boolean emailAnnouncements;
+
+    // ── Night Owl Mode ──────────────────────────────────────────────────────────
+    private String nightOwlMode;
+    private int nightStartHour;
+    private int nightEndHour;
+    private String nightAmbientSound;
+    private String nightAccent;
 }

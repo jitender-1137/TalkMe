@@ -53,6 +53,14 @@ public class AuthControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
+    // The breached-password check (HaveIBeenPwned) rejects common passwords; mock it so the
+    // signup/change/reset happy-paths don't depend on the network or a breach list.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.chat.talkMe.service.PwnedPasswordService pwnedPasswordService;
+
     private MockMvc mockMvc;
     private User testUser;
 
@@ -76,6 +84,9 @@ public class AuthControllerTest {
                 .roles(Set.of(userRole))
                 .build();
         testUser = userRepository.save(testUser);
+
+        org.mockito.Mockito.when(pwnedPasswordService.isBreached(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(false);
     }
 
     @AfterEach
@@ -405,6 +416,14 @@ public class AuthControllerTest {
 
     @Test
     void testResetPasswordSuccess() throws Exception {
+        // Seed a valid reset token the way forgotPassword does: Redis key
+        // "pwreset:token:<sha256hex(token)>" → the user's uuid.
+        String token = "valid-token-value";
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        String hash = java.util.HexFormat.of()
+                .formatHex(md.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        redisTemplate.opsForValue().set("pwreset:token:" + hash, testUser.getUuid().toString());
+
         String payload = """
                 {
                   "token": "valid-token-value",

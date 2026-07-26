@@ -39,6 +39,17 @@ public class Story extends BaseEntity {
     @Embedded
     private AudioTrack audio;
 
+    /**
+     * Medium of this story (feature #21). VISUAL = classic image/video (the default; every
+     * existing row backfills here). VOICE = an audio-only status whose {@code mediaUrl} is a
+     * validated voice clip played through the shared audio bar.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kind", length = 12, nullable = false)
+    @org.hibernate.annotations.ColumnDefault("'VISUAL'")
+    @Builder.Default
+    private com.chat.talkMe.enums.StoryKind kind = com.chat.talkMe.enums.StoryKind.VISUAL;
+
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

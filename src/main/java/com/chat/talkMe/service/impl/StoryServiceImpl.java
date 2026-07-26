@@ -33,6 +33,7 @@ public class StoryServiceImpl implements StoryService {
     private final PhotoMusicMuxer photoMusicMuxer;
     private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
     private final com.chat.talkMe.service.NotificationService notificationService;
+    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
 
     @Override
     @Transactional
@@ -43,17 +44,36 @@ public class StoryServiceImpl implements StoryService {
             throw new com.chat.talkMe.exception.ContentModerationException(
                     "Your story caption contains content that violates our community guidelines.");
         }
-        // Photo + music story → merge into an auto-playing video (Instagram-style) so
-        // the sound plays with the story like a video. Skip if the media is already a
-        // video; fall back to the plain image if muxing is unavailable.
+
+        com.chat.talkMe.enums.StoryKind kind = "VOICE".equalsIgnoreCase(
+                request.getKind() == null ? "" : request.getKind().trim())
+                ? com.chat.talkMe.enums.StoryKind.VOICE
+                : com.chat.talkMe.enums.StoryKind.VISUAL;
+
         String mediaUrl = request.getMediaUrl();
         var audioReq = request.getAudio();
-        boolean alreadyVideo = mediaUrl != null && mediaUrl.toLowerCase().contains(".mp4");
-        if (audioReq != null && audioReq.getAudioUrl() != null && mediaUrl != null && !alreadyVideo) {
-            int start = audioReq.getAudioStartSec() == null ? 0 : audioReq.getAudioStartSec();
-            int clip = audioReq.getAudioClipSeconds() == null ? 15 : audioReq.getAudioClipSeconds();
-            String video = photoMusicMuxer.muxPhotoWithMusic(mediaUrl, audioReq.getAudioUrl(), start, clip);
-            if (video != null) mediaUrl = video;
+
+        if (kind == com.chat.talkMe.enums.StoryKind.VOICE) {
+            // Voice status (feature #21): mediaUrl IS the voice clip. Gate + validate; no image
+            // moderation / photo-music muxing applies (it's pure audio).
+            if (!featureAccessService.hasAccess(currentUser, com.chat.talkMe.enums.FeatureKey.VOICE_STATUS)) {
+                throw new com.chat.talkMe.exception.FeatureLockedException();
+            }
+            if (!com.chat.talkMe.validator.AudioValidator.hasAudioExtension(mediaUrl)) {
+                throw new com.chat.talkMe.exception.BadRequestException(
+                        "A voice status must be an audio clip", "TM_232");
+            }
+        } else {
+            // Photo + music story → merge into an auto-playing video (Instagram-style) so
+            // the sound plays with the story like a video. Skip if the media is already a
+            // video; fall back to the plain image if muxing is unavailable.
+            boolean alreadyVideo = mediaUrl != null && mediaUrl.toLowerCase().contains(".mp4");
+            if (audioReq != null && audioReq.getAudioUrl() != null && mediaUrl != null && !alreadyVideo) {
+                int start = audioReq.getAudioStartSec() == null ? 0 : audioReq.getAudioStartSec();
+                int clip = audioReq.getAudioClipSeconds() == null ? 15 : audioReq.getAudioClipSeconds();
+                String video = photoMusicMuxer.muxPhotoWithMusic(mediaUrl, audioReq.getAudioUrl(), start, clip);
+                if (video != null) mediaUrl = video;
+            }
         }
 
         com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
@@ -66,6 +86,7 @@ public class StoryServiceImpl implements StoryService {
                 .mediaUrl(mediaUrl)
                 .caption(request.getCaption())
                 .audience(audience)
+                .kind(kind)
                 .audio(request.getAudio() != null ? request.getAudio().toEntity() : null)
                 .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
                 .build();
@@ -132,6 +153,11 @@ public class StoryServiceImpl implements StoryService {
         Story story = storyRepository.findByUuid(UUID.fromString(storyUuid))
                 .orElseThrow(() -> new NotFoundException("Story not found", "TM_231"));
 
+        // The owner opening their own story must NOT count as a view (Instagram-style).
+        if (story.getUser().getId().equals(currentUser.getId())) {
+            return;
+        }
+
         if (storyViewRepository.existsByStoryAndUser(story, currentUser)) {
             return;
         }
@@ -146,7 +172,7 @@ public class StoryServiceImpl implements StoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AuthUserResponse> getStoryViewers(String storyUuid, User currentUser) {
+    public List<com.chat.talkMe.dto.response.StoryViewerResponse> getStoryViewers(String storyUuid, User currentUser) {
         Story story = storyRepository.findByUuid(UUID.fromString(storyUuid))
                 .orElseThrow(() -> new NotFoundException("Story not found", "TM_231"));
 
@@ -154,17 +180,27 @@ public class StoryServiceImpl implements StoryService {
             throw new ForbiddenException("Cannot inspect viewers of another user's story", "TM_103");
         }
 
-        // Fetch story views in database (JPA relationships)
-        // Set up in SQL but can query directly:
-        // We will fetch from database using standard list view
-        return storyViewRepository.findAll().stream()
-                .filter(v -> v.getStory().getId().equals(story.getId()))
-                .map(v -> userMapper.toAuthUserResponse(v.getUser()))
+        // Scoped query (most-recent first) instead of scanning every StoryView row.
+        return storyViewRepository.findByStoryOrderByViewedAtDesc(story).stream()
+                .map(v -> com.chat.talkMe.dto.response.StoryViewerResponse.builder()
+                        .user(userMapper.toAuthUserResponse(v.getUser()))
+                        .viewedAt(v.getViewedAt() != null ? v.getViewedAt().toString() : null)
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StoryResponse> getMyStories(User currentUser) {
+        // All of the current user's non-deleted stories, incl. expired (archive).
+        return storyRepository.findAllByUser(currentUser).stream()
+                .map(story -> mapToStoryResponse(story, currentUser))
                 .collect(Collectors.toList());
     }
 
     private StoryResponse mapToStoryResponse(Story story, User currentUser) {
         boolean viewed = storyViewRepository.existsByStoryAndUser(story, currentUser);
+        boolean isOwner = story.getUser().getId().equals(currentUser.getId());
 
         AuthUserResponse owner = userMapper.toAuthUserResponse(story.getUser());
         owner.setMessagingFriendsOnly(userSettingRepository.findByUser(story.getUser())
@@ -179,8 +215,14 @@ public class StoryServiceImpl implements StoryService {
                 .expiresAt(story.getExpiresAt().toString())
                 .createdAt(story.getCreatedAt().toString())
                 .viewedByMe(viewed)
+                // Total distinct viewers — only meaningful to the owner, but cheap to
+                // always include (the owner's UI reads it; others simply ignore it).
+                .viewCount(storyViewRepository.countByStory(story))
+                .owner(isOwner)
+                .expired(story.isExpired())
                 .audience(story.getAudience() != null ? story.getAudience().name() : "EVERYONE")
                 .audio(com.chat.talkMe.dto.response.AudioTrackDto.from(story.getAudio()))
+                .kind(story.getKind() != null ? story.getKind().name() : "VISUAL")
                 .build();
     }
 }

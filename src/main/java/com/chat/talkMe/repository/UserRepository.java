@@ -35,6 +35,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     // ── Admin dashboard counters ─────────────────────────────────────────────
     long countByIsVerifiedTrue();
     long countByIsGuestTrue();
+
+    /** Recently-joined real accounts (Night Owl Lobby "recently joined", feature #2). */
+    List<User> findByIsGuestFalseAndBannedFalseAndIsDeletedFalseOrderByCreatedAtDesc(
+            org.springframework.data.domain.Pageable pageable);
     long countByCreatedAtAfter(java.time.Instant since);
     /** Signup timestamps since a cutoff — bucketed by day in the service for charts. */
     @Query("SELECT u.createdAt FROM User u WHERE u.createdAt >= :since")

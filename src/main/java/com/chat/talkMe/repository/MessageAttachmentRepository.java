@@ -14,6 +14,23 @@ public interface MessageAttachmentRepository extends JpaRepository<MessageAttach
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM MessageAttachment a")
     long sumFileSize();
 
+    // ── Social Memory / Relationship Journey (feature #19) — "photos shared" ──────
+    // Photos are IMAGE-type messages; mimeType is stored plaintext so the LIKE is safe
+    // and tolerates a null mimeType (won't match).
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COUNT(a) FROM MessageAttachment a WHERE a.message.chat = :chat " +
+        "AND a.message.isDeleted = false " +
+        "AND (a.message.messageType = com.chat.talkMe.enums.MessageType.IMAGE " +
+        "     OR LOWER(a.mimeType) LIKE 'image/%')")
+    long countImagesByChat(@org.springframework.data.repository.query.Param("chat") com.chat.talkMe.domain.Chat chat);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT MIN(a.createdAt) FROM MessageAttachment a WHERE a.message.chat = :chat " +
+        "AND a.message.isDeleted = false " +
+        "AND (a.message.messageType = com.chat.talkMe.enums.MessageType.IMAGE " +
+        "     OR LOWER(a.mimeType) LIKE 'image/%')")
+    java.time.Instant findFirstImageAt(@org.springframework.data.repository.query.Param("chat") com.chat.talkMe.domain.Chat chat);
+
     @org.springframework.data.jpa.repository.Query("SELECT a.createdAt FROM MessageAttachment a WHERE a.createdAt >= :since")
     java.util.List<java.time.Instant> findAttachmentTimesSince(
         @org.springframework.data.repository.query.Param("since") java.time.Instant since);

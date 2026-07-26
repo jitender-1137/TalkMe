@@ -99,6 +99,33 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT COALESCE(MAX(m.id), 0) FROM Message m WHERE m.chat = :chat AND m.isDeleted = false")
     long findMaxMessageId(Chat chat);
 
+    // ── Social Memory / Relationship Journey (feature #19) ───────────────────────
+    /** Total non-system, non-deleted messages in a chat (the pair's "messages exchanged"). */
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.isDeleted = false " +
+           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+    long countVisibleByChat(@org.springframework.data.repository.query.Param("chat") Chat chat);
+
+    /** Timestamp of the first visible message in a chat (null if none). */
+    @Query("SELECT MIN(m.createdAt) FROM Message m WHERE m.chat = :chat AND m.isDeleted = false " +
+           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+    Instant findFirstMessageAt(@org.springframework.data.repository.query.Param("chat") Chat chat);
+
+    /** Visible message times ordered by id — pass PageRequest.of(n-1,1) to get the n-th message's time. */
+    @Query("SELECT m.createdAt FROM Message m WHERE m.chat = :chat AND m.isDeleted = false " +
+           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM ORDER BY m.id ASC")
+    List<Instant> findVisibleMessageTimes(@org.springframework.data.repository.query.Param("chat") Chat chat, Pageable pageable);
+
+    /** Visible messages a specific user sent in a chat (for the "who texts first" summary split). */
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.sender.id = :senderId " +
+           "AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+    long countVisibleByChatAndSender(@org.springframework.data.repository.query.Param("chat") Chat chat,
+                                     @org.springframework.data.repository.query.Param("senderId") Long senderId);
+
+    /** Distinct calendar-ish activity: number of unique days that carried at least one visible message. */
+    @Query("SELECT COUNT(DISTINCT CAST(m.createdAt AS date)) FROM Message m WHERE m.chat = :chat " +
+           "AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+    long countActiveDays(@org.springframework.data.repository.query.Param("chat") Chat chat);
+
     /** The currently-pinned message in a chat, if any (most recent pin wins). */
     Optional<Message> findFirstByChatAndPinnedTrueOrderByPinnedAtDesc(Chat chat);
 

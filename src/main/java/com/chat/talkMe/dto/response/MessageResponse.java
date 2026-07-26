@@ -37,4 +37,8 @@ public class MessageResponse {
     private Integer selfDestructSeconds;
     private String selfDestructArmedAt; // ISO instant the receiver first opened it (timer start), else null
     private boolean selfDestructExpired; // true → media destroyed; render the greyed "expired" note
+
+    // Media download permission: false (default) → receiver's viewer hides the
+    // Download/Save action; true → sender allowed downloading THIS media.
+    private boolean allowDownload;
 }

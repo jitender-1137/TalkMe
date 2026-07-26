@@ -18,7 +18,9 @@ import java.util.Set;
         // Discovery: list PUBLIC groups/channels/rooms of a given type.
         @Index(name = "idx_chats_visibility_type", columnList = "visibility, chat_type"),
         // Public @handle lookup.
-        @Index(name = "idx_chats_slug", columnList = "slug")
+        @Index(name = "idx_chats_slug", columnList = "slug"),
+        // Virtual Night City district lookup (feature #25).
+        @Index(name = "idx_chats_city_location", columnList = "city_location")
 })
 @Getter
 @Setter
@@ -115,6 +117,24 @@ public class Chat extends BaseEntity {
     @Column(name = "tag", length = 30)
     @Builder.Default
     private Set<Interest> tags = new HashSet<>();
+
+    /** Editorially-curated room surfaced on the Trending/Night rail (feature #23). */
+    @Column(name = "room_curated", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean roomCurated = false;
+
+    /** Which Virtual Night City district this ROOM belongs to, if any (feature #25). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "city_location", length = 32)
+    private com.chat.talkMe.enums.CityLocation cityLocation;
+
+    /** Behavioural mode of a ROOM (features #26/#27). STANDARD for every ordinary room. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_mode", length = 20, nullable = false)
+    @ColumnDefault("'STANDARD'")
+    @Builder.Default
+    private com.chat.talkMe.enums.RoomMode roomMode = com.chat.talkMe.enums.RoomMode.STANDARD;
 
     /** True for GROUP/CHANNEL/ROOM. Convenience delegate to chatType. */
     @Transient
