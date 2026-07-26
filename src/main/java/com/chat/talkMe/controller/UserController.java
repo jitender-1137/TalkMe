@@ -1,5 +1,6 @@
 package com.chat.talkMe.controller;
 
+import com.chat.talkMe.dto.request.DeleteAccountRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
@@ -52,6 +53,15 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Profile updated successfully", "TM_060"));
     }
 
+    /** Fast, param-based mood update (feature #4) — e.g. PUT /users/me/mood?value=FLIRT. */
+    @PutMapping("/me/mood")
+    public ResponseEntity<ResponseDto<UserResponse>> updateMood(
+            @RequestParam("value") String value,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserResponse response = userService.updateMood(value, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Mood updated", "TM_060"));
+    }
+
     @PostMapping(value = "/me/avatar", consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<Map<String, String>>> uploadAvatar(
             @RequestParam("file") MultipartFile file,
@@ -73,8 +83,11 @@ public class UserController {
      * anonymized by the scheduled purge job.
      */
     @DeleteMapping("/me")
-    public ResponseEntity<ResponseDto<Void>> deleteAccount(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        authService.requestAccountDeletion(userDetails.getUser());
+    public ResponseEntity<ResponseDto<Void>> deleteAccount(
+            @RequestBody(required = false) DeleteAccountRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.requestAccountDeletion(userDetails.getUser(),
+                request != null ? request.getPassword() : null);
         return ResponseEntity.ok(SuccessResponseDto.success(
                 null, "Account scheduled for deletion. Log in again within the recovery window to restore it.",
                 "TM_USER_003"));
@@ -84,9 +97,19 @@ public class UserController {
     public ResponseEntity<ResponseDto<UserResponse>> getUserById(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         UserResponse response = userService.getUserById(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
+    /** Smart Profile Card (feature #20) — late-night attributes + compatibility hint. */
+    @GetMapping("/{userId}/card")
+    @PreAuthorize("@featureGuard.check('SMART_PROFILE_CARD')")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.SmartProfileCardResponse>> getSmartProfileCard(
+            @PathVariable("userId") String userId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                userService.getSmartProfileCard(userId, userDetails.getUser())));
     }
 
     @GetMapping("/search")

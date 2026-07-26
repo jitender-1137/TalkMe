@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 9090
 
 spring:
   datasource:
@@ -105,7 +105,7 @@ app:
     exposed-headers: Set-Cookie
     allow-credentials: true
   cookie:
-    secure: ${COOKIE_SECURE:false}
+    secure: ${COOKIE_SECURE:true}
     same-site: ${COOKIE_SAME_SITE:Lax}
 
 # WebSocket Configuration
@@ -140,11 +140,23 @@ moderation:
   enabled: ${MODERATION_ENABLED:true}
   nsfw:
     enabled: ${NSFW_ENABLED:true}
-    base-url: ${NSFW_BASE_URL:http://nsfw.parkarspot.com}
+    base-url: ${NSFW_BASE_URL:}
 
 storage:
+  # Dev uses OCI Object Storage as well (same tenancy as prod, but its OWN bucket so
+  # dev media never overwrites prod's). Set STORAGE_PROVIDER=local to fall back to the
+  # VM/local disk. Requires OCI API-key credentials (OCI_CONFIG_FILE) on the dev host.
+  provider: ${STORAGE_PROVIDER:oci}
   local:
     directory: ${FILE_BASE_DIR:/opt/media/talkme}
+  oci:
+    # Namespace is auto-resolved at startup if left blank.
+    namespace: ${OCI_NAMESPACE:}
+    region: ${OCI_REGION:ap-mumbai-1}
+    # Separate bucket from prod (create it in the OCI console, or override).
+    bucket: ${OCI_BUCKET:neochathub-media-dev}
+    config-file: ${OCI_CONFIG_FILE:~/.oci/config}
+    config-profile: ${OCI_CONFIG_PROFILE:DEFAULT}
 
 logging:
   level:

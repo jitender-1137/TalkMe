@@ -125,9 +125,15 @@ public class AdminController {
 
     @GetMapping("/audit")
     public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView>>> audit(
+            @RequestParam(value = "action", required = false) String action,
+            @RequestParam(value = "targetType", required = false) String targetType,
+            @RequestParam(value = "admin", required = false) String admin,
+            @RequestParam(value = "from", required = false) String from,
+            @RequestParam(value = "to", required = false) String to,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
-        return ResponseEntity.ok(SuccessResponseDto.success(adminService.listAudit(page, size)));
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.listAudit(action, targetType, admin, from, to, page, size)));
     }
 
     // ── Phase 3: create / edit / delete + charts ─────────────────────────────
@@ -265,6 +271,26 @@ public class AdminController {
             @RequestParam(value = "note", required = false) String note) {
         return ResponseEntity.ok(SuccessResponseDto.success(
                 adminService.reviewReport(uuid, action, note, name(admin))));
+    }
+
+    // ── User feedback ─────────────────────────────────────────────────────────
+
+    @GetMapping("/feedback")
+    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminFeedbackView>>> feedback(
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(SuccessResponseDto.success(adminService.listFeedback(type, status, page, size)));
+    }
+
+    @PostMapping("/feedback/{uuid}/status")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminFeedbackView>> updateFeedbackStatus(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @PathVariable String uuid,
+            @RequestParam("status") String status) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.updateFeedbackStatus(uuid, status, name(admin)), "Feedback updated", "TM_311"));
     }
 
     @GetMapping("/social/friends")

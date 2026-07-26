@@ -26,7 +26,8 @@ public class AdminPostView {
     private boolean deleted;       // soft-deleted post (admin sees it flagged)
 
     @Data
-    @Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
     public static class Media {
         private String url;
         private String type;      // IMAGE / VIDEO

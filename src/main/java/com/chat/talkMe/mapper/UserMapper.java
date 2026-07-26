@@ -18,6 +18,12 @@ public interface UserMapper {
     @Mapping(target = "lastSeen", ignore = true)
     @Mapping(target = "messagingFriendsOnly", ignore = true)
     @Mapping(target = "roles", expression = "java(mapRoleNames(user))")
+    @Mapping(target = "features", ignore = true) // self-only; enriched in AuthServiceImpl, never here
+    @Mapping(target = "interests", expression = "java(mapInterestsToStringSet(user.getInterests()))")
+    @Mapping(target = "mood", expression = "java(user.getMood() != null ? user.getMood().name() : null)")
+    @Mapping(target = "conversationEnergy", expression = "java(user.getConversationEnergy() != null ? user.getConversationEnergy().name() : null)")
+    @Mapping(target = "languages", expression = "java(mapEnumSet(user.getLanguages()))")
+    @Mapping(target = "lookingFor", expression = "java(mapEnumSet(user.getLookingFor()))")
     AuthUserResponse toAuthUserResponse(User user);
 
     @Mapping(target = "isVerified", source = "verified")
@@ -37,6 +43,10 @@ public interface UserMapper {
     @Mapping(target = "followingCount", ignore = true)
     @Mapping(target = "postsCount", ignore = true)
     @Mapping(target = "roles", expression = "java(mapRoleNames(user))")
+    @Mapping(target = "mood", expression = "java(user.getMood() != null ? user.getMood().name() : null)")
+    @Mapping(target = "conversationEnergy", expression = "java(user.getConversationEnergy() != null ? user.getConversationEnergy().name() : null)")
+    @Mapping(target = "languages", expression = "java(mapEnumSet(user.getLanguages()))")
+    @Mapping(target = "lookingFor", expression = "java(mapEnumSet(user.getLookingFor()))")
     UserResponse toUserResponse(User user);
 
     default java.util.List<String> mapRoleNames(User user) {
@@ -53,5 +63,13 @@ public interface UserMapper {
             stringInterests.add(interest.name());
         }
         return stringInterests;
+    }
+
+    /** Generic enum-set → name-set (languages, looking-for). */
+    default <E extends Enum<E>> java.util.Set<String> mapEnumSet(java.util.Set<E> values) {
+        if (values == null) return java.util.Collections.emptySet();
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (E v : values) out.add(v.name());
+        return out;
     }
 }

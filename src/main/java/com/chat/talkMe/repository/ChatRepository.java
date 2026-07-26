@@ -72,6 +72,27 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
                                       org.springframework.data.domain.Pageable pageable);
 
     /**
+     * Trending public ROOMs for the Night Owl rail (feature #23): editorially-curated rooms
+     * first, then most-recently-active. Bounded by {@code Pageable}.
+     */
+    @Query("SELECT c FROM Chat c WHERE c.isDeleted = false " +
+           "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
+           "AND c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC " +
+           "ORDER BY c.roomCurated DESC, c.updatedAt DESC")
+    List<Chat> findTrendingRooms(org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Public ROOMs seeded into a Virtual Night City district (feature #25), newest-active first.
+     */
+    @Query("SELECT c FROM Chat c WHERE c.isDeleted = false " +
+           "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
+           "AND c.cityLocation = :loc ORDER BY c.updatedAt DESC")
+    List<Chat> findByCityLocation(@Param("loc") com.chat.talkMe.enums.CityLocation loc);
+
+    /** Whether a curated room already exists for a district — idempotent seeding guard. */
+    boolean existsByCityLocationAndRoomCuratedTrue(com.chat.talkMe.enums.CityLocation cityLocation);
+
+    /**
      * Bump a chat's sort timestamp without touching the @Version column, so concurrent
      * sends to the same chat don't collide on optimistic locking. Single-column UPDATE by id.
      */

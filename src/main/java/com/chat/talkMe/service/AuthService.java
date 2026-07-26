@@ -53,7 +53,7 @@ public interface AuthService {
      * simply logging in again within the configured window. All refresh tokens are
      * revoked so other devices are signed out.
      */
-    void requestAccountDeletion(User currentUser);
+    void requestAccountDeletion(User currentUser, String password);
 
     /**
      * Permanently purge accounts whose deletion window has elapsed (irreversible

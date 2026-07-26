@@ -75,6 +75,11 @@ public class UserControllerTest {
     @MockitoBean
     private StorageService storageService;
 
+    // Avatar upload runs the (real) NSFW moderation sidecar, which is unavailable in tests —
+    // mock it so uploadAvatar doesn't fail on a connection error.
+    @MockitoBean
+    private com.chat.talkMe.moderation.ContentModerationService moderationService;
+
     private MockMvc mockMvc;
     private User testUser;
     private User targetUser;
@@ -119,6 +124,15 @@ public class UserControllerTest {
                 .roles(Set.of(userRole))
                 .build();
         thirdUser = userRepository.save(thirdUser);
+
+        // ContentModerationService is mocked (its NSFW sidecar isn't available in tests). Several
+        // endpoints moderate input (updateProfile → moderateText(bio), uploadAvatar → moderateUpload),
+        // so return a non-explicit result by default to avoid NPEs on the unstubbed mock.
+        com.chat.talkMe.moderation.ModerationResult clean =
+                Mockito.mock(com.chat.talkMe.moderation.ModerationResult.class);
+        Mockito.lenient().when(clean.isExplicit()).thenReturn(false);
+        Mockito.lenient().when(moderationService.moderateText(any())).thenReturn(clean);
+        Mockito.lenient().when(moderationService.moderateUpload(any())).thenReturn(clean);
     }
 
     @AfterEach
@@ -138,7 +152,7 @@ public class UserControllerTest {
 
     @Test
     void testGetMeSuccess() throws Exception {
-        mockMvc.perform(get("/users/me")
+        mockMvc.perform(get("/api/v1/users/me")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -148,24 +162,24 @@ public class UserControllerTest {
 
     @Test
     void testGetMeUnauthorized() throws Exception {
-        mockMvc.perform(get("/users/me"))
+        mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void testUpdateProfileSuccess() throws Exception {
+        // NOTE: the service now rejects country changes (TM_099 "Country cannot be updated"),
+        // so the update payload only carries editable fields.
         String updatePayload = """
                 {
                   "name": "Updated Name",
-                  "bio": "Developer bio",
-                  "country": "US",
-                  "city": "San Francisco"
+                  "bio": "Developer bio"
                 }
                 """;
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(patch("/users/me")
+        mockMvc.perform(patch("/api/v1/users/me")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
@@ -174,9 +188,7 @@ public class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Updated Name"))
-                .andExpect(jsonPath("$.data.bio").value("Developer bio"))
-                .andExpect(jsonPath("$.data.country").value("US"))
-                .andExpect(jsonPath("$.data.city").value("San Francisco"));
+                .andExpect(jsonPath("$.data.bio").value("Developer bio"));
     }
 
     @Test
@@ -190,7 +202,7 @@ public class UserControllerTest {
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(patch("/users/me")
+        mockMvc.perform(patch("/api/v1/users/me")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
@@ -210,12 +222,14 @@ public class UserControllerTest {
                 "some-image-bytes".getBytes()
         );
 
-        Mockito.when(storageService.storeFile(any(), anyString()))
+        // Moderation is stubbed clean in setUp. uploadAvatar calls the 3-arg
+        // storeFile(file, "avatar", "profiles/<uuid>").
+        Mockito.when(storageService.storeFile(any(), anyString(), anyString()))
                 .thenReturn("http://example.com/avatar.jpg");
 
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/users/me/avatar")
+        mockMvc.perform(multipart("/api/v1/users/me/avatar")
                 .file(file)
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
@@ -229,7 +243,7 @@ public class UserControllerTest {
     void testUploadAvatarMissingFile() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(multipart("/users/me/avatar")
+        mockMvc.perform(multipart("/api/v1/users/me/avatar")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
@@ -240,7 +254,7 @@ public class UserControllerTest {
     void testRemoveAvatarSuccess() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
-        mockMvc.perform(delete("/users/me/avatar")
+        mockMvc.perform(delete("/api/v1/users/me/avatar")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
@@ -252,7 +266,7 @@ public class UserControllerTest {
     @Test
     void testGetUserByIdSuccess() throws Exception {
         String targetUuid = targetUser.getUuid().toString();
-        mockMvc.perform(get("/users/" + targetUuid)
+        mockMvc.perform(get("/api/v1/users/" + targetUuid)
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -262,7 +276,7 @@ public class UserControllerTest {
     @Test
     void testGetUserByIdNotFound() throws Exception {
         String randomUuid = UUID.randomUUID().toString();
-        mockMvc.perform(get("/users/" + randomUuid)
+        mockMvc.perform(get("/api/v1/users/" + randomUuid)
                 .with(user(testUserDetails())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
@@ -271,7 +285,7 @@ public class UserControllerTest {
 
     @Test
     void testGetUserByIdInvalidUuid() throws Exception {
-        mockMvc.perform(get("/users/invalid-uuid-string")
+        mockMvc.perform(get("/api/v1/users/invalid-uuid-string")
                 .with(user(testUserDetails())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
@@ -281,7 +295,7 @@ public class UserControllerTest {
     @Test
     void testGetUserProfileSuccess() throws Exception {
         String targetUuid = targetUser.getUuid().toString();
-        mockMvc.perform(get("/users/" + targetUuid + "/profile")
+        mockMvc.perform(get("/api/v1/users/" + targetUuid + "/profile")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -290,7 +304,7 @@ public class UserControllerTest {
 
     @Test
     void testSearchUsersSuccess() throws Exception {
-        mockMvc.perform(get("/users/search")
+        mockMvc.perform(get("/api/v1/users/search")
                 .param("q", "target")
                 .param("limit", "10")
                 .with(user(testUserDetails())))
@@ -301,7 +315,7 @@ public class UserControllerTest {
 
     @Test
     void testSearchUsersQueryTooShort() throws Exception {
-        mockMvc.perform(get("/users/search")
+        mockMvc.perform(get("/api/v1/users/search")
                 .param("q", "t")
                 .with(user(testUserDetails())))
                 .andExpect(status().isBadRequest())
@@ -314,7 +328,7 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
         String targetUuid = targetUser.getUuid().toString();
 
-        mockMvc.perform(post("/users/" + targetUuid + "/block")
+        mockMvc.perform(post("/api/v1/users/" + targetUuid + "/block")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
@@ -328,7 +342,7 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
         String selfUuid = testUser.getUuid().toString();
 
-        mockMvc.perform(post("/users/" + selfUuid + "/block")
+        mockMvc.perform(post("/api/v1/users/" + selfUuid + "/block")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
@@ -344,7 +358,7 @@ public class UserControllerTest {
 
         blockUserRepository.save(BlockUser.builder().user(testUser).blocked(targetUser).build());
 
-        mockMvc.perform(delete("/users/" + targetUuid + "/block")
+        mockMvc.perform(delete("/api/v1/users/" + targetUuid + "/block")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value"))
@@ -357,7 +371,7 @@ public class UserControllerTest {
     void testGetBlockedUsersSuccess() throws Exception {
         blockUserRepository.save(BlockUser.builder().user(testUser).blocked(targetUser).build());
 
-        mockMvc.perform(get("/users/blocked")
+        mockMvc.perform(get("/api/v1/users/blocked")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -375,7 +389,7 @@ public class UserControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/users/" + targetUuid + "/report")
+        mockMvc.perform(post("/api/v1/users/" + targetUuid + "/report")
                 .with(user(testUserDetails()))
                 .cookie(csrfCookie)
                 .header("X-CSRF-Token", "test-token-value")
@@ -394,7 +408,7 @@ public class UserControllerTest {
                 .build());
 
         String targetUuid = targetUser.getUuid().toString();
-        mockMvc.perform(get("/users/" + targetUuid + "/posts")
+        mockMvc.perform(get("/api/v1/users/" + targetUuid + "/posts")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -410,7 +424,7 @@ public class UserControllerTest {
         friendRepository.save(Friend.builder().user(thirdUser).friend(targetUser).build());
 
         String targetUuid = targetUser.getUuid().toString();
-        mockMvc.perform(get("/users/" + targetUuid + "/mutual-friends")
+        mockMvc.perform(get("/api/v1/users/" + targetUuid + "/mutual-friends")
                 .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))

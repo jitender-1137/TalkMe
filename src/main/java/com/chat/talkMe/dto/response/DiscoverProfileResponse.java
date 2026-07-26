@@ -29,6 +29,12 @@ public class DiscoverProfileResponse {
     private String occupation;
     private String education;
     private Set<String> interests;
+    // ── Late-Night Social attributes (nullable; populated where the matching UI needs them) ──
+    private String mood;
+    private String conversationEnergy;
+    private Set<String> lookingFor;
+    private Set<String> languages;
+    private String voiceIntroUrl;
     private List<String> images;
     @JsonProperty("isVerified")
     private boolean isVerified;

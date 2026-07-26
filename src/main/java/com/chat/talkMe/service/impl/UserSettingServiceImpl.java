@@ -69,6 +69,22 @@ public class UserSettingServiceImpl implements UserSettingService {
         if (request.getEmailAnnouncements() != null) {
             settings.setEmailAnnouncements(request.getEmailAnnouncements());
         }
+        // ── Night Owl Mode ──
+        if (request.getNightOwlMode() != null) {
+            settings.setNightOwlMode(parseNightOwlMode(request.getNightOwlMode()));
+        }
+        if (request.getNightStartHour() != null) {
+            settings.setNightStartHour(clampHour(request.getNightStartHour()));
+        }
+        if (request.getNightEndHour() != null) {
+            settings.setNightEndHour(clampHour(request.getNightEndHour()));
+        }
+        if (request.getNightAmbientSound() != null) {
+            settings.setNightAmbientSound(request.getNightAmbientSound());
+        }
+        if (request.getNightAccent() != null) {
+            settings.setNightAccent(request.getNightAccent());
+        }
 
         settings = userSettingRepository.save(settings);
         userSettingsCache.evict(currentUser.getId());
@@ -120,6 +136,19 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
     }
 
+    private com.chat.talkMe.enums.NightOwlMode parseNightOwlMode(String value) {
+        try {
+            return com.chat.talkMe.enums.NightOwlMode.valueOf(value.trim().toUpperCase());
+        } catch (Exception e) {
+            throw new BadRequestException("nightOwlMode must be AUTO, ON or OFF", "TM_067");
+        }
+    }
+
+    /** Keep the night window within 0–23. */
+    private int clampHour(int hour) {
+        return Math.max(0, Math.min(23, hour));
+    }
+
     private UserSetting createDefaultSettings(User user) {
         UserSetting defaultSettings = UserSetting.builder()
                 .user(user)
@@ -154,6 +183,13 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .emailLoginAlerts(setting.isEmailLoginAlerts())
                 .emailUnreadMessages(setting.isEmailUnreadMessages())
                 .emailAnnouncements(setting.isEmailAnnouncements())
+                .nightOwlMode(setting.getNightOwlMode() != null
+                        ? setting.getNightOwlMode().name()
+                        : com.chat.talkMe.enums.NightOwlMode.AUTO.name())
+                .nightStartHour(setting.getNightStartHour())
+                .nightEndHour(setting.getNightEndHour())
+                .nightAmbientSound(setting.getNightAmbientSound())
+                .nightAccent(setting.getNightAccent())
                 .build();
     }
 }

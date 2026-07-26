@@ -38,4 +38,12 @@ public class UpdateSettingRequest {
 
     /** Product news / announcement emails. */
     private Boolean emailAnnouncements;
+
+    // ── Night Owl Mode (feature #1); null ⇒ unchanged ──
+    /** "AUTO", "ON" or "OFF". */
+    private String nightOwlMode;
+    private Integer nightStartHour;
+    private Integer nightEndHour;
+    private String nightAmbientSound;
+    private String nightAccent;
 }

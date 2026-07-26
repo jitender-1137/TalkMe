@@ -27,4 +27,5 @@ public class PostResponse {
     private PollResponse poll; // non-null only for poll posts
     private AudioTrackDto audio; // non-null only when a soundtrack is attached
     private String audience; // EVERYONE | FRIENDS
+    private String expiresAt; // ISO-8601; non-null only for temporary posts (feature #22)
 }

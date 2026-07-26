@@ -71,8 +71,15 @@ public class JwtTokenProvider {
                 return false;
             }
             return true;
+        } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+            // An expired access token is a NORMAL, expected condition — the client
+            // refreshes via its refresh-token cookie. Log at DEBUG so routine expiry
+            // (e.g. a long-open tab whose 15-min token lapsed) doesn't flood ERROR logs.
+            log.debug("JWT expired: {}", ex.getMessage());
         } catch (Exception ex) {
-            log.error("JWT validation error: {}", ex.getMessage());
+            // Malformed / bad-signature / unsupported tokens are worth a WARN — they can
+            // indicate tampering or a client bug — but are still not a server ERROR.
+            log.warn("JWT validation error: {}", ex.getMessage());
         }
         return false;
     }

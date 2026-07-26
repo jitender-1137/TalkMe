@@ -40,7 +40,7 @@ public class CorsConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(allowedOrigins != null && !allowedOrigins.isBlank() ?
+        configuration.setAllowedOrigins(isHasOrigins() ?
                 Arrays.stream(allowedOrigins.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
                 Collections.singletonList("*"));
 
@@ -61,5 +61,15 @@ public class CorsConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return new CorsFilter(source);
+    }
+
+    private boolean isHasOrigins() {
+        boolean hasOrigins = allowedOrigins != null && !allowedOrigins.isBlank();
+        if (!hasOrigins && allowCredentials) {
+            throw new IllegalStateException(
+                    "app.cors.allowed-origins must be set explicitly when app.cors.allow-credentials=true " +
+                            "(refusing to fall back to a '*' wildcard origin).");
+        }
+        return hasOrigins;
     }
 }

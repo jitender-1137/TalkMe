@@ -3,9 +3,11 @@ package com.chat.talkMe.dto.request;
 import com.chat.talkMe.validator.ValidAge;
 import com.chat.talkMe.validator.ValidGender;
 import com.chat.talkMe.validator.ValidPassword;
+import com.chat.talkMe.validator.ValidUsername;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,9 +19,11 @@ import lombok.NoArgsConstructor;
 public class SignupRequest {
 
     @NotBlank(message = "Name is required")
+    @Size(max = 100, message = "Name must be at most 100 characters")
     private String name;
 
-    @NotBlank(message = "Name is required")
+    @NotBlank(message = "Username is required")
+    @ValidUsername
     private String username;
 
     @NotBlank(message = "Email is required")

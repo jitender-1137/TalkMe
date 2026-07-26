@@ -133,6 +133,15 @@ public class Message extends BaseEntity {
     @Builder.Default
     private boolean selfDestructExpired = false;
 
+    // ── Media download permission (per media message) ──────────────────────────
+    // false (default) = the receiver may NOT download/save this media; only the
+    // sender opting in per-message allows the receiver's viewer to expose a
+    // Download/Save action. @ColumnDefault lets ddl-auto add the NOT-NULL column.
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(name = "allow_download", nullable = false)
+    @Builder.Default
+    private boolean allowDownload = false;
+
     // ── Group message pinning ──────────────────────────────────────────────────
     @org.hibernate.annotations.ColumnDefault("false")
     @Column(name = "pinned", nullable = false)

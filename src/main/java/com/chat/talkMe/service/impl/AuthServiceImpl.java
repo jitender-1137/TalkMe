@@ -41,8 +41,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -68,10 +72,14 @@ public class AuthServiceImpl implements AuthService {
     private final CountryDetectionService countryDetectionService;
     private final com.chat.talkMe.service.LoginAttemptService loginAttemptService;
     private final StringRedisTemplate redisTemplate;
+    private final com.chat.talkMe.service.PwnedPasswordService pwnedPasswordService;
     private final EmailService emailService;
     private final com.chat.talkMe.service.WebPushService webPushService;
     private final com.chat.talkMe.moderation.ContentModerationService moderationService;
     private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
+    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
+    private final com.chat.talkMe.cache.FeatureAccessCache featureAccessCache;
+    private final com.chat.talkMe.service.ReputationRecorder reputationRecorder;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -99,6 +107,8 @@ public class AuthServiceImpl implements AuthService {
     /** Redis key prefix for one-time email-verification tokens (value = user UUID). */
     private static final String EMAILVERIFY_KEY_PREFIX = "emailverify:token:";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    /** Minimum seconds between transactional emails to the same recipient. */
+    private static final int MAIL_COOLDOWN_SECONDS = 60;
 
     @Override
     @Transactional
@@ -192,6 +202,12 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("TM_047");
+        }
+
+        // Reject passwords known to appear in public breaches (HIBP k-anonymity).
+        if (pwnedPasswordService.isBreached(request.getPassword())) {
+            throw new BadRequestException(
+                    "This password has appeared in a known data breach. Please choose a different one.", "TM_496");
         }
 
         // The display name is publicly visible — reject a non-clean one at signup.
@@ -518,10 +534,17 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
 
-        // Cryptographically-strong, single-use token stored in Redis with a short TTL.
+        // Per-recipient cooldown (anti-bombing). Silent return keeps anti-enumeration.
+        if (!mailCooldownOk("pwreset", user.getEmail())) {
+            log.info("Password reset for user '{}' suppressed — cooldown active", user.getUsername());
+            return;
+        }
+
+        // Cryptographically-strong, single-use token. Only its SHA-256 hash is stored
+        // in Redis; the live token travels solely in the emailed link.
         String token = generateSecureToken();
         redisTemplate.opsForValue().set(
-                PWRESET_KEY_PREFIX + token,
+                PWRESET_KEY_PREFIX + hashToken(token),
                 user.getUuid().toString(),
                 Duration.ofMinutes(passwordResetTtlMinutes));
 
@@ -533,7 +556,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        String key = PWRESET_KEY_PREFIX + request.getToken();
+        if (request.getToken() == null || request.getToken().isBlank()) {
+            throw new UnauthorizedException("Reset token invalid or expired", "TM_038");
+        }
+        String key = PWRESET_KEY_PREFIX + hashToken(request.getToken());
         String userUuid = redisTemplate.opsForValue().get(key);
         if (userUuid == null) {
             throw new UnauthorizedException("Reset token invalid or expired", "TM_038");
@@ -547,6 +573,10 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("Reset token invalid or expired", "TM_038");
         }
 
+        if (pwnedPasswordService.isBreached(request.getPassword())) {
+            throw new BadRequestException(
+                    "This password has appeared in a known data breach. Please choose a different one.", "TM_496");
+        }
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         userRepository.save(user);
 
@@ -564,7 +594,7 @@ public class AuthServiceImpl implements AuthService {
         if (token == null || token.isBlank()) {
             throw new UnauthorizedException("Verification token invalid or expired", "TM_403");
         }
-        String key = EMAILVERIFY_KEY_PREFIX + token;
+        String key = EMAILVERIFY_KEY_PREFIX + hashToken(token);
         String userUuid = redisTemplate.opsForValue().get(key);
         if (userUuid == null) {
             throw new UnauthorizedException("Verification token invalid or expired", "TM_403");
@@ -589,6 +619,8 @@ public class AuthServiceImpl implements AuthService {
 
         user.setVerified(true);
         userRepository.save(user);
+        // Verification unlocks verified-gated features — drop the stale entitlement cache.
+        featureAccessCache.evict(user.getId());
         log.info("Email verified for user '{}'", user.getUsername());
 
         // Now — and only now — send the welcome email.
@@ -613,9 +645,14 @@ public class AuthServiceImpl implements AuthService {
         if (user.getEmail() == null || user.getEmail().isBlank()) {
             return;
         }
+        // Per-recipient cooldown so a signup + rapid "resend" can't email-bomb an address.
+        if (!mailCooldownOk("verify", user.getEmail())) {
+            log.info("Verification email for user '{}' suppressed — cooldown active", user.getUsername());
+            return;
+        }
         String token = generateSecureToken();
         redisTemplate.opsForValue().set(
-                EMAILVERIFY_KEY_PREFIX + token,
+                EMAILVERIFY_KEY_PREFIX + hashToken(token),
                 user.getUuid().toString(),
                 Duration.ofMinutes(emailVerificationTtlMinutes));
         String verifyLink = frontendBaseUrl.replaceAll("/+$", "") + "/verify-email?token=" + token;
@@ -680,6 +717,10 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(request.getCurrentPassword(), currentUser.getPasswordHash())) {
             throw new UnauthorizedException("Current password incorrect", "TM_042");
         }
+        if (pwnedPasswordService.isBreached(request.getNewPassword())) {
+            throw new BadRequestException(
+                    "This password has appeared in a known data breach. Please choose a different one.", "TM_496");
+        }
 
         currentUser.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(currentUser);
@@ -690,7 +731,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public void requestAccountDeletion(User currentUser) {
+    public void requestAccountDeletion(User currentUser, String password) {
         // Re-load to operate on a managed entity (the principal may be detached).
         User user = userRepository.findById(currentUser.getId()).orElse(currentUser);
         if (user.isGuest()) {
@@ -698,6 +739,15 @@ public class AuthServiceImpl implements AuthService {
         }
         if (user.isDeleted()) {
             return; // already pending deletion — idempotent
+        }
+        // Re-authenticate this destructive action. Accounts with a local password must
+        // confirm it; OAuth-only accounts (no password hash) are exempt.
+        String hash = user.getPasswordHash();
+        if (hash != null && !hash.isBlank()) {
+            if (password == null || !passwordEncoder.matches(password, hash)) {
+                throw new UnauthorizedException(
+                        "Password confirmation is required to delete your account", "TM_497");
+            }
         }
 
         user.setDeleted(true);
@@ -765,6 +815,38 @@ public class AuthServiceImpl implements AuthService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    /**
+     * SHA-256 hex of a token. Redis stores only this hash as the lookup key, never
+     * the live token — so read access to Redis (see the prior Redis-hijack incident)
+     * can't yield a usable reset/verification token. The plaintext token still
+     * travels only in the emailed link.
+     */
+    private String hashToken(String token) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /**
+     * Per-recipient email cooldown (anti email-bombing). Returns true and reserves
+     * the slot if Sand is allowed now; false if one was sent within the window.
+     * Fail-open so a Redis blip never blocks a legitimate reset.
+     */
+    private boolean mailCooldownOk(String type, String email) {
+        if (email == null || email.isBlank()) return true;
+        try {
+            String key = "mail:cooldown:" + type + ":" + hashToken(email.trim().toLowerCase());
+            Boolean first = redisTemplate.opsForValue()
+                    .setIfAbsent(key, "1", Duration.ofSeconds(MAIL_COOLDOWN_SECONDS));
+            return Boolean.TRUE.equals(first);
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
     private LoginResponse generateLoginResponse(User user, String userAgent, CountryDetectionResult detection) {
         String ip = detection != null ? detection.getClientIp() : null;
         String location = detection != null ? detection.getDisplayLocation() : null;
@@ -818,7 +900,11 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLocationAt(Instant.now());
         userRepository.save(user);
 
+        // Login may have just flipped verified/age (OAuth backfill) — recompute the
+        // entitlement set fresh rather than serving a pre-login cached value.
+        featureAccessCache.evict(user.getId());
         AuthUserResponse authUser = userMapper.toAuthUserResponse(user);
+        authUser.setFeatures(featureAccessService.effectiveWireNames(user));
 
         JwtTokensResponse jwtTokens = JwtTokensResponse.builder()
                 .accessToken(accessToken)
@@ -842,7 +928,9 @@ public class AuthServiceImpl implements AuthService {
     public AuthUserResponse getCurrentUser(User currentUser) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
-        return userMapper.toAuthUserResponse(user);
+        AuthUserResponse res = userMapper.toAuthUserResponse(user);
+        res.setFeatures(featureAccessService.effectiveWireNames(user));
+        return res;
     }
 
     @Override
@@ -885,9 +973,50 @@ public class AuthServiceImpl implements AuthService {
             user.getInterests().clear();
             user.getInterests().addAll(request.getInterests());
         }
+        // ── Late-Night Social attributes ──
+        if (request.getMood() != null) {
+            user.setMood(request.getMood());
+            user.setMoodUpdatedAt(Instant.now());
+        }
+        if (request.getConversationEnergy() != null) {
+            user.setConversationEnergy(request.getConversationEnergy());
+        }
+        if (request.getLanguages() != null) {
+            user.getLanguages().clear();
+            user.getLanguages().addAll(request.getLanguages());
+        }
+        if (request.getLookingFor() != null) {
+            user.getLookingFor().clear();
+            user.getLookingFor().addAll(request.getLookingFor());
+        }
+        if (request.getPersonality() != null) {
+            user.getPersonality().clear();
+            for (var e : request.getPersonality().entrySet()) {
+                if (e.getKey() != null && e.getValue() != null) {
+                    user.getPersonality().put(e.getKey(), Math.max(0, Math.min(100, e.getValue())));
+                }
+            }
+        }
+        if (request.getVoiceIntroUrl() != null) {
+            user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+        }
+        if (request.getVoiceIntroDurationMs() != null) {
+            user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());
+        }
+        // Recompute the cached completion score from the merged state.
+        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
 
         user = userRepository.save(user);
+        if (user.getProfileCompletion() >= 100) {
+            reputationRecorder.record(user.getId(),
+                    com.chat.talkMe.enums.ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
+        }
         log.info("User profile updated successfully for: {}", user.getUsername());
-        return userMapper.toAuthUserResponse(user);
+        // Age (and later verification) can change entitlement — evict so the returned
+        // feature set is recomputed fresh rather than served from a stale cache.
+        featureAccessCache.evict(user.getId());
+        AuthUserResponse res = userMapper.toAuthUserResponse(user);
+        res.setFeatures(featureAccessService.effectiveWireNames(user));
+        return res;
     }
 }

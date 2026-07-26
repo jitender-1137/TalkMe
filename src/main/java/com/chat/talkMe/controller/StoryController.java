@@ -1,9 +1,9 @@
 package com.chat.talkMe.controller;
 
 import com.chat.talkMe.dto.request.StoryRequest;
-import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.StoryResponse;
+import com.chat.talkMe.dto.response.StoryViewerResponse;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.StoryService;
@@ -40,6 +40,14 @@ public class StoryController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /** The current user's own stories, incl. EXPIRED ones — the profile "My Stories" archive. */
+    @GetMapping("/mine")
+    public ResponseEntity<ResponseDto<List<StoryResponse>>> getMyStories(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        List<StoryResponse> response = storyService.getMyStories(userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ResponseDto<Void>> deleteStory(
             @PathVariable("id") String storyUuid,
@@ -57,10 +65,10 @@ public class StoryController {
     }
 
     @GetMapping("/{id}/viewers")
-    public ResponseEntity<ResponseDto<List<AuthUserResponse>>> getStoryViewers(
+    public ResponseEntity<ResponseDto<List<StoryViewerResponse>>> getStoryViewers(
             @PathVariable("id") String storyUuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<AuthUserResponse> response = storyService.getStoryViewers(storyUuid, userDetails.getUser());
+        List<StoryViewerResponse> response = storyService.getStoryViewers(storyUuid, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 }

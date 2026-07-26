@@ -12,5 +12,6 @@ import java.util.Optional;
 public interface BlockUserRepository extends JpaRepository<BlockUser, Long> {
     Optional<BlockUser> findByUserAndBlocked(User user, User blocked);
     List<BlockUser> findByUser(User user);
+    List<BlockUser> findByBlocked(User blocked);
     boolean existsByUserAndBlocked(User user, User blocked);
 }

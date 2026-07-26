@@ -9,6 +9,7 @@ import lombok.Data;
 public class AdminAuditView {
     private String id;
     private String adminUsername;
+    private String adminId;       // uuid of the acting admin (nullable), for cross-linking
     private String action;
     private String targetType;
     private String targetId;

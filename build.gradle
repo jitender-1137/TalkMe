@@ -23,7 +23,7 @@ repositories {
 // 4.0.2 while leaving OCI's jersey-apache-connector at 3.0.8 — a Jersey 3+4 mix that
 // fails at runtime. Pin the whole Jersey island (isolated: nothing else here uses
 // JAX-RS) back to the coherent 3.0.8 / JAX-RS 3.0 set.
-configurations.all {
+configurations.configureEach {
     resolutionStrategy.eachDependency { details ->
         if (details.requested.group.startsWith('org.glassfish.jersey')) {
             details.useVersion '3.0.8'
@@ -84,20 +84,19 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
 
-    // Oracle Cloud Infrastructure (OCI) Object Storage — prod-only media backend
-    // (shared bucket instead of per-VM disk). The client bean is gated on
-    // `storage.provider=oci`, so the SDK is inert in local/dev.
-    implementation 'com.oracle.oci.sdk:oci-java-sdk-objectstorage:3.45.0'
-    // The OCI SDK needs a pluggable HTTP-client provider at runtime; without one the
-    // ObjectStorageClient fails to build ("No http provider available"). Jersey 3
-    // (jakarta.*) matches Spring Boot 4. NOTE: the Jersey versions are force-pinned to
-    // 3.0.8 below — Spring Boot 4's BOM otherwise bumps jersey-common to 4.0.2 while the
-    // OCI apache-connector stays 3.0.8, mixing Jersey 3 + 4 and breaking at runtime.
-    runtimeOnly 'com.oracle.oci.sdk:oci-java-sdk-common-httpclient-jersey3:3.45.0'
+    // Source: https://mvnrepository.com/artifact/com.oracle.oci.sdk/oci-java-sdk-objectstorage
+    implementation('com.oracle.oci.sdk:oci-java-sdk-objectstorage:3.91.1')
+    // Source: https://mvnrepository.com/artifact/com.oracle.oci.sdk/oci-java-sdk-common-httpclient-jersey3
+    implementation('com.oracle.oci.sdk:oci-java-sdk-common-httpclient-jersey3:3.91.1')
 
     // Web Push (VAPID) — background notifications for installed PWAs (Android / desktop / iOS 16.4+ Home Screen)
-    implementation 'nl.martijndwars:web-push:5.1.1'
-    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    implementation 'nl.martijndwars:web-push:5.1.2'
+    // web-push 5.1.2 declares jose4j at RUNTIME scope, but PushService.send() throws
+    // org.jose4j.lang.JoseException — so JoseException must be on OUR compile classpath.
+    // Declare it directly (also upgrades the transitive 0.7.9, which carries several
+    // CVEs, to the patched 0.9.6).
+    implementation 'org.bitbucket.b_c:jose4j:0.9.6'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.84'
 
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'

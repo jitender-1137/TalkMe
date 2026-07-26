@@ -26,6 +26,14 @@ public class UserResponse {
     private Set<String> interests;
     private String occupation;
     private String education;
+    // ── Late-Night Social attributes ──
+    private String mood;
+    private String conversationEnergy;
+    private Set<String> languages;
+    private Set<String> lookingFor;
+    private String voiceIntroUrl;
+    private Integer voiceIntroDurationMs;
+    private int profileCompletion;
     @JsonProperty("isVerified")
     private boolean isVerified;
     
@@ -34,6 +42,9 @@ public class UserResponse {
     
     @JsonProperty("isBlocked")
     private boolean isBlocked;
+    /** Whether the requesting user and this user are friends (drives friends-only UI). */
+    @JsonProperty("isFriend")
+    private boolean isFriend;
     /**
      * Whether the requesting user is currently allowed to message this user
      * (false only when this user restricts messages to friends and the

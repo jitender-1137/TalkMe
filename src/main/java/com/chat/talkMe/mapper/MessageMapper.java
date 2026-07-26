@@ -42,6 +42,7 @@ public interface MessageMapper {
         }
         // Explicit (MapStruct doesn't auto-map the boolean is-prefixed field reliably).
         response.setForwarded(message.isForwarded());
+        response.setAllowDownload(message.isAllowDownload());
     }
 
     default String resolveMessageStatus(Message message) {

@@ -7,6 +7,7 @@ import com.chat.talkMe.dto.request.SavePushSubscriptionRequest;
 import com.chat.talkMe.enums.InstallationType;
 import com.chat.talkMe.repository.PushSubscriptionRepository;
 import com.chat.talkMe.service.WebPushService;
+import com.chat.talkMe.util.SsrfGuard;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,16 @@ public class WebPushServiceImpl implements WebPushService {
     @Override
     @Transactional
     public void saveSubscription(User user, SavePushSubscriptionRequest request) {
+        // SSRF guard: the server POSTs to this endpoint on every push. A legitimate
+        // push endpoint is always a https URL on a public push-service host — reject
+        // internal/loopback/link-local/private targets so a client can't turn the
+        // dispatcher into an internal-request primitive.
+        try {
+            SsrfGuard.assertSafeHttps(request.getEndpoint());
+        } catch (IllegalArgumentException e) {
+            throw new com.chat.talkMe.exception.BadRequestException(
+                    "Invalid push subscription endpoint", "TM_PUSH_ENDPOINT");
+        }
         PushSubscription sub = subscriptionRepository.findByEndpoint(request.getEndpoint())
                 .orElseGet(PushSubscription::new);
         sub.setUser(user);
@@ -91,7 +102,9 @@ public class WebPushServiceImpl implements WebPushService {
         }
     }
 
-    /** Build and send a single Web Push; returns the push service HTTP status. */
+    /**
+     * Build and send a single Web Push; returns the push service HTTP status.
+     */
     private int sendOne(PushSubscription sub, byte[] payload) throws Exception {
         Notification notification = Notification.builder()
                 .endpoint(sub.getEndpoint())

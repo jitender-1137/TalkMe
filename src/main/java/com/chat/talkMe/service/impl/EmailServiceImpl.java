@@ -128,9 +128,12 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendPasswordResetEmail(String toEmail, String recipientName, String resetLink, long expiryMinutes) {
         if (!deliveryConfigured()) {
-            // Dev / unconfigured: never fail the flow — surface the link in logs only.
-            log.warn("[Mail] disabled or unconfigured — password reset link for {} (valid {}m): {}",
-                    toEmail, expiryMinutes, resetLink);
+            // Never fail the flow. The link carries a live token, so keep it out of
+            // prod-level logs — WARN masks the recipient and omits the token; the full
+            // link is emitted only at DEBUG for local development.
+            log.warn("[Mail] disabled or unconfigured — password reset link for {} (valid {}m) not sent",
+                    maskEmail(toEmail), expiryMinutes);
+            log.debug("[Mail] password reset link: {}", resetLink);
             return;
         }
         deliver(toEmail, recipientName, "Reset your NeoChatHub password",
@@ -152,8 +155,9 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyLink, long expiryMinutes) {
         if (!deliveryConfigured()) {
-            log.warn("[Mail] disabled or unconfigured — verification link for {} (valid {}m): {}",
-                    toEmail, expiryMinutes, verifyLink);
+            log.warn("[Mail] disabled or unconfigured — verification link for {} (valid {}m) not sent",
+                    maskEmail(toEmail), expiryMinutes);
+            log.debug("[Mail] verification link: {}", verifyLink);
             return;
         }
         deliver(toEmail, recipientName, "Verify your email for NeoChatHub",
@@ -232,6 +236,17 @@ public class EmailServiceImpl implements EmailService {
             return;
         }
         deliver(toEmail, toName, subject, html, MailCategory.TRANSACTIONAL);
+    }
+
+    /** Masks an email for logs: "jane.doe@example.com" → "ja***@example.com". */
+    private static String maskEmail(String email) {
+        if (email == null || email.isBlank()) return "(none)";
+        int at = email.indexOf('@');
+        if (at <= 0) return "***";
+        String local = email.substring(0, at);
+        String domain = email.substring(at);
+        String head = local.length() <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+        return head + "***" + domain;
     }
 
     private boolean deliveryConfigured() {
@@ -422,7 +437,7 @@ public class EmailServiceImpl implements EmailService {
             }
             return used == null || used <= dailyLimit;
         } catch (Exception e) {
-            log.debug("[Mail] quota check unavailable ({}), allowing send", e.getMessage());
+            log.debug("[Mail] quota check unavailable ({}), allowing to send", e.getMessage());
             return true;
         }
     }

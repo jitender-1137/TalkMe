@@ -14,4 +14,6 @@ public class MatchSessionResponse {
     private AnonymousPartnerResponse partner; // anonymized — never exposes partner identity
     private String chatId; // stranger chat room uuid
     private boolean isActive;
+    /** Match mode (QUICK/FLIRT/MASK/COFFEE/CHEMISTRY) so a refresh mid-match restores the overlay. */
+    private String mode;
 }

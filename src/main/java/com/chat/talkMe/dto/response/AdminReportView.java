@@ -16,6 +16,7 @@ public class AdminReportView {
     private String status;        // PENDING / ACTION_TAKEN / DISMISSED
     private String actionTaken;   // NONE / REVIEWED / WARNED / BANNED_REPORTED
     private String reviewedBy;
+    private String reviewedById;  // uuid of the reviewing admin (nullable), for cross-linking
     private String reviewedAt;
     private String resolutionNote;
     private String createdAt;
@@ -51,6 +52,7 @@ public class AdminReportView {
         private String id;
         private String reason;
         private String reporterUsername;
+        private String reporterId;    // uuid of the reporter (nullable), for cross-linking
         private String status;
         private String createdAt;
     }
@@ -71,7 +73,9 @@ public class AdminReportView {
     public static class Session {
         private String id;        // uuid (nullable)
         private String hostUsername;
+        private String hostId;    // uuid of host (nullable), for cross-linking
         private String peerUsername;
+        private String peerId;    // uuid of peer (nullable), for cross-linking
         private boolean active;
         private String endedAt;
     }

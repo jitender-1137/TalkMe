@@ -60,6 +60,8 @@ public class GroupServiceImpl implements GroupService {
     private final com.chat.talkMe.repository.GroupInviteRepository groupInviteRepository;
     private final com.chat.talkMe.cache.MemberCountCache memberCountCache;
     private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
+    /** Lazy to break the GroupService ⇄ EventService constructor cycle (Events spins up rooms via GroupService). */
+    private final org.springframework.beans.factory.ObjectProvider<com.chat.talkMe.service.EventService> eventServiceProvider;
 
     @Override
     @Transactional
@@ -370,9 +372,52 @@ public class GroupServiceImpl implements GroupService {
                 types, pattern, tagEnum, org.springframework.data.domain.PageRequest.of(0, 50));
 
         User me = userRepository.findById(currentUser.getId()).orElse(currentUser);
+        // Build membership-FREE discovery cards. Discovery lists PUBLIC rooms the caller is (by
+        // definition) usually NOT a member of, so it must NOT go through getChatByUuid, which
+        // throws "Not a member of this chat" (TM_141) for non-members — that would 404 the whole
+        // list the moment any not-yet-joined public room shows up (e.g. the seeded city rooms).
         return chats.stream()
-                .map(c -> chatService.getChatByUuid(c.getUuid().toString(), me))
+                .map(c -> toDiscoveryCard(c, me))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Map a public chat to a discovery card without enforcing membership. The viewer's own
+     * membership state (role/active) is filled in when present so the client can show "Open" vs
+     * "Join", but a non-member never triggers an exception.
+     */
+    private ChatResponse toDiscoveryCard(Chat chat, User me) {
+        ChatMember membership = chatMemberRepository.findByChatAndUser(chat, me).orElse(null);
+        boolean isMember = membership != null && !membership.isDeleted() && membership.getLeftAt() == null;
+        int memberCount;
+        try {
+            memberCount = memberCountCache.get(chat);
+        } catch (Exception e) {
+            memberCount = 0;
+        }
+        return ChatResponse.builder()
+                .id(chat.getUuid().toString())
+                .name(chat.getName())
+                .chatType(chat.getChatType().name())
+                .avatar(chat.getImageUrl())
+                .group(com.chat.talkMe.dto.response.GroupInfoResponse.builder()
+                        .subtype(chat.getChatType().name().toLowerCase())
+                        .visibility(chat.getVisibility().name())
+                        .joinPolicy(chat.getJoinPolicy().name())
+                        .allowExplicitContent(chat.isAllowExplicitContent())
+                        .allowNonFriends(chat.isAllowNonFriends())
+                        .memberLimit(chat.getMemberLimit())
+                        .memberCount(memberCount)
+                        .description(chat.getDescription())
+                        .imageUrl(chat.getImageUrl())
+                        .publicUsername(chat.getSlug())
+                        .category(chat.getCategory())
+                        .tags(chat.getTags() == null ? List.of()
+                                : chat.getTags().stream().map(Enum::name).collect(Collectors.toList()))
+                        .myRole(isMember ? membership.getRole().name() : null)
+                        .active(isMember)
+                        .build())
+                .build();
     }
 
     @Override
@@ -404,6 +449,15 @@ public class GroupServiceImpl implements GroupService {
         }
         broadcastGroupEvent(chatUuid, "member_joined", memberEventPayload(chatUuid, me));
         memberCountCache.evict(chatUuid);
+
+        // Midnight Events (#24): if this room hosts an event, credit attendance + reputation
+        // exactly once. Best-effort — a hiccup here must never fail the join.
+        try {
+            eventServiceProvider.getObject().markAttendedByRoom(chatUuid, me);
+        } catch (Exception e) {
+            log.debug("[events] attendance hook skipped for room {}: {}", chatUuid, e.getMessage());
+        }
+
         return chatService.getChatByUuid(chatUuid, me);
     }
 

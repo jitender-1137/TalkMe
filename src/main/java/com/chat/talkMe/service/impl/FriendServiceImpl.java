@@ -34,6 +34,29 @@ public class FriendServiceImpl implements FriendService {
     private final UserMapper userMapper;
     private final PresenceService presenceService;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
+    /** Max NEW friend requests one user may originate per day (anti-spam). */
+    private static final int FRIEND_REQUEST_DAILY_CAP = 50;
+
+    /** Redis daily counter; throws 429 past the cap. Fail-open on Redis errors. */
+    private void enforceFriendRequestQuota(User sender) {
+        try {
+            String key = "friendreq:" + sender.getId() + ":" + java.time.LocalDate.now();
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1L) {
+                redisTemplate.expire(key, java.time.Duration.ofDays(1));
+            }
+            if (count != null && count > FRIEND_REQUEST_DAILY_CAP) {
+                throw new TooManyRequestsException(
+                        "Daily friend-request limit reached. Try again tomorrow.", "TM_498");
+            }
+        } catch (TooManyRequestsException e) {
+            throw e;
+        } catch (Exception e) {
+            log.debug("Friend-request quota check failed (fail-open): {}", e.getMessage());
+        }
+    }
 
     private void broadcastFriendEvent(User user, String eventType) {
         try {
@@ -71,7 +94,7 @@ public class FriendServiceImpl implements FriendService {
         if (existingRequestOpt.isPresent()) {
             FriendRequest existingRequest = existingRequestOpt.get();
             if (existingRequest.getStatus() == FriendRequestStatus.ACCEPTED) {
-                // If status is ACCEPTED but they are not friends (checked above), 
+                // If status is ACCEPTED, but they are not friends (checked above),
                 // it means they unfriended. We can reuse the request by setting it to PENDING.
                 existingRequest.setStatus(FriendRequestStatus.PENDING);
                 existingRequest = friendRequestRepository.save(existingRequest);
@@ -95,6 +118,11 @@ public class FriendServiceImpl implements FriendService {
             acceptFriendRequest(reverseRequestOpt.get().getUuid().toString(), currentUser);
             return friendRequestMapper.toResponse(reverseRequestOpt.get());
         }
+
+        // Anti-spam: bound brand-new outbound requests per day. Re-sends and
+        // auto-accepts above reuse existing rows and don't reach here, so they
+        // don't consume quota.
+        enforceFriendRequestQuota(currentUser);
 
         FriendRequest request = FriendRequest.builder()
                 .sender(currentUser)
@@ -196,7 +224,7 @@ public class FriendServiceImpl implements FriendService {
                     AuthUserResponse response = userMapper.toAuthUserResponse(friend);
                     if (presenceService != null) {
                         response.setPresence(presenceService.getStatus(friend).name().toLowerCase());
-                        // Apparent last-seen: nulled for Invisible / Hide-last-seen
+                        // Apparent last-seen: null for Invisible / Hide-last-seen
                         // (privacy rule centralized in PresenceService).
                         java.time.Instant lastSeen = presenceService.getApparentLastSeen(friend);
                         if (lastSeen != null) {

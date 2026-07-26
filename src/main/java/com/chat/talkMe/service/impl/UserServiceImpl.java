@@ -64,6 +64,9 @@ public class UserServiceImpl implements UserService {
     private final PostRepository postRepository;
     private final ContentModerationService moderationService;
     private final com.chat.talkMe.service.NotificationService notificationService;
+    private final com.chat.talkMe.service.ReputationRecorder reputationRecorder;
+    private final com.chat.talkMe.service.CompatibilityService compatibilityService;
+    private final com.chat.talkMe.service.StreakService streakService;
 
     @Override
     @Transactional(readOnly = true)
@@ -125,14 +128,67 @@ public class UserServiceImpl implements UserService {
             user.getInterests().clear();
             user.getInterests().addAll(request.getInterests());
         }
+        // ── Late-Night Social attributes ──
+        if (request.getMood() != null) {
+            user.setMood(request.getMood());
+            user.setMoodUpdatedAt(Instant.now());
+        }
+        if (request.getConversationEnergy() != null) {
+            user.setConversationEnergy(request.getConversationEnergy());
+        }
+        if (request.getLanguages() != null) {
+            user.getLanguages().clear();
+            user.getLanguages().addAll(request.getLanguages());
+        }
+        if (request.getLookingFor() != null) {
+            user.getLookingFor().clear();
+            user.getLookingFor().addAll(request.getLookingFor());
+        }
+        if (request.getPersonality() != null) {
+            user.getPersonality().clear();
+            for (var e : request.getPersonality().entrySet()) {
+                if (e.getKey() != null && e.getValue() != null) {
+                    user.getPersonality().put(e.getKey(), Math.max(0, Math.min(100, e.getValue())));
+                }
+            }
+        }
+        if (request.getVoiceIntroUrl() != null) {
+            user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+        }
+        if (request.getVoiceIntroDurationMs() != null) {
+            user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());
+        }
+        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
 
         user = userRepository.save(user);
+        if (user.getProfileCompletion() >= 100) {
+            reputationRecorder.record(user.getId(),
+                    com.chat.talkMe.enums.ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
+        }
 
         UserResponse response = userMapper.toUserResponse(user);
         response.setPresence("online");
         response.setLastSeen(Instant.now().toString());
         populateUserCounts(response, user);
         return response;
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateMood(String moodValue, User currentUser) {
+        com.chat.talkMe.enums.Mood mood;
+        try {
+            mood = com.chat.talkMe.enums.Mood.valueOf(moodValue.trim().toUpperCase());
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid mood value: " + moodValue, "TM_002");
+        }
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        user.setMood(mood);
+        user.setMoodUpdatedAt(Instant.now());
+        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
+        user = userRepository.save(user);
+        return userMapper.toUserResponse(user);
     }
 
     @Override
@@ -197,7 +253,76 @@ public class UserServiceImpl implements UserService {
         UserResponse response = userMapper.toUserResponse(targetUser);
         populatePresenceAndBlockStatus(response, currentUser, targetUser);
         populateUserCounts(response, targetUser);
+        // Friendship flag — cheap lookup (mirrors the canMessage check). Lets the client
+        // gate friends-only UI (e.g. the relationship journey) instead of firing a
+        // request that would 403. Self is never "a friend".
+        boolean friend = currentUser != null
+                && !currentUser.getId().equals(targetUser.getId())
+                && friendRepository.findByUserAndFriend(currentUser, targetUser).isPresent();
+        response.setFriend(friend);
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.chat.talkMe.dto.response.SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser) {
+        User target = userRepository.findByUuid(UUID.fromString(userId))
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        // Reuse the fully-mapped UserResponse (presence, lastSeen, all string sets) as the base.
+        UserResponse ur = getUserById(userId, currentUser);
+        int mutual = getMutualFriends(userId, currentUser).getCount();
+        // Re-load the viewer as a MANAGED entity within this readOnly tx — the security
+        // principal is detached, so scoring against it would hit a LazyInit on personality.
+        User viewer = userRepository.findById(currentUser.getId()).orElse(currentUser);
+        com.chat.talkMe.dto.response.CompatibilityScore compat =
+                compatibilityService.score(viewer, target);
+
+        // Best-effort, fail-open enrichments (P3.5) — the card must render even if either lookup
+        // throws. Both are decoration only; null omits the pill/stat on the client.
+        Integer onlineStreak = null;
+        try {
+            int s = streakService.getStreak(target).getCurrentStreak();
+            if (s > 0) {
+                onlineStreak = s;
+            }
+        } catch (Exception e) {
+            log.debug("Smart card streak lookup failed for {}: {}", userId, e.getMessage());
+        }
+        Integer recentPublicPosts = null;
+        try {
+            java.time.Instant since = java.time.Instant.now()
+                    .minus(30, java.time.temporal.ChronoUnit.DAYS);
+            long c = postRepository.countRecentPublicByUser(target, since);
+            if (c > 0) {
+                recentPublicPosts = (int) c;
+            }
+        } catch (Exception e) {
+            log.debug("Smart card recent-posts count failed for {}: {}", userId, e.getMessage());
+        }
+
+        return com.chat.talkMe.dto.response.SmartProfileCardResponse.builder()
+                .id(ur.getId())
+                .name(ur.getName())
+                .username(ur.getUsername())
+                .avatar(ur.getAvatar())
+                .age(ur.getAge())
+                .country(ur.getCountry())
+                .city(ur.getCity())
+                .mood(ur.getMood())
+                .conversationEnergy(ur.getConversationEnergy())
+                .interests(ur.getInterests())
+                .lookingFor(ur.getLookingFor())
+                .languages(ur.getLanguages())
+                .voiceIntroUrl(ur.getVoiceIntroUrl())
+                .voiceIntroDurationMs(ur.getVoiceIntroDurationMs())
+                .profileCompletion(ur.getProfileCompletion())
+                .presence(ur.getPresence())
+                .lastSeen(ur.getLastSeen())
+                .mutualFriendsCount(mutual)
+                .onlineStreak(onlineStreak)
+                .recentPublicPosts(recentPublicPosts)
+                .compatibility(compat)
+                .build();
     }
 
     @Override
@@ -380,7 +505,7 @@ public class UserServiceImpl implements UserService {
     private void populateUserCounts(UserResponse response, User user) {
         long followers = userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(user, "ACCEPTED");
         long following = userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(user, "ACCEPTED");
-        long posts = postRepository.countByUserAndIsDeletedFalse(user);
+        long posts = postRepository.countVisibleByUser(user);
         response.setFollowersCount(followers);
         response.setFollowingCount(following);
         response.setPostsCount(posts);

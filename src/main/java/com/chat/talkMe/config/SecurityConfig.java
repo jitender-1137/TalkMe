@@ -13,17 +13,17 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -93,7 +93,15 @@ public class SecurityConfig {
                                 "media-src 'self' blob: https:; " +
                                 "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"))
                         .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
-                                "geolocation=(), microphone=(self), camera=(self), payment=()")))
+                                "geolocation=(), microphone=(self), camera=(self), payment=()"))
+                        // Explicit MIME-sniffing block (Spring emits this by default; make it explicit).
+                        .addHeaderWriter(new StaticHeadersWriter("X-Content-Type-Options", "nosniff"))
+                        // Cross-origin isolation: prevent this origin's window from being
+                        // referenced by cross-origin popups, and block cross-site embedding
+                        // of its resources. (COEP:require-corp is intentionally NOT set — it
+                        // would break the Turnstile widget and https media.)
+                        .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
+                        .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-site")))
                 .authorizeHttpRequests(auth -> {
                     // Actuator lives at /actuator (OUTSIDE the /api/v1 prefix), so it would
                     // otherwise fall through to anyRequest().permitAll() and be exposed

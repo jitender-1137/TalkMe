@@ -7,6 +7,7 @@
 # Safe locally: with no proxy there are no X-Forwarded-* headers, so the real request
 # is used unchanged. Assumes the backend port is reachable only via the proxy.
 server:
+  address: 0.0.0.0
   port: 8080
   forward-headers-strategy: framework
   servlet:
@@ -19,6 +20,13 @@ spring:
     active: ${ACTIVE_PROFILE:local}
   application:
     name: talkMe
+  # Jackson: an ABSENT or null JSON primitive (e.g. the optional boolean flags `allowDownload` /
+  # `forwarded` on SendMessageRequest, which a text-only message never sends) deserializes to its
+  # default (false / 0) instead of throwing. Jackson 3 defaults this strict; the app's DTOs rely on
+  # the lenient behavior across every optional primitive field.
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
   # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.
   # This is the GLOBAL multipart limit, so it must be the LARGEST allowed media:
   # videos = 30MB. The stricter per-type image cap (2MB) is enforced in
@@ -109,13 +117,53 @@ management:
 # NOTE: session base-auth creds (auth.username/password) are environment-specific
 # and live per profile (application-{local,dev,prod}.yml).
 
+# ── Feature kill-switches (Tier-1 global) for the Late-Night Social ecosystem ──
+# Per-user entitlement + self-toggle live in the DB (user_feature_grants); this is the
+# platform-wide master switch per feature. A key omitted here falls back to
+# enabled-by-default. Keys are FeatureKey wire-names (lowercase). Emergency-disable a
+# feature everywhere by flipping its env var — no deploy needed.
+features:
+  enabled-by-default: ${FEATURES_ENABLED_BY_DEFAULT:true}
+  flags:
+    # Live multi-party audio/video is deferred (Phase 6) — stays OFF until infra exists.
+    live_audio: ${FEATURE_LIVE_AUDIO:false}
+    # Adult surface — global switch (still additionally gated per-user by age+consent).
+    flirt_lobby: ${FEATURE_FLIRT_LOBBY:true}
+    midnight_events: ${FEATURE_MIDNIGHT_EVENTS:true}
+
 app:
+  # Instant Translation (Phase 7). Primary = Azure AI Translator (F0 free tier = 2M chars/month);
+  # fallback = MyMemory (keyless) when Azure errors or its monthly quota is exhausted. Stateless:
+  # the client sends already-decrypted plaintext, nothing is stored. With no Azure key AND MyMemory
+  # unreachable the service fails open (returns the text unchanged).
+  translation:
+    enabled: ${TRANSLATION_ENABLED:true}
+    daily-cap-per-user: ${TRANSLATION_DAILY_CAP:200}
+    azure-key: ${AZURE_TRANSLATOR_KEY:}
+    azure-region: ${AZURE_TRANSLATOR_REGION:}               # e.g. eastus (blank for a Global resource)
+    azure-url: ${AZURE_TRANSLATOR_URL:https://api.cognitive.microsofttranslator.com/translate}
+    mymemory-url: ${MYMEMORY_URL:https://api.mymemory.translated.net/get}
+  # Live A/V (Phase 6) — deferred token seam. Stays OFF until enabled AND LiveKit creds are
+  # supplied; ALSO requires the per-user LIVE_AUDIO entitlement (features.flags.live_audio,
+  # itself default-off). STOMP keeps app state; LiveKit only carries media.
+  live-audio:
+    enabled: ${LIVE_AUDIO_ENABLED:false}
+    ws-url: ${LIVEKIT_WS_URL:}
+    api-key: ${LIVEKIT_API_KEY:}
+    api-secret: ${LIVEKIT_API_SECRET:}
+    token-ttl-seconds: ${LIVEKIT_TOKEN_TTL:3600}
   geo:
     # Default ON for local dev: when the client IP is local/private (localhost),
     # geolocate the server's own public IP so country detection still works.
     # Deployed profiles (prod/dev) override this to false — there real client IPs
     # arrive via proxy headers and a private IP would be a misconfiguration.
     geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:true}
+  # User-level consent versions (18+, community guidelines, flirt lobby). Bumping a
+  # version re-prompts everyone whose stored acceptance is now stale.
+  consent:
+    age18-plus-version: ${CONSENT_AGE_VERSION:2026-07}
+    community-guidelines-version: ${CONSENT_GUIDELINES_VERSION:2026-07}
+    flirt-lobby-version: ${CONSENT_FLIRT_VERSION:2026-07}
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:Lax}

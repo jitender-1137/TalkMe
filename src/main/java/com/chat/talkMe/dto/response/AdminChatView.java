@@ -15,6 +15,8 @@ public class AdminChatView {
     private List<Member> members;
     private long messageCount;
     private String lastMessageAt;
+    private String lastMessagePreview;  // DECRYPTED snippet of the latest message (or a media label)
+    private String lastMessageSender;   // username of the latest message's sender
     private String createdAt;
     private boolean deleted;       // soft-deleted chat (admin sees it flagged)
 
