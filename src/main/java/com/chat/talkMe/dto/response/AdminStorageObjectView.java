@@ -26,6 +26,17 @@ public class AdminStorageObjectView {
     private boolean linked;        // true = has a matching DB attachment row
     private boolean orphan;        // true = chat-media object with no DB row
 
+    // ── Owner provenance ────────────────────────────────────────────────────────
+    // How the sender below was resolved:
+    //   MESSAGE_ATTACHMENT — linked chat attachment (message.sender)
+    //   UPLOAD_RECORD      — admin-only MediaAsset row written at upload time
+    //   STORAGE_PATH       — parsed from an owner-in-path key (lobby/profiles/posts/stories) — legacy
+    //   UNRECORDED         — no owner recoverable (legacy anonymous stranger upload)
+    private String ownerSource;
+    // True when the uploader's identity is/was hidden from the chat peer (stranger mode).
+    // Admin can still see who sent it — this flag marks that the PEER could not.
+    private boolean strangerMode;
+
     // ── Enrichment (present only when linked to a chat attachment) ──────────────
     private String attachmentId;   // uuid
     private String messageId;      // uuid
@@ -62,6 +73,7 @@ public class AdminStorageObjectView {
 
     // Timestamps
     private String sentAt;         // when the message was sent (message.createdAt)
+    private String uploadedAt;     // when the file was uploaded (MediaAsset.createdAt) — set for orphans
     private String createdAt;      // attachment row created
     private String updatedAt;      // attachment row updated
 

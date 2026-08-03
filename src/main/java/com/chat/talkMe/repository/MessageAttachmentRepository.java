@@ -49,4 +49,26 @@ public interface MessageAttachmentRepository extends JpaRepository<MessageAttach
         @org.springframework.data.repository.query.Param("type") com.chat.talkMe.enums.MessageType type,
         @org.springframework.data.repository.query.Param("includeDeleted") boolean includeDeleted,
         org.springframework.data.domain.Pageable pageable);
+
+    // ── Admin "media in this conversation" (chat detail panel) ─────────────────
+    // Every non-deleted attachment in one chat, newest first — the authoritative,
+    // always-populated source of a conversation's media (independent of the
+    // media_assets ledger, which only covers post-feature uploads).
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT a FROM MessageAttachment a " +
+        "WHERE a.message.chat.id = :chatId AND a.message.isDeleted = false " +
+        "ORDER BY a.id DESC")
+    org.springframework.data.domain.Page<MessageAttachment> findByChatForAdmin(
+        @org.springframework.data.repository.query.Param("chatId") Long chatId,
+        org.springframework.data.domain.Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COUNT(a) FROM MessageAttachment a " +
+        "WHERE a.message.chat.id = :chatId AND a.message.isDeleted = false")
+    long countByChatForAdmin(@org.springframework.data.repository.query.Param("chatId") Long chatId);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COALESCE(SUM(a.fileSize), 0) FROM MessageAttachment a " +
+        "WHERE a.message.chat.id = :chatId AND a.message.isDeleted = false")
+    long sumFileSizeByChat(@org.springframework.data.repository.query.Param("chatId") Long chatId);
 }

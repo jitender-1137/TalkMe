@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FeedbackServiceImpl.submit")
@@ -109,5 +110,32 @@ class FeedbackServiceImplTest {
         assertThatThrownBy(() -> service.submit(req(0, "   ", "  ", "MANUAL"), user))
                 .isInstanceOf(BadRequestException.class);
         verify(feedbackRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldAcceptCommentOnlySubmission() {
+        // rating 0 + no reason but a comment → guard's comment==null sub-condition is false, persists.
+        service.submit(req(0, null, "Just a note", "MANUAL"), user);
+        ArgumentCaptor<Feedback> saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository).save(saved.capture());
+        assertThat(saved.getValue().getComment()).isEqualTo("Just a note");
+        assertThat(saved.getValue().getRating()).isZero();
+    }
+
+    @Test
+    void shouldMapNullEntityFieldsToNullResponseFields() {
+        // Saved entity with no uuid/type/status/createdAt exercises the null sides of toResponse.
+        // type/status carry @Builder.Default values, so null them explicitly to hit the null branch.
+        Feedback saved = new Feedback();
+        saved.setType(null);
+        saved.setStatus(null);
+        when(feedbackRepository.save(any(Feedback.class))).thenReturn(saved);
+
+        FeedbackResponse res = service.submit(req(3, null, "ok", "MANUAL"), user);
+
+        assertThat(res.getId()).isNull();
+        assertThat(res.getType()).isNull();
+        assertThat(res.getStatus()).isNull();
+        assertThat(res.getCreatedAt()).isNull();
     }
 }

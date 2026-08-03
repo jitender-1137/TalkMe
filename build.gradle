@@ -2,6 +2,9 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.6'
     id 'io.spring.dependency-management' version '1.1.7'
+    // Test coverage: measures how much production logic the test suite actually
+    // exercises, so "no scenario missed" is objectively verifiable rather than a claim.
+    id 'jacoco'
 }
 
 group = 'com.chat'
@@ -120,6 +123,121 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+// ---------------------------------------------------------------------------
+// Test coverage (Jacoco)
+// ---------------------------------------------------------------------------
+// Coverage is the objective "nothing missed" signal: any targeted class below
+// the threshold below is a scenario gap to fill. The verification task is NOT
+// wired into `check` yet — run it manually while the coverage effort is in
+// flight so an in-progress baseline never breaks the build:
+//   ./gradlew test jacocoTestReport                -> reports (build/reports/jacoco)
+//   ./gradlew jacocoTestCoverageVerification       -> enforce the per-class gate
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+// Classes with no meaningful branching logic — excluded from BOTH report noise
+// and the coverage gate. Keep this list tight; everything else must be covered.
+def coverageExclusions = [
+        '**/config/**',            // Spring wiring / @Configuration / *Properties
+        '**/enums/**',             // data-only enums
+        '**/dto/**',               // request/response POJOs
+        '**/domain/**',            // JPA entities / POJOs
+        '**/*MapStructImpl.class', // generated mapper impls
+        '**/*MapperImpl.class',    // generated mapper impls (default MapStruct naming)
+        '**/TalkMeApplication.class',
+        // No unit-testable logic — static content / native-binary wrappers / static data:
+        '**/service/impl/EmailTemplates.class', // HTML email template strings
+        '**/service/impl/MailTheme.class',      // colour/style constants
+        '**/service/impl/PhotoMusicMuxer.class',// bundled-ffmpeg muxing (integration-only)
+        '**/service/impl/FfmpegSupport.class',  // native ffmpeg probe
+        '**/service/impl/DisposableEmailDomains.class', // static blocklist data set
+        '**/service/GamePromptBank.class',      // static conversation-game prompt data
+        '**/match/MatchPreferenceSnapshot.class', // Lombok @Data value object (equals/hashCode only)
+        '**/exception/*Exception.class',        // trivial custom exception types (logic lives in GlobalExceptionHandler)
+]
+
+// The per-class gate applies to the business-logic layers (Plan Part B). Controllers,
+// websocket handlers and the storage/ package are unit-tested and appear in the report,
+// but are not part of this gate's scope.
+def gateIncludes = [
+        'com.chat.talkMe.service.*',    // service + service.impl (* spans sub-packages in JaCoCo)
+        'com.chat.talkMe.match.*',      // match + match.impl
+        'com.chat.talkMe.mapper.*',
+        'com.chat.talkMe.validator.*',
+        'com.chat.talkMe.security.*',   // security + security.oauth
+        'com.chat.talkMe.crypto.*',
+        'com.chat.talkMe.moderation.*', // moderation + moderation.impl
+        'com.chat.talkMe.event.*',
+        'com.chat.talkMe.cache.*',
+        'com.chat.talkMe.schedule.*',
+        'com.chat.talkMe.util.*',
+        'com.chat.talkMe.exception.*',
+]
+
+// Kept in the REPORT but exempt from BOTH gate rules: residual uncovered lines+branches are
+// native (bundled-ffmpeg subprocess paths) — unreachable by a pure Mockito unit test.
+def gateExclusions = [
+        'com.chat.talkMe.service.impl.StorageServiceImpl',  // native ffmpeg video-transcode (lines + branches)
+]
+
+// Exempt from the BRANCH gate only: residual uncovered branches are integration-only
+// (JPA Specification/Criteria predicates that run solely inside Hibernate) or native — not
+// reachable by a pure Mockito unit test. All their unit-testable branches ARE covered.
+def branchGateExclusions = gateExclusions + [
+        'com.chat.talkMe.service.impl.AdminServiceImpl',    // buildUserSpec/listAudit JPA Specification lambdas
+        'com.chat.talkMe.service.impl.DiscoverServiceImpl', // getDiscover JPA Specification lambda
+        'com.chat.talkMe.moderation.FrameExtractor',        // native ffmpeg frame extraction
+]
+
+tasks.named('jacocoTestReport') {
+    dependsOn test
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+    violationRules {
+        // Per-class targets: any single production class below these is a gap.
+        rule {
+            element = 'CLASS'
+            includes = gateIncludes
+            excludes = gateExclusions
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.85
+            }
+        }
+        rule {
+            element = 'CLASS'
+            includes = gateIncludes
+            excludes = branchGateExclusions
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+// Apply the class-dir exclusions once the project is evaluated (classDirectories are
+// populated by the jacoco plugin's own afterEvaluate, so this must run at project scope).
+afterEvaluate {
+    [tasks.named('jacocoTestReport'), tasks.named('jacocoTestCoverageVerification')].each { provider ->
+        provider.configure { t ->
+            t.classDirectories.setFrom(files(t.classDirectories.files.collect {
+                fileTree(dir: it, exclude: coverageExclusions)
+            }))
+        }
+    }
 }
 
 // Task to build frontend static files and copy them to spring resources

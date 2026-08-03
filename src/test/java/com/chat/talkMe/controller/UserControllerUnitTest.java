@@ -382,6 +382,48 @@ class UserControllerUnitTest {
         }
     }
 
+    // ── GET /users/by-username/{username} (public share link) ───────────────────
+
+    @Nested
+    @DisplayName("GET /users/by-username/{username} (public)")
+    class PublicProfileByUsername {
+        private com.chat.talkMe.dto.response.PublicProfileResponse pub(String username) {
+            return com.chat.talkMe.dto.response.PublicProfileResponse.builder()
+                    .id("u-1").username(username).name("Test User").avatar("/a.png")
+                    .bio("hi").isVerified(true).presence("online").createdAt("2026-01-01T00:00:00Z")
+                    .followersCount(3).followingCount(2).postsCount(5)
+                    .level(4).starRank("GOLD").prestigeCount(1)
+                    .build();
+        }
+
+        @Test
+        void shouldReturnTrimmedPublicProfile() throws Exception {
+            when(userService.getPublicProfileByUsername("bob")).thenReturn(pub("bob"));
+            mockMvc.perform(get(BASE + "/by-username/bob"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.username").value("bob"))
+                    .andExpect(jsonPath("$.data.isVerified").value(true))
+                    .andExpect(jsonPath("$.data.starRank").value("GOLD"))
+                    .andExpect(jsonPath("$.data.followersCount").value(3))
+                    // The public projection must NEVER carry PII — these fields don't exist on it.
+                    .andExpect(jsonPath("$.data.phone").doesNotExist())
+                    .andExpect(jsonPath("$.data.email").doesNotExist())
+                    .andExpect(jsonPath("$.data.roles").doesNotExist())
+                    .andExpect(jsonPath("$.data.age").doesNotExist());
+            verify(userService).getPublicProfileByUsername("bob");
+        }
+
+        @Test
+        void shouldReturn404WhenMissingGuestOrBanned() throws Exception {
+            // Service throws for missing/guest/banned/soft-deleted — all surface as 404.
+            when(userService.getPublicProfileByUsername(any()))
+                    .thenThrow(new NotFoundException("Profile not found", "TM_USER_NOT_FOUND"));
+            mockMvc.perform(get(BASE + "/by-username/ghost"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.messageCode").value("TM_USER_NOT_FOUND"));
+        }
+    }
+
     // ── GET /users/search ───────────────────────────────────────────────────────
 
     @Nested

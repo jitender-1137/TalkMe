@@ -102,6 +102,20 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * PUBLIC profile lookup by username, backing the shareable {@code /@username} link. Anonymous
+     * callers are allowed (method-level permitAll overrides the class-level role rule, mirroring
+     * {@code /lobby}); it must ALSO be listed in SecurityConfig#unSecured so the filter chain lets
+     * it through. Returns a trimmed, PII-free projection.
+     */
+    @GetMapping("/by-username/{username}")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.PublicProfileResponse>> getPublicProfileByUsername(
+            @PathVariable("username") String username) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                userService.getPublicProfileByUsername(username)));
+    }
+
     /** Smart Profile Card (feature #20) — late-night attributes + compatibility hint. */
     @GetMapping("/{userId}/card")
     @PreAuthorize("@featureGuard.check('SMART_PROFILE_CARD')")

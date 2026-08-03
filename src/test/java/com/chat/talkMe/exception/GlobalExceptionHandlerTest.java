@@ -5,6 +5,7 @@ import org.apache.catalina.connector.ClientAbortException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -207,6 +210,19 @@ class GlobalExceptionHandlerTest {
             assertThatCode(() -> handler.handleIOException(new IOException("disk failure")))
                     .doesNotThrowAnyException();
         }
+
+        @Test
+        void shouldSwallowConnectionReset() {
+            assertThatCode(() -> handler.handleIOException(new IOException("Connection reset")))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        void shouldSwallowNullMessageIoError() {
+            // msg == null short-circuits the broken-pipe check → else branch.
+            assertThatCode(() -> handler.handleIOException(new IOException((String) null)))
+                    .doesNotThrowAnyException();
+        }
     }
 
     // ── HttpMessageNotWritable: client abort → null; genuine → 500 ───────────────
@@ -269,6 +285,83 @@ class GlobalExceptionHandlerTest {
 
             assertThat(res.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
             assertThat(res.getBody().getMessageCode()).isEqualTo("TM_002");
+        }
+
+        @Test
+        @DisplayName("AsyncRequestNotUsable is recognized as a client abort → null")
+        void shouldReturnNullForAsyncRequestNotUsable() {
+            ResponseEntity<ResponseDto<Void>> res =
+                    handler.handleAllExceptions(new AsyncRequestNotUsableException("client gone"));
+
+            assertThat(res).isNull();
+        }
+
+        @Test
+        @DisplayName("a 'Broken pipe' message (not a ClientAbort type) buried in the chain → null")
+        void shouldReturnNullForBrokenPipeMessageInChain() {
+            Exception buried = new RuntimeException("wrapper", new IllegalStateException("Broken pipe"));
+
+            assertThat(handler.handleAllExceptions(buried)).isNull();
+        }
+
+        @Test
+        @DisplayName("null-message exception with no abort in the chain → 500 (m == null branch)")
+        void shouldReturn500ForNullMessageException() {
+            ResponseEntity<ResponseDto<Void>> res =
+                    handler.handleAllExceptions(new RuntimeException((String) null));
+
+            assertThat(res.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+            assertThat(res.getBody().getMessageCode()).isEqualTo("TM_002");
+        }
+
+        @Test
+        @DisplayName("cause chain longer than the hop guard → loop bails, still 500")
+        void shouldReturn500WhenChainExceedsHopGuard() {
+            Throwable t = new RuntimeException("leaf");
+            for (int i = 0; i < 15; i++) {
+                t = new RuntimeException("hop-" + i, t); // no abort anywhere; forces hops >= 12
+            }
+            ResponseEntity<ResponseDto<Void>> res =
+                    handler.handleAllExceptions(new RuntimeException("top", t));
+
+            assertThat(res.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        @Test
+        @DisplayName("self-referential cause → loop breaks (no infinite spin), still 500")
+        void shouldReturn500ForSelfReferentialCause() {
+            Exception selfRef = new RuntimeException("loop") {
+                @Override
+                public synchronized Throwable getCause() {
+                    return this; // t.getCause() == t → break
+                }
+            };
+            ResponseEntity<ResponseDto<Void>> res = handler.handleAllExceptions(selfRef);
+
+            assertThat(res.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── getLocalizedMessage fallback when the MessageSource itself throws ─────────
+
+    @Nested
+    @DisplayName("getLocalizedMessage")
+    class LocalizedMessage {
+
+        @Test
+        @DisplayName("MessageSource throwing → falls back to the default message")
+        void fallsBackWhenSourceThrows() {
+            MessageSource throwing = mock(MessageSource.class);
+            when(throwing.getMessage(anyString(), any(), anyString(), any()))
+                    .thenThrow(new RuntimeException("i18n boom"));
+            GlobalExceptionHandler h = new GlobalExceptionHandler(throwing);
+
+            ResponseEntity<ResponseDto<Void>> res =
+                    h.handleServiceException(new NotFoundException("Missing", "TM_101"));
+
+            assertThat(res.getBody()).isNotNull();
+            assertThat(res.getBody().getMessage()).isEqualTo("Missing"); // default, not localized
+            assertThat(res.getBody().getMessageCode()).isEqualTo("TM_101");
         }
     }
 }

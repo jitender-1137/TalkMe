@@ -65,6 +65,7 @@ public class UserServiceImpl implements UserService {
     private final ContentModerationService moderationService;
     private final com.chat.talkMe.service.NotificationService notificationService;
     private final com.chat.talkMe.service.ReputationRecorder reputationRecorder;
+    private final com.chat.talkMe.service.ReputationService reputationService;
     private final com.chat.talkMe.service.CompatibilityService compatibilityService;
     private final com.chat.talkMe.service.StreakService streakService;
 
@@ -261,6 +262,52 @@ public class UserServiceImpl implements UserService {
                 && friendRepository.findByUserAndFriend(currentUser, targetUser).isPresent();
         response.setFriend(friend);
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.chat.talkMe.dto.response.PublicProfileResponse getPublicProfileByUsername(String username) {
+        if (username == null || username.isBlank()) {
+            throw new NotFoundException("Profile not found", "TM_USER_NOT_FOUND");
+        }
+        User u = userRepository.findByUsernameIgnoreCase(username.trim())
+                .orElseThrow(() -> new NotFoundException("Profile not found", "TM_USER_NOT_FOUND"));
+        // A shareable profile must be a real, active account. Guests have no public identity,
+        // and banned/soft-deleted accounts must not be reachable via a link.
+        if (u.isGuest() || u.isBanned() || u.isDeleted()) {
+            throw new NotFoundException("Profile not found", "TM_USER_NOT_FOUND");
+        }
+
+        // Reuse the mapper for the correctly-derived avatar/createdAt, then copy ONLY the safe
+        // subset into the trimmed DTO (never the phone/roles/age on UserResponse).
+        UserResponse base = userMapper.toUserResponse(u);
+        com.chat.talkMe.dto.response.PublicProfileResponse resp =
+                com.chat.talkMe.dto.response.PublicProfileResponse.builder()
+                        .id(base.getId())
+                        .name(base.getName())
+                        .username(base.getUsername())
+                        .avatar(base.getAvatar())
+                        .bio(base.getBio())
+                        .isVerified(base.isVerified())
+                        .createdAt(base.getCreatedAt())
+                        .presence(presenceService.getStatus(u).name().toLowerCase())
+                        .followersCount(userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(u, "ACCEPTED"))
+                        .followingCount(userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(u, "ACCEPTED"))
+                        .postsCount(postRepository.countVisibleByUser(u))
+                        .build();
+
+        // Cosmetic reputation summary — fail-open (decoration only; a link must still render
+        // if the reputation lookup hiccups).
+        try {
+            com.chat.talkMe.dto.response.ReputationResponse rep =
+                    reputationService.getFor(u.getUuid().toString());
+            resp.setLevel(rep.getLevel());
+            resp.setStarRank(rep.getStarRank());
+            resp.setPrestigeCount(rep.getPrestigeCount());
+        } catch (Exception ignored) {
+            // leave level=0/starRank=null — client shows no rep chip
+        }
+        return resp;
     }
 
     @Override

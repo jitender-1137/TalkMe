@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -360,6 +361,204 @@ class ConversationSummaryServiceImplTest {
             assertThat(res.getPhotosShared()).isZero();
             assertThat(res.getActiveDays()).isZero();
             assertThat(res.getTotalMessages()).isEqualTo(8L);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  Branch-coverage backfill: compound guards + headline/join arms
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("branch backfill")
+    class BranchBackfill {
+
+        private User userWith(long id, String name, Set<Interest> interests) {
+            User u = User.builder()
+                    .username("u" + id).email(id + "@e.com").name(name)
+                    .interests(interests).build();
+            u.setId(id);
+            return u;
+        }
+
+        /** Stub a live 1:1 pair on the given (non-field) users with explicit counts. */
+        private Chat stubPair(Chat chat, User meU, User otherU, long total, long my, long their,
+                              long photos, long activeDays, Instant firstAt) {
+            when(chatRepository.findByUuid(any(UUID.class))).thenReturn(Optional.of(chat));
+            when(chatMemberRepository.findByChatAndUser(chat, meU))
+                    .thenReturn(Optional.of(activeMember(chat, meU)));
+            when(chatMemberRepository.findByChat(chat))
+                    .thenReturn(List.of(memberFor(chat, meU), memberFor(chat, otherU)));
+            when(messageRepository.countVisibleByChat(chat)).thenReturn(total);
+            when(messageRepository.countVisibleByChatAndSender(chat, meU.getId())).thenReturn(my);
+            when(messageRepository.countVisibleByChatAndSender(chat, otherU.getId())).thenReturn(their);
+            when(messageAttachmentRepository.countImagesByChat(chat)).thenReturn(photos);
+            when(messageRepository.countActiveDays(chat)).thenReturn(activeDays);
+            when(messageRepository.findFirstMessageAt(chat)).thenReturn(firstAt);
+            return chat;
+        }
+
+        @Test
+        @DisplayName("null chatType passes the 1:1-only gate (isMultiParty not evaluated)")
+        void nullChatTypePassesOneToOneGate() {
+            Chat chat = Chat.builder().chatType(null).build();
+            chat.setDeleted(false);
+            stubPair(chat, me, other, 3L, 2L, 1L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(me, CHAT_UUID);
+
+            assertThat(res.getOtherName()).isEqualTo("Bob");
+            assertThat(res.getHeadline()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("resolveOther skips a member row whose user is null")
+        void resolveOtherSkipsNullUserMember() {
+            Chat chat = privateChat();
+            when(chatRepository.findByUuid(any(UUID.class))).thenReturn(Optional.of(chat));
+            when(chatMemberRepository.findByChatAndUser(chat, me))
+                    .thenReturn(Optional.of(activeMember(chat, me)));
+            when(chatMemberRepository.findByChat(chat))
+                    .thenReturn(List.of(memberFor(chat, null), memberFor(chat, other)));
+            when(messageRepository.countVisibleByChat(chat)).thenReturn(4L);
+            when(messageRepository.countVisibleByChatAndSender(chat, ME_ID)).thenReturn(2L);
+            when(messageRepository.countVisibleByChatAndSender(chat, OTHER_ID)).thenReturn(2L);
+            when(messageAttachmentRepository.countImagesByChat(chat)).thenReturn(0L);
+            when(messageRepository.countActiveDays(chat)).thenReturn(1L);
+            when(messageRepository.findFirstMessageAt(chat)).thenReturn(null);
+
+            ConversationSummaryResponse res = service.summarize(me, CHAT_UUID);
+
+            // The null-user row was skipped; the real partner is resolved onto the card.
+            assertThat(res.getOtherName()).isEqualTo("Bob");
+        }
+
+        @Test
+        @DisplayName("shared interests: caller has null interests → empty (line 122 mine == null)")
+        void callerNullInterests() {
+            User meU = userWith(ME_ID, "Alice", null);
+            User otherU = userWith(OTHER_ID, "Bob", Set.of(Interest.GAMING));
+            Chat chat = stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getSharedInterests()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("shared interests: partner has null interests → empty (line 122 theirs == null)")
+        void partnerNullInterests() {
+            User meU = userWith(ME_ID, "Alice", Set.of(Interest.GAMING));
+            User otherU = userWith(OTHER_ID, "Bob", null);
+            stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getSharedInterests()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("shared interests: caller has empty interests → empty (line 122 mine.isEmpty)")
+        void callerEmptyInterests() {
+            User meU = userWith(ME_ID, "Alice", Set.of());
+            User otherU = userWith(OTHER_ID, "Bob", Set.of(Interest.GAMING));
+            stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getSharedInterests()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("shared interests: partner has empty interests → empty (line 122 theirs.isEmpty)")
+        void partnerEmptyInterests() {
+            User meU = userWith(ME_ID, "Alice", Set.of(Interest.GAMING));
+            User otherU = userWith(OTHER_ID, "Bob", Set.of());
+            stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getSharedInterests()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("shared interests are capped at 6 (line 127 break)")
+        void sharedInterestsCappedAtSix() {
+            Set<Interest> seven = Set.of(Interest.SPORTS, Interest.MUSIC, Interest.MOVIES,
+                    Interest.GAMING, Interest.TRAVEL, Interest.FOOD, Interest.CODING);
+            User meU = userWith(ME_ID, "Alice", seven);
+            User otherU = userWith(OTHER_ID, "Bob", seven);
+            stubPair(privateChat(), meU, otherU, 20L, 10L, 10L, 0L, 3L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getSharedInterests()).hasSize(6);
+        }
+
+        @Test
+        @DisplayName("headline uses 'them' when the partner exists but has a null name (line 135)")
+        void headlinePartnerNullName() {
+            User otherU = userWith(OTHER_ID, null, Set.of(Interest.SPORTS));
+            stubPair(privateChat(), me, otherU, 4L, 2L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(me, CHAT_UUID);
+
+            assertThat(res.getHeadline()).contains("them").doesNotContain("null");
+        }
+
+        @Test
+        @DisplayName("singular message/day/photo wording (lines 141/143/147)")
+        void singularWording() {
+            Instant firstAt = Instant.now().minus(Duration.ofDays(1));
+            // total = 1, one photo, ~1 day known → all singular arms.
+            stubPair(privateChat(), me, other, 1L, 1L, 0L, 1L, 1L, firstAt);
+
+            ConversationSummaryResponse res = service.summarize(me, CHAT_UUID);
+
+            assertThat(res.getHeadline())
+                    .contains("1 message").doesNotContain("1 messages")
+                    .contains("1 day").doesNotContain("1 days")
+                    .contains("1 photo").doesNotContain("1 photos");
+        }
+
+        @Test
+        @DisplayName("humanJoin single interest (line 158)")
+        void humanJoinSingle() {
+            User meU = userWith(ME_ID, "Alice", new LinkedHashSet<>(List.of(Interest.GAMING)));
+            User otherU = userWith(OTHER_ID, "Bob",
+                    Set.of(Interest.GAMING, Interest.SPORTS));
+            stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getHeadline()).contains("You both love Gaming.");
+        }
+
+        @Test
+        @DisplayName("humanJoin two interests → 'X and Y' (line 159)")
+        void humanJoinPair() {
+            User meU = userWith(ME_ID, "Alice",
+                    new LinkedHashSet<>(List.of(Interest.GAMING, Interest.TRAVEL)));
+            User otherU = userWith(OTHER_ID, "Bob",
+                    Set.of(Interest.GAMING, Interest.TRAVEL, Interest.SPORTS));
+            stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getHeadline()).contains("You both love Gaming and Travel.");
+        }
+
+        @Test
+        @DisplayName("humanJoin three interests → 'X, Y and Z' (line 160)")
+        void humanJoinThree() {
+            User meU = userWith(ME_ID, "Alice",
+                    new LinkedHashSet<>(List.of(Interest.GAMING, Interest.TRAVEL, Interest.FOOD)));
+            User otherU = userWith(OTHER_ID, "Bob",
+                    Set.of(Interest.GAMING, Interest.TRAVEL, Interest.FOOD, Interest.SPORTS));
+            stubPair(privateChat(), meU, otherU, 5L, 3L, 2L, 0L, 1L, null);
+
+            ConversationSummaryResponse res = service.summarize(meU, CHAT_UUID);
+
+            assertThat(res.getHeadline()).contains("You both love Gaming, Travel and Food.");
         }
     }
 }

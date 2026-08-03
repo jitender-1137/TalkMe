@@ -71,6 +71,16 @@ public interface AdminService {
     /** Delete a single physical object (by key) from the media store. Audited. */
     void deleteStorageObject(String key, String adminUsername);
 
+    // ── Media-ownership analytics (media_assets ledger) ───────────────────────
+    /** Dashboard analytics over the upload-ownership ledger; range keys as elsewhere. */
+    com.chat.talkMe.dto.response.AdminMediaOwnershipResponse getMediaOwnership(String range, String adminUsername);
+    /** A single user's uploads (incl. now-attributable stranger/lobby media), paged. */
+    com.chat.talkMe.dto.response.AdminMediaListResponse getUserMedia(
+        String userUuid, int page, int size, String adminUsername);
+    /** Media uploaded in one conversation (by chat uuid), paged, owners included. */
+    com.chat.talkMe.dto.response.AdminMediaListResponse getChatMedia(
+        String chatUuid, int page, int size, String adminUsername);
+
     // ── News / feed ───────────────────────────────────────────────────────────
     PaginatedResponse<com.chat.talkMe.dto.response.AdminPostView> listPosts(int page, int size);
     PaginatedResponse<com.chat.talkMe.dto.response.AdminPostLikeView> getPostLikes(String postUuid, int page, int size);

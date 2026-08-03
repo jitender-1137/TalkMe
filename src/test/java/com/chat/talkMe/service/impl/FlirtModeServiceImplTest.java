@@ -20,7 +20,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,9 +30,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -361,6 +366,160 @@ class FlirtModeServiceImplTest {
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_103"));
 
             verify(flirtModeRepository, never()).save(any());
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  enable / disable → setConsentWithRetry (retry loop + after-commit pushes)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("enable/disable — setConsentWithRetry + WS delivery")
+    class SetConsentWithRetry {
+
+        @Test
+        void enableShouldApplyConsentAndPushToBothParticipantsAfterCommit() {
+            // self-proxy resolves to the real service (lenient setUp), so applyConsentTx runs inline;
+            // the two after-commit pushes must then be delivered per-user on /queue/flirt-mode.
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any())).thenReturn(Optional.of(row(false, false)));
+
+            FlirtModeResponse res = service.enable(lowUser, CHAT_UUID);
+
+            assertThat(res.isMyEnabled()).isTrue();
+            assertThat(res.isOtherEnabled()).isFalse();
+            verify(messagingTemplate).convertAndSendToUser(
+                    eq("low_user"), eq("/queue/flirt-mode"), any());
+            verify(messagingTemplate).convertAndSendToUser(
+                    eq("high_user"), eq("/queue/flirt-mode"), any());
+        }
+
+        @Test
+        void disableShouldApplyConsentAndDeliverPushes() {
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any())).thenReturn(Optional.of(row(true, true)));
+
+            FlirtModeResponse res = service.disable(lowUser, CHAT_UUID);
+
+            assertThat(res.isMyEnabled()).isFalse();  // low just disabled
+            assertThat(res.isActive()).isFalse();
+            verify(messagingTemplate, times(2))
+                    .convertAndSendToUser(anyString(), eq("/queue/flirt-mode"), any());
+        }
+
+        @Test
+        void shouldRetryOnOptimisticLockThenSucceed() {
+            // First save loses the version race; the loop re-reads the committed row and re-applies,
+            // so the caller's toggle still lands instead of 500ing.
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any())).thenReturn(Optional.of(row(false, false)));
+            when(flirtModeRepository.save(any(ChatFlirtMode.class)))
+                    .thenThrow(new ObjectOptimisticLockingFailureException("race", null))
+                    .thenAnswer(inv -> inv.getArgument(0));
+
+            FlirtModeResponse res = service.enable(lowUser, CHAT_UUID);
+
+            assertThat(res.isMyEnabled()).isTrue();
+            verify(flirtModeRepository, times(2)).save(any(ChatFlirtMode.class));
+            // Pushes only fire on the successful commit (once), never on the rolled-back attempt.
+            verify(messagingTemplate, times(2))
+                    .convertAndSendToUser(anyString(), eq("/queue/flirt-mode"), any());
+        }
+
+        @Test
+        void shouldRethrowAfterExhaustingRetryAttempts() {
+            // Every attempt loses the race → after MAX_TOGGLE_ATTEMPTS the last exception surfaces.
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any())).thenReturn(Optional.of(row(false, false)));
+            when(flirtModeRepository.save(any(ChatFlirtMode.class)))
+                    .thenThrow(new ObjectOptimisticLockingFailureException("race", null));
+
+            assertThatThrownBy(() -> service.enable(lowUser, CHAT_UUID))
+                    .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+            verify(flirtModeRepository, times(3)).save(any(ChatFlirtMode.class));
+            // A never-committed mutation must never push cached state to either client.
+            verify(messagingTemplate, never())
+                    .convertAndSendToUser(anyString(), anyString(), any());
+        }
+
+        @Test
+        void pushDeliveryFailureShouldNotFailTheToggle() {
+            // WS delivery is best-effort/fail-open: a broker blip must not roll back a committed toggle.
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any())).thenReturn(Optional.of(row(false, false)));
+            doThrow(new RuntimeException("stomp down"))
+                    .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
+
+            FlirtModeResponse res = service.enable(lowUser, CHAT_UUID);
+
+            assertThat(res.isMyEnabled()).isTrue();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  getOrCreateRow / createRowInNewTx — lazy-create race handling
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("getOrCreateRow — race handling")
+    class LazyCreateRace {
+
+        @Test
+        void shouldRecoverWinnersRowWhenCreateLosesUniqueConstraintRace() {
+            // The lazy INSERT loses a unique-constraint race; getOrCreateRow swallows the violation
+            // and re-reads the winner's row rather than propagating a 500.
+            Chat chat = privateChat(lowUser, highUser);
+            ChatFlirtMode winner = row(false, false);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any()))
+                    .thenReturn(Optional.empty(), Optional.of(winner));
+            when(chatRepository.getReferenceById(CHAT_PK)).thenReturn(chat);
+            when(flirtModeRepository.save(any(ChatFlirtMode.class)))
+                    .thenThrow(new DataIntegrityViolationException("duplicate key"))
+                    .thenAnswer(inv -> inv.getArgument(0));
+
+            service.applyConsentTx(lowUser, CHAT_UUID, true);
+
+            // Consent landed on the recovered winner row, not a duplicate insert.
+            assertThat(winner.isEnabledByLow()).isTrue();
+            verify(chatRepository).getReferenceById(CHAT_PK);
+        }
+
+        @Test
+        void shouldRethrowViolationWhenRowStillMissingAfterRace() {
+            // Constraint violation but the row genuinely isn't there on re-read → surface it.
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(any()))
+                    .thenReturn(Optional.empty(), Optional.empty());
+            when(chatRepository.getReferenceById(CHAT_PK)).thenReturn(chat);
+            when(flirtModeRepository.save(any(ChatFlirtMode.class)))
+                    .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+            assertThatThrownBy(() -> service.applyConsentTx(lowUser, CHAT_UUID, true))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        }
+
+        @Test
+        void createRowInNewTxShouldBuildFreshRowKeyedLowHighAllDisabled() {
+            Chat ref = privateChat(lowUser, highUser);
+            when(chatRepository.getReferenceById(CHAT_PK)).thenReturn(ref);
+
+            ChatFlirtMode created = service.createRowInNewTx(CHAT_PK, LOW_ID, HIGH_ID);
+
+            assertThat(created.getLowUserId()).isEqualTo(LOW_ID);
+            assertThat(created.getHighUserId()).isEqualTo(HIGH_ID);
+            assertThat(created.isEnabledByLow()).isFalse();
+            assertThat(created.isEnabledByHigh()).isFalse();
+            assertThat(created.isActive()).isFalse();
+            assertThat(created.getChat()).isSameAs(ref);
+            verify(flirtModeRepository).save(any(ChatFlirtMode.class));
         }
     }
 

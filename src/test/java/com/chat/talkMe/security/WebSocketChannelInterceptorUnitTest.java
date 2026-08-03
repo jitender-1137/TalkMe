@@ -30,11 +30,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -94,6 +96,13 @@ class WebSocketChannelInterceptorUnitTest {
 
     private Message<byte[]> message(StompHeaderAccessor accessor) {
         return message(accessor, new byte[0]);
+    }
+
+    /** Build a STOMP message with an arbitrary (non-byte[]) payload type. */
+    private Message<?> messageWith(StompHeaderAccessor accessor, Object payload) {
+        accessor.setLeaveMutable(true);
+        accessor.setSessionId("sess-1");
+        return MessageBuilder.createMessage(payload, accessor.getMessageHeaders());
     }
 
     /** Stub the Redis fixed-window counter to return the given count. */
@@ -546,6 +555,331 @@ class WebSocketChannelInterceptorUnitTest {
             assertThat(result).isSameAs(msg);
             verify(chatRepository, never()).findByUuidWithMembers(any());
             verifyNoInteractions(tokenProvider, userDetailsService, friendRepository, redisTemplate);
+        }
+    }
+
+    // ── branch backfill (uncovered negative / edge branches) ─────────────────
+
+    @Nested
+    @DisplayName("branch backfill")
+    class BranchBackfill {
+
+        private final byte[] CALL = "{\"event\":\"call_offer\"}".getBytes(StandardCharsets.UTF_8);
+
+        // ---- withinLimit / rate-limit counter ----
+
+        @Test
+        @DisplayName("first frame in the window (count==1) sets the TTL")
+        void firstFrameSetsExpiry() {
+            interceptor = newInterceptor();
+            User alice = user("alice");
+            when(tokenProvider.validateToken("good")).thenReturn(true);
+            when(tokenProvider.getUsernameFromToken("good")).thenReturn("alice");
+            when(userDetailsService.loadUserByUsername("alice")).thenReturn(new CustomUserDetails(alice));
+            stubRedisCount(1L); // first CONNECT of the window
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+            accessor.addNativeHeader("Authorization", "Bearer good");
+            Message<byte[]> msg = message(accessor);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verify(redisTemplate).expire(anyString(), eq(60L), eq(TimeUnit.SECONDS));
+        }
+
+        @Test
+        @DisplayName("Redis increment null on SEND → fail-open, frame not dropped")
+        void nullCountFailsOpenOnSend() {
+            interceptor = newInterceptor();
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(null);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, "{\"content\":\"hi\"}".getBytes(StandardCharsets.UTF_8));
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        // ---- SEND destination shape (line 125 compound guard) ----
+
+        @Test
+        @DisplayName("SEND with no destination passes the flood guard and returns")
+        void sendNullDestinationPasses() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        @Test
+        @DisplayName("SEND to a non-chat destination is not friendship-checked")
+        void sendNonChatDestinationPasses() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/other/x/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        @Test
+        @DisplayName("SEND to a chat destination that is not '/messages' is not friendship-checked")
+        void sendNonMessagesDestinationPasses() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/typing");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        // ---- payload type discrimination (lines 132 / 134) ----
+
+        @Test
+        @DisplayName("String (non-byte[]) payload is read for call detection")
+        void stringPayloadHandled() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<?> msg = messageWith(accessor, "{\"content\":\"hi\"}");
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        @Test
+        @DisplayName("payload that is neither byte[] nor String is treated as empty")
+        void otherPayloadTypeHandled() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<?> msg = messageWith(accessor, Integer.valueOf(42));
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        // ---- call-event detection second pattern (line 138, spaced JSON) ----
+
+        @Test
+        @DisplayName("call event with a space after the colon is still detected")
+        void spacedCallEventDetected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            User alice = user("alice");
+            User bob = user("bob");
+            Chat chat = Chat.builder().chatType(ChatType.PRIVATE)
+                    .members(List.of(
+                            ChatMember.builder().user(alice).build(),
+                            ChatMember.builder().user(bob).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
+            when(friendRepository.findByUserAndFriend(any(), any()))
+                    .thenReturn(Optional.of(mock(Friend.class)));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(alice));
+            Message<byte[]> msg = message(accessor,
+                    "{\"event\": \"call_offer\"}".getBytes(StandardCharsets.UTF_8));
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verify(friendRepository).findByUserAndFriend(any(), any());
+        }
+
+        // ---- call-event principal shape (lines 140 / 142 / usernameOrNull 199) ----
+
+        @Test
+        @DisplayName("call event whose principal is not a UserDetails is skipped (no chat lookup)")
+        void callPrincipalNotUserDetails() {
+            interceptor = newInterceptor();
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            // principal present but not a UserDetails → usernameOrNull returns null, call gate skips
+            accessor.setUser(new UsernamePasswordAuthenticationToken("plain-principal", null));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(redisTemplate, chatRepository, friendRepository);
+        }
+
+        // ---- call-event chat/membership branches (lines 148 / 150 / 161) ----
+
+        @Test
+        @DisplayName("call event to a chat that no longer exists is skipped")
+        void callChatNotFound() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.empty());
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(friendRepository);
+        }
+
+        @Test
+        @DisplayName("call event to a non-PRIVATE (GROUP) chat skips the friendship gate")
+        void callToGroupChatSkipsFriendCheck() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            User alice = user("alice");
+            User bob = user("bob");
+            Chat chat = Chat.builder().chatType(ChatType.GROUP)
+                    .members(List.of(
+                            ChatMember.builder().user(alice).build(),
+                            ChatMember.builder().user(bob).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(alice));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(friendRepository);
+        }
+
+        @Test
+        @DisplayName("call event where the sender is not a chat member (sender==null) skips the gate")
+        void callSenderNotMember() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            User bob = user("bob");
+            User carol = user("carol");
+            Chat chat = Chat.builder().chatType(ChatType.PRIVATE)
+                    .members(List.of(
+                            ChatMember.builder().user(bob).build(),
+                            ChatMember.builder().user(carol).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice"))); // alice is not a member
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(friendRepository);
+        }
+
+        @Test
+        @DisplayName("call event in a chat with no distinct recipient (recipient==null) skips the gate")
+        void callRecipientNull() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            User alice = user("alice");
+            Chat chat = Chat.builder().chatType(ChatType.PRIVATE)
+                    .members(List.of(ChatMember.builder().user(alice).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(alice));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+            verifyNoInteractions(friendRepository);
+        }
+
+        // ---- call validation catch block (lines 171 false / 174) ----
+
+        @Test
+        @DisplayName("a non-IllegalArgumentException during call validation is logged and swallowed")
+        void callValidationUnexpectedErrorSwallowed() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            User alice = user("alice");
+            User bob = user("bob");
+            Chat chat = Chat.builder().chatType(ChatType.PRIVATE)
+                    .members(List.of(
+                            ChatMember.builder().user(alice).build(),
+                            ChatMember.builder().user(bob).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
+            when(friendRepository.findByUserAndFriend(any(), any()))
+                    .thenThrow(new RuntimeException("db down"));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(alice));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            // non-IAE is swallowed → the frame still passes through
+            Message<?> result = interceptor.preSend(msg, channel);
+
+            assertThat(result).isSameAs(msg);
+        }
+
+        // ---- SUBSCRIBE malformed topic, blank uuid segment (line 100) ----
+
+        @Test
+        @DisplayName("SUBSCRIBE to '/topic/chat//messages' (blank uuid segment) is rejected")
+        void subscribeBlankUuidSegmentRejected() {
+            interceptor = newInterceptor();
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+            accessor.setDestination("/topic/chat//messages"); // parts[3] is blank
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Malformed chat topic");
+
+            verifyNoInteractions(chatRepository);
         }
     }
 }

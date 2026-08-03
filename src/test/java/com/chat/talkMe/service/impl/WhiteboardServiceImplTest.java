@@ -425,4 +425,179 @@ class WhiteboardServiceImplTest {
                     eq("/topic/chat/" + chatUuid + "/messages"), any(Object.class));
         }
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  clear  (delete op-log + seed clear marker + broadcast)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("clear")
+    class Clear {
+
+        @Test
+        void shouldRejectClearFromNonMember() {
+            when(chatRepository.findByUuid(chatId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.clear(me, chatUuid))
+                    .isInstanceOfSatisfying(ForbiddenException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_103"));
+
+            // Never touched Redis or broadcast a clear.
+            verifyNoInteractions(messagingTemplate);
+            verify(redis, never()).delete(anyString());
+        }
+
+        @Test
+        void shouldDeleteOpLogSeedClearMarkerAndBroadcast() throws Exception {
+            arrangeActiveMember();
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(9L);
+            when(redis.opsForList()).thenReturn(listOps);
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            service.clear(me, chatUuid);
+
+            // Old strokes dropped, then a fresh "clear" op appended and re-broadcast.
+            verify(redis).delete("wb:ops:" + chatUuid);
+            verify(listOps).rightPush(eq("wb:ops:" + chatUuid), anyString());
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/chat/" + chatUuid + "/messages"), any(Object.class));
+        }
+
+        @Test
+        void shouldFailOpenWhenDeleteThrowsButStillSeedAndBroadcast() throws Exception {
+            // The op-log delete blowing up must NOT abort the clear: the marker is still seeded
+            // and the clear is still broadcast (fail-open on every Redis call).
+            arrangeActiveMember();
+            when(redis.delete(anyString())).thenThrow(new RuntimeException("redis down"));
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(1L);
+            when(redis.opsForList()).thenReturn(listOps);
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            assertThatCode(() -> service.clear(me, chatUuid)).doesNotThrowAnyException();
+
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/chat/" + chatUuid + "/messages"), any(Object.class));
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  undo  (append undo marker + broadcast)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("undo")
+    class Undo {
+
+        @Test
+        void shouldRejectUndoFromNonMember() {
+            when(chatRepository.findByUuid(chatId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.undo(me, chatUuid))
+                    .isInstanceOfSatisfying(ForbiddenException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_103"));
+
+            verifyNoInteractions(messagingTemplate);
+        }
+
+        @Test
+        void shouldAppendUndoMarkerStampSeqAndBroadcast() throws Exception {
+            arrangeActiveMember();
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(42L);
+            when(redis.opsForList()).thenReturn(listOps);
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            WhiteboardOp op = service.undo(me, chatUuid);
+
+            assertThat(op.getType()).isEqualTo("undo");
+            assertThat(op.getSeq()).isEqualTo(42L);
+            assertThat(op.getAuthorUuid()).isEqualTo(me.getUuid().toString());
+            assertThat(op.getTs()).isPositive();
+            verify(listOps).rightPush(eq("wb:ops:" + chatUuid), anyString());
+            verify(messagingTemplate).convertAndSend(
+                    eq("/topic/chat/" + chatUuid + "/messages"), any(Object.class));
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  Internals: nextSeq / pushOp / broadcast fail-open (driven through addStroke)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("internals fail-open")
+    class InternalsFailOpen {
+
+        private WhiteboardStrokeRequest simpleStroke() {
+            return strokeRequest(chatUuid, List.of(new double[]{0.1, 0.2}));
+        }
+
+        @Test
+        void nextSeqShouldFallBackToTimestampWhenIncrementReturnsNull() throws Exception {
+            // INCR returns null (unusual, but possible on a Redis error): the op still gets a
+            // monotonic-ish seq from the wall clock rather than 0/failure.
+            arrangeActiveMember();
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(null);
+            when(redis.opsForList()).thenReturn(listOps);
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            WhiteboardOp op = service.addStroke(me, simpleStroke());
+
+            // The timestamp fallback is a large epoch-millis value, never <= 0.
+            assertThat(op.getSeq()).isGreaterThan(1_000_000_000_000L);
+            verify(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+        }
+
+        @Test
+        void nextSeqShouldFallBackToTimestampWhenIncrementThrows() throws Exception {
+            arrangeActiveMember();
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenThrow(new RuntimeException("redis down"));
+            when(redis.opsForList()).thenReturn(listOps);
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+            WhiteboardOp op = service.addStroke(me, simpleStroke());
+
+            assertThat(op.getSeq()).isGreaterThan(1_000_000_000_000L);
+            // The write path still runs and re-broadcasts.
+            verify(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+        }
+
+        @Test
+        void pushOpShouldFailOpenWhenSerializationThrows() throws Exception {
+            // writeValueAsString blowing up must NOT fail the draw: addStroke returns the op and
+            // still broadcasts (persistence is best-effort).
+            arrangeActiveMember();
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(3L);
+            when(objectMapper.writeValueAsString(any()))
+                    .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {});
+
+            WhiteboardOp op = service.addStroke(me, simpleStroke());
+
+            assertThat(op).isNotNull();
+            assertThat(op.getSeq()).isEqualTo(3L);
+            // rightPush never reached, but the op is still broadcast.
+            verify(listOps, never()).rightPush(anyString(), anyString());
+            verify(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+        }
+
+        @Test
+        void broadcastShouldFailOpenWhenMessagingThrows() throws Exception {
+            arrangeActiveMember();
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.increment(anyString())).thenReturn(4L);
+            when(redis.opsForList()).thenReturn(listOps);
+            when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+            org.mockito.Mockito.doThrow(new RuntimeException("stomp down"))
+                    .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+
+            // The broadcast throwing is swallowed — addStroke still returns the stamped op.
+            WhiteboardOp op = service.addStroke(me, simpleStroke());
+
+            assertThat(op.getSeq()).isEqualTo(4L);
+        }
+    }
 }

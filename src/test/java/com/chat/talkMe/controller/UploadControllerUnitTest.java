@@ -91,6 +91,8 @@ class UploadControllerUnitTest {
     private ChatMemberRepository chatMemberRepository;
     @Mock
     private ContentModerationService moderationService;
+    @Mock
+    private com.chat.talkMe.service.MediaAssetService mediaAssetService;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -98,7 +100,8 @@ class UploadControllerUnitTest {
     @BeforeEach
     void setUp() {
         UploadController controller = new UploadController(
-                storageService, mediaStorage, chatRepository, chatMemberRepository, moderationService);
+                storageService, mediaStorage, chatRepository, chatMemberRepository, moderationService,
+                mediaAssetService);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -197,6 +200,38 @@ class UploadControllerUnitTest {
 
             verifyNoInteractions(storageService);
         }
+
+        @Test
+        void fileTypeWithNullContentTypeIsNeitherImageNorVideoSoSizeGuardPasses() throws Exception {
+            authenticate();
+            // type="file" AND a null Content-Type → in validateSize both isImage and isVideo evaluate
+            // their (ct != null) sub-condition to FALSE, so neither size cap fires. The upload then
+            // fails the magic-byte DOCUMENT check (PNG bytes) with 415 — but the size guard's
+            // ct==null branches (lines 138 & 139) have been exercised first.
+            MockMultipartFile file = new MockMultipartFile("file", "x.bin", null, pngBytes());
+
+            mockMvc.perform(multipart(BASE).file(file).param("type", "file"))
+                    .andExpect(status().isUnsupportedMediaType())
+                    .andExpect(jsonPath("$.messageCode").value("TM_495"));
+
+            verifyNoInteractions(storageService);
+        }
+
+        @Test
+        void videoByContentTypeUnderLimitPassesSizeGuard() throws Exception {
+            authenticate();
+            // type="file" but Content-Type video/* → isVideo becomes true via its (ct != null &&
+            // startsWith("video/")) sub-condition; 64 bytes is far under the 30 MB cap so the video
+            // size check (line 143) evaluates isVideo=true with size-not-exceeded and does not throw.
+            // The DOCUMENT magic-byte check then rejects the PNG bytes → 415.
+            MockMultipartFile file = new MockMultipartFile("file", "clip.bin", "video/mp4", pngBytes());
+
+            mockMvc.perform(multipart(BASE).file(file).param("type", "file"))
+                    .andExpect(status().isUnsupportedMediaType())
+                    .andExpect(jsonPath("$.messageCode").value("TM_495"));
+
+            verifyNoInteractions(storageService);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -245,6 +280,37 @@ class UploadControllerUnitTest {
             mockMvc.perform(multipart(BASE).file(validPng()).param("type", "image"))
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
+        }
+
+        @Test
+        void shouldReportActualOnDiskSizeWhenStoredFileExists() throws Exception {
+            authenticate();
+            // storeFile returns a path to a REAL file → Files.exists(stored) is true (line 81) and
+            // the reported size comes from Files.size(stored) (line 82), NOT the 64-byte multipart.
+            java.nio.file.Path stored = java.nio.file.Files.createTempFile("upload-unit-", ".png");
+            java.nio.file.Files.write(stored, new byte[10]);
+            try {
+                when(storageService.storeFile(any(), any(), any())).thenReturn(stored.toString());
+
+                mockMvc.perform(multipart(BASE).file(validPng()).param("type", "image"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.fileSize").value(10));
+            } finally {
+                java.nio.file.Files.deleteIfExists(stored);
+            }
+        }
+
+        @Test
+        void shouldFallBackToMultipartSizeWhenStoredPathIsInvalid() throws Exception {
+            authenticate();
+            // A NUL byte makes Paths.get(url) throw InvalidPathException, which the try/catch swallows
+            // (line 84) → the response falls back to the original multipart size (64 bytes).
+            when(storageService.storeFile(any(), any(), any())).thenReturn("bad\0path.png");
+
+            mockMvc.perform(multipart(BASE).file(validPng()).param("type", "image"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.fileSize").value(64));
+
         }
     }
 
@@ -393,6 +459,60 @@ class UploadControllerUnitTest {
             assertThat(uploadAndCaptureSubdir("conversation", "not-a-uuid")).isEqualTo("others");
             verifyNoInteractions(chatRepository, chatMemberRepository);
         }
+
+        @Test
+        void conversationWithNullContextIdFallsBackToOthers() throws Exception {
+            authenticate();
+            // No contextId → safeUuid(null) hits the (value == null) branch and returns null, so the
+            // conversation guard's (cid != null) sub-condition is false and the repo is never queried.
+            assertThat(uploadAndCaptureSubdir("conversation", null)).isEqualTo("others");
+            verifyNoInteractions(chatRepository, chatMemberRepository);
+        }
+
+        @Test
+        void conversationWithBlankContextIdFallsBackToOthers() throws Exception {
+            authenticate();
+            // A whitespace-only contextId → safeUuid hits the (value.isBlank()) branch and returns null.
+            assertThat(uploadAndCaptureSubdir("conversation", "   ")).isEqualTo("others");
+            verifyNoInteractions(chatRepository, chatMemberRepository);
+        }
+
+        // ── Unauthenticated principal: userDetails == null → uid == null everywhere ────────────
+        // (No authenticate() call → @AuthenticationPrincipal resolves to null. Each context's
+        //  (uid != null) guard is false, so all fall back to "others".)
+
+        @Test
+        void profileWithoutAuthenticatedUserFallsBackToOthers() throws Exception {
+            when(moderationService.moderateUpload(any())).thenReturn(ModerationResult.clean()); // profile is moderated
+            assertThat(uploadAndCaptureSubdir("profile", null)).isEqualTo("others");
+        }
+
+        @Test
+        void postWithoutAuthenticatedUserFallsBackToOthers() throws Exception {
+            when(moderationService.moderateUpload(any())).thenReturn(ModerationResult.clean()); // post is moderated
+            assertThat(uploadAndCaptureSubdir("post", null)).isEqualTo("others");
+        }
+
+        @Test
+        void storyWithoutAuthenticatedUserFallsBackToOthers() throws Exception {
+            when(moderationService.moderateUpload(any())).thenReturn(ModerationResult.clean()); // story is moderated
+            assertThat(uploadAndCaptureSubdir("story", null)).isEqualTo("others");
+        }
+
+        @Test
+        void lobbyWithoutAuthenticatedUserFallsBackToOthers() throws Exception {
+            // Not moderated; userDetails == null makes uid null → the lobby (uid != null) guard is false.
+            assertThat(uploadAndCaptureSubdir("lobby", null)).isEqualTo("others");
+        }
+
+        @Test
+        void conversationWithoutAuthenticatedUserFallsBackToOthersAndNeverHitsRepo() throws Exception {
+            // cid resolves to a valid UUID, but the conversation guard's (userDetails != null)
+            // sub-condition short-circuits to false, so the repositories are never consulted.
+            String cid = "22222222-2222-2222-2222-222222222222";
+            assertThat(uploadAndCaptureSubdir("conversation", cid)).isEqualTo("others");
+            verifyNoInteractions(chatRepository, chatMemberRepository);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -538,6 +658,60 @@ class UploadControllerUnitTest {
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
             verifyNoInteractions(mediaStorage);
+        }
+
+        @Test
+        void shouldDefaultToOctetStreamWhenContentTypeNull() throws Exception {
+            // mc.contentType() == null → the ternary falls back to "application/octet-stream"; the type
+            // is not scriptable so no Content-Disposition/CSP is added.
+            byte[] body = pngBytes();
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), null, body.length)));
+
+            mockMvc.perform(get(MEDIA).param("path", "x/y.bin"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "application/octet-stream"))
+                    .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                    .andExpect(header().doesNotExist("Content-Disposition"));
+        }
+
+        @Test
+        void shouldSandboxScriptableHtml() throws Exception {
+            // contentType contains "html" → the scriptable-types guard adds attachment + sandbox CSP.
+            byte[] body = "<h1>x</h1>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), "text/html", body.length)));
+
+            mockMvc.perform(get(MEDIA).param("path", "x/y.html"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Disposition", "attachment"))
+                    .andExpect(header().string("Content-Security-Policy", "default-src 'none'; sandbox"));
+        }
+
+        @Test
+        void shouldSandboxScriptableXml() throws Exception {
+            // contentType contains "xml" → scriptable-types guard fires (svg/html both false first).
+            byte[] body = "<root/>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), "application/xml", body.length)));
+
+            mockMvc.perform(get(MEDIA).param("path", "x/y.xml"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Disposition", "attachment"))
+                    .andExpect(header().string("Content-Security-Policy", "default-src 'none'; sandbox"));
+        }
+
+        @Test
+        void shouldOmitContentLengthWhenNegative() throws Exception {
+            // mc.contentLength() < 0 → the controller skips builder.contentLength(...); the body still streams.
+            byte[] body = pngBytes();
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", -1)));
+
+            mockMvc.perform(get(MEDIA).param("path", "x/y.png"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "image/png"))
+                    .andExpect(header().string("X-Content-Type-Options", "nosniff"));
         }
     }
 }

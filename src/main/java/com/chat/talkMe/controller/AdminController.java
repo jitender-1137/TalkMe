@@ -227,6 +227,36 @@ public class AdminController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Object deleted", "TM_281"));
     }
 
+    // ── Media-ownership analytics (media_assets ledger) ─────────────────────────
+
+    @GetMapping("/media/stats")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse>> mediaStats(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @RequestParam(value = "range", defaultValue = "30d") String range) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.getMediaOwnership(range, name(admin))));
+    }
+
+    @GetMapping("/media/user")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminMediaListResponse>> userMedia(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @RequestParam("userId") String userId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "24") int size) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.getUserMedia(userId, page, size, name(admin))));
+    }
+
+    @GetMapping("/media/chat")
+    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminMediaListResponse>> chatMedia(
+            @AuthenticationPrincipal CustomUserDetails admin,
+            @RequestParam("chatId") String chatId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "24") int size) {
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                adminService.getChatMedia(chatId, page, size, name(admin))));
+    }
+
     @GetMapping("/posts")
     public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminPostView>>> posts(
             @RequestParam(value = "page", defaultValue = "0") int page,

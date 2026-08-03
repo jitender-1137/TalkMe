@@ -18,7 +18,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -27,6 +33,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -431,6 +441,285 @@ class TranslationServiceImplTest {
             assertThat(res.getResults().get(1).getTranslatedText()).isEqualTo("");
             // Blank items skip the per-item cache lookup entirely → no cache / cap / provider I/O.
             verifyNoInteractions(redis, objectMapper);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  Providers: Azure primary + MyMemory fallback. The private HttpClient is
+    //  swapped for a Mockito mock via reflection, and the endpoints point at a
+    //  literal public IP (8.8.8.8) so SsrfGuard passes WITHOUT any DNS/network —
+    //  this lets us exercise the real success / non-2xx / malformed-body branches
+    //  of callAzure / callAzureBatch / callMyMemory and the result-cache write.
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("providers")
+    class Providers {
+
+        private TranslationServiceImpl svc;
+        private HttpClient httpClient;
+
+        @BeforeEach
+        void wireRealMapperAndMockClient() {
+            // A REAL ObjectMapper so provider JSON is genuinely parsed; a mocked HttpClient
+            // swapped in via reflection so no real network I/O ever happens.
+            svc = new TranslationServiceImpl(properties, redis, new ObjectMapper());
+            httpClient = mock(HttpClient.class);
+            ReflectionTestUtils.setField(svc, "httpClient", httpClient);
+            // Public literal IP → InetAddress parses it without DNS, SsrfGuard allows it.
+            properties.setAzureUrl("http://8.8.8.8/translate");
+            properties.setMymemoryUrl("http://8.8.8.8/get");
+        }
+
+        @SuppressWarnings("unchecked")
+        private HttpResponse<String> resp(int status, String body) {
+            // A REAL HttpResponse (not a mock) — building resp() inside a chained
+            // doReturn(...).doReturn(...) must not perform any Mockito stubbing, or the inner
+            // stub interrupts the outer one (UnfinishedStubbingException). Production only
+            // reads statusCode() and body().
+            return new HttpResponse<>() {
+                @Override public int statusCode() { return status; }
+                @Override public String body() { return body; }
+                @Override public HttpRequest request() { return null; }
+                @Override public java.util.Optional<HttpResponse<String>> previousResponse() { return java.util.Optional.empty(); }
+                @Override public HttpHeaders headers() { return HttpHeaders.of(java.util.Map.of(), (a, b) -> true); }
+                @Override public java.util.Optional<javax.net.ssl.SSLSession> sslSession() { return java.util.Optional.empty(); }
+                @Override public URI uri() { return URI.create("https://test.local"); }
+                @Override public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
+            };
+        }
+
+        /** Cache miss for the single-translate path (cap is enforced, arms the TTL). */
+        private void singleMiss() {
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+            when(valueOps.increment(anyString())).thenReturn(1L);
+        }
+
+        private TranslateBatchRequest twoItemBatch() {
+            return new TranslateBatchRequest(java.util.List.of(
+                    new TranslateBatchRequest.Item("m1", "hello"),
+                    new TranslateBatchRequest.Item("m2", "world")), "es", null);
+        }
+
+        // ── single: Azure ────────────────────────────────────────────────────
+
+        @Test
+        @DisplayName("Azure 200 → returns the azure translation and writes it to cache")
+        void azureSuccess_returnsAzureTranslation_andCachesResult() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            properties.setAzureRegion("eastus"); // exercises the region-header branch
+            String azure = "[{\"detectedLanguage\":{\"language\":\"en\"},"
+                    + "\"translations\":[{\"text\":\"hola\",\"to\":\"es\"}]}]";
+            doReturn(resp(200, azure)).when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hello", "es", null));
+
+            assertThat(result.getProvider()).isEqualTo("azure");
+            assertThat(result.getTranslatedText()).isEqualTo("hola");
+            assertThat(result.getDetectedSource()).isEqualTo("en");
+            assertThat(result.getTarget()).isEqualTo("es");
+            assertThat(result.isCached()).isFalse();
+            // a successful (uncached) translation is written to the result cache
+            verify(valueOps).set(anyString(), eq("hola"), any(Duration.class));
+        }
+
+        @Test
+        @DisplayName("Azure detectedLanguage absent → falls back to the supplied source")
+        void azureNoDetectedLanguage_usesSuppliedSource() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            // concrete source "de" (not blank / not auto) exercises the &from= branch too
+            String azure = "[{\"translations\":[{\"text\":\"hallo\"}]}]";
+            doReturn(resp(200, azure)).when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hi", "es", "de"));
+
+            assertThat(result.getProvider()).isEqualTo("azure");
+            assertThat(result.getTranslatedText()).isEqualTo("hallo");
+            assertThat(result.getDetectedSource()).isEqualTo("de"); // detected empty → source
+        }
+
+        @Test
+        @DisplayName("blank Azure key → straight to MyMemory (no Azure HTTP call)")
+        void azureKeyBlank_fallsBackToMyMemory_success() throws Exception {
+            singleMiss();
+            properties.setAzureKey(""); // Azure disabled
+            doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"hola-mm\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hello", "es", null));
+
+            assertThat(result.getProvider()).isEqualTo("mymemory");
+            assertThat(result.getTranslatedText()).isEqualTo("hola-mm");
+            assertThat(result.getDetectedSource()).isEqualTo("en"); // MyMemory defaults source→en
+            verify(httpClient, times(1)).send(any(), any()); // only the MyMemory GET
+            verify(valueOps).set(anyString(), eq("hola-mm"), any(Duration.class));
+        }
+
+        @Test
+        @DisplayName("Azure HTTP 403 (quota) → MyMemory fallback, honouring an explicit source")
+        void azureHttp403_fallsBackToMyMemory_withExplicitSource() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            doReturn(resp(403, "over quota"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"mm-text\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hi", "fr", "en"));
+
+            assertThat(result.getProvider()).isEqualTo("mymemory");
+            assertThat(result.getTranslatedText()).isEqualTo("mm-text");
+            assertThat(result.getDetectedSource()).isEqualTo("en"); // MyMemory src reflects source
+            verify(httpClient, times(2)).send(any(), any()); // Azure POST then MyMemory GET
+        }
+
+        @Test
+        @DisplayName("Azure empty JSON array → MyMemory fallback")
+        void azureEmptyArray_fallsBackToMyMemory() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            doReturn(resp(200, "[]"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"x\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hi", "fr", null));
+
+            assertThat(result.getProvider()).isEqualTo("mymemory");
+            assertThat(result.getTranslatedText()).isEqualTo("x");
+            verify(httpClient, times(2)).send(any(), any());
+        }
+
+        @Test
+        @DisplayName("Azure returns an empty translation string → MyMemory fallback")
+        void azureEmptyTranslationText_fallsBackToMyMemory() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            doReturn(resp(200, "[{\"translations\":[{\"text\":\"\"}]}]"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"y\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hi", "fr", null));
+
+            assertThat(result.getProvider()).isEqualTo("mymemory");
+            assertThat(result.getTranslatedText()).isEqualTo("y");
+        }
+
+        @Test
+        @DisplayName("both providers error → echo input unchanged, provider=none, nothing cached")
+        void bothProvidersHttpError_echoesInput_providerNone() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            doReturn(resp(500, "err")).doReturn(resp(500, "err"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hello", "es", null));
+
+            assertThat(result.getProvider()).isEqualTo("none");
+            assertThat(result.getTranslatedText()).isEqualTo("hello");
+            assertThat(result.isCached()).isFalse();
+            // a fail-open echo must NOT be written to the result cache
+            verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
+        }
+
+        @Test
+        @DisplayName("Azure fails and MyMemory returns an empty translation → echo none")
+        void azureFails_andMyMemoryEmpty_echoesNone() throws Exception {
+            singleMiss();
+            properties.setAzureKey("k");
+            doReturn(resp(500, "e"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateResponse result = svc.translate(capUser, reqOf("hi", "fr", null));
+
+            assertThat(result.getProvider()).isEqualTo("none");
+            assertThat(result.getTranslatedText()).isEqualTo("hi");
+        }
+
+        // ── batch: Azure batch + per-item MyMemory ────────────────────────────
+
+        @Test
+        @DisplayName("Azure batch 200 → one call translates every miss and caches each")
+        void batchAzureSuccess_translatesMisses_cachesEach() throws Exception {
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null); // all misses
+            when(valueOps.increment(anyString())).thenReturn(1L);
+            properties.setAzureKey("k");
+            String batch = "[{\"detectedLanguage\":{\"language\":\"en\"},\"translations\":[{\"text\":\"hola\"}]},"
+                    + "{\"detectedLanguage\":{\"language\":\"en\"},\"translations\":[{\"text\":\"mundo\"}]}]";
+            doReturn(resp(200, batch)).when(httpClient).send(any(), any());
+
+            TranslateBatchResponse res = svc.translateBatch(capUser, twoItemBatch());
+
+            assertThat(res.getProvider()).isEqualTo("azure");
+            assertThat(res.getResults()).hasSize(2);
+            assertThat(res.getResults().get(0).getTranslatedText()).isEqualTo("hola");
+            assertThat(res.getResults().get(1).getTranslatedText()).isEqualTo("mundo");
+            assertThat(res.getResults().get(0).getDetectedSource()).isEqualTo("en");
+            assertThat(res.getResults().get(0).isCached()).isFalse();
+            verify(valueOps, times(2)).set(anyString(), anyString(), any(Duration.class));
+            verify(httpClient, times(1)).send(any(), any()); // ONE batch call for all misses
+        }
+
+        @Test
+        @DisplayName("blank Azure key → per-item MyMemory translates every miss")
+        void batchAzureKeyBlank_perItemMyMemory_success() throws Exception {
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+            when(valueOps.increment(anyString())).thenReturn(1L);
+            properties.setAzureKey(""); // batch Azure disabled → per-item MyMemory
+            doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"a\"}}"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"b\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateBatchResponse res = svc.translateBatch(capUser, twoItemBatch());
+
+            assertThat(res.getProvider()).isEqualTo("mymemory");
+            assertThat(res.getResults().get(0).getTranslatedText()).isEqualTo("a");
+            assertThat(res.getResults().get(1).getTranslatedText()).isEqualTo("b");
+            verify(valueOps, times(2)).set(anyString(), anyString(), any(Duration.class));
+            verify(httpClient, times(2)).send(any(), any()); // one GET per item
+        }
+
+        @Test
+        @DisplayName("Azure batch size mismatch → per-item MyMemory fallback")
+        void batchAzureSizeMismatch_perItemMyMemory() throws Exception {
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+            when(valueOps.increment(anyString())).thenReturn(1L);
+            properties.setAzureKey("k");
+            // Azure returns ONE element for TWO inputs → size mismatch → per-item fallback.
+            doReturn(resp(200, "[{\"translations\":[{\"text\":\"only\"}]}]"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"a\"}}"))
+                    .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"b\"}}"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateBatchResponse res = svc.translateBatch(capUser, twoItemBatch());
+
+            assertThat(res.getProvider()).isEqualTo("mymemory");
+            assertThat(res.getResults().get(0).getTranslatedText()).isEqualTo("a");
+            verify(httpClient, times(3)).send(any(), any()); // 1 batch attempt + 2 per-item GETs
+        }
+
+        @Test
+        @DisplayName("Azure batch fails and every MyMemory item fails → provider=none, echoes all")
+        void batchAzureFail_allMyMemoryFail_providerNone() throws Exception {
+            when(redis.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+            when(valueOps.increment(anyString())).thenReturn(1L);
+            properties.setAzureKey("k");
+            doReturn(resp(500, "e")).doReturn(resp(500, "e")).doReturn(resp(500, "e"))
+                    .when(httpClient).send(any(), any());
+
+            TranslateBatchResponse res = svc.translateBatch(capUser, twoItemBatch());
+
+            assertThat(res.getProvider()).isEqualTo("none");
+            assertThat(res.getResults().get(0).getTranslatedText()).isEqualTo("hello");
+            assertThat(res.getResults().get(1).getTranslatedText()).isEqualTo("world");
+            // nothing translated → nothing cached
+            verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
         }
     }
 }

@@ -9,10 +9,12 @@ import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.service.MediaAssetService;
 import com.chat.talkMe.service.StorageService;
 import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.util.UploadValidator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/uploads")
 @RequiredArgsConstructor
@@ -39,6 +42,7 @@ public class UploadController {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
     private final ContentModerationService moderationService;
+    private final MediaAssetService mediaAssetService;
 
     /** Upload categories whose images/videos must be CLEAN (publicly visible content). */
     private static final java.util.Set<String> MODERATED_CONTEXTS = java.util.Set.of("profile", "post", "story");
@@ -83,6 +87,25 @@ public class UploadController {
             }
         } catch (Exception ignored) {
             // fall back to the original multipart size
+        }
+
+        // Record an admin-only ownership row for this object (fail-open — never blocks the
+        // upload). This is the ONLY durable owner link for stranger media, whose storage
+        // path is deliberately anonymous, and it lets the admin gallery attribute lobby /
+        // stranger files that never become a persisted MessageAttachment. The call site is
+        // guarded too: record() runs in its own (REQUIRES_NEW) transaction whose commit
+        // happens as it returns, so a flush/commit-time failure would otherwise escape here.
+        try {
+            mediaAssetService.record(
+                    url,
+                    userDetails != null ? userDetails.getUser() : null,
+                    type,
+                    file.getOriginalFilename(),
+                    file.getContentType(),
+                    storedSize);
+        } catch (RuntimeException e) {
+            // Bookkeeping must never fail an already-stored upload.
+            log.warn("[Upload] media-ownership record failed for {}: {}", url, e.getMessage());
         }
 
         UploadResponse response = UploadResponse.builder()

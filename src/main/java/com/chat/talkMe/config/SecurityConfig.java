@@ -204,7 +204,12 @@ public class SecurityConfig {
                 "/error",
                 // Push delivery-ack: authorized by the signed token in the body,
                 // not a Bearer header (the service worker has no access token).
-                "/api/v1/push/delivered", "/push/delivered"
+                "/api/v1/push/delivered", "/push/delivered",
+                // Public profile-by-username, backing the shareable /@username link. Serves a
+                // deliberately TRIMMED, PII-free projection (PublicProfileResponse) — no phone,
+                // email, roles, age, or location — so a logged-out visitor/crawler can view it.
+                // Unlike the removed /users/lobby, this returns no contact details.
+                "/api/v1/users/by-username/**", "/users/by-username/**"
                 // REMOVED (now require auth):
                 //  - /users/lobby : returned full user records incl. phone numbers to
                 //    unauthenticated callers (PII/IDOR leak). The frontend only ever calls

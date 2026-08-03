@@ -290,6 +290,74 @@ class AdminControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
             verifyNoInteractions(adminService);
         }
+
+        // ── Media-ownership analytics (media_assets ledger) ─────────────────────
+        @Test
+        void shouldGetMediaStatsWithDefaultRange() throws Exception {
+            when(adminService.getMediaOwnership(eq("30d"), eq(ADMIN_NAME)))
+                    .thenReturn(com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.builder()
+                            .totalAssets(5).build());
+
+            mockMvc.perform(get(BASE + "/media/stats"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.messageCode").value(OK_CODE))
+                    .andExpect(jsonPath("$.data.totalAssets").value(5));
+
+            verify(adminService).getMediaOwnership("30d", ADMIN_NAME);
+        }
+
+        @Test
+        void shouldGetMediaStatsForwardingRange() throws Exception {
+            when(adminService.getMediaOwnership(eq("7d"), eq(ADMIN_NAME)))
+                    .thenReturn(new com.chat.talkMe.dto.response.AdminMediaOwnershipResponse());
+
+            mockMvc.perform(get(BASE + "/media/stats").param("range", "7d"))
+                    .andExpect(status().isOk());
+
+            verify(adminService).getMediaOwnership("7d", ADMIN_NAME);
+        }
+
+        @Test
+        void shouldGetUserMediaForwardingParams() throws Exception {
+            when(adminService.getUserMedia(eq("u-1"), anyInt(), anyInt(), eq(ADMIN_NAME)))
+                    .thenReturn(com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+                            .items(List.of()).build());
+
+            mockMvc.perform(get(BASE + "/media/user")
+                            .param("userId", "u-1").param("page", "1").param("size", "10"))
+                    .andExpect(status().isOk());
+
+            verify(adminService).getUserMedia("u-1", 1, 10, ADMIN_NAME);
+        }
+
+        @Test
+        void shouldReturn500WhenUserIdMissingOnUserMedia() throws Exception {
+            mockMvc.perform(get(BASE + "/media/user"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
+            verifyNoInteractions(adminService);
+        }
+
+        @Test
+        void shouldGetChatMediaWithDefaults() throws Exception {
+            when(adminService.getChatMedia(eq("c-1"), anyInt(), anyInt(), eq(ADMIN_NAME)))
+                    .thenReturn(com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+                            .items(List.of()).build());
+
+            mockMvc.perform(get(BASE + "/media/chat").param("chatId", "c-1"))
+                    .andExpect(status().isOk());
+
+            // page/size default to 0/24
+            verify(adminService).getChatMedia("c-1", 0, 24, ADMIN_NAME);
+        }
+
+        @Test
+        void shouldReturn500WhenChatIdMissingOnChatMedia() throws Exception {
+            mockMvc.perform(get(BASE + "/media/chat"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
+            verifyNoInteractions(adminService);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────

@@ -223,6 +223,11 @@ public class AuthServiceImpl implements AuthService {
 
         CountryDetectionResult detectionResult = countryDetectionService.detectCountry(httpRequest);
 
+        // Referral attribution (who invited this user) — resolved BEFORE the insert so it's a single
+        // save. Best-effort with no reward payout: any problem yields null and the signup proceeds
+        // (a second write here could mark the tx rollback-only and defeat "never block signup").
+        User referrer = resolveReferrer(request.getReferredByUsername(), username);
+
         User user = User.builder()
                 .name(request.getName())
                 .email(email)
@@ -234,17 +239,38 @@ public class AuthServiceImpl implements AuthService {
                 .age(request.getAge())
                 .gender(request.getGender())
                 .country(detectionResult.getCountry())
+                .referredBy(referrer)
                 .build();
 
         user = userRepository.save(user);
-        log.info("User registered successfully: {}. Country detected: {} (Source: {}, IP: {})",
-                username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
+        log.info("User registered successfully: {}. Country detected: {} (Source: {}, IP: {}){}",
+                username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp(),
+                referrer != null ? " | invited by " + referrer.getUsername() : "");
 
         // Send the verification email first. The welcome email is sent later, only once
         // the address is actually confirmed via verifyEmail().
         sendVerificationEmail(user);
 
         return generateLoginResponse(user, userAgent, detectionResult);
+    }
+
+    /**
+     * Resolve who invited a new signup, or null. Best-effort — a blank/unknown/self/guest/banned/
+     * deleted referrer yields null (never throws, never blocks signup). No reward payout. Only a
+     * read here, so it can't mark the surrounding signup transaction rollback-only.
+     */
+    private User resolveReferrer(String referrerUsername, String newUsername) {
+        if (referrerUsername == null || referrerUsername.isBlank()) return null;
+        try {
+            String uname = referrerUsername.trim().replaceFirst("^@+", "");
+            if (uname.isEmpty() || uname.equalsIgnoreCase(newUsername)) return null;
+            return userRepository.findByUsernameIgnoreCase(uname)
+                    .filter(ref -> !ref.isGuest() && !ref.isBanned() && !ref.isDeleted())
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Referral lookup skipped: {}", e.getMessage());
+            return null;
+        }
     }
 
     @Override

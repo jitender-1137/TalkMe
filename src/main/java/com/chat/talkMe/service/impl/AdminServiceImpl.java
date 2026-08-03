@@ -71,6 +71,7 @@ public class AdminServiceImpl implements AdminService {
     // ── Storage reconciliation (Attachments gallery: storage ⇄ DB) ────────────
     private final com.chat.talkMe.storage.MediaStorage mediaStorage;
     private final com.chat.talkMe.storage.StorageProperties storageProperties;
+    private final com.chat.talkMe.repository.MediaAssetRepository mediaAssetRepository;
 
     /**
      * Redis-backed read-through cache for the expensive analytics aggregates, so the
@@ -849,6 +850,7 @@ public class AdminServiceImpl implements AdminService {
         List<Instant> times = switch (m) {
             case "signups", "users" -> userRepository.findSignupTimesSince(since);
             case "attachments", "media" -> attachmentRepository.findAttachmentTimesSince(since);
+            case "uploads", "media_assets" -> mediaAssetRepository.findUploadTimesSince(since);
             case "posts" -> postRepository.findTimesSince(since);
             case "stories" -> storyRepository.findTimesSince(since);
             case "profileviews", "profile_views", "views" -> profileViewRepository.findTimesSince(since);
@@ -1540,6 +1542,238 @@ public class AdminServiceImpl implements AdminService {
         audit(adminUsername, "DELETE_STORAGE_OBJECT", "STORAGE", key, "reference=" + reference);
     }
 
+    // ── Media-ownership analytics (media_assets ledger) ───────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.chat.talkMe.dto.response.AdminMediaOwnershipResponse getMediaOwnership(
+            String range, String adminUsername) {
+        audit(adminUsername, "VIEW_MEDIA_STATS", "MEDIA", range != null ? range : "30d", null);
+        String key = genKey("media:" + (range == null ? "30d" : range));
+        return cached(key, 20, com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.class,
+                () -> computeMediaOwnership(range));
+    }
+
+    private com.chat.talkMe.dto.response.AdminMediaOwnershipResponse computeMediaOwnership(String range) {
+        long total = mediaAssetRepository.count();
+        long unattributed = mediaAssetRepository.countByOwnerIsNull();
+
+        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket> byContext =
+                mediaAssetRepository.aggregateByContext().stream()
+                        .map(r -> bucket(String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
+                        .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                        .collect(Collectors.toList());
+        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket> byType =
+                mediaAssetRepository.aggregateByType().stream()
+                        .map(r -> bucket(r[0] == null ? "unknown" : String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
+                        .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                        .collect(Collectors.toList());
+
+        // Top uploaders — group in SQL, then batch-load the users for names/avatars.
+        List<Object[]> rows = mediaAssetRepository.topUploaders(
+                com.chat.talkMe.enums.MediaContext.STRANGER, PageRequest.of(0, 10));
+        List<Long> ownerIds = rows.stream().map(r -> ((Number) r[0]).longValue()).collect(Collectors.toList());
+        java.util.Map<Long, User> owners = userRepository.findAllById(ownerIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.UploaderStat> topUploaders = rows.stream()
+                .map(r -> {
+                    User u = owners.get(((Number) r[0]).longValue());
+                    return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.UploaderStat.builder()
+                            .id(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
+                            .username(u != null ? u.getUsername() : null)
+                            .name(u != null ? u.getName() : null)
+                            .avatar(u != null ? u.getProfileImage() : null)
+                            .count(((Number) r[1]).longValue())
+                            .bytes(((Number) r[2]).longValue())
+                            .strangerCount(((Number) r[3]).longValue())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.RecentUpload> recent =
+                mediaAssetRepository.recentWithOwner(PageRequest.of(0, 16)).stream()
+                        .map(this::toRecentUpload)
+                        .collect(Collectors.toList());
+
+        RangeSpec spec = resolveRange(range);
+        List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> series =
+                bucketize(mediaAssetRepository.findUploadTimesSince(spec.since()), spec);
+
+        return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.builder()
+                .totalAssets(total)
+                .totalBytes(mediaAssetRepository.sumBytes())
+                .attributedAssets(total - unattributed)
+                .unattributedAssets(unattributed)
+                .uploaderCount(mediaAssetRepository.countDistinctOwners())
+                .strangerAssets(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.STRANGER))
+                .strangerBytes(mediaAssetRepository.sumBytesByContext(com.chat.talkMe.enums.MediaContext.STRANGER))
+                .lobbyAssets(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.LOBBY))
+                .conversationAssets(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.CONVERSATION))
+                .byContext(byContext)
+                .byType(byType)
+                .topUploaders(topUploaders)
+                .recent(recent)
+                .range(range == null ? "30d" : range)
+                .granularity(spec.granularity())
+                .uploadsSeries(series)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.chat.talkMe.dto.response.AdminMediaListResponse getUserMedia(
+            String userUuid, int page, int size, String adminUsername) {
+        User user = requireUser(userUuid);
+        audit(adminUsername, "VIEW_USER_MEDIA", "MEDIA", userUuid, "page=" + page);
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        Page<com.chat.talkMe.domain.MediaAsset> result =
+                mediaAssetRepository.findByOwner_IdOrderByCreatedAtDesc(user.getId(), pageable);
+        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket> byContext =
+                mediaAssetRepository.aggregateByContextForOwner(user.getId()).stream()
+                        .map(r -> bucket(String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
+                        .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                        .collect(Collectors.toList());
+        return com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+                .items(result.getContent().stream().map(this::toMediaAssetView).collect(Collectors.toList()))
+                .total(mediaAssetRepository.countByOwner_Id(user.getId()))
+                .totalBytes(mediaAssetRepository.sumBytesByOwner(user.getId()))
+                .byContext(byContext)
+                .page(result.getNumber())
+                .size(result.getSize())
+                .hasNext(result.hasNext())
+                .build();
+    }
+
+    @Override
+    @Transactional // NOT readOnly: decrypts file refs + writes a VIEW audit row
+    public com.chat.talkMe.dto.response.AdminMediaListResponse getChatMedia(
+            String chatUuid, int page, int size, String adminUsername) {
+        // Source from MessageAttachment (the authoritative, always-populated media of a
+        // persisted conversation) rather than the media_assets ledger — the ledger only
+        // covers post-feature uploads and would leave this panel empty for older chats.
+        Chat chat = chatRepository.findByUuidWithMembers(parseUuid(chatUuid, "Chat not found", "TM_121"))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        audit(adminUsername, "VIEW_CHAT_MEDIA", "MEDIA", chatUuid, "page=" + page);
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        Page<MessageAttachment> result = attachmentRepository.findByChatForAdmin(chat.getId(), pageable);
+        List<com.chat.talkMe.dto.response.AdminMediaAssetView> items = result.getContent().stream()
+                .map(a -> toChatMediaView(a, chat))
+                .collect(Collectors.toList());
+        return com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+                .items(items)
+                .total(attachmentRepository.countByChatForAdmin(chat.getId()))
+                .totalBytes(attachmentRepository.sumFileSizeByChat(chat.getId()))
+                .byContext(List.of())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .hasNext(result.hasNext())
+                .build();
+    }
+
+    /** Map a chat's {@link MessageAttachment} to the shared media-asset view (owner = sender). */
+    private com.chat.talkMe.dto.response.AdminMediaAssetView toChatMediaView(
+            MessageAttachment a, Chat chat) {
+        Message m = a.getMessage();
+        Long chatId = chat.getId();
+        User sender = m != null ? m.getSender() : null;
+        String ref = safeDecrypt(chatId, a.getFileUrl());
+        String name = safeDecrypt(chatId, a.getFileName());
+        String key = com.chat.talkMe.storage.MediaKeys.key(ref, storageProperties.getMediaRoot());
+        boolean stranger = chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER;
+        return com.chat.talkMe.dto.response.AdminMediaAssetView.builder()
+                .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
+                .key(key)
+                .reference(ref)
+                .url(mediaServeUrl(ref))
+                .kind(kindForLinked(m != null ? m.getMessageType() : null, a.getMimeType(), name, key != null ? key : ""))
+                .context(com.chat.talkMe.enums.MediaContext.CONVERSATION.name())
+                .contextId(chat.getUuid() != null ? chat.getUuid().toString() : null)
+                .uploadType(m != null && m.getMessageType() != null ? m.getMessageType().name() : null)
+                .contentType(a.getMimeType())
+                .fileSize(a.getFileSize() != null ? a.getFileSize() : 0L)
+                .originalFileName(name)
+                .strangerMode(stranger)
+                .uploadedAt(a.getCreatedAt() != null ? a.getCreatedAt().toString() : null)
+                .ownerId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
+                .ownerUsername(sender != null ? sender.getUsername() : null)
+                .ownerName(sender != null ? sender.getName() : null)
+                .ownerAvatar(sender != null ? sender.getProfileImage() : null)
+                .build();
+    }
+
+    // ── media_assets mappers ──────────────────────────────────────────────────
+
+    private static com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket bucket(
+            String label, Number count, Number bytes) {
+        return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket.builder()
+                .label(label)
+                .count(count != null ? count.longValue() : 0L)
+                .bytes(bytes != null ? bytes.longValue() : 0L)
+                .build();
+    }
+
+    /** Serve URL for a stored reference (same shape the storage gallery uses). */
+    private static String mediaServeUrl(String reference) {
+        if (reference == null) return null;
+        return "/api/v1/uploads/media?path=" + java.net.URLEncoder.encode(
+                reference, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.RecentUpload toRecentUpload(
+            com.chat.talkMe.domain.MediaAsset m) {
+        User o = m.getOwner();
+        boolean stranger = m.getContext() == com.chat.talkMe.enums.MediaContext.STRANGER;
+        return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.RecentUpload.builder()
+                .key(m.getStorageKey())
+                .reference(m.getReference())
+                .url(mediaServeUrl(m.getReference()))
+                .kind(mediaKind(m.getUploadType(), m.getContentType(), m.getStorageKey()))
+                .context(m.getContext() != null ? m.getContext().name() : null)
+                .uploadType(m.getUploadType())
+                .contentType(m.getContentType())
+                .fileSize(m.getFileSize() != null ? m.getFileSize() : 0L)
+                .strangerMode(stranger)
+                .uploadedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                .ownerId(o != null && o.getUuid() != null ? o.getUuid().toString() : null)
+                .ownerUsername(o != null ? o.getUsername() : null)
+                .ownerName(o != null ? o.getName() : null)
+                .ownerAvatar(o != null ? o.getProfileImage() : null)
+                .build();
+    }
+
+    private com.chat.talkMe.dto.response.AdminMediaAssetView toMediaAssetView(
+            com.chat.talkMe.domain.MediaAsset m) {
+        User o = m.getOwner();
+        boolean stranger = m.getContext() == com.chat.talkMe.enums.MediaContext.STRANGER;
+        return com.chat.talkMe.dto.response.AdminMediaAssetView.builder()
+                .id(m.getUuid() != null ? m.getUuid().toString() : String.valueOf(m.getId()))
+                .key(m.getStorageKey())
+                .reference(m.getReference())
+                .url(mediaServeUrl(m.getReference()))
+                .kind(mediaKind(m.getUploadType(), m.getContentType(), m.getStorageKey()))
+                .context(m.getContext() != null ? m.getContext().name() : null)
+                .contextId(m.getContextId())
+                .uploadType(m.getUploadType())
+                .contentType(m.getContentType())
+                .fileSize(m.getFileSize() != null ? m.getFileSize() : 0L)
+                .originalFileName(m.getOriginalFileName())
+                .strangerMode(stranger)
+                .uploadedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                .ownerId(o != null && o.getUuid() != null ? o.getUuid().toString() : null)
+                .ownerUsername(o != null ? o.getUsername() : null)
+                .ownerName(o != null ? o.getName() : null)
+                .ownerAvatar(o != null ? o.getProfileImage() : null)
+                .build();
+    }
+
+    /** Coarse media kind from the upload type / mime / key — image/video/audio/file. */
+    private static String mediaKind(String uploadType, String contentType, String key) {
+        String t = uploadType != null ? uploadType.toLowerCase() : "";
+        if (t.equals("image") || t.equals("video") || t.equals("audio")) return t;
+        if (t.equals("voice")) return "audio";
+        return kindOf(key != null ? key : "", contentType);
+    }
+
     /** List + DB-reconcile a prefix, TTL-cached (OCI ListObjects is expensive). */
     private List<AdminStorageObjectView> reconcileStorage(String prefix) {
         String cacheKey = prefix == null ? "" : prefix;
@@ -1572,6 +1806,20 @@ public class AdminServiceImpl implements AdminService {
         }
 
         List<MediaStorage.StoredObject> stored = mediaStorage.list(prefix);
+
+        // Admin-only upload-ownership rows — the authoritative owner for objects that
+        // never became a chat attachment (stranger & lobby media). Bulk-loaded by key.
+        java.util.Map<String, com.chat.talkMe.domain.MediaAsset> assetByKey = new java.util.HashMap<>();
+        List<String> objectKeys = stored.stream().map(MediaStorage.StoredObject::key).collect(Collectors.toList());
+        for (int i = 0; i < objectKeys.size(); i += 1000) { // chunk the IN-list
+            List<String> chunk = objectKeys.subList(i, Math.min(i + 1000, objectKeys.size()));
+            for (com.chat.talkMe.domain.MediaAsset ma : mediaAssetRepository.findByStorageKeyIn(chunk)) {
+                assetByKey.putIfAbsent(ma.getStorageKey(), ma);
+            }
+        }
+        // Per-reconcile cache for the legacy owner-in-path fallback (uuid → User).
+        java.util.Map<String, User> userByUuid = new java.util.HashMap<>();
+
         List<AdminStorageObjectView> out = new java.util.ArrayList<>(stored.size());
         for (MediaStorage.StoredObject o : stored) {
             String key = o.key();
@@ -1622,6 +1870,8 @@ public class AdminServiceImpl implements AdminService {
                  .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
                  .chatName(chat != null ? chat.getName() : null)
                  .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
+                 .strangerMode(chat != null && chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER)
+                 .ownerSource("MESSAGE_ATTACHMENT")
                  .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
                  .senderUsername(sender != null ? sender.getUsername() : null)
                  .senderName(sender != null ? sender.getName() : null)
@@ -1648,12 +1898,90 @@ public class AdminServiceImpl implements AdminService {
             } else {
                 // Orphan / non-chat object — best-effort classify from the extension.
                 b.kind(kindOf(key, o.contentType()));
+                enrichOrphanOwner(b, key, cat, assetByKey.get(key), userByUuid);
             }
             out.add(b.build());
         }
 
         storageCache.put(cacheKey, new StorageSnapshot(now, out));
         return out;
+    }
+
+    /** Owner-in-path storage categories: the 2nd key segment is the uploader's User.uuid. */
+    private static final Set<String> OWNER_IN_PATH_CATEGORIES = Set.of("lobby", "profiles", "posts", "stories");
+
+    /**
+     * Attribute an orphan object (no chat attachment) to its uploader. Priority:
+     * <ol>
+     *   <li>the admin-only {@link com.chat.talkMe.domain.MediaAsset} upload record;</li>
+     *   <li>legacy fallback — the owner {@code User.uuid} embedded in the storage path
+     *       ({@code lobby|profiles|posts|stories/<uuid>/…});</li>
+     *   <li>otherwise UNRECORDED (a legacy anonymous {@code strangers/} upload has no
+     *       owner anywhere — flagged as stranger mode so the UI can say so).</li>
+     * </ol>
+     */
+    private void enrichOrphanOwner(AdminStorageObjectView.AdminStorageObjectViewBuilder b,
+                                   String key, String category,
+                                   com.chat.talkMe.domain.MediaAsset asset,
+                                   java.util.Map<String, User> userByUuid) {
+        if (asset != null) {
+            User owner = asset.getOwner();
+            boolean anon = asset.getContext() != null && asset.getContext().isAnonymousToPeer();
+            b.ownerSource("UPLOAD_RECORD")
+             .strangerMode(anon)
+             .chatType(asset.getContext() != null ? asset.getContext().name() : null)
+             .chatId(asset.getContextId())
+             .uploadedAt(asset.getCreatedAt() != null ? asset.getCreatedAt().toString() : null)
+             .fileName(asset.getOriginalFileName())
+             .mimeType(asset.getContentType())
+             .messageType(asset.getUploadType() != null ? asset.getUploadType().toUpperCase() : null)
+             .fileSize(asset.getFileSize() != null ? asset.getFileSize() : 0L);
+            applyOwner(b, owner);
+            return;
+        }
+
+        // Legacy fallback: owner UUID sits in the path for these categories.
+        if (OWNER_IN_PATH_CATEGORIES.contains(category)) {
+            String uuid = segment(key, 1);
+            User owner = lookupUser(uuid, userByUuid);
+            if (owner != null) {
+                b.ownerSource("STORAGE_PATH").strangerMode(false);
+                applyOwner(b, owner);
+                return;
+            }
+        }
+
+        // Truly anonymous legacy stranger upload (or an unattributable file): no owner
+        // was ever recorded and the path carries none.
+        if ("strangers".equals(category)) {
+            b.ownerSource("UNRECORDED").strangerMode(true);
+        }
+    }
+
+    private void applyOwner(AdminStorageObjectView.AdminStorageObjectViewBuilder b, User owner) {
+        if (owner == null) return;
+        b.senderId(owner.getUuid() != null ? owner.getUuid().toString() : null)
+         .senderUsername(owner.getUsername())
+         .senderName(owner.getName())
+         .senderAvatar(owner.getProfileImage());
+    }
+
+    /** UUID → User with a per-reconcile cache; null on missing/invalid uuid. */
+    private User lookupUser(String uuid, java.util.Map<String, User> cache) {
+        if (uuid == null || uuid.isBlank()) return null;
+        if (cache.containsKey(uuid)) return cache.get(uuid);
+        User u = null;
+        try { u = userRepository.findByUuid(UUID.fromString(uuid)).orElse(null); }
+        catch (RuntimeException ignored) { /* not a uuid (IllegalArgumentException) / lookup fail */ }
+        cache.put(uuid, u);
+        return u;
+    }
+
+    /** The nth {@code /}-separated segment of a key, or null. */
+    private static String segment(String key, int index) {
+        if (key == null) return null;
+        String[] parts = key.split("/");
+        return index >= 0 && index < parts.length ? parts[index] : null;
     }
 
     private String safeDecrypt(Long chatId, String value) {

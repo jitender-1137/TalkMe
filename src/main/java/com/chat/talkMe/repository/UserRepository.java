@@ -32,6 +32,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByEmailIgnoreCase(String email);
     boolean existsByUsernameIgnoreCase(String username);
 
+    // ── Referrals (attribution only — no reward payout) ──────────────────────
+    // Count excludes soft-deleted joiners so the headline matches the listed rows.
+    long countByReferredByAndIsDeletedFalse(User referredBy);
+    List<User> findByReferredByAndIsDeletedFalseOrderByCreatedAtDesc(
+            User referredBy, org.springframework.data.domain.Pageable pageable);
+
     // ── Admin dashboard counters ─────────────────────────────────────────────
     long countByIsVerifiedTrue();
     long countByIsGuestTrue();

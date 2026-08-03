@@ -45,4 +45,8 @@ public class SignupRequest {
 
     /** Honeypot — must stay empty; bots tend to fill every field. */
     private String website;
+
+    /** Optional: the username of whoever invited this user (from their /@username link). */
+    @Size(max = 50, message = "Invalid referrer")
+    private String referredByUsername;
 }

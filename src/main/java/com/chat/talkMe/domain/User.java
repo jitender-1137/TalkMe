@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.FetchType;
@@ -222,4 +223,12 @@ public class User extends BaseEntity {
     @Column(name = "banned", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean banned = false;
+
+    /**
+     * Who invited this user (set at signup from the referrer's /@username link). Attribution only —
+     * there is intentionally NO reward payout. Nullable: organic signups have no referrer.
+     */
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "referred_by_id")
+    private User referredBy;
 }
