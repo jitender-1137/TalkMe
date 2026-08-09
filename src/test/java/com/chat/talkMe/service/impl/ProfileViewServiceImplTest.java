@@ -150,6 +150,11 @@ class ProfileViewServiceImplTest {
             assertThat(pv.getLastViewedAt()).isAfter(Instant.EPOCH);
         }
 
+        /**
+         * Simulates two viewers inserting concurrently: the first {@code save} hits the unique
+         * constraint, the recorder re-reads the row that won the race, bumps it, and re-saves —
+         * so exactly two saves happen and the broadcast still fires.
+         */
         @Test
         @DisplayName("concurrent-insert race → re-reads the winning row, bumps it, still broadcasts")
         void raceReReadsAndBumps() {
@@ -175,6 +180,11 @@ class ProfileViewServiceImplTest {
             verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/profile-views"), any());
         }
 
+        /**
+         * Race variant where the re-read finds nothing (the winning row was deleted between the
+         * collision and the retry): the recorder gives up after the single failed save instead of
+         * retrying or throwing.
+         */
         @Test
         @DisplayName("race where the winning row vanished → no second save, no throw")
         void raceWinnerVanished() {

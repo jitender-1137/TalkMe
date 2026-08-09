@@ -74,6 +74,11 @@ class ChatControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone {@link MockMvc}: real controller over the mocked {@link ChatService},
+     * the real {@link GlobalExceptionHandler}, a validator and the {@code @AuthenticationPrincipal}
+     * resolver. Seeds a non-guest {@code ROLE_USER} test user; each test calls {@link #authenticate()}.
+     */
     @BeforeEach
     void setUp() {
         ChatController controller = new ChatController(chatService);
@@ -101,6 +106,7 @@ class ChatControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -108,6 +114,7 @@ class ChatControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** Builds a minimal {@link ChatResponse} stub with the given id and chat type. */
     private static ChatResponse chat(String id, String type) {
         return ChatResponse.builder().id(id).name("A Chat").chatType(type).build();
     }

@@ -13,6 +13,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit test for {@link FileSizeValidator} — the {@code ConstraintValidator} that rejects byte
+ * sizes exceeding the {@code max} configured on the {@link ValidFileSize} annotation.
+ *
+ * <p>Plain JUnit 5 + Mockito style: {@code setUp} feeds the validator a mocked {@link ValidFileSize}
+ * (max = 1000) through {@code initialize} so the bound is test-controlled; a second {@code @Nested}
+ * repeats the drill with the production default (100 MB). Coverage is boundary-driven — null
+ * (optional ⇒ valid), zero, just below / exactly at (inclusive) / just above max, and
+ * {@code Long.MAX_VALUE}.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FileSizeValidator")
 class FileSizeValidatorTest {

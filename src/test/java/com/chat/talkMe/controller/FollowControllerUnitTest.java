@@ -85,6 +85,12 @@ class FollowControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone MockMvc wiring the real {@link GlobalExceptionHandler}, a validator, the
+     * {@code @AuthenticationPrincipal} resolver and a {@link PageableHandlerMethodArgumentResolver}
+     * (for the list endpoints), and prepares a ROLE_USER {@link #testUser} whose uuid is set so the
+     * controller's {@code "me"} → own-uuid resolution has a value to read.
+     */
     @BeforeEach
     void setUp() {
         FollowController controller = new FollowController(followService);
@@ -117,6 +123,7 @@ class FollowControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -124,6 +131,7 @@ class FollowControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** Minimal {@link AuthUserResponse} row for follower/following page content. */
     private static AuthUserResponse user(String username) {
         return AuthUserResponse.builder().id("u-1").username(username).build();
     }
@@ -193,6 +201,7 @@ class FollowControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_253"));
         }
 
+        /** "Invalid UUID string" IllegalArgumentException maps to TM_INVALID_UUID (not TM_071). */
         @Test
         void shouldReturn400WithInvalidUuidCodeWhenUuidUnparseable() throws Exception {
             authenticate();
@@ -318,6 +327,7 @@ class FollowControllerUnitTest {
                     .andExpect(jsonPath("$.data.content").isEmpty());
         }
 
+        /** The {@code "me"} path alias resolves to the authenticated user's own uuid before delegating. */
         @Test
         void shouldResolveMeToOwnUuid() throws Exception {
             authenticate();
@@ -331,6 +341,7 @@ class FollowControllerUnitTest {
             assertThat(uuid.getValue()).isEqualTo(ME_UUID.toString());
         }
 
+        /** With no paging params the controller's default page size 20 and createdAt-DESC sort apply. */
         @Test
         void shouldApplyDefaultPageSizeAndCreatedAtDescSort() throws Exception {
             authenticate();
@@ -409,6 +420,7 @@ class FollowControllerUnitTest {
                     .andExpect(jsonPath("$.data.content").isEmpty());
         }
 
+        /** The {@code "me"} path alias resolves to the authenticated user's own uuid before delegating. */
         @Test
         void shouldResolveMeToOwnUuid() throws Exception {
             authenticate();

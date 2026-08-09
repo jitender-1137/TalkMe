@@ -13,6 +13,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link GenderValidator} — the {@code ConstraintValidator} that accepts only the
+ * allowed gender tokens ("male"/"female"), case-insensitively and without trimming.
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases under {@code @Nested "isValid"}.
+ * Coverage: null (deferred to {@code @NotNull} ⇒ valid), parameterized allowed values, mixed-case
+ * acceptance, a parameterized sweep of disallowed values (incl. empty), and rejection of
+ * whitespace-padded input to prove no trimming occurs.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GenderValidator")
 class GenderValidatorTest {

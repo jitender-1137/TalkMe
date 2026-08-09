@@ -204,6 +204,11 @@ class UnreadDigestServiceTest {
             verify(emailService, never()).sendUnreadMessagesEmail(any(), any(), any(), anyInt(), any());
         }
 
+        /**
+         * The user's digest watermark is pre-set equal to the newest unread id (40), so the
+         * newest-&lt;=-lastNotified guard fires: no email, no watermark save, and the total-unread
+         * count is never even queried.
+         */
         @Test
         @DisplayName("newest unread id already at/below the watermark → not re-notified")
         void alreadyNotified() {

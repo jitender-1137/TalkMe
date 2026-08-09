@@ -12,6 +12,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit test for {@link JwtAuthenticationEntryPoint}: unauthenticated access to a protected endpoint
  * must yield a 401 JSON body carrying the {@code TM_105} code.
+ *
+ * <p>Test style: plain JUnit 5, no mocks or Spring context — the entry point is constructed directly
+ * and {@code commence(...)} is driven with Spring mock servlet objects, asserting on the raw JSON
+ * {@code ResponseDto} error envelope written to the response.
  */
 @DisplayName("JwtAuthenticationEntryPoint (unit)")
 class JwtAuthenticationEntryPointUnitTest {

@@ -124,10 +124,15 @@ class EventControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** A default SCHEDULED event ({@link #EVENT_UUID}) with no viewer RSVP. */
     private static EventResponse event() {
         return event(EVENT_UUID, "SCHEDULED", null);
     }
 
+    /**
+     * Builds a fully-populated {@link EventResponse} hosted by the test user, parameterising the
+     * event uuid, lifecycle status and the viewer's own RSVP state.
+     */
     private static EventResponse event(String uuid, String eventStatus, String myRsvp) {
         return EventResponse.builder()
                 .eventUuid(uuid)

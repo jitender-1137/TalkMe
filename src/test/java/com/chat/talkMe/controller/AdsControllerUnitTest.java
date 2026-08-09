@@ -36,6 +36,11 @@ class AdsControllerUnitTest {
     private AdsProperties adsProperties;
     private FeatureFlags featureFlags;
 
+    /**
+     * Builds a standalone MockMvc for an {@link AdsController} wired with fresh config POJOs, with the
+     * master ads kill-switch ({@code features.flags.ads}) set to {@code adsGloballyOn} and a fixed
+     * provider/label so assertions stay independent of config defaults.
+     */
     private MockMvc mockMvcFor(boolean adsGloballyOn) {
         featureFlags = new FeatureFlags();
         featureFlags.setEnabledByDefault(false);

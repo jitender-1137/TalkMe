@@ -47,6 +47,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Full-context integration test for {@link UserController}.
+ *
+ * <p>Boots the whole Spring context ({@code @SpringBootTest}, {@code test} profile) and drives the
+ * real endpoints through a {@link MockMvc} built with {@code webAppContextSetup} + Spring Security
+ * ({@link SecurityMockMvcConfigurers#springSecurity()}), so the class-level {@code @PreAuthorize}
+ * gates, CSRF and JSON wiring are all live. Persistence uses the real (autowired) repositories:
+ * each test seeds {@code testUser}/{@code targetUser}/{@code thirdUser} in {@code setUp} and wipes
+ * every touched table in {@code tearDown}.
+ *
+ * <p>Only two collaborators are replaced with mocks ({@code @MockitoBean}): {@link StorageService}
+ * (no real object store in tests) and {@link ContentModerationService} (its NSFW sidecar is
+ * unavailable), the latter stubbed to return a non-explicit result so moderated endpoints proceed.
+ *
+ * <p>This is the infra-dependent complement to the hermetic {@code UserControllerUnitTest}: here
+ * status codes and {@code messageCode}s are asserted against the genuine service + handler stack,
+ * not stubbed exceptions.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 public class UserControllerTest {
@@ -245,6 +263,10 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.data.avatarUrl").value("http://example.com/avatar.jpg"));
     }
 
+    /**
+     * No multipart {@code file} part → the required part is absent, which surfaces as a 500 rather
+     * than a 4xx (there is no dedicated handler for the missing-part exception in this stack).
+     */
     @Test
     void testUploadAvatarMissingFile() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
@@ -357,6 +379,7 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.messageCode").value("TM_071"));
     }
 
+    /** Pre-seeds an existing block of targetUser so the DELETE has something to remove. */
     @Test
     void testUnblockUserSuccess() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
@@ -421,6 +444,11 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.data.content[0].content").value("Hello World from target user"));
     }
 
+    /**
+     * Seeds reciprocal friendships (testUser↔thirdUser and targetUser↔thirdUser) so that
+     * {@code thirdUser} is the sole friend common to both testUser and targetUser, and asserts the
+     * mutual-friends endpoint reports exactly that one overlap.
+     */
     @Test
     void testGetMutualFriendsSuccess() throws Exception {
         friendRepository.save(Friend.builder().user(testUser).friend(thirdUser).build());

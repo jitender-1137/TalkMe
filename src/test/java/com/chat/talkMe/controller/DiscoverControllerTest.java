@@ -29,6 +29,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Full-stack integration test for {@link DiscoverController}.
+ *
+ * <p>Style: {@code @SpringBootTest} booting the full application context under the {@code test}
+ * profile, with a real {@link MockMvc} built via {@code webAppContextSetup} and Spring Security
+ * applied ({@link SecurityMockMvcConfigurers#springSecurity()}). Uses the real
+ * {@link UserRepository}, {@link RoleRepository} and {@link UserPresenceRepository} (persisted
+ * fixtures), so the security filter chain, method-security and CSRF are all live here — unlike the
+ * companion standalone unit test.
+ *
+ * <p>The authenticated caller is installed directly into the {@link SecurityContextHolder}; each
+ * test seeds its own users/presence and {@code tearDown} clears the context and wipes the tables.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 public class DiscoverControllerTest {
@@ -49,6 +62,11 @@ public class DiscoverControllerTest {
     private User testUser;
     private User discoverableUser;
 
+    /**
+     * Builds a security-enabled {@link MockMvc}, ensures the {@code ROLE_USER} role exists, and
+     * persists two verified users: the authenticated caller ({@code testuser}) and a second
+     * discoverable user. The caller is then placed into the {@link SecurityContextHolder}.
+     */
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
@@ -100,6 +118,10 @@ public class DiscoverControllerTest {
                 .andExpect(jsonPath("$.data.items[0].name").value("Discoverable User"));
     }
 
+    /**
+     * A user with {@code ONLINE} presence must sort ahead of an offline discoverable user, so the
+     * online user is expected first and the offline one second in the returned page.
+     */
     @Test
     void testGetDiscoverSorting() throws Exception {
         Role userRole = roleRepository.findByName("ROLE_USER").orElseThrow();
@@ -130,6 +152,11 @@ public class DiscoverControllerTest {
                 .andExpect(jsonPath("$.data.items[1].name").value("Discoverable User"));
     }
 
+    /**
+     * Likes then unlikes the discoverable user's profile over the live filter chain; both mutating
+     * requests carry the matching CSRF cookie and {@code X-CSRF-Token} header required by the
+     * security config.
+     */
     @Test
     void testLikeAndUnlikeDiscoverProfile() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");

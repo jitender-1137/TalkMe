@@ -99,6 +99,11 @@ class AdminControllerUnitTest {
     private MockMvc mockMvc;
     private User adminUser;
 
+    /**
+     * Wires a standalone MockMvc with the real {@link GlobalExceptionHandler}, a tolerant JSON
+     * converter (so primitive boolean/int param binding does not fail), a bean validator and the
+     * {@code @AuthenticationPrincipal} resolver, then seeds a SUPER_ADMIN principal into the context.
+     */
     @BeforeEach
     void setUp() {
         AdminController controller = new AdminController(adminService);
@@ -140,6 +145,7 @@ class AdminControllerUnitTest {
         return AdminUserView.builder().id(id).username("bob").name("Bob").email("bob@e.com").build();
     }
 
+    /** Wraps a single item in a one-page {@link PaginatedResponse} (page 0, size 25, total 1). */
     private static <T> PaginatedResponse<T> paged(T item) {
         return PaginatedResponse.<T>builder()
                 .items(List.of(item))

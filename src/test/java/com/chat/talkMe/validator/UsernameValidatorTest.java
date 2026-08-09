@@ -13,6 +13,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link UsernameValidator} — the {@code ConstraintValidator} that requires a
+ * username of length 3–30 composed only of letters, digits and underscores.
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases under {@code @Nested "isValid"}; the
+ * {@code repeat} helper builds fixed-length names. Coverage: null (required ⇒ invalid), the length
+ * boundaries, empty string, a parameterized sweep of valid alphanumeric/underscore names, and a
+ * parameterized sweep of names carrying disallowed characters (space, dash, dot, @, emoji,
+ * slash).</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UsernameValidator")
 class UsernameValidatorTest {

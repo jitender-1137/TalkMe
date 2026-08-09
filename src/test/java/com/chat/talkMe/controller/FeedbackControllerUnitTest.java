@@ -64,6 +64,12 @@ class FeedbackControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone MockMvc wiring the real {@link GlobalExceptionHandler}, a bean validator,
+     * the {@code @AuthenticationPrincipal} resolver, and a Jackson converter with
+     * {@code FAIL_ON_NULL_FOR_PRIMITIVES} disabled so a body omitting the primitive {@code rating}
+     * deserializes as it does in production rather than failing in the converter.
+     */
     @BeforeEach
     void setUp() {
         FeedbackController controller = new FeedbackController(feedbackService);
@@ -96,6 +102,7 @@ class FeedbackControllerUnitTest {
         SecurityContextHolder.clearContext();
     }
 
+    /** Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -103,6 +110,7 @@ class FeedbackControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** Canned successful {@link FeedbackResponse} returned by the mocked service. */
     private static FeedbackResponse feedback() {
         return FeedbackResponse.builder()
                 .id("fb-1").rating(5).reason("Compliment").comment("Love it")
@@ -133,6 +141,7 @@ class FeedbackControllerUnitTest {
         assertThat(req.getValue().getType()).isEqualTo("MANUAL");
     }
 
+    /** Comment-only body (no rating) is accepted; {@code rating} defaults to 0 and contextRef forwards. */
     @Test
     void shouldAcceptCommentOnlyFeedbackWithoutRating() throws Exception {
         authenticate();
@@ -160,6 +169,7 @@ class FeedbackControllerUnitTest {
         verifyNoInteractions(feedbackService);
     }
 
+    /** Empty body passes bean validation but the service rejects it (TM_312) → 400. */
     @Test
     void shouldReturn400WhenServiceRejectsEmptySubmission() throws Exception {
         authenticate();
@@ -170,6 +180,7 @@ class FeedbackControllerUnitTest {
                 .andExpect(jsonPath("$.messageCode").value("TM_312"));
     }
 
+    /** Malformed JSON body → catch-all 500/TM_002, service never invoked. */
     @Test
     void shouldReturn500WhenBodyMalformed() throws Exception {
         authenticate();

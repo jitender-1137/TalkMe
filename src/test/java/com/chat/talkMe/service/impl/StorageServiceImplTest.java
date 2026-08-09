@@ -230,6 +230,11 @@ class StorageServiceImplTest {
     @DisplayName("storeFile (video)")
     class StoreVideo {
 
+        /**
+         * ffmpeg.path() points at a bogus binary so ProcessBuilder.start() throws, compression reports
+         * unavailable, and the graceful-degradation branch stores the ORIGINAL upload bytes — retaining
+         * the source extension and its declared contentType.
+         */
         @Test
         @DisplayName("type=video, ffmpeg unavailable → original stored untouched with its own contentType")
         void videoByTypeStoresOriginalWhenCompressionUnavailable() throws IOException {

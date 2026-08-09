@@ -83,6 +83,11 @@ class BucketListControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone {@link MockMvc}: real controller over the mocked service, the real
+     * {@link GlobalExceptionHandler}, a JSR-380 validator and the {@code @AuthenticationPrincipal}
+     * resolver. Also seeds a non-guest {@code ROLE_USER} test user (id 1).
+     */
     @BeforeEach
     void setUp() {
         BucketListController controller = new BucketListController(bucketListService);
@@ -111,6 +116,7 @@ class BucketListControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -118,6 +124,7 @@ class BucketListControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** Builds a bucket item; when {@code completed}, wires the completed-by/at metadata sensibly. */
     private static BucketItemResponse item(String id, String text, boolean completed, int orderIndex) {
         return BucketItemResponse.builder()
                 .id(id).text(text).completed(completed)

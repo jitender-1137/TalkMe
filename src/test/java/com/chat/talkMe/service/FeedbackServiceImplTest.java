@@ -28,6 +28,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Pure Mockito unit test ({@link MockitoExtension}) for {@link FeedbackServiceImpl#submit} — the
+ * single write path for user feedback. Verifies text trimming, rating clamping into 0–5, type
+ * resolution ({@link FeedbackType}: blank → MANUAL, unknown → OTHER, valid enum names honoured), the
+ * "at least one of rating/reason/comment" guard that rejects empty submissions with
+ * {@link BadRequestException}, and the entity → {@link FeedbackResponse} mapping including its null
+ * branches. The {@link FeedbackRepository} is mocked; its {@code save} stub (lenient) echoes the
+ * entity back with a generated uuid/timestamp to mimic JPA.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FeedbackServiceImpl.submit")
 class FeedbackServiceImplTest {

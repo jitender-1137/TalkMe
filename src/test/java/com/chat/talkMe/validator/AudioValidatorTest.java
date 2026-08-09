@@ -13,6 +13,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link AudioValidator} — the {@code ConstraintValidator} that accepts a filename
+ * only when its extension is a supported audio format, plus its static {@code hasAudioExtension}
+ * helper (also usable against full URLs).
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}; {@code @Nested} classes split the instance
+ * {@code isValid} from the static helper. Coverage: null (optional field ⇒ valid), a parameterized
+ * sweep of every supported extension, case-insensitivity, unsupported/missing/trailing-dot
+ * extensions, and last-dot extension derivation.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AudioValidator")
 class AudioValidatorTest {

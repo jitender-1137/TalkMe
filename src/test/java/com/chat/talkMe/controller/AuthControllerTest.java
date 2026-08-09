@@ -44,6 +44,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Full-context integration test for {@link com.chat.talkMe.controller.AuthController}.
+ *
+ * <p>{@code @SpringBootTest} boots the whole application context under the {@code test} profile and
+ * drives real endpoints through a {@link MockMvc} built from the {@link WebApplicationContext} with
+ * Spring Security applied ({@link SecurityMockMvcConfigurers#springSecurity()}). Unlike the
+ * standalone {@code AuthControllerUnitTest}, this exercises the true filter chain, security config,
+ * validation, controller advice, JPA repositories and Redis-backed reset-token flow end to end.
+ *
+ * <p>Real collaborators are wired via {@code @Autowired}; only {@link PwnedPasswordService} is
+ * replaced with a {@code @MockitoBean} so the breached-password check never depends on the network
+ * or a live breach list. Each test seeds a persisted {@code testUser} in {@link #setUp()} and wipes
+ * sessions, refresh tokens and users in {@link #tearDown()}.
+ */
 @SpringBootTest
 @ActiveProfiles("test")
 public class AuthControllerTest {
@@ -77,6 +91,10 @@ public class AuthControllerTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds a security-aware {@link MockMvc}, ensures {@code ROLE_USER} exists, persists a verified
+     * {@code testUser}, and stubs the breached-password check to always pass.
+     */
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
@@ -109,6 +127,9 @@ public class AuthControllerTest {
         userRepository.deleteAll();
     }
 
+    /**
+     * Wraps the seeded {@code testUser} as the authenticated principal for {@code .with(user(...))}.
+     */
     private CustomUserDetails testUserDetails() {
         return new CustomUserDetails(testUser);
     }
@@ -137,6 +158,7 @@ public class AuthControllerTest {
                 .andExpect(cookie().exists("csrf_token"));
     }
 
+    /** Signup resolves the user's country from the Cloudflare {@code CF-IPCountry} header (IN → India). */
     @Test
     void testSignupSuccessWithCloudflareCountry() throws Exception {
         String signupPayload = """
@@ -220,6 +242,7 @@ public class AuthControllerTest {
                 .andExpect(cookie().exists("csrf_token"));
     }
 
+    /** A body with {@code isGuest:true} routes to guest login and returns a guest user. */
     @Test
     void testLoginGuestSuccess() throws Exception {
         String loginPayload = """
@@ -241,6 +264,7 @@ public class AuthControllerTest {
                 .andExpect(cookie().exists("csrf_token"));
     }
 
+    /** Guest login also resolves country from {@code CF-IPCountry} (US → United States). */
     @Test
     void testLoginGuestSuccessWithCloudflareCountry() throws Exception {
         String loginPayload = """

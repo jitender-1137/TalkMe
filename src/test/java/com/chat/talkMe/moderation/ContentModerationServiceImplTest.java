@@ -20,10 +20,25 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Plain JUnit5 + Mockito unit test for {@link ContentModerationServiceImpl}, with no Spring context;
+ * the {@code enabled} flag and the {@code @PostConstruct} word-list loader are driven directly via
+ * {@link ReflectionTestUtils}. Verifies three surfaces: text moderation (clean text, plain profanity,
+ * Hinglish abuse, evasion normalisation such as spacing/repeats/punctuation/leetspeak, benign
+ * substrings, the disabled and empty-word-list short-circuits, and the ABUSE category/score/matched-
+ * terms payload); {@link ContentModerationServiceImpl#moderateMedia} over a mocked {@link NsfwClient}
+ * (guard skips for null/disabled/non-image-or-video, fail-open when the classifier is unavailable,
+ * and NSFW image vs video branches); and {@link ContentModerationServiceImpl#moderateUpload}
+ * (MultipartFile guard cases plus classifier delegation with fail-open on classifier errors).
+ */
 class ContentModerationServiceImplTest {
 
     private ContentModerationServiceImpl service;
 
+    /**
+     * Builds a text-only service (null NSFW client), forces {@code enabled=true}, and manually
+     * invokes the private {@code @PostConstruct load()} to populate the bad-word lists.
+     */
     @BeforeEach
     void setUp() {
         service = new ContentModerationServiceImpl(null); // text-only tests don't use the NSFW client
@@ -115,6 +130,7 @@ class ContentModerationServiceImplTest {
 
     // ── moderateMedia() ──────────────────────────────────────────────────────
 
+    /** Builds an enabled service wired to the given (usually mocked) NSFW client for media tests. */
     private ContentModerationServiceImpl mediaService(NsfwClient client) {
         ContentModerationServiceImpl s = new ContentModerationServiceImpl(client);
         ReflectionTestUtils.setField(s, "enabled", true);

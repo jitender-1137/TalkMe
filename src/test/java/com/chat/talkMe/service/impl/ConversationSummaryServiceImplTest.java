@@ -146,6 +146,10 @@ class ConversationSummaryServiceImplTest {
             verifyNoInteractions(chatMemberRepository, messageRepository, messageAttachmentRepository);
         }
 
+        /**
+         * A non-UUID chat id is mapped to {@code NotFoundException} (TM_024) at the parse step, so no
+         * repository is ever consulted.
+         */
         @Test
         void shouldThrowNotFoundOnMalformedUuidWithoutTouchingRepositories() {
             // UUID.fromString throws before the repo is queried; the impl maps it to TM_024.
@@ -263,6 +267,12 @@ class ConversationSummaryServiceImplTest {
             return chat;
         }
 
+        /**
+         * Full happy-path assertion: per-sender counts, photo/active-day totals and firstMessageAt
+         * flow onto the card, the non-caller participant is resolved onto the header, and a headline
+         * mentioning the partner and message volume is produced. Also proves theirMessages comes from
+         * the per-sender count on the resolved partner rather than the total-minus-mine fallback.
+         */
         @Test
         void shouldComputeCountsResolveOtherAndBuildHeadline() {
             Instant firstAt = Instant.now().minus(Duration.ofDays(10));
@@ -305,6 +315,11 @@ class ConversationSummaryServiceImplTest {
                     .doesNotContain("Music", "Sports");
         }
 
+        /**
+         * When the partner cannot be resolved (findByChat returns only the caller), theirMessages is
+         * derived as total minus mine, the header fields stay null, no interest intersection is done,
+         * and the headline degrades to the generic "them" wording.
+         */
         @Test
         void shouldFallBackToTotalMinusMineWhenOtherUnresolved() {
             // findByChat returns only the caller ⇒ resolveOther == null ⇒ theirMessages = total - mine,

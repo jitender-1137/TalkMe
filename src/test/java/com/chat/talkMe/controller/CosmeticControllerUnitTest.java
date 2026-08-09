@@ -113,6 +113,10 @@ class CosmeticControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /**
+     * Builds a {@link CosmeticResponse} of the given type with COMMON rarity and a LEVEL unlock,
+     * letting the caller set the ownership/equipped/locked flags exercised by each assertion.
+     */
     private static CosmeticResponse cosmetic(String code, CosmeticType type,
                                              boolean owned, boolean equipped, boolean locked) {
         return CosmeticResponse.builder()

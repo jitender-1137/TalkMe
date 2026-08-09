@@ -119,6 +119,7 @@ class AdminFeatureControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Populates the SecurityContext with the acting admin ({@code testUser}) as the principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -126,6 +127,7 @@ class AdminFeatureControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** Stubs the repository to resolve {@link #UUID_STR} to the {@code targetUser}. */
     private void stubUserFound() {
         when(userRepository.findByUuid(eq(UUID.fromString(UUID_STR)))).thenReturn(Optional.of(targetUser));
     }

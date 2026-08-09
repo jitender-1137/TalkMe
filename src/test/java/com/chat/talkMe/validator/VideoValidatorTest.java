@@ -13,6 +13,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link VideoValidator} — the {@code ConstraintValidator} that accepts a filename
+ * only when its extension is a supported video format (mp4/mov/avi/webm).
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases under {@code @Nested "isValid"}.
+ * Coverage: null (optional ⇒ valid), a parameterized sweep of every supported extension,
+ * case-insensitivity, unsupported/missing/trailing-dot extensions, and last-dot extension
+ * derivation.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("VideoValidator")
 class VideoValidatorTest {

@@ -66,6 +66,12 @@ class CompatibilityControllerUnitTest {
     private User testUser;
     private User otherUser;
 
+    /**
+     * Builds the standalone {@link MockMvc} (mocked {@link CompatibilityService} +
+     * {@link UserRepository}, real {@link GlobalExceptionHandler}, validator, principal resolver),
+     * seeds the caller ({@code me}) and target ({@code other}) users, and installs {@code me} as the
+     * authenticated principal.
+     */
     @BeforeEach
     void setUp() {
         CompatibilityController controller =
@@ -97,6 +103,7 @@ class CompatibilityControllerUnitTest {
         SecurityContextHolder.clearContext();
     }
 
+    /** Builds a {@link CompatibilityScore} stub with the given overall value (fixed HIGH bucket). */
     private static CompatibilityScore score(int overall) {
         return CompatibilityScore.builder().overall(overall).bucket("HIGH").explanation("great").build();
     }

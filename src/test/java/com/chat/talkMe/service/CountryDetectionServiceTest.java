@@ -20,6 +20,17 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+/**
+ * Pure Mockito unit test for {@link CountryDetectionServiceImpl} — country/geo resolution from an
+ * inbound HTTP request. Manual Mockito wiring ({@code MockitoAnnotations.openMocks}) with the
+ * collaborating {@link RestTemplate} mocked and config fields injected via
+ * {@link org.springframework.test.util.ReflectionTestUtils}. Exercises the full resolution chain:
+ * Cloudflare {@code CF-IPCountry} header, the configured/fallback proxy country headers, client-IP
+ * resolution precedence ({@code CF-Connecting-IP} → {@code X-Forwarded-For} → {@code X-Real-IP} →
+ * remote addr), local/private-IP bypass, and the ip-api GeoIP lookup with its success/failure and
+ * field-coercion edge cases. Many methods carry inline comments naming the exact source branch they
+ * backfill for coverage.
+ */
 class CountryDetectionServiceTest {
 
     @InjectMocks

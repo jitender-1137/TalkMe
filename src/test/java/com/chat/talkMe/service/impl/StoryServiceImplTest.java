@@ -218,6 +218,10 @@ class StoryServiceImplTest {
             assertThat(saved.getValue().getMediaUrl()).isEqualTo("https://cdn/pic.png");
         }
 
+        /**
+         * When the mediaUrl is already a video, the photo+music mux step is bypassed entirely even though
+         * an audio track is attached — verified by asserting the muxer is never invoked.
+         */
         @Test
         @DisplayName("media already an mp4 → muxing is skipped")
         void alreadyVideoSkipsMux() {
@@ -354,6 +358,10 @@ class StoryServiceImplTest {
             assertThat(service.getActiveStories(owner)).hasSize(1);
         }
 
+        /**
+         * A FRIENDS-audience story is visible when an ACCEPTED follow relationship exists in either
+         * direction between the viewer and the owner.
+         */
         @Test
         @DisplayName("FRIENDS story is visible to an accepted follower (either direction)")
         void friendsVisibleToFollower() {

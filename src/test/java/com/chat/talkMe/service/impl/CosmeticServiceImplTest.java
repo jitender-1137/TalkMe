@@ -152,6 +152,11 @@ class CosmeticServiceImplTest {
             assertThat(out).extracting(CosmeticResponse::getCode).containsExactly("alpha", "beta");
         }
 
+        /**
+         * A GOLD_STAR / prestige-2 snapshot unlocks the STAR cosmetic (its rank's minLevel of 20 is
+         * met) and the PRESTIGE-2 cosmetic, while BADGE (no badge inventory) and SEASONAL (not in an
+         * active season) remain locked.
+         */
         @Test
         @DisplayName("reputation snapshot drives STAR/PRESTIGE unlocks; BADGE + SEASONAL stay locked")
         void reputationBasedUnlocks() {
@@ -322,6 +327,10 @@ class CosmeticServiceImplTest {
             verify(userCosmeticRepo).save(existing);
         }
 
+        /**
+         * Same-slot exclusivity: equipping a FRAME clears any other equipped FRAME row (saved) but
+         * leaves an equipped BORDER row in a different slot untouched.
+         */
         @Test
         @DisplayName("equipping unequips other cosmetics in the SAME slot only")
         void unequipsSameSlotSiblings() {

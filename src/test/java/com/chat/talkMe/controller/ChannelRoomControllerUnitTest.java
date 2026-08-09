@@ -66,6 +66,11 @@ class ChannelRoomControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone {@link MockMvc} (mocked {@link GroupService}, real
+     * {@link GlobalExceptionHandler}, validator, principal resolver) and installs a non-guest
+     * {@code ROLE_USER} principal into the {@link SecurityContextHolder} for every test.
+     */
     @BeforeEach
     void setUp() {
         ChannelRoomController controller = new ChannelRoomController(groupService);
@@ -96,6 +101,7 @@ class ChannelRoomControllerUnitTest {
         SecurityContextHolder.clearContext();
     }
 
+    /** Builds a minimal {@link ChatResponse} stub for the created channel/room. */
     private static ChatResponse group(String id, String type) {
         return ChatResponse.builder().id(id).name("My " + type).chatType(type).build();
     }

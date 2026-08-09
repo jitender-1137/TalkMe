@@ -490,6 +490,11 @@ class ReputationServiceImplTest {
             assertThat(frame.get("event")).isEqualTo("prestige");
         }
 
+        /**
+         * prestige first runs an internal recompute that folds the pending ledger rows in and crosses
+         * into level 100; that internal recompute must suppress its own {@code level_up} WS frame so the
+         * only frame emitted is the {@code prestige} event (asserted via {@code times(1)} on the template).
+         */
         @Test
         @DisplayName("pending ledger rows fold in first, reaching level 100, WITHOUT a level_up push")
         void foldsPendingThenPrestigesWithoutLevelUpPush() {
@@ -541,6 +546,11 @@ class ReputationServiceImplTest {
     @DisplayName("opaque breakdown, curve & memberSince (branch backfill)")
     class BranchBackfill {
 
+        /**
+         * Per-type awarded totals are bucketed by magnitude (LOW &lt; 50, MED &gt;= 50, HIGH &gt;= 200),
+         * any type whose total is &lt;= 0 is dropped, and the surviving contributors are serialised
+         * highest-magnitude first — asserted via {@code indexOf} ordering in the emitted JSON.
+         */
         @Test
         @DisplayName("multi-type contributors → HIGH/MED/LOW buckets, zero-total dropped, sorted HIGH-first")
         void buildsSortedOpaqueContributors() {

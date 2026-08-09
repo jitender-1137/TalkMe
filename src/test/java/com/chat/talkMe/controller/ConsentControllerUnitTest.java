@@ -76,6 +76,12 @@ class ConsentControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone {@link MockMvc}: real controller over the mocked
+     * {@link ConsentAcceptanceService}, the real {@link GlobalExceptionHandler}, a validator and the
+     * {@code @AuthenticationPrincipal} resolver. Seeds a non-guest {@code ROLE_USER} test user; each
+     * test calls {@link #authenticate()} to place it in the security context.
+     */
     @BeforeEach
     void setUp() {
         ConsentController controller = new ConsentController(consentAcceptanceService);
@@ -103,6 +109,7 @@ class ConsentControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -110,6 +117,7 @@ class ConsentControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** A fully-accepted status snapshot (age-verified, flirt-lobby ready) for happy-path stubs. */
     private static ConsentStatusResponse fullStatus() {
         return ConsentStatusResponse.builder()
                 .accepted(Map.of(
@@ -125,6 +133,7 @@ class ConsentControllerUnitTest {
                 .build();
     }
 
+    /** A nothing-accepted status snapshot (not age-verified, flirt-lobby not ready). */
     private static ConsentStatusResponse emptyStatus() {
         return ConsentStatusResponse.builder()
                 .accepted(Map.of())

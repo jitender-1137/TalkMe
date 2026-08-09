@@ -19,6 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * adapter over the domain {@link User}. Covers authority flattening (roles + their
  * permissions), the passthrough getters, and the four account-status flags whose truth
  * table is driven by the {@code isDeleted}/{@code banned} security fields.
+ *
+ * <p>Test style: plain JUnit 5 with no mocks or Spring context — real {@link User}/{@link Role}/
+ * {@link Permission} builders feed the adapter's constructor, grouped into {@code @Nested} blocks
+ * (authorities / passthrough getters / account status flags) with per-method {@code @DisplayName}s.
  */
 @DisplayName("CustomUserDetails (unit)")
 class CustomUserDetailsTest {

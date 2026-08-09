@@ -124,6 +124,7 @@ class MessageControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -131,12 +132,14 @@ class MessageControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** Builds a SENT TEXT {@link MessageResponse} fixture in the test chat with the given id and content. */
     private static MessageResponse msg(String id, String content) {
         return MessageResponse.builder()
                 .id(id).chatId(CHAT).content(content)
                 .messageType("TEXT").status("SENT").build();
     }
 
+    /** Builds a string of {@code n} copies of {@code c} — used to exceed field length limits. */
     private static String repeat(char c, int n) {
         return String.valueOf(c).repeat(n);
     }

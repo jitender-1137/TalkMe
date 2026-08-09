@@ -106,6 +106,7 @@ class BadgeControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Populates the SecurityContext with {@code testUser} as the {@code @AuthenticationPrincipal}. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -113,6 +114,10 @@ class BadgeControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /**
+     * Builds a {@link BadgeResponse} fixture; when {@code earned} is false the {@code awardedAt}
+     * timestamp is left null to model an in-progress (unearned) badge.
+     */
     private static BadgeResponse badge(BadgeType type, int count, boolean earned) {
         return BadgeResponse.builder()
                 .type(type.name())

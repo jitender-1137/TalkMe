@@ -337,6 +337,10 @@ class HeuristicWingmanServiceImplTest {
     @DisplayName("icebreakers — highlight-to-opener mapping")
     class HighlightMapping {
 
+        /**
+         * Stubs the compatibility score to carry a single highlight, then returns the one opener
+         * the wingman derives from it (max=1) so each mapping branch can be asserted in isolation.
+         */
         private List<String> openersForHighlight(String highlight) {
             when(compatibilityService.score(any(), any())).thenReturn(
                     CompatibilityScore.builder()

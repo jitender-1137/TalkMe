@@ -339,6 +339,11 @@ class PresenceServiceImplTest {
     @DisplayName("markDisconnected")
     class MarkDisconnected {
 
+        /**
+         * A socket drop while a background AWAY deadline is already pending is treated as the
+         * app being backgrounded (not a genuine disconnect): the existing deadline is left to
+         * run, so no status write, no new deadline, and no broadcast happen.
+         */
         @Test
         @DisplayName("staged background (AWAY deadline present) → deferred, no idle write")
         void deferredWhenAwayStaged() {
@@ -365,6 +370,10 @@ class PresenceServiceImplTest {
             verify(zSetOps, never()).addIfAbsent(anyString(), anyString(), anyDouble());
         }
 
+        /**
+         * With neither an AWAY nor an IDLE deadline staged, the disconnect is genuine, so the
+         * user is flipped to IDLE with an offline deadline scheduled and an IDLE broadcast.
+         */
         @Test
         @DisplayName("genuine active disconnect (no staged deadline) → falls through to markIdle")
         void activeDisconnectMarksIdle() {
@@ -473,6 +482,11 @@ class PresenceServiceImplTest {
             verify(hashOps, never()).putAll(anyString(), anyMap());
         }
 
+        /**
+         * A heartbeat-lapsed user still ONLINE but carrying an AWAY deadline is mid background
+         * transition: the reaper drops the stale session but leaves the status change to the
+         * dedicated deadline reaper, so no presence hash is rewritten and nothing is counted.
+         */
         @Test
         @DisplayName("in a staged background transition → left to its deadline, session dropped")
         void stagedTransition() {
@@ -1132,6 +1146,10 @@ class PresenceServiceImplTest {
             verify(userRepository, never()).findById(anyLong());
         }
 
+        /**
+         * A null user short-circuits through ensureManagedUser's null guard and the helper is
+         * handed null, so the whole call resolves to null with no repository lookup.
+         */
         @Test
         @DisplayName("null user → ensureManagedUser returns null (line 59), helper gets null")
         void nullUserReturnsNull() {
@@ -1211,6 +1229,10 @@ class PresenceServiceImplTest {
             assertThat(captureBroadcast(USERNAME).getStatus()).isEqualTo("OFFLINE");
         }
 
+        /**
+         * When the cached last-seen is absent at flip time, the OFFLINE transition still succeeds
+         * using a "now" fallback timestamp rather than persisting a null last-seen.
+         */
         @Test
         @DisplayName("Redis last-seen missing → liveLastSeen falls back to now (658 ls==null, 661 fallback!=null)")
         void liveLastSeenFallsBackWhenRedisMissing() {
@@ -1376,6 +1398,10 @@ class PresenceServiceImplTest {
             assertThat(captureBroadcast(USERNAME).getStatus()).isEqualTo("IDLE");
         }
 
+        /**
+         * If the live status resolves to an unparseable value, the re-broadcast triggered by a
+         * privacy toggle defensively degrades to OFFLINE rather than throwing.
+         */
         @Test
         @DisplayName("liveStatus returns unparseable → broadcastCurrent catch → OFFLINE (lines 541/542)")
         void broadcastCurrentCatchOnBogusLiveStatus() {

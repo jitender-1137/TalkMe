@@ -297,6 +297,11 @@ class SecretCrushServiceImplTest {
             verify(secretCrushRepository).save(active);
         }
 
+        /**
+         * The full happy path: the caller's row is persisted once when created/reactivated and again when
+         * flipped to MATCHED (hence {@code times(2)} on {@code mine}), the reciprocal row is flipped and
+         * saved once, and both participants receive a notification, a WS frame and a reputation event.
+         */
         @Test
         @DisplayName("mutual crush → both rows MATCHED, symmetric notify + reputation")
         void mutualMatch() {

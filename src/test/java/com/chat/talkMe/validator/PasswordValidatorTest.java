@@ -11,6 +11,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link PasswordValidator} — the {@code ConstraintValidator} that requires a
+ * password of length 6–128 containing at least one letter and one digit.
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases under {@code @Nested "isValid"};
+ * the {@code validOfLength} helper builds an always letter+digit password of a given length and
+ * {@code repeat} builds fixed-length runs. Coverage: null (required ⇒ invalid), the length
+ * boundaries, the letter-and-digit rule (missing digit / missing letter / symbols only / both
+ * present / digit-first / unicode letters), and the length-ok-but-no-digit corner.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PasswordValidator")
 class PasswordValidatorTest {

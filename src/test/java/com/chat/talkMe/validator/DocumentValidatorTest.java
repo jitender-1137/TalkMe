@@ -13,6 +13,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link DocumentValidator} — the {@code ConstraintValidator} that accepts a filename
+ * only when its extension is a supported document format (pdf/doc(x)/xls(x)/ppt(x)/txt/zip).
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases grouped under {@code @Nested
+ * "isValid"} and narrated via {@code @DisplayName}. Coverage: null (optional ⇒ valid), a
+ * parameterized sweep of every supported extension, case-insensitivity, unsupported/missing/
+ * trailing-dot extensions, and last-dot extension derivation.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DocumentValidator")
 class DocumentValidatorTest {

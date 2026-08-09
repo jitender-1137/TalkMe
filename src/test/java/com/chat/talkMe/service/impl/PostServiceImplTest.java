@@ -369,6 +369,10 @@ class PostServiceImplTest {
             verify(postMediaRepository, never()).save(any());
         }
 
+        /**
+         * A lone still image plus a soundtrack triggers the muxer; the resulting MP4 replaces the
+         * image so the stored media flips from IMAGE to VIDEO.
+         */
         @Test
         @DisplayName("single image + soundtrack → muxed into a VIDEO media item")
         void photoMusicMux() {
@@ -579,6 +583,10 @@ class PostServiceImplTest {
             verify(notificationService, never()).createNotification(any(), any(), any(), any(), any(), any(), any());
         }
 
+        /**
+         * Voting again for the option the user already picked removes the vote entirely
+         * (delete, not re-save) and fires no notification.
+         */
         @Test
         @DisplayName("re-tapping the current choice retracts the vote (toggle-off, no notify)")
         void toggleOff() {
@@ -595,6 +603,10 @@ class PostServiceImplTest {
             verify(notificationService, never()).createNotification(any(), any(), any(), any(), any(), any(), any());
         }
 
+        /**
+         * Picking a different option reuses the existing vote row (option re-pointed and saved),
+         * never deletes it, and does not re-notify as a brand-new vote.
+         */
         @Test
         @DisplayName("choosing a different option switches the existing vote (no new-vote notify)")
         void switchVote() {
@@ -1631,6 +1643,10 @@ class PostServiceImplTest {
             verify(moderationService, never()).moderateText("   ");
         }
 
+        /**
+         * The share short-code generator probes for uniqueness; a first collision forces at least
+         * a second existsByShortCode round before a free code is accepted.
+         */
         @Test
         @DisplayName("short-code collision → ShortCodes.unique retries until a free code")
         void shortCodeCollisionRetries() {
@@ -1722,6 +1738,10 @@ class PostServiceImplTest {
             assertThat(saved.getValue().getMediaType()).isEqualTo("VIDEO");
         }
 
+        /**
+         * When the muxer fails and returns null, the post degrades gracefully to the original
+         * still image rather than dropping the media — type stays IMAGE.
+         */
         @Test
         @DisplayName("mux returns null → falls back to the plain image (stays IMAGE)")
         void muxReturnsNullFallsBackToImage() {
@@ -2040,6 +2060,10 @@ class PostServiceImplTest {
                     eq("COMMENT"), any(), eq(currentUser), any());
         }
 
+        /**
+         * When the parent comment's author and the post owner are the same person, the two
+         * notification targets collapse — that recipient is notified exactly once, not twice.
+         */
         @Test
         @DisplayName("reply where the parent author is the post owner → only notified once")
         void replyWhereParentAuthorIsPostOwner() {

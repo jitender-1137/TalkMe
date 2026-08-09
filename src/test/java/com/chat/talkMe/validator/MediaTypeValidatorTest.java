@@ -13,6 +13,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link MediaTypeValidator} — the {@code ConstraintValidator} that accepts only the
+ * allowed media categories ("image"/"video"/"audio"/"document"), case-insensitively, treating the
+ * value as required.
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases under {@code @Nested "isValid"}.
+ * Coverage: null (required ⇒ invalid), parameterized allowed categories, mixed-case acceptance, a
+ * parameterized sweep of disallowed values (incl. empty), and rejection of whitespace-padded input
+ * to prove no trimming occurs.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("MediaTypeValidator")
 class MediaTypeValidatorTest {

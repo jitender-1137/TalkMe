@@ -81,6 +81,11 @@ class CityControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone {@link MockMvc} (mocked {@link CityService}, real
+     * {@link GlobalExceptionHandler}, validator, principal resolver) and installs a non-guest
+     * {@code ROLE_USER} principal into the {@link SecurityContextHolder} for every test.
+     */
     @BeforeEach
     void setUp() {
         CityController controller = new CityController(cityService);
@@ -111,6 +116,7 @@ class CityControllerUnitTest {
 
     // ── Fixtures ─────────────────────────────────────────────────────────────────
 
+    /** Builds a district summary card (list view) for the given slug. */
     private static CityDistrictResponse card(String slug) {
         return CityDistrictResponse.builder()
                 .slug(slug)
@@ -122,6 +128,7 @@ class CityControllerUnitTest {
                 .build();
     }
 
+    /** Builds a district detail (card + rooms + online roster) for the given slug. */
     private static CityDistrictDetailResponse detail(String slug) {
         return CityDistrictDetailResponse.builder()
                 .district(card(slug))

@@ -46,6 +46,10 @@ class ReferralServiceImplTest {
         currentUser.setId(1L);
     }
 
+    /**
+     * Builds a referred-user fixture; a null {@code uuid} or {@code createdAt} is left unset to
+     * exercise the service's null-safe id / joinedAt mapping.
+     */
     private User referred(String uuid, String name, String username, String avatar, Instant createdAt) {
         User u = User.builder().name(name).username(username).profileImage(avatar).build();
         if (uuid != null) u.setUuid(UUID.fromString(uuid));

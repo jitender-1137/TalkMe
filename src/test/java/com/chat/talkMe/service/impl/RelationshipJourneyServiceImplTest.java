@@ -184,6 +184,12 @@ class RelationshipJourneyServiceImplTest {
             verify(selfProvider, never()).getObject();
         }
 
+        /**
+         * Happy path: for an active friend the read triggers a lazy materialize through the self
+         * proxy, then returns the persisted milestones plus fully-populated aggregate stats
+         * (messages / photos / games / friends-since / first-message / days-known) sourced from the
+         * shared chat.
+         */
         @Test
         @DisplayName("friend → materializes via proxy, returns ordered milestones + stats")
         void nominal() {
@@ -468,6 +474,7 @@ class RelationshipJourneyServiceImplTest {
             return f;
         }
 
+        /** Asserts exactly one milestone was persisted and returns it for further assertions. */
         private RelationshipMilestone captureSingleSave() {
             ArgumentCaptor<RelationshipMilestone> captor =
                     ArgumentCaptor.forClass(RelationshipMilestone.class);

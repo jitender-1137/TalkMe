@@ -11,6 +11,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link MessageContentValidator} — the {@code ConstraintValidator} that requires
+ * non-blank message content whose <em>trimmed</em> length does not exceed the max (4096 chars).
+ *
+ * <p>Plain JUnit 5 + Mockito style with a mocked
+ * {@link jakarta.validation.ConstraintValidatorContext}, cases under {@code @Nested "isValid"}; the
+ * {@code repeat} helper builds fixed-length strings. Coverage: null/empty/whitespace-only rejected,
+ * a single char accepted, and the trimmed-length boundary — exactly max valid, one over invalid,
+ * and surrounding whitespace not counted toward the limit.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("MessageContentValidator")
 class MessageContentValidatorTest {

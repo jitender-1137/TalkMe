@@ -13,6 +13,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit test for {@link AgeValidator} — the {@code jakarta.validation.ConstraintValidator} that
+ * enforces the accepted age range (18–99 inclusive) on onboarding input.
+ *
+ * <p>Plain JUnit 5 + Mockito style: a mocked {@link jakarta.validation.ConstraintValidatorContext}
+ * is passed to {@code isValid}, with cases grouped under a {@code @Nested "isValid"} class and
+ * narrated via {@code @DisplayName}. Coverage is boundary-driven — null (deferred to
+ * {@code @NotNull}), the exact min/max, one step either side, and parameterized in/out-of-range
+ * sweeps.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AgeValidator")
 class AgeValidatorTest {

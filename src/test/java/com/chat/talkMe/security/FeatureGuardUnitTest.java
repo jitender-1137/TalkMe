@@ -25,6 +25,10 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test for the {@code @featureGuard.check(...)} SpEL bean {@link FeatureGuard}: unknown key,
  * no/typed authentication, and the entitlement delegation to {@link FeatureAccessService}.
+ *
+ * <p>Test style: pure Mockito ({@code @ExtendWith(MockitoExtension.class)}) with a mocked
+ * {@link FeatureAccessService}; the {@code SecurityContextHolder} is populated per-test via the
+ * {@code authenticateAsUser()} helper and cleared in {@code @AfterEach} to isolate the thread-local.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("FeatureGuard (unit)")

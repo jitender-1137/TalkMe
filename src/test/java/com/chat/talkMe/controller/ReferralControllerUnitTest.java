@@ -32,6 +32,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Pure controller unit test for {@link ReferralController}.
+ *
+ * <p>Standalone {@link MockMvc} with a mocked {@link ReferralService} and the real
+ * {@link GlobalExceptionHandler}. Only {@link AuthenticationPrincipalArgumentResolver} is
+ * registered — the sole endpoint ({@code GET /referrals/me}) takes just
+ * {@code @AuthenticationPrincipal}; there is no {@code @RequestBody} (so no JSON message
+ * converter) and no {@code Pageable}. The authenticated principal is installed once in
+ * {@code setUp} rather than via a per-test helper.
+ *
+ * <p><b>Scope boundary:</b> filter-chain authentication/authorization (JWT, roles, CSRF) and any
+ * {@code @PreAuthorize} method-security gates are enforced by Spring's security layer, which is
+ * NOT active in a standalone MockMvc setup — those are covered by integration tests. Here we
+ * verify the controller's response wiring and its delegation to the service, asserting the
+ * summary payload is forwarded for both the populated and the zero-referral cases.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ReferralController (unit)")
 class ReferralControllerUnitTest {

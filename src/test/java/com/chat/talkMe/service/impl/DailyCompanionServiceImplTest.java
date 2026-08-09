@@ -329,6 +329,11 @@ class DailyCompanionServiceImplTest {
             assertThat(service.assignFor(me)).isNull();
         }
 
+        /**
+         * Given two eligible candidates, the higher compatibility score wins the pairing (status
+         * ACTIVE, today's date, score copied through) and a DAILY_COMPANION notification is raised for
+         * the caller referencing the new pairing uuid and the chosen companion.
+         */
         @Test
         @DisplayName("nominal → pairs the highest-scoring eligible candidate and notifies")
         void picksBestAndNotifies() {
@@ -367,6 +372,11 @@ class DailyCompanionServiceImplTest {
                     eq("DAILY_COMPANION"), eq(p.getUuid().toString()), eq(high), anyString());
         }
 
+        /**
+         * The candidate pool contains the caller, a recently-paired user, someone the caller blocked
+         * and someone who blocked the caller; all four are filtered out before scoring, leaving only
+         * "ok" to be scored and paired.
+         */
         @Test
         @DisplayName("excludes self, recently-paired, blocked and candidates who blocked me")
         void appliesExclusions() {

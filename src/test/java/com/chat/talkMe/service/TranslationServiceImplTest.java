@@ -191,6 +191,10 @@ class TranslationServiceImplTest {
             verifyNoInteractions(objectMapper);
         }
 
+        /**
+         * First uncached call of the day: {@code increment} returns 1, so the code must arm the
+         * per-user daily TTL via {@code redis.expire(...)} (only the first hit sets the window).
+         */
         @Test
         void firstUncachedUseOfTheDay_armsCapTtl() {
             when(redis.opsForValue()).thenReturn(valueOps);

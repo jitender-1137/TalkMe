@@ -74,6 +74,12 @@ class ChatConsentControllerUnitTest {
     private MockMvc mockMvc;
     private User testUser;
 
+    /**
+     * Builds the standalone {@link MockMvc}: real controller over the mocked
+     * {@link ChatConsentService}, the real {@link GlobalExceptionHandler}, a validator and the
+     * {@code @AuthenticationPrincipal} resolver. Seeds a non-guest {@code ROLE_USER} test user
+     * (each test calls {@link #authenticate()} to place it in the security context).
+     */
     @BeforeEach
     void setUp() {
         ChatConsentController controller = new ChatConsentController(chatConsentService);
@@ -101,6 +107,7 @@ class ChatConsentControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =

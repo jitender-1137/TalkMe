@@ -88,6 +88,7 @@ class MusicControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Builds a {@link MusicTrackResponse} fixture with derived artwork/preview URLs and a 30s duration. */
     private static MusicTrackResponse track(String id, String title, String artist) {
         return MusicTrackResponse.builder()
                 .id(id).title(title).artist(artist)

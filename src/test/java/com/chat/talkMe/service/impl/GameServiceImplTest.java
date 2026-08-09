@@ -94,6 +94,10 @@ class GameServiceImplTest {
         });
     }
 
+    /**
+     * A persisted TWO_TRUTHS session at the given state/round with a matching currentPromptId
+     * and SESSION_UUID pre-assigned.
+     */
     private GameSession session(GameState state, int round) {
         GameSession s = GameSession.builder()
                 .chatId(CHAT_ID)

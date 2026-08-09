@@ -25,6 +25,11 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test for {@link CustomUserDetailsService}: username-then-email fallback lookup, trimming,
  * not-found handling, and load-by-id.
+ *
+ * <p>Test style: pure Mockito ({@code @ExtendWith(MockitoExtension.class)}) with a mocked
+ * {@link UserRepository} injected via {@code @InjectMocks}; no Spring context. Each test stubs the
+ * repository lookups and asserts the returned {@link UserDetails} (a {@link CustomUserDetails}) or the
+ * {@code org.springframework.security.core.userdetails.UsernameNotFoundException} thrown when nothing matches.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CustomUserDetailsService (unit)")

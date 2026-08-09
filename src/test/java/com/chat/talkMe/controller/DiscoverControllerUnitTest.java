@@ -101,6 +101,7 @@ class DiscoverControllerUnitTest {
         SecurityContextHolder.clearContext();
     }
 
+    /** Wraps a single profile in a one-item {@link PaginatedResponse} with a canned pagination block. */
     private static PaginatedResponse<DiscoverProfileResponse> paged(DiscoverProfileResponse item) {
         return PaginatedResponse.<DiscoverProfileResponse>builder()
                 .items(List.of(item))
@@ -110,6 +111,7 @@ class DiscoverControllerUnitTest {
                 .build();
     }
 
+    /** Minimal discover profile ("Bob") identified by the given id. */
     private static DiscoverProfileResponse profile(String id) {
         return DiscoverProfileResponse.builder().id(id).name("Bob").username("bob").age(28).build();
     }
