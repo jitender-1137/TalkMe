@@ -116,7 +116,9 @@ class FlirtLobbyControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -124,7 +126,9 @@ class FlirtLobbyControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Builds a roster {@link NightUserCard} with derived username/avatar and fixed mood/presence. */
+    /**
+     * Builds a roster {@link NightUserCard} with derived username/avatar and fixed mood/presence.
+     */
     private static NightUserCard card(String id, String name) {
         return NightUserCard.builder()
                 .id(id).name(name).username(name.toLowerCase())
@@ -260,7 +264,9 @@ class FlirtLobbyControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }
 
-        /** No principal → {@code userDetails.getUser()} NPEs → catch-all 500; service never called. */
+        /**
+         * No principal → {@code userDetails.getUser()} NPEs → catch-all 500; service never called.
+         */
         @Test
         void shouldReturn500WhenUnauthenticated() throws Exception {
             // No SecurityContext → @AuthenticationPrincipal resolves to null → NPE on
@@ -341,7 +347,9 @@ class FlirtLobbyControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }
 
-        /** No principal → NPE resolving the current user → catch-all 500; roster never read. */
+        /**
+         * No principal → NPE resolving the current user → catch-all 500; roster never read.
+         */
         @Test
         void shouldReturn500WhenUnauthenticated() throws Exception {
             mockMvc.perform(get(BASE + "/online"))
@@ -402,7 +410,9 @@ class FlirtLobbyControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }
 
-        /** No principal → NPE resolving the current user → catch-all 500; leave never called. */
+        /**
+         * No principal → NPE resolving the current user → catch-all 500; leave never called.
+         */
         @Test
         void shouldReturn500WhenUnauthenticated() throws Exception {
             mockMvc.perform(post(BASE + "/leave"))

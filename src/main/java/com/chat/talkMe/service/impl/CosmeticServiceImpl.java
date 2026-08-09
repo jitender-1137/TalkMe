@@ -102,8 +102,8 @@ public class CosmeticServiceImpl implements CosmeticService {
      * @param code the cosmetic code
      * @return the user's refreshed owned cosmetics
      * @throws com.chat.talkMe.exception.BadRequestException (TM_930) blank code, or (TM_932)
-     *         the cosmetic is not yet unlocked
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_931) unknown or retired cosmetic
+     *                                                       the cosmetic is not yet unlocked
+     * @throws com.chat.talkMe.exception.NotFoundException   (TM_931) unknown or retired cosmetic
      */
     @Override
     public List<CosmeticResponse> equip(User user, String code) {
@@ -204,11 +204,11 @@ public class CosmeticServiceImpl implements CosmeticService {
      * Whether the user currently satisfies a cosmetic's unlock condition.
      */
     /**
-     * @param c the cosmetic
-     * @param rep the user's reputation snapshot (null → level 1 / no prestige / bronze)
+     * @param c               the cosmetic
+     * @param rep             the user's reputation snapshot (null → level 1 / no prestige / bronze)
      * @param ownedBadgeCodes badge codes owned by the user (for BADGE unlocks)
      * @return true when the user meets the cosmetic's unlock condition (LEVEL/STAR/PRESTIGE/
-     *         BADGE); SEASONAL is never auto-unlocked
+     * BADGE); SEASONAL is never auto-unlocked
      */
     private boolean isUnlocked(UnlockableCosmetic c, UserReputation rep, Set<String> ownedBadgeCodes) {
         int level = rep != null ? rep.getLevel() : 1;
@@ -231,9 +231,9 @@ public class CosmeticServiceImpl implements CosmeticService {
      * Maps a catalog cosmetic to a response DTO, computing owned (explicit row or unlocked),
      * equipped and locked flags for the user.
      *
-     * @param c the cosmetic
-     * @param rep the user's reputation snapshot (nullable)
-     * @param owned the user's explicit owned rows by code
+     * @param c               the cosmetic
+     * @param rep             the user's reputation snapshot (nullable)
+     * @param owned           the user's explicit owned rows by code
      * @param ownedBadgeCodes badge codes owned by the user
      * @return the response DTO
      */

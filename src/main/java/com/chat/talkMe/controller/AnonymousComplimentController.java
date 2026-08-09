@@ -40,7 +40,7 @@ public class AnonymousComplimentController {
      * @param userDetails the authenticated principal (the sender)
      * @return the created {@link ComplimentResponse} (sender's view)
      * @throws com.chat.talkMe.exception.BadRequestException        if the recipient is the sender,
-     *         is not a valid target, or the message is empty
+     *                                                              is not a valid target, or the message is empty
      * @throws com.chat.talkMe.exception.ContentModerationException if the message fails moderation
      * @throws com.chat.talkMe.exception.TooManyRequestsException   if the sender exceeds the rate limit
      */
@@ -89,9 +89,9 @@ public class AnonymousComplimentController {
      * @param userDetails the authenticated principal (must be the recipient)
      * @return the recipient's {@link ComplimentResponse} view (sender still hidden)
      * @throws com.chat.talkMe.exception.NotFoundException   if the compliment does not exist
-     *         or the caller is not its recipient
+     *                                                       or the caller is not its recipient
      * @throws com.chat.talkMe.exception.BadRequestException if the compliment was already
-     *         revealed or the reveal was declined
+     *                                                       revealed or the reveal was declined
      */
     @PostMapping("/{uuid}/reveal-request")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
@@ -111,7 +111,7 @@ public class AnonymousComplimentController {
      * @param userDetails the authenticated principal (must be the sender)
      * @return the updated {@link ComplimentResponse}
      * @throws com.chat.talkMe.exception.NotFoundException   if the compliment does not exist
-     *         or the caller is not its sender
+     *                                                       or the caller is not its sender
      * @throws com.chat.talkMe.exception.BadRequestException if there is no pending reveal request
      */
     @PostMapping("/{uuid}/reveal-response")

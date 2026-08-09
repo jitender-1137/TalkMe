@@ -116,7 +116,7 @@ public class NightCitySeeder implements ApplicationRunner {
      * Resolves the system host that owns curated rooms.
      *
      * @return the first configured super-admin account found, else the most-recently-joined real
-     *         (non-guest, non-banned, non-deleted) account, else {@code null} if none exists yet
+     * (non-guest, non-banned, non-deleted) account, else {@code null} if none exists yet
      */
     private User resolveHost() {
         if (superAdminEmails != null && !superAdminEmails.isBlank()) {

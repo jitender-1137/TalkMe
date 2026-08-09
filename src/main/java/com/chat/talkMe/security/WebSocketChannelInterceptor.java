@@ -73,8 +73,8 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
      * @return the (unmodified) message to continue processing, or {@code null} to drop it
      * @throws org.springframework.security.access.AccessDeniedException if authn/authz or the connect
      *                                                                   rate limit fails
-     * @throws java.lang.IllegalArgumentException if a call-event SEND targets a non-friend on a
-     *                                            PRIVATE chat
+     * @throws java.lang.IllegalArgumentException                        if a call-event SEND targets a non-friend on a
+     *                                                                   PRIVATE chat
      */
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {

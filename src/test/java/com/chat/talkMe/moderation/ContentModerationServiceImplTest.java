@@ -130,7 +130,9 @@ class ContentModerationServiceImplTest {
 
     // ── moderateMedia() ──────────────────────────────────────────────────────
 
-    /** Builds an enabled service wired to the given (usually mocked) NSFW client for media tests. */
+    /**
+     * Builds an enabled service wired to the given (usually mocked) NSFW client for media tests.
+     */
     private ContentModerationServiceImpl mediaService(NsfwClient client) {
         ContentModerationServiceImpl s = new ContentModerationServiceImpl(client);
         ReflectionTestUtils.setField(s, "enabled", true);

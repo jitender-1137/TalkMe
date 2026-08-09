@@ -44,6 +44,7 @@ public class ReputationEventRecorder {
     // REQUIRES_NEW so a fresh transaction is opened even when the executor's
     // CallerRunsPolicy runs this synchronously on the just-committed producer thread
     // (otherwise the insert would join an already-committed tx and be discarded).
+
     /**
      * Handles one {@link ReputationSignal} AFTER_COMMIT: dedupes by key, applies diminishing
      * returns and per-type/per-source/global daily caps, then inserts a ledger row with the

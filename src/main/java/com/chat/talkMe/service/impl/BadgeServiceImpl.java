@@ -55,7 +55,7 @@ public class BadgeServiceImpl implements BadgeService {
      * @param userUuid the target user's uuid
      * @return one {@link BadgeResponse} per persisted {@code UserBadge}
      * @throws com.chat.talkMe.exception.BadRequestException if the uuid is malformed (TM_922)
-     * @throws com.chat.talkMe.exception.NotFoundException if no such user (TM_404)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no such user (TM_404)
      */
     @Override
     @Transactional(readOnly = true)
@@ -75,15 +75,15 @@ public class BadgeServiceImpl implements BadgeService {
      * that returns current state. On acceptance records an ENDORSEMENT_RECEIVED reputation
      * event, and a BADGE_EARNED event additionally on first award (both best-effort, cosmetic).
      *
-     * @param endorser     the endorsing user (must not be guest/banned)
+     * @param endorser      the endorsing user (must not be guest/banned)
      * @param recipientUuid uuid of the user being endorsed
-     * @param badgeType    the trait/badge being endorsed
+     * @param badgeType     the trait/badge being endorsed
      * @return the resulting badge state for that recipient + type
      * @throws com.chat.talkMe.exception.BadRequestException if badgeType is null (TM_920),
-     *         self-endorsement (TM_921), a malformed uuid (TM_922), or the recipient is a
-     *         guest/banned/deleted account (TM_924)
-     * @throws com.chat.talkMe.exception.ForbiddenException if the endorser is guest/banned (TM_923)
-     * @throws com.chat.talkMe.exception.NotFoundException if the recipient uuid does not resolve (TM_404)
+     *                                                       self-endorsement (TM_921), a malformed uuid (TM_922), or the recipient is a
+     *                                                       guest/banned/deleted account (TM_924)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the endorser is guest/banned (TM_923)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the recipient uuid does not resolve (TM_404)
      */
     @Override
     public BadgeResponse endorse(User endorser, String recipientUuid, BadgeType badgeType) {
@@ -188,7 +188,7 @@ public class BadgeServiceImpl implements BadgeService {
      * Resolve a user by uuid string.
      *
      * @throws com.chat.talkMe.exception.BadRequestException if the uuid is malformed (TM_922)
-     * @throws com.chat.talkMe.exception.NotFoundException if no such user (TM_404)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no such user (TM_404)
      */
     private User resolveUser(String userUuid) {
         UUID uuid;

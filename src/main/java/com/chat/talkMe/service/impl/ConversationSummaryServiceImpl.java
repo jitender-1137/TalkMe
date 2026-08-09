@@ -44,13 +44,13 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
      * theirs message counts, photos shared, active days, first-message date, days known, shared
      * interests, the other party's public identity and a generated headline. Read-only.
      *
-     * @param me the requesting user
+     * @param me       the requesting user
      * @param chatUuid target chat UUID
      * @return the assembled summary DTO
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) if the UUID is malformed or the
-     *         chat is missing/deleted
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_024) if the UUID is malformed or the
+     *                                                      chat is missing/deleted
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_026) if the caller is not an active
-     *         member, or the chat is a group/room rather than 1:1
+     *                                                      member, or the chat is a group/room rather than 1:1
      */
     @Override
     @Transactional(readOnly = true)
@@ -114,7 +114,7 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
      * Finds the other participant of a 1:1 chat, or null when none can be resolved.
      *
      * @param chat the chat
-     * @param me the caller
+     * @param me   the caller
      * @return the other user, or null
      */
     private User resolveOther(Chat chat, User me) {
@@ -144,7 +144,7 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
     /**
      * Up to six prettified interests present for both users, in the caller's iteration order.
      *
-     * @param me the caller
+     * @param me    the caller
      * @param other the other user (nullable)
      * @return shared interest labels (empty when none)
      */
@@ -167,11 +167,11 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
      * Composes the natural-language headline from the summary metrics (or a "just getting
      * started" line when there are no messages yet).
      *
-     * @param total total message count
+     * @param total     total message count
      * @param daysKnown days since first message
-     * @param photos photos shared
-     * @param shared shared interest labels
-     * @param other the other user (nullable)
+     * @param photos    photos shared
+     * @param shared    shared interest labels
+     * @param other     the other user (nullable)
      * @return the headline sentence
      */
     private static String buildHeadline(long total, long daysKnown, long photos,

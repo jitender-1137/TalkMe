@@ -23,7 +23,7 @@ public final class AliasGenerator {
      * distinct aliases; derived purely from a masked, non-negative hash — never identity.
      *
      * @param sessionId the match session id mixed into the hash
-     * @param slot which peer: 0 = userA, 1 = userB
+     * @param slot      which peer: 0 = userA, 1 = userB
      * @return a stable alias such as "Moon #247"
      */
     public static String alias(String sessionId, int slot) {

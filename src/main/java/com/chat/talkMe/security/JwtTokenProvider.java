@@ -103,7 +103,7 @@ public class JwtTokenProvider {
      *
      * @param token the JWT to validate
      * @return {@code true} if the token is a valid, non-expired access token; {@code false} otherwise
-     *         (expired, malformed, bad signature, or a delivery-ack token)
+     * (expired, malformed, bad signature, or a delivery-ack token)
      */
     public boolean validateToken(String token) {
         try {

@@ -70,7 +70,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
      * Returns up to {@code max} waiting candidates oldest-first (favouring longest waiters),
      * excluding the given user, without removing them from the queue.
      *
-     * @param max the maximum number of candidates to return
+     * @param max     the maximum number of candidates to return
      * @param exclude a username to omit (typically the seeker)
      * @return the candidate usernames, oldest-first
      */

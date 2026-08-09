@@ -59,6 +59,7 @@ public class FlirtLobbyController {
     // user is still online (consent revoked, grant expired, self opt-out) and leave required
     // that entitlement, the user would get 403 and stay stranded in the roster — roster() only
     // prunes OFFLINE members and there is no time-based reaper for the flirt-lobby set.
+
     /**
      * Removes the current user from the flirt-lobby set. Deliberately gated only by
      * {@code hasRole('USER')} (not FLIRT_LOBBY) so leaving always succeeds even if the entitlement

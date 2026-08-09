@@ -44,9 +44,9 @@ public class MessageController {
     /**
      * Send a message to a chat (idempotent by client id; runs moderation/consent + durable fan-out).
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param request      validated message payload (content/type/attachment/reply/mentions/flags)
-     * @param userDetails  the authenticated sender
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param request     validated message payload (content/type/attachment/reply/mentions/flags)
+     * @param userDetails the authenticated sender
      * @return the persisted (or ephemeral) message (TM_160)
      * @throws com.chat.talkMe.exception.NotFoundException          chat not found / deleted (TM_121)
      * @throws com.chat.talkMe.exception.ForbiddenException         not a member (TM_141), sender blocked
@@ -68,10 +68,10 @@ public class MessageController {
     /**
      * Fetch a page of chat history (newest first) using a sequence-number cursor.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param cursor       sequence number to page before (null = newest page)
-     * @param limit        page size (defaults to 30, capped at 100)
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param cursor      sequence number to page before (null = newest page)
+     * @param limit       page size (defaults to 30, capped at 100)
+     * @param userDetails the authenticated caller
      * @return a page of messages with the next cursor and a hasMore flag
      * @throws com.chat.talkMe.exception.NotFoundException  chat not found (TM_121)
      * @throws com.chat.talkMe.exception.ForbiddenException caller is not a member (TM_141)
@@ -89,9 +89,9 @@ public class MessageController {
     /**
      * Fetch messages created after a given sequence number (incremental catch-up sync).
      *
-     * @param chatUuid       UUID of the chat (from the path)
-     * @param afterSequence  return messages with a sequence number greater than this
-     * @param userDetails    the authenticated caller
+     * @param chatUuid      UUID of the chat (from the path)
+     * @param afterSequence return messages with a sequence number greater than this
+     * @param userDetails   the authenticated caller
      * @return the newer messages wrapped in a success envelope
      * @throws com.chat.talkMe.exception.NotFoundException  chat not found (TM_121)
      * @throws com.chat.talkMe.exception.ForbiddenException caller is not a member (TM_141)
@@ -108,10 +108,10 @@ public class MessageController {
     /**
      * Full-text search within a chat's messages.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param query        the search text
-     * @param pageable     paging/sort (defaults to size 50, createdAt DESC)
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param query       the search text
+     * @param pageable    paging/sort (defaults to size 50, createdAt DESC)
+     * @param userDetails the authenticated caller
      * @return a page of matching messages wrapped in a success envelope
      * @throws com.chat.talkMe.exception.NotFoundException  chat not found (TM_121)
      * @throws com.chat.talkMe.exception.ForbiddenException caller is not a member (TM_141)
@@ -129,10 +129,10 @@ public class MessageController {
     /**
      * Edit the caller's own text message (re-runs moderation, then broadcasts the update).
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message to edit
-     * @param request      body carrying the new {@code content}
-     * @param userDetails  the authenticated sender
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message to edit
+     * @param request     body carrying the new {@code content}
+     * @param userDetails the authenticated sender
      * @return the updated message (TM_167)
      * @throws com.chat.talkMe.exception.NotFoundException          chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException         not a member (TM_141), message not in this
@@ -156,9 +156,9 @@ public class MessageController {
      * Delete a message: sender/group-admin deletes for everyone (tombstone + broadcast); a
      * recipient deletes it for themselves only.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message to delete
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message to delete
+     * @param userDetails the authenticated caller
      * @return empty success envelope (TM_163)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), or message not in this
@@ -175,12 +175,13 @@ public class MessageController {
 
     // Receiver opens a self-destruct/view-once media → arms the timer (server-side) and
     // returns the message so the client can run its countdown. Only the receiver may arm.
+
     /**
      * Receiver opens a self-destruct/view-once media message, arming the server-side timer.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the self-destruct message
-     * @param userDetails  the authenticated receiver
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the self-destruct message
+     * @param userDetails the authenticated receiver
      * @return the message so the client can run its countdown
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), message not in this chat
@@ -196,12 +197,13 @@ public class MessageController {
     }
 
     // Receiver finished viewing (countdown hit 0 / view-once closed) → destroy the media now.
+
     /**
      * Receiver finished viewing a self-destruct message, destroying the media now (no-op for sender).
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the self-destruct message
-     * @param userDetails  the authenticated receiver
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the self-destruct message
+     * @param userDetails the authenticated receiver
      * @return empty success envelope (TM_164)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), or message not in this
@@ -217,12 +219,13 @@ public class MessageController {
     }
 
     // Pin / unpin a message (group admins per settings.whoCanPin).
+
     /**
      * Pin a message (group pinning gated by the chat's whoCanPin setting); broadcasts the change.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message to pin
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message to pin
+     * @param userDetails the authenticated caller
      * @return the updated message (TM_287)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), message not in this chat
@@ -240,9 +243,9 @@ public class MessageController {
     /**
      * Unpin a message (group pinning gated by the chat's whoCanPin setting); broadcasts the change.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message to unpin
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message to unpin
+     * @param userDetails the authenticated caller
      * @return the updated message (TM_288)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), message not in this chat
@@ -258,12 +261,13 @@ public class MessageController {
     }
 
     // Star / unstar (save) a message for the current user.
+
     /**
      * Star (save) a message for the current user; idempotent.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message to star
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message to star
+     * @param userDetails the authenticated caller
      * @return empty success envelope (TM_308)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), or message not in this
@@ -281,9 +285,9 @@ public class MessageController {
     /**
      * Unstar (unsave) a message for the current user; a no-op if it was not starred.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message to unstar
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message to unstar
+     * @param userDetails the authenticated caller
      * @return empty success envelope (TM_309)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), or message not in this
@@ -301,10 +305,10 @@ public class MessageController {
     /**
      * Add an emoji reaction to a message (no-op if the caller already reacted with it); broadcasts.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message
-     * @param request      validated body carrying the reaction {@code emoji}
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message
+     * @param request     validated body carrying the reaction {@code emoji}
+     * @param userDetails the authenticated caller
      * @return the updated message (TM_152)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), or message not in this
@@ -323,10 +327,10 @@ public class MessageController {
     /**
      * Remove the caller's emoji reaction from a message (no-op if absent); broadcasts the change.
      *
-     * @param chatUuid     UUID of the chat (from the path)
-     * @param messageUuid  UUID of the message
-     * @param emoji        the reaction emoji to remove
-     * @param userDetails  the authenticated caller
+     * @param chatUuid    UUID of the chat (from the path)
+     * @param messageUuid UUID of the message
+     * @param emoji       the reaction emoji to remove
+     * @param userDetails the authenticated caller
      * @return the updated message (TM_153)
      * @throws com.chat.talkMe.exception.NotFoundException  chat (TM_121) or message (TM_161) not found
      * @throws com.chat.talkMe.exception.ForbiddenException not a member (TM_141), or message not in this

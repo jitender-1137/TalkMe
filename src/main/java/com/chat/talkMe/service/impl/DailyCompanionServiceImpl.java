@@ -127,7 +127,7 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
      *
      * @param user the user to assign a companion to
      * @return the created (or existing) pairing, or {@code null} when the user is ineligible or no
-     *         eligible candidate exists
+     * eligible candidate exists
      */
     @Override
     public DailyCompanion assignFor(User user) {

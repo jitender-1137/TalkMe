@@ -42,8 +42,8 @@ public class GroupController {
     /**
      * Create a group, channel, or room (subtype from the request); the caller becomes OWNER.
      *
-     * @param request      validated group-creation payload (name, subtype, visibility, members, tags…)
-     * @param userDetails  the authenticated creator
+     * @param request     validated group-creation payload (name, subtype, visibility, members, tags…)
+     * @param userDetails the authenticated creator
      * @return the created chat as a ChatResponse (TM_280)
      */
     @PostMapping
@@ -58,9 +58,9 @@ public class GroupController {
     /**
      * Update group info/settings (name, image, visibility, send/pin/edit policies, slow mode…).
      *
-     * @param uuid         UUID of the group
-     * @param request      validated partial-update payload (only non-null fields are applied)
-     * @param userDetails  the authenticated caller (needs the group's whoCanEditInfo role)
+     * @param uuid        UUID of the group
+     * @param request     validated partial-update payload (only non-null fields are applied)
+     * @param userDetails the authenticated caller (needs the group's whoCanEditInfo role)
      * @return the updated chat as a ChatResponse (TM_281)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException chat is not a group (TM_299), or bad id (TM_300)
@@ -78,8 +78,8 @@ public class GroupController {
     /**
      * List active members of a group (former members excluded), enriched with role and presence.
      *
-     * @param uuid         UUID of the group
-     * @param userDetails  the authenticated caller (must be a member)
+     * @param uuid        UUID of the group
+     * @param userDetails the authenticated caller (must be a member)
      * @return the active member list wrapped in a success envelope
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException chat is not a group (TM_299), or bad id (TM_300)
@@ -96,9 +96,9 @@ public class GroupController {
     /**
      * Add members to a group; targets whose privacy disallows a direct add get an invite instead.
      *
-     * @param uuid         UUID of the group
-     * @param body         map with {@code memberIds} (list of user UUIDs); defaults to empty
-     * @param userDetails  the authenticated caller (needs the group's whoCanAddMembers role)
+     * @param uuid        UUID of the group
+     * @param body        map with {@code memberIds} (list of user UUIDs); defaults to empty
+     * @param userDetails the authenticated caller (needs the group's whoCanAddMembers role)
      * @return the updated chat as a ChatResponse (TM_282)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException member limit reached (TM_297), not a group
@@ -119,9 +119,9 @@ public class GroupController {
     /**
      * Remove a member from a group (marks them a former member, keeping read-only history).
      *
-     * @param uuid         UUID of the group
-     * @param userId       UUID of the member to remove
-     * @param userDetails  the authenticated caller (needs at least ADMIN)
+     * @param uuid        UUID of the group
+     * @param userId      UUID of the member to remove
+     * @param userDetails the authenticated caller (needs at least ADMIN)
      * @return empty success envelope (TM_283)
      * @throws com.chat.talkMe.exception.NotFoundException   group, user, or membership not found
      *                                                       (TM_121 / TM_064 / TM_141)
@@ -141,10 +141,10 @@ public class GroupController {
     /**
      * Set a member's role (MEMBER/ADMIN); owner-only. Use transfer-ownership to assign OWNER.
      *
-     * @param uuid         UUID of the group
-     * @param userId       UUID of the target member
-     * @param body         map with {@code role} (defaults to MEMBER); parsed case-insensitively
-     * @param userDetails  the authenticated caller (must be OWNER)
+     * @param uuid        UUID of the group
+     * @param userId      UUID of the target member
+     * @param body        map with {@code role} (defaults to MEMBER); parsed case-insensitively
+     * @param userDetails the authenticated caller (must be OWNER)
      * @return empty success envelope (TM_284)
      * @throws com.chat.talkMe.exception.NotFoundException   group, user, or membership not found
      *                                                       (TM_121 / TM_064 / TM_141)
@@ -167,8 +167,8 @@ public class GroupController {
     /**
      * Leave a group (marks the caller a former member); the owner must transfer/delete first.
      *
-     * @param uuid         UUID of the group
-     * @param userDetails  the authenticated caller
+     * @param uuid        UUID of the group
+     * @param userDetails the authenticated caller
      * @return empty success envelope (TM_285)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException caller is the owner (TM_298), not a group
@@ -186,9 +186,9 @@ public class GroupController {
     /**
      * Transfer ownership to another member (caller demotes to ADMIN, target becomes OWNER).
      *
-     * @param uuid         UUID of the group
-     * @param body         map with {@code newOwnerId} (UUID of the new owner)
-     * @param userDetails  the authenticated caller (must be OWNER)
+     * @param uuid        UUID of the group
+     * @param body        map with {@code newOwnerId} (UUID of the new owner)
+     * @param userDetails the authenticated caller (must be OWNER)
      * @return empty success envelope (TM_286)
      * @throws com.chat.talkMe.exception.NotFoundException   group, new owner, or membership not found
      *                                                       (TM_121 / TM_064 / TM_141)
@@ -207,10 +207,10 @@ public class GroupController {
     /**
      * Discover public channels/rooms. type=channel|room (omit for both).
      *
-     * @param type         "channel" or "room" to narrow the type; null lists both (optional)
-     * @param query        free-text name/description filter (optional)
-     * @param tag          interest tag to filter by; unknown tags are ignored (optional)
-     * @param userDetails  the authenticated caller
+     * @param type        "channel" or "room" to narrow the type; null lists both (optional)
+     * @param query       free-text name/description filter (optional)
+     * @param tag         interest tag to filter by; unknown tags are ignored (optional)
+     * @param userDetails the authenticated caller
      * @return matching public discovery cards (membership-free) wrapped in a success envelope
      */
     @GetMapping("/discover")
@@ -226,8 +226,8 @@ public class GroupController {
     /**
      * Join a public, open channel/room.
      *
-     * @param uuid         UUID of the channel/room
-     * @param userDetails  the authenticated caller
+     * @param uuid        UUID of the channel/room
+     * @param userDetails the authenticated caller
      * @return the joined chat as a ChatResponse (TM_282)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException room is full (TM_297), not a group (TM_299),
@@ -245,8 +245,8 @@ public class GroupController {
     /**
      * Accept a pending group invitation (join the group).
      *
-     * @param uuid         UUID of the group
-     * @param userDetails  the authenticated invitee
+     * @param uuid        UUID of the group
+     * @param userDetails the authenticated invitee
      * @return the joined chat as a ChatResponse (TM_283)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121), or no pending
      *                                                       invite (TM_307)
@@ -264,8 +264,8 @@ public class GroupController {
     /**
      * Decline a pending group invitation (no-op if there is none).
      *
-     * @param uuid         UUID of the group
-     * @param userDetails  the authenticated invitee
+     * @param uuid        UUID of the group
+     * @param userDetails the authenticated invitee
      * @return empty success envelope (TM_284)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException not a group (TM_299), or bad id (TM_300)
@@ -281,9 +281,9 @@ public class GroupController {
     /**
      * Report a group/channel/room (writes an audit-log entry).
      *
-     * @param uuid         UUID of the group
-     * @param body         optional map with {@code reason} (default "other") and {@code details}
-     * @param userDetails  the authenticated reporter
+     * @param uuid        UUID of the group
+     * @param body        optional map with {@code reason} (default "other") and {@code details}
+     * @param userDetails the authenticated reporter
      * @return empty success envelope (TM_307)
      * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
      * @throws com.chat.talkMe.exception.BadRequestException not a group (TM_299), or bad id (TM_300)

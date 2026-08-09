@@ -231,7 +231,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Password-login pipeline: identifier resolution, country backfill, soft-delete recovery, and rejections. */
+
+    /**
+     * Password-login pipeline: identifier resolution, country backfill, soft-delete recovery, and rejections.
+     */
     @Nested
     @DisplayName("login")
     class Login {
@@ -431,7 +434,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Local account signup: persistence (lowercased email, unverified), referral attribution, and guards. */
+
+    /**
+     * Local account signup: persistence (lowercased email, unverified), referral attribution, and guards.
+     */
     @Nested
     @DisplayName("signup")
     class Signup {
@@ -538,7 +544,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Guest login: provisions an unverified guest with a generated username, creating ROLE_GUEST on demand. */
+
+    /**
+     * Guest login: provisions an unverified guest with a generated username, creating ROLE_GUEST on demand.
+     */
     @Nested
     @DisplayName("loginAsGuest")
     class LoginAsGuest {
@@ -585,7 +594,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Google OAuth login: first-time provisioning, existing-account backfill, soft-delete recovery, create races. */
+
+    /**
+     * Google OAuth login: first-time provisioning, existing-account backfill, soft-delete recovery, create races.
+     */
     @Nested
     @DisplayName("oauthLogin")
     class OauthLogin {
@@ -729,7 +741,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Refresh-token rotation: old token revoked, matching session bumped, guest expiry, and TM_026 rejections. */
+
+    /**
+     * Refresh-token rotation: old token revoked, matching session bumped, guest expiry, and TM_026 rejections.
+     */
     @Nested
     @DisplayName("refresh")
     class Refresh {
@@ -866,7 +881,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Logout: revokes a known refresh token; unknown tokens are a silent no-op. */
+
+    /**
+     * Logout: revokes a known refresh token; unknown tokens are a silent no-op.
+     */
     @Nested
     @DisplayName("logout")
     class Logout {
@@ -896,7 +914,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** getSessions: maps the user's active sessions to responses (empty list when none). */
+
+    /**
+     * getSessions: maps the user's active sessions to responses (empty list when none).
+     */
     @Nested
     @DisplayName("getSessions")
     class GetSessions {
@@ -926,7 +947,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** revokeSession: owner soft-deletes own session; TM_053 when missing, TM_103 (IDOR) for another user's. */
+
+    /**
+     * revokeSession: owner soft-deletes own session; TM_053 when missing, TM_103 (IDOR) for another user's.
+     */
     @Nested
     @DisplayName("revokeSession")
     class RevokeSession {
@@ -975,7 +999,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** revokeAllSessions: deletes every session except the caller's current one. */
+
+    /**
+     * revokeAllSessions: deletes every session except the caller's current one.
+     */
     @Nested
     @DisplayName("revokeAllSessions")
     class RevokeAllSessions {
@@ -998,7 +1025,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** forgotPassword: stores a Redis reset token and emails it; anti-enumeration no-op for unknown/guest/deleted. */
+
+    /**
+     * forgotPassword: stores a Redis reset token and emails it; anti-enumeration no-op for unknown/guest/deleted.
+     */
     @Nested
     @DisplayName("forgotPassword")
     class ForgotPassword {
@@ -1071,7 +1101,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** resetPassword: consumes the Redis token, resets the hash, revokes all tokens; TM_038 on any bad token. */
+
+    /**
+     * resetPassword: consumes the Redis token, resets the hash, revokes all tokens; TM_038 on any bad token.
+     */
     @Nested
     @DisplayName("resetPassword")
     class ResetPassword {
@@ -1155,7 +1188,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** verifyEmail: marks verified + evicts feature cache + sends welcome; idempotent when already verified. */
+
+    /**
+     * verifyEmail: marks verified + evicts feature cache + sends welcome; idempotent when already verified.
+     */
     @Nested
     @DisplayName("verifyEmail")
     class VerifyEmail {
@@ -1233,7 +1269,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** resendVerificationEmail: re-sends for an unverified user; TM_404 when already verified, no-op for guest/null. */
+
+    /**
+     * resendVerificationEmail: re-sends for an unverified user; TM_404 when already verified, no-op for guest/null.
+     */
     @Nested
     @DisplayName("resendVerificationEmail")
     class ResendVerificationEmail {
@@ -1282,7 +1321,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** changePassword: verifies the current password, updates the hash, revokes all tokens; TM_042 on mismatch. */
+
+    /**
+     * changePassword: verifies the current password, updates the hash, revokes all tokens; TM_042 on mismatch.
+     */
     @Nested
     @DisplayName("changePassword")
     class ChangePassword {
@@ -1336,6 +1378,7 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
+
     /**
      * requestAccountDeletion: soft-deletes + sets the purge timer + revokes tokens;
      * OAuth-only skips the password check.
@@ -1424,8 +1467,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** purgeExpiredDeletedAccounts: anonymizes accounts past the recovery window and returns the count; one bad
-     * row is isolated so the rest still purge. */
+
+    /**
+     * purgeExpiredDeletedAccounts: anonymizes accounts past the recovery window and returns the count; one bad
+     * row is isolated so the rest still purge.
+     */
     @Nested
     @DisplayName("purgeExpiredDeletedAccounts")
     class PurgeExpiredDeletedAccounts {
@@ -1484,7 +1530,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** getCurrentUser: re-reads the user and returns the mapped response enriched with effective features; TM_024. */
+
+    /**
+     * getCurrentUser: re-reads the user and returns the mapped response enriched with effective features; TM_024.
+     */
     @Nested
     @DisplayName("getCurrentUser")
     class GetCurrentUser {
@@ -1517,8 +1566,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** updateProfile: applies non-null fields (null left untouched), clamps/filters the personality map, and
-     * records PROFILE_COMPLETED on reaching 100% completion. */
+
+    /**
+     * updateProfile: applies non-null fields (null left untouched), clamps/filters the personality map, and
+     * records PROFILE_COMPLETED on reaching 100% completion.
+     */
     @Nested
     @DisplayName("updateProfile")
     class UpdateProfile {
@@ -1642,8 +1694,10 @@ class AuthServiceImplTest {
     // returns, cooldown fail-open, and the pure device/username helpers.
     // ══════════════════════════════════════════════════════════════════════════════
 
-    /** Extra branch coverage for {@code login}: country-backfill guards, login-alert opt-out/null/blank/failure
-     * paths, blank-IP handling, and swallowed push-sweep failures. */
+    /**
+     * Extra branch coverage for {@code login}: country-backfill guards, login-alert opt-out/null/blank/failure
+     * paths, blank-IP handling, and swallowed push-sweep failures.
+     */
     @Nested
     @DisplayName("login (branch backfill)")
     class LoginBranches {
@@ -1827,8 +1881,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Extra branch coverage for {@code signup}: every referrer-rejection path (blank/@-only/self/guest/banned/
-     * deleted/lookup-throws) and the null-email verification-send skip. */
+
+    /**
+     * Extra branch coverage for {@code signup}: every referrer-rejection path (blank/@-only/self/guest/banned/
+     * deleted/lookup-throws) and the null-email verification-send skip.
+     */
     @Nested
     @DisplayName("signup referral / verification (branch backfill)")
     class SignupReferralBranches {
@@ -1845,7 +1902,9 @@ class AuthServiceImplTest {
             return r;
         }
 
-        /** Stub the collaborators a clean signup needs so a test only has to vary the referrer/email under test. */
+        /**
+         * Stub the collaborators a clean signup needs so a test only has to vary the referrer/email under test.
+         */
         private void stubSignupBase() {
             when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
             when(pwnedPasswordService.isBreached(any())).thenReturn(false);
@@ -1857,7 +1916,9 @@ class AuthServiceImplTest {
             stubLoginPipeline();
         }
 
-        /** The user as last persisted; signup saves twice (create, then referral/attribution), so return the last. */
+        /**
+         * The user as last persisted; signup saves twice (create, then referral/attribution), so return the last.
+         */
         private User savedUser() {
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
@@ -1968,8 +2029,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Extra branch coverage for {@code oauthLogin}: blank/null email + provider-id matching, default display name,
-     * per-field backfill guards (image/gender/verified/country), and the email-based create-race recovery. */
+
+    /**
+     * Extra branch coverage for {@code oauthLogin}: blank/null email + provider-id matching, default display name,
+     * per-field backfill guards (image/gender/verified/country), and the email-based create-race recovery.
+     */
     @Nested
     @DisplayName("oauthLogin (branch backfill)")
     class OauthBranches {
@@ -2230,7 +2294,10 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Extra branch coverage for {@code resendVerificationEmail}: blank-email recipient guard and active cooldown. */
+
+    /**
+     * Extra branch coverage for {@code resendVerificationEmail}: blank-email recipient guard and active cooldown.
+     */
     @Nested
     @DisplayName("resendVerificationEmail (branch backfill)")
     class ResendVerificationBranches {
@@ -2261,8 +2328,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Extra branch coverage for {@code forgotPassword}: null/blank recipient email passing the cooldown check,
-     * and a Redis failure in the cooldown lookup failing open (reset still sent). */
+
+    /**
+     * Extra branch coverage for {@code forgotPassword}: null/blank recipient email passing the cooldown check,
+     * and a Redis failure in the cooldown lookup failing open (reset still sent).
+     */
     @Nested
     @DisplayName("forgotPassword cooldown / recipient (branch backfill)")
     class ForgotPasswordCooldownBranches {
@@ -2312,8 +2382,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Assorted null-token / state-guard branches across resetPassword, verifyEmail, forgotPassword, refresh
-     * (user-agent mismatch), requestAccountDeletion (blank hash), and purge (null interests). */
+
+    /**
+     * Assorted null-token / state-guard branches across resetPassword, verifyEmail, forgotPassword, refresh
+     * (user-agent mismatch), requestAccountDeletion (blank hash), and purge (null interests).
+     */
     @Nested
     @DisplayName("token/state guard branches (backfill)")
     class MiscBranchCoverage {
@@ -2399,8 +2472,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Directly exercises the private {@code generateUniqueUsername} helper (via reflection): base derivation from
-     * email/name, blank fallback to "user", 40-char truncation, and collision suffixing. */
+
+    /**
+     * Directly exercises the private {@code generateUniqueUsername} helper (via reflection): base derivation from
+     * email/name, blank fallback to "user", 40-char truncation, and collision suffixing.
+     */
     @Nested
     @DisplayName("generateUniqueUsername (direct)")
     class GenerateUniqueUsernameDirect {
@@ -2448,8 +2524,11 @@ class AuthServiceImplTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
-    /** Parameterized coverage of the private {@code friendlyDevice} User-Agent → label mapper across the
-     * OS/browser matrix (via reflection). */
+
+    /**
+     * Parameterized coverage of the private {@code friendlyDevice} User-Agent → label mapper across the
+     * OS/browser matrix (via reflection).
+     */
     @Nested
     @DisplayName("friendlyDevice (direct)")
     class FriendlyDeviceDirect {

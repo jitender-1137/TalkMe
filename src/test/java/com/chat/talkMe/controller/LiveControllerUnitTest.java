@@ -102,7 +102,9 @@ class LiveControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -110,12 +112,16 @@ class LiveControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Renders the single-field request body {@code {"chatUuid":"<value>"}}. */
+    /**
+     * Renders the single-field request body {@code {"chatUuid":"<value>"}}.
+     */
     private static String body(String chatUuid) {
         return "{\"chatUuid\":\"" + chatUuid + "\"}";
     }
 
-    /** Fixture for a minted LiveKit token response. */
+    /**
+     * Fixture for a minted LiveKit token response.
+     */
     private static LiveTokenResponse token() {
         return LiveTokenResponse.builder()
                 .token("jwt-token")

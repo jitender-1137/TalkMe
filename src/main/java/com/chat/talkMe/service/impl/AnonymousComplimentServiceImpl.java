@@ -64,13 +64,13 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
      * @param sender  the authenticated author of the compliment
      * @param request holds the recipient uuid and the compliment message
      * @return the sender's own "sent" view of the persisted compliment (fromMe=true)
-     * @throws com.chat.talkMe.exception.BadRequestException on self-send (TM_962), a
-     *         guest/banned recipient or a block in either direction (TM_963), or empty
-     *         message (TM_964); {@link com.chat.talkMe.exception.NotFoundException} (TM_404)
-     *         if the recipient uuid does not resolve
+     * @throws com.chat.talkMe.exception.BadRequestException        on self-send (TM_962), a
+     *                                                              guest/banned recipient or a block in either direction (TM_963), or empty
+     *                                                              message (TM_964); {@link com.chat.talkMe.exception.NotFoundException} (TM_404)
+     *                                                              if the recipient uuid does not resolve
      * @throws com.chat.talkMe.exception.ContentModerationException if the text is explicit
-     * @throws com.chat.talkMe.exception.TooManyRequestsException if the sender exceeded the
-     *         rolling 24h cap of {@link #DAILY_CAP} (TM_965)
+     * @throws com.chat.talkMe.exception.TooManyRequestsException   if the sender exceeded the
+     *                                                              rolling 24h cap of {@link #DAILY_CAP} (TM_965)
      */
     @Override
     public ComplimentResponse send(User sender, SendComplimentRequest request) {
@@ -160,13 +160,13 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
      * Recipient asks the sender to reveal their identity, moving SENT → REVEAL_REQUESTED and
      * notifying the sender over WS. Idempotent when already REVEAL_REQUESTED.
      *
-     * @param me            the authenticated recipient (only the recipient may request)
+     * @param me             the authenticated recipient (only the recipient may request)
      * @param complimentUuid uuid of the compliment
      * @return the recipient's own view (sender still hidden unless already REVEALED)
-     * @throws com.chat.talkMe.exception.NotFoundException if the compliment is missing or the
-     *         caller is not its recipient (IDOR-guarded, TM_966)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the compliment is missing or the
+     *                                                       caller is not its recipient (IDOR-guarded, TM_966)
      * @throws com.chat.talkMe.exception.BadRequestException if it was already REVEALED or
-     *         DECLINED (TM_967)
+     *                                                       DECLINED (TM_967)
      */
     @Override
     public ComplimentResponse requestReveal(User me, String complimentUuid) {
@@ -200,14 +200,14 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
      * learns the sender — the one point identity is exposed); on decline it becomes DECLINED.
      * The recipient is notified over WS either way.
      *
-     * @param me            the authenticated sender (only the sender may respond)
+     * @param me             the authenticated sender (only the sender may respond)
      * @param complimentUuid uuid of the compliment
-     * @param accept        true to reveal identity, false to stay anonymous
+     * @param accept         true to reveal identity, false to stay anonymous
      * @return the sender's own "sent" view of the resolved compliment
-     * @throws com.chat.talkMe.exception.NotFoundException if the compliment is missing or the
-     *         caller is not its sender (IDOR-guarded, TM_966)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the compliment is missing or the
+     *                                                       caller is not its sender (IDOR-guarded, TM_966)
      * @throws com.chat.talkMe.exception.BadRequestException if there is no pending reveal
-     *         request (status != REVEAL_REQUESTED, TM_968)
+     *                                                       request (status != REVEAL_REQUESTED, TM_968)
      */
     @Override
     public ComplimentResponse respondReveal(User me, String complimentUuid, boolean accept) {
@@ -241,7 +241,7 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
     /**
      * Resolve a user by uuid.
      *
-     * @throws com.chat.talkMe.exception.NotFoundException if no such user (TM_404)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no such user (TM_404)
      * @throws com.chat.talkMe.exception.BadRequestException if the uuid is malformed (TM_961)
      */
     private User resolveUser(String uuid) {
@@ -252,7 +252,7 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
     /**
      * Resolve a compliment by uuid.
      *
-     * @throws com.chat.talkMe.exception.NotFoundException if no such compliment (TM_966)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no such compliment (TM_966)
      * @throws com.chat.talkMe.exception.BadRequestException if the uuid is malformed (TM_961)
      */
     private AnonymousCompliment resolveCompliment(String uuid) {

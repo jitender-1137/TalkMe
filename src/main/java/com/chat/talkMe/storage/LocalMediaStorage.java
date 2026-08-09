@@ -51,7 +51,7 @@ public class LocalMediaStorage implements MediaStorage {
      * @param contentType the MIME type ({@code java.lang.String}); unused by this backend
      * @return the absolute path reference {@code <media-root>/<key>} ({@code java.lang.String})
      * @throws com.chat.talkMe.exception.FileStorageException if the key is unsafe, escapes
-     *                    the root, or the copy fails
+     *                                                        the root, or the copy fails
      */
     @Override
     public String store(Path source, String key, String contentType) {
@@ -77,8 +77,8 @@ public class LocalMediaStorage implements MediaStorage {
      *
      * @param reference the stored reference ({@code java.lang.String})
      * @return an {@code java.util.Optional} of {@link MediaContent}; empty if the reference
-     *                  is unresolvable, escapes the root, is unreadable, or an
-     *                  {@code java.io.IOException} occurs
+     * is unresolvable, escapes the root, is unreadable, or an
+     * {@code java.io.IOException} occurs
      */
     @Override
     public Optional<MediaContent> open(String reference) {
@@ -100,7 +100,7 @@ public class LocalMediaStorage implements MediaStorage {
      *
      * @param reference the stored reference ({@code java.lang.String})
      * @return an {@code java.util.Optional} of {@link LocalFile}; empty if the reference is
-     *                  unresolvable or the file is not readable
+     * unresolvable or the file is not readable
      */
     @Override
     public Optional<LocalFile> localCopy(String reference) {

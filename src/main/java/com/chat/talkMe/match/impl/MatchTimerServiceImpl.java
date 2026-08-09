@@ -64,7 +64,7 @@ public class MatchTimerServiceImpl implements MatchTimerService {
      * No-op if the session no longer exists.
      *
      * @param sessionId the match session id
-     * @param seconds countdown length in seconds (floored to at least 1)
+     * @param seconds   countdown length in seconds (floored to at least 1)
      */
     @Override
     public void arm(String sessionId, int seconds) {
@@ -179,7 +179,7 @@ public class MatchTimerServiceImpl implements MatchTimerService {
      * peers as a CHEMISTRY_PROMPT event.
      *
      * @param session the match session
-     * @param index the (possibly out-of-range) rotating prompt index
+     * @param index   the (possibly out-of-range) rotating prompt index
      */
     private void sendPrompt(MatchSession session, int index) {
         String prompt = PROMPTS[Math.floorMod(index, PROMPTS.length)];
@@ -190,7 +190,7 @@ public class MatchTimerServiceImpl implements MatchTimerService {
      * Sends a match event with the given payload to both peers of the session.
      *
      * @param session the match session
-     * @param event the event name
+     * @param event   the event name
      * @param payload the event payload (copied defensively before sending)
      */
     private void sendBoth(MatchSession session, String event, Map<String, Object> payload) {

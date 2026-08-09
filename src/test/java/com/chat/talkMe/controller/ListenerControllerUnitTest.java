@@ -108,7 +108,9 @@ class ListenerControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -116,7 +118,9 @@ class ListenerControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Fixture for an on-duty volunteer whose shift is {@code AVAILABLE} (not yet matched to a room). */
+    /**
+     * Fixture for an on-duty volunteer whose shift is {@code AVAILABLE} (not yet matched to a room).
+     */
     private static ListenerShiftResponse availableShift() {
         return ListenerShiftResponse.builder()
                 .id(SHIFT_ID)
@@ -131,7 +135,9 @@ class ListenerControllerUnitTest {
                 .build();
     }
 
-    /** Fixture for an {@code ENGAGED} shift that has been matched to a live room ({@code roomChatUuid} set). */
+    /**
+     * Fixture for an {@code ENGAGED} shift that has been matched to a live room ({@code roomChatUuid} set).
+     */
     private static ListenerShiftResponse matchedShift() {
         return ListenerShiftResponse.builder()
                 .id(SHIFT_ID)

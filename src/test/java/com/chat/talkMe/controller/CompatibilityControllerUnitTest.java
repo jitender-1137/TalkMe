@@ -103,7 +103,9 @@ class CompatibilityControllerUnitTest {
         SecurityContextHolder.clearContext();
     }
 
-    /** Builds a {@link CompatibilityScore} stub with the given overall value (fixed HIGH bucket). */
+    /**
+     * Builds a {@link CompatibilityScore} stub with the given overall value (fixed HIGH bucket).
+     */
     private static CompatibilityScore score(int overall) {
         return CompatibilityScore.builder().overall(overall).bucket("HIGH").explanation("great").build();
     }

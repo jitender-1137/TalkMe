@@ -37,9 +37,9 @@ public class MatchConsentServiceImpl implements MatchConsentService {
      * PENDING, then tells the sender their message was held (echoing the clientId, current
      * status, decline count and whether the cap is reached) so the UI can flag it in-place.
      *
-     * @param sender the username whose explicit message was held
+     * @param sender   the username whose explicit message was held
      * @param clientId the sender's client-generated message id (may be null)
-     * @param session the active match session carrying the consent state
+     * @param session  the active match session carrying the consent state
      */
     @Override
     public void handleHeldExplicit(String sender, String clientId, MatchSession session) {
@@ -128,7 +128,7 @@ public class MatchConsentServiceImpl implements MatchConsentService {
      * Returns the other participant of the session relative to the given user.
      *
      * @param session the match session
-     * @param user one participant's username
+     * @param user    one participant's username
      * @return the peer's username
      */
     private String peer(MatchSession session, String user) {

@@ -51,7 +51,7 @@ public class BucketListServiceImpl implements BucketListService {
      * IDOR guard: the caller must be a member of the chat the list belongs to.
      *
      * @throws com.chat.talkMe.exception.BadRequestException if chatId is not a valid uuid (TM_400)
-     * @throws com.chat.talkMe.exception.ForbiddenException if the user is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the user is not a chat member (TM_103)
      */
     private void requireChatMember(User user, String chatId) {
         boolean member;
@@ -73,7 +73,7 @@ public class BucketListServiceImpl implements BucketListService {
      * @param user   the authenticated caller (must be a member of the chat)
      * @param chatId uuid of the owning chat
      * @return the list with all items ordered by index
-     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member (TM_103)
      * @throws com.chat.talkMe.exception.BadRequestException if chatId is malformed (TM_400)
      */
     @Override
@@ -90,9 +90,9 @@ public class BucketListServiceImpl implements BucketListService {
      * @param chatId uuid of the owning chat
      * @param text   the item text (trimmed); must be non-blank
      * @return the refreshed full list
-     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member (TM_103)
      * @throws com.chat.talkMe.exception.BadRequestException if text is blank (TM_810) or chatId
-     *         is malformed (TM_400)
+     *                                                       is malformed (TM_400)
      */
     @Override
     public BucketListResponse addItem(User user, String chatId, String text) {
@@ -124,10 +124,10 @@ public class BucketListServiceImpl implements BucketListService {
      * @param chatId   uuid of the owning chat
      * @param itemUuid uuid of the item to toggle
      * @return the refreshed full list
-     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member (TM_103)
      * @throws com.chat.talkMe.exception.BadRequestException if chatId (TM_400) or itemUuid (TM_811)
-     *         is malformed
-     * @throws com.chat.talkMe.exception.NotFoundException if the item is not in this list (TM_812)
+     *                                                       is malformed
+     * @throws com.chat.talkMe.exception.NotFoundException   if the item is not in this list (TM_812)
      */
     @Override
     public BucketListResponse toggleItem(User user, String chatId, String itemUuid) {
@@ -156,10 +156,10 @@ public class BucketListServiceImpl implements BucketListService {
      * @param chatId   uuid of the owning chat
      * @param itemUuid uuid of the item to remove
      * @return the refreshed full list
-     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member (TM_103)
      * @throws com.chat.talkMe.exception.BadRequestException if chatId (TM_400) or itemUuid (TM_811)
-     *         is malformed
-     * @throws com.chat.talkMe.exception.NotFoundException if the item is not in this list (TM_812)
+     *                                                       is malformed
+     * @throws com.chat.talkMe.exception.NotFoundException   if the item is not in this list (TM_812)
      */
     @Override
     public BucketListResponse removeItem(User user, String chatId, String itemUuid) {
@@ -202,7 +202,7 @@ public class BucketListServiceImpl implements BucketListService {
      * Load an item by uuid, scoped to the given list.
      *
      * @throws com.chat.talkMe.exception.BadRequestException if itemUuid is malformed (TM_811)
-     * @throws com.chat.talkMe.exception.NotFoundException if no such item in the list (TM_812)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no such item in the list (TM_812)
      */
     private BucketListItem loadItem(BucketList list, String itemUuid) {
         UUID uuid;

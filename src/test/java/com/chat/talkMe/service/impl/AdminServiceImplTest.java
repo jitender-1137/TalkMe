@@ -277,6 +277,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getStats}: the dashboard headline counts, plus the Redis read-through cache
      * (miss→compute→populate, hit→deserialize, outage→fail-open to a live DB read).
@@ -341,6 +342,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code listUsers}: filter→page mapping with presence enrichment, null-filter defaulting,
      * sort-field whitelisting (unknown key → createdAt desc) and page-size clamping to 100.
@@ -417,6 +419,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getUser}: single-user detail view with chat/message counts; malformed and absent
      * uuids both surface as {@code NotFoundException TM_064} rather than a raw 500.
@@ -461,6 +464,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getUserFull}: assembles the account/settings/presence maps, falling back to
      * explanatory {@code _note} entries when the settings/presence rows are absent.
@@ -513,6 +517,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getUserChats}: maps the admin chat history (including soft-deleted chats) into views
      * with message counts; absent user → {@code TM_064}.
@@ -552,6 +557,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code listChats}: parses the chat-type filter (unknown → no type filter), writes a
      * {@code VIEW_CHATS} audit row, and paginates.
@@ -590,6 +596,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getChatMessages}: decrypts message content, writes a {@code VIEW_MESSAGES} audit
      * trail, and paginates; malformed/absent chat uuid → {@code TM_121}.
@@ -643,6 +650,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The moderation flag mutations ({@code setBanned}/{@code setVerified}/{@code setSoftDeleted}):
      * each toggles its flag, saves, and writes the matching audit action (and stamps/clears
@@ -732,6 +740,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code grantRole}/{@code revokeRole}: role add/remove with lazy Role creation, idempotent
      * no-ops when already-held / not-held, and a non-assignable role rejected as {@code TM_071}
@@ -831,6 +840,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code listAudit}: maps audit rows and batch-resolves acting-admin usernames to uuids;
      * an empty page skips the resolution query entirely.
@@ -876,6 +886,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code createUser}: creates a pre-verified user with a normalized email and hashed password;
      * duplicate email → {@code TM_047}, duplicate username → {@code TM_048}, neither saves.
@@ -949,6 +960,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code updateUser}: applies only non-null fields, parses/filters interests, re-hashes the
      * password; email/username clashes → {@code TM_047}/{@code TM_048}; absent user → {@code TM_064}.
@@ -1023,6 +1035,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code deleteMessage}/{@code deleteChat}: soft-delete + save + audit; absent message →
      * {@code TM_150}, absent chat → {@code TM_121}.
@@ -1083,6 +1096,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getSignupTimeseries}: one zero-filled point per day over the requested window,
      * with the day count clamped to the [1, 365] range.
@@ -1114,6 +1128,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getTimeseries}: metric routing (default/signups → the right repository) and bucketing;
      * a custom from/to window bypasses the Redis cache and computes directly.
@@ -1164,6 +1179,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getAnalytics}: assembles totals, a live Redis lobby snapshot (fail-open to 0),
      * presence status breakdown, and the friend-count distribution bucketing. {@code stubAnalyticsDefaults}
@@ -1285,6 +1301,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getUserFriends}: each friend mapped to a connector view sorted by friend count desc;
      * absent user → {@code TM_064}.
@@ -1323,6 +1340,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getAttachments}: maps attachments with decrypted urls and a {@code VIEW_ATTACHMENTS}
      * audit; user + type filters parse (unknown type → null), and a filter on an absent user → {@code TM_064}.
@@ -1385,6 +1403,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getStorageObjects}: reconciles the object store against DB rows, classifies kind and
      * flags chat-media orphans, computes aggregate counts, applies kind/category/orphan/search
@@ -1483,6 +1502,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code deleteStorageObject}: deletes the physical object by reference and audits; null or
      * path-traversal keys are rejected as {@code TM_071} with nothing deleted.
@@ -1520,6 +1540,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The post read surface ({@code listPosts}/{@code getPostLikes}/{@code getPostComments}):
      * maps posts with like/comment counts and their likers/commenters; absent post → {@code TM_180}.
@@ -1607,6 +1628,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The moderation-report surface ({@code listReports}/{@code getReport}/{@code reviewReport}):
      * status-filtered listing, enriched detail with reported-user history, and the review actions
@@ -1745,6 +1767,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code listFeedback}/{@code updateFeedbackStatus}: the four type/status filter combinations
      * each route to the right repository query; status transition saves+audits; unknown status →
@@ -1846,6 +1869,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * Targets the private {@code toView} user mapper (exercised via getUser/listUsers): presence
      * resolution to online/idle/offline and the optional-field rendering of a fully-populated user.
@@ -1892,6 +1916,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getUserFull} again, driving every non-null branch of the account map (passwordSet,
      * googleLinked, interests, roles, timestamps).
@@ -1929,6 +1954,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code updateUser} coverage completion: sets every remaining scalar field, and verifies the
      * same-case-insensitive email/username short-circuit (no uniqueness query) and blank-password
@@ -1976,6 +2002,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getChatMessages} attachment branch: a message carrying an attachment surfaces a
      * decrypted mediaUrl on the view.
@@ -2008,6 +2035,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The private {@code toAttachmentView} mapper (via getAttachments): chat members other than the
      * sender become {@code sharedWith}, thumbnails/chat metadata render, and an orphaned message
@@ -2071,6 +2099,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The private post/like/comment mappers: a rich post maps all media items and poll/audio flags;
      * author-less posts and null-user likes/comments degrade to null fields with id fallbacks, and a
@@ -2162,6 +2191,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The private {@code toReportView} mapper (via listReports): renders the match-session block and
      * the against/by/duplicate count fields; null reporter/reported and a host/peer-less session
@@ -2230,6 +2260,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The private {@code reconcileStorage} pass behind getStorageObjects, linked-media path:
      * classifies each linked chat attachment by type/mime/name (image/video/voice/audio/file),
@@ -2314,6 +2345,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code reconcileStorage} orphan path: kind derived from content-type then filename extension,
      * with {@code orphan} true only for chat-media categories (conversations/lobby/strangers), not
@@ -2358,6 +2390,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getStorageObjects} resilience: the oldest/smallest/name comparators all resolve, and an
      * attachment whose encrypted file reference cannot be decrypted is skipped rather than fatal.
@@ -2402,6 +2435,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The private {@code toChatView} mapper (via getUserChats): blank names derive from members,
      * long last-message previews truncate at 140 chars, media/blank/short content preview variants,
@@ -2492,6 +2526,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code reconcileStorage} deep edge coverage: a fully-populated linked message renders
      * forwarded/edited/expired/deleted + all timestamps; minimal/null messages fall back; foreign or
@@ -2646,6 +2681,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * The private {@code kindForLinked}/{@code categoryOf} helpers: with a null message-type, kind is
      * driven by mime (audio→voice/audio, video, image), and opus/ogg/ptt/voice-prefix names read as
@@ -2698,6 +2734,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * Null/blank sub-branch coverage for the user mappers: null uuid, blank googleId, and null
      * roles/interests render as null/false; and inside the present settings/presence lambdas, null
@@ -2750,6 +2787,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getChatMessages} message-mapper null branches: no uuid → numeric id, null sender/type
      * (null type → "TEXT"), null attachments → null mediaUrl, null moderation status.
@@ -2786,6 +2824,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code listAudit} edge branches: a log without a uuid falls back to its numeric id, an admin
      * whose uuid is null is dropped from the resolution map, and unparseable/blank date filters are ignored.
@@ -2819,6 +2858,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code toPostView} remaining branches: null media list → empty, null audience, author without a
      * uuid → null authorId, createdAt present.
@@ -2852,6 +2892,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code toAttachmentView} remaining branches: a null sender means all members are shared; null
      * chat uuid/type → null ids; a null members list → empty sharedWith; and a sender without a uuid
@@ -2915,6 +2956,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code toReportView} id/session fallbacks plus {@code getReport} enrichment: builds the prior-report
      * history (mixing populated and all-null rows) and resolves {@code relatedChatId} from a private chat
@@ -3018,6 +3060,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code listFeedback} parse fallbacks (unparseable type AND status → findAll) and the
      * {@code toFeedbackView} null branches (null user → null author, null uuid/type/status, author
@@ -3067,6 +3110,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getTimeseries} exhaustive switch coverage: every named range, every metric (each routed to
      * its repository), every interval override (incl. snap-to-1w on huge spans), and reversed/unparseable
@@ -3144,6 +3188,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getMediaOwnership}: aggregates the media_assets ledger into totals, per-context/type
      * buckets, top uploaders, and recent uploads (+ a {@code VIEW_MEDIA_STATS} audit); an empty ledger
@@ -3227,6 +3272,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getUserMedia}: a user's uploads + per-context summary from media_assets, audited as
      * {@code VIEW_USER_MEDIA}; absent user → {@code TM_064}.
@@ -3277,6 +3323,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code getChatMedia}: sources media from the chat's MessageAttachments (sender as owner,
      * CONVERSATION context), audited as {@code VIEW_CHAT_MEDIA}; malformed/absent chat → {@code TM_121}.
@@ -3335,6 +3382,7 @@ class AdminServiceImplTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+
     /**
      * {@code reconcileStorage} orphan-owner attribution precedence: an upload record →
      * {@code UPLOAD_RECORD}, else a uuid parsed from a legacy path → {@code STORAGE_PATH}, else

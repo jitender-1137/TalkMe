@@ -167,6 +167,7 @@ public class AdminServiceImpl implements AdminService {
      * against Postgres every few seconds. Short TTLs keep it near-real-time; a Redis
      * outage transparently falls back to the live DB query.
      */
+
     /**
      * Namespace cache keys with a generation counter so one INCR invalidates ALL of them.
      */
@@ -682,7 +683,7 @@ public class AdminServiceImpl implements AdminService {
      * @param adminUsername acting admin, recorded in the audit log
      * @return the updated detail view
      * @throws com.chat.talkMe.exception.BadRequestException if the role is not assignable (TM_071)
-     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the user is unknown (TM_064)
      */
     @Override
     @Transactional
@@ -709,7 +710,7 @@ public class AdminServiceImpl implements AdminService {
      * @param adminUsername acting admin, recorded in the audit log
      * @return the updated detail view
      * @throws com.chat.talkMe.exception.BadRequestException if the role is not assignable (TM_071)
-     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the user is unknown (TM_064)
      */
     @Override
     @Transactional
@@ -887,7 +888,7 @@ public class AdminServiceImpl implements AdminService {
      * @param adminUsername acting admin, recorded in the audit log
      * @return the created user's detail view
      * @throws com.chat.talkMe.exception.ConflictException if the email (TM_047) or username
-     *         (TM_048) already exists
+     *                                                     (TM_048) already exists
      */
     @Override
     @Transactional
@@ -929,7 +930,7 @@ public class AdminServiceImpl implements AdminService {
      * @return the updated detail view
      * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
      * @throws com.chat.talkMe.exception.ConflictException if a changed email (TM_047) or
-     *         username (TM_048) collides with another account
+     *                                                     username (TM_048) collides with another account
      */
     @Override
     @Transactional
@@ -1593,7 +1594,7 @@ public class AdminServiceImpl implements AdminService {
      * @param note          optional resolution note
      * @param adminUsername acting admin, recorded on the report and in the audit log
      * @return the updated report view
-     * @throws com.chat.talkMe.exception.NotFoundException if the report is unknown (TM_181)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the report is unknown (TM_181)
      * @throws com.chat.talkMe.exception.BadRequestException if the action is unrecognized (TM_071)
      */
     @Override
@@ -1673,7 +1674,7 @@ public class AdminServiceImpl implements AdminService {
      * @param status        the new status name (case-insensitive)
      * @param adminUsername acting admin, recorded in the audit log
      * @return the updated feedback view
-     * @throws com.chat.talkMe.exception.NotFoundException if the feedback is unknown (TM_312)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the feedback is unknown (TM_312)
      * @throws com.chat.talkMe.exception.BadRequestException if the status is unrecognized (TM_071)
      */
     @Override

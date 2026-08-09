@@ -73,9 +73,9 @@ public class UploadController {
      * @param contextId   client-supplied id used only for the conversation context (validated as a UUID)
      * @param userDetails the authenticated principal; owner ids are derived from it, never the client
      * @return 200 with the stored file's url, name, actual stored size, and mime type
-     * @throws com.chat.talkMe.exception.ServiceException            if the file exceeds its per-type size cap (413)
-     * @throws com.chat.talkMe.exception.ContentModerationException  if a moderated-context image is explicit
-     * @throws com.chat.talkMe.exception.FileStorageException        if the file cannot be stored
+     * @throws com.chat.talkMe.exception.ServiceException           if the file exceeds its per-type size cap (413)
+     * @throws com.chat.talkMe.exception.ContentModerationException if a moderated-context image is explicit
+     * @throws com.chat.talkMe.exception.FileStorageException       if the file cannot be stored
      */
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<UploadResponse>> uploadFile(

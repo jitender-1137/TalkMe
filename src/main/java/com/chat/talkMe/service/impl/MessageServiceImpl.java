@@ -122,10 +122,10 @@ public class MessageServiceImpl implements MessageService {
      * @param request     send payload (content, type, attachment, clientId, mentions, flags)
      * @param currentUser the authenticated sender
      * @return the persisted (or transient, for ephemeral rooms) message as a response DTO
-     * @throws com.chat.talkMe.exception.NotFoundException          if the chat is missing/deleted
-     * @throws com.chat.talkMe.exception.ForbiddenException         if not a member, left, blocked,
-     *                                                              or messaging-privacy/authz denies
-     * @throws com.chat.talkMe.exception.TooManyRequestsException   if slow mode gate is hit
+     * @throws com.chat.talkMe.exception.NotFoundException           if the chat is missing/deleted
+     * @throws com.chat.talkMe.exception.ForbiddenException          if not a member, left, blocked,
+     *                                                               or messaging-privacy/authz denies
+     * @throws com.chat.talkMe.exception.TooManyRequestsException    if slow mode gate is hit
      * @throws com.chat.talkMe.moderation.ContentModerationException if explicit content is hard-blocked
      */
     @Override
@@ -940,9 +940,9 @@ public class MessageServiceImpl implements MessageService {
      * @param content     new content (ciphertext for encrypted chats, else plaintext)
      * @param currentUser the authenticated caller (must be the sender)
      * @return the updated message as a response DTO
-     * @throws com.chat.talkMe.exception.NotFoundException          if the chat/message is missing
-     * @throws com.chat.talkMe.exception.ForbiddenException         if not a member or not the sender
-     * @throws com.chat.talkMe.exception.BadRequestException        if deleted, non-text, or empty
+     * @throws com.chat.talkMe.exception.NotFoundException           if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException          if not a member or not the sender
+     * @throws com.chat.talkMe.exception.BadRequestException         if deleted, non-text, or empty
      * @throws com.chat.talkMe.moderation.ContentModerationException if the new text is disallowed explicit
      */
     @Override

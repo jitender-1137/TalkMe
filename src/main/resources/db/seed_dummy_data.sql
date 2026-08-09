@@ -1404,7 +1404,8 @@ INSERT INTO users (id, uuid, username, email, password_hash, name, age, gender, 
         ', false, true, NULL, ' United States ', ' Los Angeles ', ' + 13661053720 ', ' Gaming is life.Hit me up for a co
         - op session ! ', ' Entrepreneur ', ' Associate Degree ', NOW() - INTERVAL ' 1 days ', NOW());
 INSERT INTO user_roles (user_id, role_id) VALUES (92, 1);
-INSERT INTO user_settings (id, uuid, user_id, theme, language, notifications_enabled, safe_mode_enabled, sound_enabled) VALUES (92, ' 88693030-
+INSERT INTO user_settings (id, uuid, user_id, theme, language, notifications_enabled, safe_mode_enabled, sound_enabled) VALUES (92, '
+        88693030 -
         be50 - 44b1 - 915a - f09ff1e33372 ', 92, ' LIGHT ', ' en ', true, true, true);
 INSERT INTO user_presences (id, uuid, user_id, status, last_seen_at, ghost_mode_enabled, invisible_mode_enabled) VALUES (92, '
         c9b6b8fc - e351 - 4977 - 9fca - 7cabb258ace1 ', 92, ' IDLE ', NOW() - INTERVAL ' 7 minutes ', false, false);
@@ -2310,7 +2311,8 @@ INSERT INTO post_comments (uuid, post_id, user_id, content, created_at, updated_
         af47 - 9cf61c3e0da3 ', 21, 13, ' Which book is it ? ', NOW() - INTERVAL ' 4 hours ', NOW());
 
 INSERT INTO posts (id, uuid, user_id, content, created_at, updated_at) VALUES (22, ' d89a653c - f132 - 4f3c - 9ac0 -
-        0f808950b961 ', 88, ' Spent the weekend hiking in the mountains.The views were absolutely breathtaking.🌲🏔️', NOW() - INTERVAL ' 4
+        0f808950b961 ', 88, ' Spent the weekend hiking in the mountains.The views were absolutely breathtaking.🌲🏔️', NOW() - INTERVAL '
+        4
         days ', NOW());
 INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' 892e1f45 - 2524 - 43fb - b5c4 - 7f5a0299ffd6
         ', 22, 5, NOW() - INTERVAL ' 24 hours ');
@@ -2334,11 +2336,11 @@ INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' 3bfedff8 -
         ', 22, 13, NOW() - INTERVAL ' 1 hours ');
 INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' a20719cc - dbf0 - 435d - a35b - db7699756c29
         ', 22, 68, NOW() - INTERVAL ' 13 hours ');
-INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' 46020e59- 71a2 - 4df0 - b1c4 - 4e6c2bfd5d06
+INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' 46020e59 - 71a2 - 4df0 - b1c4 - 4e6c2bfd5d06
         ', 22, 39, NOW() - INTERVAL ' 24 hours ');
-INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' 08208866- 3853 - 42b3 - abe0 - ab88a4cbced4
+INSERT INTO post_likes (uuid, post_id, user_id, created_at) VALUES (' 08208866 - 3853 - 42b3 - abe0 - ab88a4cbced4
         ', 22, 91, NOW() - INTERVAL ' 22 hours ');
-INSERT INTO post_comments (uuid, post_id, user_id, content, created_at, updated_at) VALUES (' 11038685- 4220 - 4dc7 -
+INSERT INTO post_comments (uuid, post_id, user_id, content, created_at, updated_at) VALUES (' 11038685 - 4220 - 4dc7 -
         ae36 - 4bdf44e6d59d ', 22, 4, ' Looks beautiful, where is this ? ', NOW() - INTERVAL ' 6 hours ', NOW());
 INSERT INTO post_comments (uuid, post_id, user_id, content, created_at, updated_at) VALUES (' b74f27ed - 5f51 - 4d5c -
         8fe2 - 66e546255695 ', 22, 47, ' Congrats ! Keep up the good work.', NOW() - INTERVAL ' 9 hours ', NOW());

@@ -40,7 +40,7 @@ public class EventController {
      * @param userDetails the authenticated user who becomes the host
      * @return 200 with the created event and success code TM_952
      * @throws com.chat.talkMe.exception.BadRequestException if the start time is not in the future,
-     *         the end time is not after the start, or maxAttendees is negative
+     *                                                       the end time is not after the start, or maxAttendees is negative
      */
     @PostMapping
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
@@ -91,7 +91,7 @@ public class EventController {
      * @return 200 with the updated event and success code TM_953
      * @throws com.chat.talkMe.exception.NotFoundException   if the UUID is malformed or no event exists
      * @throws com.chat.talkMe.exception.BadRequestException if the status is invalid, the event is
-     *         cancelled/ended, or a new GOING RSVP would exceed the seat cap
+     *                                                       cancelled/ended, or a new GOING RSVP would exceed the seat cap
      */
     @PostMapping("/{uuid}/rsvp")
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")

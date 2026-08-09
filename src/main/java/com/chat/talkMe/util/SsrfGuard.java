@@ -101,7 +101,7 @@ public final class SsrfGuard {
     /**
      * @param addr the resolved address to check
      * @return {@code true} if the address is loopback, any-local, link-local, site-local,
-     *         multicast, or an IPv6 unique-local address (i.e. not safe to fetch)
+     * multicast, or an IPv6 unique-local address (i.e. not safe to fetch)
      */
     private static boolean isBlocked(InetAddress addr) {
         return addr.isLoopbackAddress()

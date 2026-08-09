@@ -303,7 +303,7 @@ public class AdminController {
      * @return the updated {@link AdminUserView}
      * @throws com.chat.talkMe.exception.NotFoundException if no user matches the UUID
      * @throws com.chat.talkMe.exception.ConflictException if a changed username or email
-     *         collides with another account
+     *                                                     collides with another account
      */
     @PatchMapping("/users/{uuid}")
     public ResponseEntity<ResponseDto<AdminUserView>> updateUser(

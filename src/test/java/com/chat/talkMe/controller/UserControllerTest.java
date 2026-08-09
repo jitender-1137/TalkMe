@@ -379,7 +379,9 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.messageCode").value("TM_071"));
     }
 
-    /** Pre-seeds an existing block of targetUser so the DELETE has something to remove. */
+    /**
+     * Pre-seeds an existing block of targetUser so the DELETE has something to remove.
+     */
     @Test
     void testUnblockUserSuccess() throws Exception {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");

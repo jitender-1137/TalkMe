@@ -34,7 +34,7 @@ public class ListenerController {
     /**
      * Go on duty as a listener (creates or re-arms the caller's shift as AVAILABLE).
      *
-     * @param userDetails  the authenticated volunteer
+     * @param userDetails the authenticated volunteer
      * @return the AVAILABLE listener shift (TM_990)
      * @throws com.chat.talkMe.exception.ForbiddenException the caller is a guest (TM_997)
      */
@@ -49,7 +49,7 @@ public class ListenerController {
     /**
      * Clock off duty (idempotent; credits the in-progress person if mid-session).
      *
-     * @param userDetails  the authenticated volunteer
+     * @param userDetails the authenticated volunteer
      * @return empty success envelope (TM_991)
      */
     @PostMapping("/end")
@@ -63,8 +63,8 @@ public class ListenerController {
     /**
      * Match me with the oldest-waiting available listener and open a private, non-recorded room.
      *
-     * @param body         optional body with a {@code reason} hint (defaults when null/unknown)
-     * @param userDetails  the authenticated requester
+     * @param body        optional body with a {@code reason} hint (defaults when null/unknown)
+     * @param userDetails the authenticated requester
      * @return the ENGAGED listener shift bound to the new room (TM_992)
      * @throws com.chat.talkMe.exception.NotFoundException no listener is available (TM_993), or the
      *                                                     freshly created room can't be reloaded (TM_998)
@@ -89,7 +89,7 @@ public class ListenerController {
     /**
      * The current live queue of available listeners (oldest-waiting first).
      *
-     * @param userDetails  the authenticated caller
+     * @param userDetails the authenticated caller
      * @return the list of currently AVAILABLE listener shifts wrapped in a success envelope
      */
     @GetMapping("/available")

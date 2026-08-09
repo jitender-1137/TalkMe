@@ -38,7 +38,7 @@ public class MasterKeyService {
      * encryption; if absent/blank, leaves encryption disabled (messages stored plaintext).
      *
      * @throws java.lang.IllegalStateException if the configured key does not decode to the
-     *         required AES-256 length
+     *                                         required AES-256 length
      */
     @PostConstruct
     void init() {

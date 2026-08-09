@@ -145,7 +145,9 @@ class AdminControllerUnitTest {
         return AdminUserView.builder().id(id).username("bob").name("Bob").email("bob@e.com").build();
     }
 
-    /** Wraps a single item in a one-page {@link PaginatedResponse} (page 0, size 25, total 1). */
+    /**
+     * Wraps a single item in a one-page {@link PaginatedResponse} (page 0, size 25, total 1).
+     */
     private static <T> PaginatedResponse<T> paged(T item) {
         return PaginatedResponse.<T>builder()
                 .items(List.of(item))

@@ -5,6 +5,7 @@ package com.chat.talkMe.exception;
  */
 public class TooManyRequestsException extends ServiceException {
     private static final long serialVersionUID = 1L;
+
     public TooManyRequestsException(String message, String messageCode) {
         super(429, message, messageCode);
     }

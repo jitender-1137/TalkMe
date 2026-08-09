@@ -103,7 +103,9 @@ class GroupControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -111,12 +113,16 @@ class GroupControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Builds a minimal GROUP {@link ChatResponse} fixture with the given id. */
+    /**
+     * Builds a minimal GROUP {@link ChatResponse} fixture with the given id.
+     */
     private static ChatResponse group(String id) {
         return ChatResponse.builder().id(id).name("My Group").chatType("GROUP").build();
     }
 
-    /** Builds a {@link GroupMemberResponse} fixture for the given user id and role. */
+    /**
+     * Builds a {@link GroupMemberResponse} fixture for the given user id and role.
+     */
     private static GroupMemberResponse member(String userId, String role) {
         return GroupMemberResponse.builder().userId(userId).username("mem").role(role).build();
     }

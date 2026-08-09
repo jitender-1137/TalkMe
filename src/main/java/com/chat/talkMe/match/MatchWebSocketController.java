@@ -40,7 +40,7 @@ public class MatchWebSocketController {
      * the legacy blind quick-match; a present body routes to preference-aware matching.
      * No-op when the principal is null.
      *
-     * @param filters optional match preferences/filters; null ⇒ blind quick-match
+     * @param filters   optional match preferences/filters; null ⇒ blind quick-match
      * @param principal the authenticated requester (null ⇒ ignored)
      */
     @MessageMapping("/match/start")
@@ -75,7 +75,7 @@ public class MatchWebSocketController {
      * if the message is held (e.g. pending 18+ consent) so the sender's UI can flag it.
      * No-op when the principal or payload is null.
      *
-     * @param payload map with {@code content} and {@code clientId} keys
+     * @param payload   map with {@code content} and {@code clientId} keys
      * @param principal the authenticated sender (null ⇒ ignored)
      */
     @MessageMapping("/match/message")
@@ -92,7 +92,7 @@ public class MatchWebSocketController {
      * Handles {@code /match/typing}: relays an anonymous typing indicator to the partner.
      * No-op when the principal is null.
      *
-     * @param typing true if the sender is currently typing
+     * @param typing    true if the sender is currently typing
      * @param principal the authenticated sender (null ⇒ ignored)
      */
     @MessageMapping("/match/typing")
@@ -129,7 +129,7 @@ public class MatchWebSocketController {
      * Handles {@code /match/gif}: relays a GIF (from the payload's {@code media} map) to
      * the partner. No-op when the principal or payload is null.
      *
-     * @param payload map containing a {@code media} descriptor
+     * @param payload   map containing a {@code media} descriptor
      * @param principal the authenticated sender (null ⇒ ignored)
      */
     @MessageMapping("/match/gif")
@@ -180,7 +180,7 @@ public class MatchWebSocketController {
      * map) to the partner; the routing layer rejects it unless image permission was
      * granted. No-op when the principal or payload is null.
      *
-     * @param payload map containing a {@code media} descriptor
+     * @param payload   map containing a {@code media} descriptor
      * @param principal the authenticated sender (null ⇒ ignored)
      */
     @MessageMapping("/match/send-image")
@@ -191,12 +191,13 @@ public class MatchWebSocketController {
     }
 
     // ── Anonymous Mask reveal handshake (features #6/#15/#16) ──
+
     /**
      * Handles {@code /match/reveal-request}: offers to reveal the payload's {@code channel}
      * (PROFILE/VOICE/PHOTO) and asks the peer; the reveal only completes when the peer
      * also grants. No-op when the principal or payload is null.
      *
-     * @param payload map containing a {@code channel} name
+     * @param payload   map containing a {@code channel} name
      * @param principal the authenticated requester (null ⇒ ignored)
      */
     @MessageMapping("/match/reveal-request")
@@ -210,7 +211,7 @@ public class MatchWebSocketController {
      * when both sides have granted, identities/payloads are exchanged. No-op when the
      * principal or payload is null.
      *
-     * @param payload map containing a {@code channel} name
+     * @param payload   map containing a {@code channel} name
      * @param principal the authenticated accepter (null ⇒ ignored)
      */
     @MessageMapping("/match/reveal-accept")
@@ -223,7 +224,7 @@ public class MatchWebSocketController {
      * Handles {@code /match/reveal-decline}: declines the payload's {@code channel} reveal.
      * No-op when the principal or payload is null.
      *
-     * @param payload map containing a {@code channel} name
+     * @param payload   map containing a {@code channel} name
      * @param principal the authenticated decliner (null ⇒ ignored)
      */
     @MessageMapping("/match/reveal-decline")
@@ -246,6 +247,7 @@ public class MatchWebSocketController {
     }
 
     // ── Coffee/Chemistry post-timer actions (features #7/#14) ──
+
     /**
      * Handles {@code /match/timed-action}: dispatches a Coffee/Chemistry post-timer action
      * from the payload's {@code action}: END exits, REMATCH starts a new chat,
@@ -253,7 +255,7 @@ public class MatchWebSocketController {
      * requests extending the timer; unknown actions are ignored. No-op when the principal
      * or payload is null.
      *
-     * @param payload map containing an {@code action} name
+     * @param payload   map containing an {@code action} name
      * @param principal the authenticated user (null ⇒ ignored)
      */
     @MessageMapping("/match/timed-action")

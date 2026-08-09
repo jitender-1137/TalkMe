@@ -75,7 +75,9 @@ class ReputationEventRecorderTest {
         when(ledger.sumAwardedForDay(anyLong(), any())).thenReturn(sumForDay);
     }
 
-    /** Captures and returns the single ledger row the recorder persisted. */
+    /**
+     * Captures and returns the single ledger row the recorder persisted.
+     */
     private ReputationEvent capturedSaved() {
         ArgumentCaptor<ReputationEvent> captor = ArgumentCaptor.forClass(ReputationEvent.class);
         verify(ledger).save(captor.capture());

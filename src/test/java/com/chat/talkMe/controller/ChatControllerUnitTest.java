@@ -106,7 +106,9 @@ class ChatControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
+    /**
+     * Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -114,7 +116,9 @@ class ChatControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Builds a minimal {@link ChatResponse} stub with the given id and chat type. */
+    /**
+     * Builds a minimal {@link ChatResponse} stub with the given id and chat type.
+     */
     private static ChatResponse chat(String id, String type) {
         return ChatResponse.builder().id(id).name("A Chat").chatType(type).build();
     }

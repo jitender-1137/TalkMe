@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
-/** Data access for {@link StoryView} rows (one per story+viewer) backing view counts and the "seen by" list. */
+/**
+ * Data access for {@link StoryView} rows (one per story+viewer) backing view counts and the "seen by" list.
+ */
 @Repository
 public interface StoryViewRepository extends JpaRepository<StoryView, Long> {
 

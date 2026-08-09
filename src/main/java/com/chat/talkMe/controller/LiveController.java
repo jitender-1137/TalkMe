@@ -31,8 +31,8 @@ public class LiveController {
     /**
      * Mint a LiveKit access token scoping the caller to their chat's voice room.
      *
-     * @param request      validated body carrying the target {@code chatUuid}
-     * @param userDetails  the authenticated caller (must be a member of the chat)
+     * @param request     validated body carrying the target {@code chatUuid}
+     * @param userDetails the authenticated caller (must be a member of the chat)
      * @return the minted token plus ws URL, room, and identity (TM_982)
      * @throws com.chat.talkMe.exception.BadRequestException live audio not enabled/configured (TM_980),
      *                                                       or bad chat id (TM_400)

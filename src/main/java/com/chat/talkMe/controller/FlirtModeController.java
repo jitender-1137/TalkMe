@@ -39,7 +39,7 @@ public class FlirtModeController {
      * @param userDetails the authenticated caller, who must be a member of the chat
      * @return 200 with the viewer-relative flirt-mode state (myEnabled/otherEnabled/active)
      * @throws com.chat.talkMe.exception.BadRequestException if the id is malformed or the chat is
-     *         not a 1:1 PRIVATE chat
+     *                                                       not a 1:1 PRIVATE chat
      * @throws com.chat.talkMe.exception.NotFoundException   if no chat matches the UUID
      * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
      */
@@ -60,7 +60,7 @@ public class FlirtModeController {
      * @param userDetails the authenticated caller, who must be a member of the chat
      * @return 200 with the caller's updated viewer-relative state and success code TM_832
      * @throws com.chat.talkMe.exception.BadRequestException if the id is malformed or the chat is
-     *         not a 1:1 PRIVATE chat
+     *                                                       not a 1:1 PRIVATE chat
      * @throws com.chat.talkMe.exception.NotFoundException   if no chat matches the UUID
      * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
      */
@@ -81,7 +81,7 @@ public class FlirtModeController {
      * @param userDetails the authenticated caller, who must be a member of the chat
      * @return 200 with the caller's updated viewer-relative state and success code TM_833
      * @throws com.chat.talkMe.exception.BadRequestException if the id is malformed or the chat is
-     *         not a 1:1 PRIVATE chat
+     *                                                       not a 1:1 PRIVATE chat
      * @throws com.chat.talkMe.exception.NotFoundException   if no chat matches the UUID
      * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
      */

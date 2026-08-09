@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Data access for {@link Story} entities: lookups, the active-stories feed, and the owner archive. */
+/**
+ * Data access for {@link Story} entities: lookups, the active-stories feed, and the owner archive.
+ */
 @Repository
 public interface StoryRepository extends JpaRepository<Story, Long> {
 

@@ -177,7 +177,7 @@ public class CityServiceImpl implements CityService {
      * Builds a district card, computing live count as presence-members intersected with the
      * supplied online set and room count as the curated ROOM chats for the location.
      *
-     * @param loc the district
+     * @param loc    the district
      * @param online the current global online-username set
      * @return the card DTO
      */
@@ -311,8 +311,8 @@ public class CityServiceImpl implements CityService {
      * card). Swallows any failure.
      *
      * @param event event name (e.g. user_joined / user_left)
-     * @param loc the district
-     * @param user the acting user
+     * @param loc   the district
+     * @param user  the acting user
      */
     private void broadcast(String event, CityLocation loc, User user) {
         try {

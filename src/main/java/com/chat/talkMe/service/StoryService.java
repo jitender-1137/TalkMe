@@ -7,7 +7,9 @@ import com.chat.talkMe.dto.response.StoryViewerResponse;
 
 import java.util.List;
 
-/** Business operations for 24-hour stories. See {@code StoryServiceImpl} for behavior details. */
+/**
+ * Business operations for 24-hour stories. See {@code StoryServiceImpl} for behavior details.
+ */
 public interface StoryService {
 
     StoryResponse createStory(StoryRequest request, User currentUser);

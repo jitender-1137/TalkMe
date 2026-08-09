@@ -29,8 +29,8 @@ public class MusicController {
     /**
      * Search music tracks (returns only playable-preview results; empty list on blank query/errors).
      *
-     * @param query  the search term
-     * @param limit  max results (defaults to 24, clamped to 1..50 by the service)
+     * @param query the search term
+     * @param limit max results (defaults to 24, clamped to 1..50 by the service)
      * @return matching tracks wrapped in a success envelope
      */
     @GetMapping("/search")

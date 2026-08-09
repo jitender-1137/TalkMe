@@ -54,8 +54,8 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
      * session's 18+ consent is not GRANTED, the message is held (auto-asking the peer and
      * flagging the sender's bubble) instead of relayed.
      *
-     * @param sender the authenticated sending username
-     * @param content the message body
+     * @param sender   the authenticated sending username
+     * @param content  the message body
      * @param clientId client-generated id echoed back if the message is held
      * @throws java.lang.IllegalArgumentException if the sender has no active session
      */
@@ -92,7 +92,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
      * Relays a GIF descriptor to the sender's partner over the match queue.
      *
      * @param sender the authenticated sending username
-     * @param media the GIF media descriptor
+     * @param media  the GIF media descriptor
      * @throws java.lang.IllegalArgumentException if the sender has no active session
      */
     @Override
@@ -120,9 +120,9 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
      * been approved for the session.
      *
      * @param sender the authenticated sending username
-     * @param media the image media descriptor
+     * @param media  the image media descriptor
      * @throws java.lang.IllegalArgumentException if the sender has no active session
-     * @throws java.lang.IllegalStateException if image exchange is not approved
+     * @throws java.lang.IllegalStateException    if image exchange is not approved
      */
     @Override
     public void relayImage(String sender, Map<String, Object> media) {

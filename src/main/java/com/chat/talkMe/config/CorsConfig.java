@@ -47,7 +47,7 @@ public class CorsConfig {
      *
      * @return a {@link CorsFilter} that applies the CORS configuration to all incoming requests.
      * @throws java.lang.IllegalStateException if credentials are allowed but no explicit
-     *         origins are configured (see {@link #isHasOrigins()}).
+     *                                         origins are configured (see {@link #isHasOrigins()}).
      */
     @Bean
     public CorsFilter corsFilter() {
@@ -82,7 +82,7 @@ public class CorsConfig {
      *
      * @return {@code true} when {@code app.cors.allowed-origins} is non-blank.
      * @throws java.lang.IllegalStateException if origins are blank while
-     *         {@code allow-credentials=true} (refuses to fall back to {@code "*"}).
+     *                                         {@code allow-credentials=true} (refuses to fall back to {@code "*"}).
      */
     private boolean isHasOrigins() {
         boolean hasOrigins = allowedOrigins != null && !allowedOrigins.isBlank();

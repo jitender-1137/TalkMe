@@ -70,8 +70,8 @@ public class MusicSessionServiceImpl implements MusicSessionService {
      * @param user   the caller (must be a chat member)
      * @param chatId the chat UUID
      * @return the live or shell session state, never null
-     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id
-     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     * @throws com.chat.talkMe.exception.BadRequestException malformed chat id
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a chat member
      */
     @Override
     public MusicSessionState getSession(User user, String chatId) {
@@ -100,8 +100,8 @@ public class MusicSessionServiceImpl implements MusicSessionService {
      * @param chatId  the chat UUID
      * @param request the track to play (url required)
      * @return the new session state
-     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id or missing track url
-     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     * @throws com.chat.talkMe.exception.BadRequestException malformed chat id or missing track url
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a chat member
      */
     @Override
     public MusicSessionState play(User user, String chatId, MusicPlayRequest request) {
@@ -149,8 +149,8 @@ public class MusicSessionServiceImpl implements MusicSessionService {
      * @param chatId      the chat UUID
      * @param positionSec optional playhead to record (clamped to >= 0)
      * @return the updated session state
-     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id or no active session
-     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     * @throws com.chat.talkMe.exception.BadRequestException malformed chat id or no active session
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a chat member
      */
     @Override
     public MusicSessionState pause(User user, String chatId, Double positionSec) {
@@ -176,9 +176,9 @@ public class MusicSessionServiceImpl implements MusicSessionService {
      * @param chatId      the chat UUID
      * @param positionSec the new playhead in seconds (required, >= 0)
      * @return the updated session state
-     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id, missing/negative
-     *                                                        position, or no active session
-     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     * @throws com.chat.talkMe.exception.BadRequestException malformed chat id, missing/negative
+     *                                                       position, or no active session
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a chat member
      */
     @Override
     public MusicSessionState seek(User user, String chatId, Double positionSec) {
@@ -205,9 +205,9 @@ public class MusicSessionServiceImpl implements MusicSessionService {
      * @param chatId the chat UUID
      * @param emoji  the reaction (required, non-blank)
      * @return the current session state
-     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id, blank emoji, or no
-     *                                                        active session
-     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     * @throws com.chat.talkMe.exception.BadRequestException malformed chat id, blank emoji, or no
+     *                                                       active session
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a chat member
      */
     @Override
     public MusicSessionState react(User user, String chatId, String emoji) {
@@ -241,7 +241,7 @@ public class MusicSessionServiceImpl implements MusicSessionService {
      *
      * @param chatId the chat UUID
      * @return the live session state
-     * @throws com.chat.talkMe.exception.BadRequestException  no active session
+     * @throws com.chat.talkMe.exception.BadRequestException no active session
      */
     private MusicSessionState requireLiveSession(String chatId) {
         MusicSessionState state = readState(chatId);

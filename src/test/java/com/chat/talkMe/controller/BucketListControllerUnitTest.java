@@ -116,7 +116,9 @@ class BucketListControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
+    /**
+     * Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -124,7 +126,9 @@ class BucketListControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Builds a bucket item; when {@code completed}, wires the completed-by/at metadata sensibly. */
+    /**
+     * Builds a bucket item; when {@code completed}, wires the completed-by/at metadata sensibly.
+     */
     private static BucketItemResponse item(String id, String text, boolean completed, int orderIndex) {
         return BucketItemResponse.builder()
                 .id(id).text(text).completed(completed)

@@ -611,7 +611,9 @@ class GroupServiceImplTest {
 
         private final User target = user(2L, TARGET_UUID, "Bob", "bob");
 
-        /** Stubs the mocked {@link ChatService} so addMembers can return its chat DTO. */
+        /**
+         * Stubs the mocked {@link ChatService} so addMembers can return its chat DTO.
+         */
         private void stubReturnDto() {
             lenient().when(chatService.getChatByUuid(eq(CHAT_UUID_STR), any()))
                     .thenReturn(ChatResponse.builder().id(CHAT_UUID_STR).build());
@@ -1418,7 +1420,9 @@ class GroupServiceImplTest {
     @DisplayName("discover")
     class Discover {
 
-        /** A discoverable PUBLIC / OPEN {@link ChatType#ROOM} used as a discovery search hit. */
+        /**
+         * A discoverable PUBLIC / OPEN {@link ChatType#ROOM} used as a discovery search hit.
+         */
         private Chat publicRoom() {
             Chat c = Chat.builder()
                     .name("City Lounge")
@@ -1572,7 +1576,9 @@ class GroupServiceImplTest {
     @DisplayName("joinChat")
     class JoinChat {
 
-        /** The base group re-typed to a PUBLIC / OPEN room so it is eligible for {@code joinChat}. */
+        /**
+         * The base group re-typed to a PUBLIC / OPEN room so it is eligible for {@code joinChat}.
+         */
         private Chat openRoom() {
             Chat c = groupChat();
             c.setChatType(ChatType.ROOM);
@@ -1787,7 +1793,9 @@ class GroupServiceImplTest {
         private final User inviter = user(9L, UUID.fromString("55555555-5555-5555-5555-555555555555"),
                 "Inviter", "inviter");
 
-        /** A PENDING invite from {@code inviter} to {@code creator} (the accepter) for the given chat. */
+        /**
+         * A PENDING invite from {@code inviter} to {@code creator} (the accepter) for the given chat.
+         */
         private GroupInvite pendingInvite(Chat chat) {
             return GroupInvite.builder().chat(chat).invitee(creator).inviter(inviter).status("PENDING").build();
         }

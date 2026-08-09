@@ -69,7 +69,7 @@ public class CosmeticController {
      * @param userDetails the authenticated principal
      * @return the caller's cosmetics list reflecting the new equipped state
      * @throws com.chat.talkMe.exception.BadRequestException if the code is missing or the cosmetic
-     *         is not yet unlocked by the caller
+     *                                                       is not yet unlocked by the caller
      * @throws com.chat.talkMe.exception.NotFoundException   if the code matches no known cosmetic
      */
     @PutMapping("/equip")

@@ -24,7 +24,7 @@ public class JpaConfig {
      * anonymous user (background jobs, startup, pre-login flows).
      *
      * @return an {@link org.springframework.data.domain.AuditorAware} that never yields
-     *         an empty {@link java.util.Optional}.
+     * an empty {@link java.util.Optional}.
      */
     @Bean
     public AuditorAware<String> auditorProvider() {

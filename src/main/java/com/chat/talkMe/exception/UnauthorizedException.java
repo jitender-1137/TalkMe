@@ -6,6 +6,7 @@ package com.chat.talkMe.exception;
  */
 public class UnauthorizedException extends ServiceException {
     private static final long serialVersionUID = 1L;
+
     public UnauthorizedException(String message, String messageCode) {
         super(401, message, messageCode);
     }

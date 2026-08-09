@@ -62,18 +62,18 @@ public class DiscoverServiceImpl implements DiscoverService {
      * survive pagination; the {@code isOnline} filter is applied in-memory after enrichment.
      * Read-only transaction.
      *
-     * @param query        case-insensitive substring matched against username/name/email; may be null/blank
-     * @param interests    comma-separated {@link Interest} names; unparseable tokens are ignored
-     * @param distance     accepted but not used for filtering (distance fields are placeholder values)
-     * @param verified     when non-null, restricts to users with this verified state
-     * @param isOnline     when non-null, keeps only results whose computed online state matches
-     * @param cursor       numeric page index as a string; blank or non-numeric ⇒ page 0
-     * @param limit        page size
-     * @param minAge       inclusive lower age bound, or null
-     * @param maxAge       inclusive upper age bound, or null
-     * @param gender       exact (case-insensitive) gender match; "all"/"any"/blank disables the filter
-     * @param country      exact (case-insensitive) country match; "all"/"any"/blank disables the filter
-     * @param currentUser  the viewer, excluded from results and used to compute relational flags
+     * @param query       case-insensitive substring matched against username/name/email; may be null/blank
+     * @param interests   comma-separated {@link Interest} names; unparseable tokens are ignored
+     * @param distance    accepted but not used for filtering (distance fields are placeholder values)
+     * @param verified    when non-null, restricts to users with this verified state
+     * @param isOnline    when non-null, keeps only results whose computed online state matches
+     * @param cursor      numeric page index as a string; blank or non-numeric ⇒ page 0
+     * @param limit       page size
+     * @param minAge      inclusive lower age bound, or null
+     * @param maxAge      inclusive upper age bound, or null
+     * @param gender      exact (case-insensitive) gender match; "all"/"any"/blank disables the filter
+     * @param country     exact (case-insensitive) country match; "all"/"any"/blank disables the filter
+     * @param currentUser the viewer, excluded from results and used to compute relational flags
      * @return a paginated response of {@link DiscoverProfileResponse} with next/previous cursor info
      */
     @Override
@@ -317,8 +317,8 @@ public class DiscoverServiceImpl implements DiscoverService {
      * Records the viewer's like of the target profile; idempotent — a no-op if already liked.
      * Transactional.
      *
-     * @param userId       target user's UUID string
-     * @param currentUser  the viewer performing the like
+     * @param userId      target user's UUID string
+     * @param currentUser the viewer performing the like
      * @throws com.chat.talkMe.exception.NotFoundException if no user matches {@code userId}
      */
     @Override
@@ -343,8 +343,8 @@ public class DiscoverServiceImpl implements DiscoverService {
      * Removes the viewer's like of the target profile if one exists; a no-op otherwise.
      * Transactional.
      *
-     * @param userId       target user's UUID string
-     * @param currentUser  the viewer performing the unlike
+     * @param userId      target user's UUID string
+     * @param currentUser the viewer performing the unlike
      * @throws com.chat.talkMe.exception.NotFoundException if no user matches {@code userId}
      */
     @Override

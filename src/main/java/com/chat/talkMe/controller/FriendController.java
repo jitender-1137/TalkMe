@@ -37,8 +37,8 @@ public class FriendController {
     /**
      * Send (or re-send) a friend request; auto-accepts if the receiver already sent one to you.
      *
-     * @param payload      body carrying {@code receiverId} (the target user's UUID)
-     * @param userDetails  the authenticated sender
+     * @param payload     body carrying {@code receiverId} (the target user's UUID)
+     * @param userDetails the authenticated sender
      * @return the created/updated friend request wrapped in a success envelope (TM_090)
      * @throws com.chat.talkMe.exception.NotFoundException        receiver UUID does not exist (TM_064)
      * @throws com.chat.talkMe.exception.BadRequestException      sending a request to yourself (TM_097)
@@ -58,8 +58,8 @@ public class FriendController {
     /**
      * Accept a pending friend request (creates the mutual friendship).
      *
-     * @param requestUuid  UUID of the friend request to accept
-     * @param userDetails  the authenticated receiver of the request
+     * @param requestUuid UUID of the friend request to accept
+     * @param userDetails the authenticated receiver of the request
      * @return empty success envelope (TM_091)
      * @throws com.chat.talkMe.exception.NotFoundException  request UUID does not exist (TM_094)
      * @throws com.chat.talkMe.exception.ForbiddenException caller is not the request's receiver (TM_103)
@@ -76,8 +76,8 @@ public class FriendController {
     /**
      * Decline a pending friend request.
      *
-     * @param requestUuid  UUID of the friend request to decline
-     * @param userDetails  the authenticated receiver of the request
+     * @param requestUuid UUID of the friend request to decline
+     * @param userDetails the authenticated receiver of the request
      * @return empty success envelope (TM_092)
      * @throws com.chat.talkMe.exception.NotFoundException  request UUID does not exist (TM_094)
      * @throws com.chat.talkMe.exception.ForbiddenException caller is not the request's receiver (TM_103)
@@ -94,8 +94,8 @@ public class FriendController {
     /**
      * Cancel a friend request you sent (deletes it).
      *
-     * @param requestUuid  UUID of the friend request to cancel
-     * @param userDetails  the authenticated sender of the request
+     * @param requestUuid UUID of the friend request to cancel
+     * @param userDetails the authenticated sender of the request
      * @return empty success envelope (TM_093)
      * @throws com.chat.talkMe.exception.NotFoundException  request UUID does not exist (TM_094)
      * @throws com.chat.talkMe.exception.ForbiddenException caller is not the request's sender (TM_103)
@@ -111,7 +111,7 @@ public class FriendController {
     /**
      * List the caller's friends, each enriched with presence and apparent last-seen.
      *
-     * @param userDetails  the authenticated user
+     * @param userDetails the authenticated user
      * @return the caller's friend list wrapped in a success envelope
      */
     @GetMapping
@@ -124,7 +124,7 @@ public class FriendController {
     /**
      * List the caller's incoming PENDING friend requests (newest first).
      *
-     * @param userDetails  the authenticated receiver
+     * @param userDetails the authenticated receiver
      * @return the pending inbound requests wrapped in a success envelope
      */
     @GetMapping("/requests")
@@ -137,10 +137,10 @@ public class FriendController {
     /**
      * Remove a friend (drops the mutual friendship and clears any prior requests between them).
      *
-     * @param friendUuid   UUID of the friend to remove
-     * @param userDetails  the authenticated user
+     * @param friendUuid  UUID of the friend to remove
+     * @param userDetails the authenticated user
      * @return empty success envelope (TM_098)
-     * @throws com.chat.talkMe.exception.NotFoundException  friend UUID does not exist (TM_064)
+     * @throws com.chat.talkMe.exception.NotFoundException friend UUID does not exist (TM_064)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<ResponseDto<Void>> removeFriend(
@@ -153,8 +153,8 @@ public class FriendController {
     /**
      * Block a user (also removes any existing friendship); idempotent if already blocked.
      *
-     * @param targetUuid   UUID of the user to block
-     * @param userDetails  the authenticated user
+     * @param targetUuid  UUID of the user to block
+     * @param userDetails the authenticated user
      * @return empty success envelope (TM_067)
      * @throws com.chat.talkMe.exception.NotFoundException   target UUID does not exist (TM_064)
      * @throws com.chat.talkMe.exception.BadRequestException blocking yourself (TM_071)
@@ -170,10 +170,10 @@ public class FriendController {
     /**
      * Unblock a previously blocked user; a no-op if they were not blocked.
      *
-     * @param targetUuid   UUID of the user to unblock
-     * @param userDetails  the authenticated user
+     * @param targetUuid  UUID of the user to unblock
+     * @param userDetails the authenticated user
      * @return empty success envelope (TM_068)
-     * @throws com.chat.talkMe.exception.NotFoundException  target UUID does not exist (TM_064)
+     * @throws com.chat.talkMe.exception.NotFoundException target UUID does not exist (TM_064)
      */
     @DeleteMapping("/block/{id}")
     public ResponseEntity<ResponseDto<Void>> unblockUser(

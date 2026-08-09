@@ -29,6 +29,7 @@ public class PresenceServiceHelper {
      * Running in REQUIRES_NEW propagation guarantees that the write is committed immediately
      * upon returning and database locks are released, avoiding cross-thread race conditions.
      */
+
     /**
      * The single durable presence write on the hot path: persists last-seen when a
      * user goes OFFLINE, so "last seen" survives a Redis eviction or restart. Live

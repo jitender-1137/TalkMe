@@ -109,7 +109,9 @@ class ConsentControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
+    /**
+     * Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -117,7 +119,9 @@ class ConsentControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A fully-accepted status snapshot (age-verified, flirt-lobby ready) for happy-path stubs. */
+    /**
+     * A fully-accepted status snapshot (age-verified, flirt-lobby ready) for happy-path stubs.
+     */
     private static ConsentStatusResponse fullStatus() {
         return ConsentStatusResponse.builder()
                 .accepted(Map.of(
@@ -133,7 +137,9 @@ class ConsentControllerUnitTest {
                 .build();
     }
 
-    /** A nothing-accepted status snapshot (not age-verified, flirt-lobby not ready). */
+    /**
+     * A nothing-accepted status snapshot (not age-verified, flirt-lobby not ready).
+     */
     private static ConsentStatusResponse emptyStatus() {
         return ConsentStatusResponse.builder()
                 .accepted(Map.of())

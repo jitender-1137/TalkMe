@@ -91,7 +91,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * the snapshot and notifies WAITING. Always rebroadcasts the online count.
      *
      * @param username the seeking user's username
-     * @param filters optional preferences/filters; null ⇒ blind quick-match
+     * @param filters  optional preferences/filters; null ⇒ blind quick-match
      */
     @Override
     public void startMatching(String username, MatchStartRequest filters) {
@@ -244,8 +244,8 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * seeker claims it first. A candidate with no loadable snapshot is only usable when the
      * seeker has no filters and QUICK mode. Relaxation is applied per-party by wait time.
      *
-     * @param seeker the seeking user's username (excluded from candidates)
-     * @param me the seeking user's entity
+     * @param seeker   the seeking user's username (excluded from candidates)
+     * @param me       the seeking user's entity
      * @param snapshot the seeker's preference snapshot
      * @return the claimed peer's username, or empty if none eligible/claimable
      */
@@ -348,7 +348,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     /**
      * Whether a candidate's own gender satisfies a gender preference (ANY/null passes all).
      *
-     * @param pref the requiring party's gender preference
+     * @param pref      the requiring party's gender preference
      * @param ownGender the candidate's own gender
      * @return true if compatible
      */
@@ -361,7 +361,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * Whether the other party's age falls within a snapshot's min/max age filter; an
      * unset filter passes, but a missing age fails a set filter.
      *
-     * @param snap the requiring party's snapshot (age filter source)
+     * @param snap     the requiring party's snapshot (age filter source)
      * @param otherAge the other party's age (may be null)
      * @return true if within range or no filter set
      */
@@ -378,7 +378,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * own soft filters.
      *
      * @param snap the party's snapshot (carries the enqueue timestamp)
-     * @param now current epoch millis
+     * @param now  current epoch millis
      * @return true if soft filters should be relaxed for this party
      */
     private static boolean shouldRelax(MatchPreferenceSnapshot snap, long now) {
@@ -390,7 +390,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * filters. As a side effect, a valid mood/energy in the request updates and persists
      * the user's live mood/energy.
      *
-     * @param me the seeking user's entity (may be mutated and saved)
+     * @param me      the seeking user's entity (may be mutated and saved)
      * @param filters the request filters (may be null)
      * @return the assembled preference snapshot
      */
@@ -459,11 +459,11 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * Sends a MATCH_FOUND event to one side, carrying the session/chat id, the anonymized
      * partner view, the mode, and (when present) the coarse match-quality bucket.
      *
-     * @param username the recipient's username
+     * @param username     the recipient's username
      * @param peerUsername the partner's username (anonymized before sending)
-     * @param session the created match session
+     * @param session      the created match session
      * @param partnerAlias the partner's Mask alias as seen by this recipient (may be null)
-     * @param bucket the coarse compatibility bucket, or null for blind matches
+     * @param bucket       the coarse compatibility bucket, or null for blind matches
      */
     private void notifyMatchFound(String username, String peerUsername, MatchSession session,
                                   String partnerAlias, String bucket) {
@@ -486,7 +486,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * Maps a session to a response DTO from the current user's perspective, exposing only
      * the anonymized partner view (with the Mask alias in MASK mode) and the mode.
      *
-     * @param session the match session
+     * @param session     the match session
      * @param currentUser the requesting user
      * @return the session response DTO
      */

@@ -108,7 +108,9 @@ class FriendControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -116,7 +118,9 @@ class FriendControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Builds a {@link FriendRequestResponse} with the given id/status and a fixed sender. */
+    /**
+     * Builds a {@link FriendRequestResponse} with the given id/status and a fixed sender.
+     */
     private static FriendRequestResponse friendRequest(String id, String status) {
         return FriendRequestResponse.builder()
                 .id(id).status(status)
@@ -124,7 +128,9 @@ class FriendControllerUnitTest {
                 .build();
     }
 
-    /** Minimal {@link AuthUserResponse} row for friend-list content. */
+    /**
+     * Minimal {@link AuthUserResponse} row for friend-list content.
+     */
     private static AuthUserResponse friend(String username) {
         return AuthUserResponse.builder().id("f-1").username(username).build();
     }
@@ -156,7 +162,9 @@ class FriendControllerUnitTest {
             assertThat(receiver.getValue()).isEqualTo(TARGET_ID);
         }
 
-        /** Absent {@code receiverId} key forwards null to the service, which rejects it (TM_095). */
+        /**
+         * Absent {@code receiverId} key forwards null to the service, which rejects it (TM_095).
+         */
         @Test
         void shouldForwardNullReceiverIdWhenKeyMissing() throws Exception {
             authenticate();
@@ -216,7 +224,9 @@ class FriendControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_069"));
         }
 
-        /** Malformed JSON body → catch-all 500/TM_002, service never invoked. */
+        /**
+         * Malformed JSON body → catch-all 500/TM_002, service never invoked.
+         */
         @Test
         void shouldReturn500WhenBodyMalformed() throws Exception {
             authenticate();

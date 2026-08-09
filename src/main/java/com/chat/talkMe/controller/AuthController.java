@@ -173,9 +173,9 @@ public class AuthController {
      * @return the {@link LoginResponse} with tokens and user profile
      * @throws com.chat.talkMe.exception.BadRequestException   if honeypot/CAPTCHA verification fails
      * @throws com.chat.talkMe.exception.UnauthorizedException if the credentials are invalid or the
-     *         account is deleted
+     *                                                         account is deleted
      * @throws com.chat.talkMe.exception.ForbiddenException    if the account is suspended or a
-     *         non-guest account uses the guest flow (and vice versa)
+     *                                                         non-guest account uses the guest flow (and vice versa)
      */
     @PostMapping("/login")
     public ResponseEntity<ResponseDto<LoginResponse>> login(
@@ -229,7 +229,7 @@ public class AuthController {
      * @param httpResponse the servlet response (rotated auth cookies are written to it)
      * @return the fresh {@link JwtTokensResponse}
      * @throws com.chat.talkMe.exception.UnauthorizedException if the cookie is missing, or the
-     *         refresh token is invalid/expired
+     *                                                         refresh token is invalid/expired
      */
     @PostMapping("/refresh")
     public ResponseEntity<ResponseDto<JwtTokensResponse>> refresh(

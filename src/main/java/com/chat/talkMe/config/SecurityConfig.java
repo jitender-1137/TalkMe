@@ -116,12 +116,12 @@ public class SecurityConfig {
      * configured, and the CSRF → JWT → rate-limiting filter chain. Swagger docs are public only in
      * non-prod profiles.
      *
-     * @param http                            the {@link HttpSecurity} builder.
-     * @param environment                     the active {@link Environment} (drives Swagger visibility).
-     * @param clientRegistrationRepository    provider for OAuth2 client registrations (may be absent).
+     * @param http                                 the {@link HttpSecurity} builder.
+     * @param environment                          the active {@link Environment} (drives Swagger visibility).
+     * @param clientRegistrationRepository         provider for OAuth2 client registrations (may be absent).
      * @param cookieAuthorizationRequestRepository cookie-based store for the in-flight OAuth2 request.
-     * @param oauth2LoginSuccessHandler       handler invoked on successful OAuth2 login.
-     * @param oauth2LoginFailureHandler       handler invoked on failed OAuth2 login.
+     * @param oauth2LoginSuccessHandler            handler invoked on successful OAuth2 login.
+     * @param oauth2LoginFailureHandler            handler invoked on failed OAuth2 login.
      * @return the built {@link SecurityFilterChain}.
      * @throws java.lang.Exception if the chain cannot be built.
      */

@@ -101,7 +101,9 @@ class ChannelRoomControllerUnitTest {
         SecurityContextHolder.clearContext();
     }
 
-    /** Builds a minimal {@link ChatResponse} stub for the created channel/room. */
+    /**
+     * Builds a minimal {@link ChatResponse} stub for the created channel/room.
+     */
     private static ChatResponse group(String id, String type) {
         return ChatResponse.builder().id(id).name("My " + type).chatType(type).build();
     }

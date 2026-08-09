@@ -106,7 +106,9 @@ class BadgeControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Populates the SecurityContext with {@code testUser} as the {@code @AuthenticationPrincipal}. */
+    /**
+     * Populates the SecurityContext with {@code testUser} as the {@code @AuthenticationPrincipal}.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =

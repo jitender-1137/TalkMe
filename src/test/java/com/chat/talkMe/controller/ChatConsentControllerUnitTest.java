@@ -107,7 +107,9 @@ class ChatConsentControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal. */
+    /**
+     * Installs {@link #testUser} (wrapped in {@link CustomUserDetails}) as the current principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =

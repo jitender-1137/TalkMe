@@ -35,7 +35,7 @@ public class FeedbackController {
      * @param userDetails the authenticated user submitting the feedback
      * @return 200 with the persisted feedback and success code TM_310
      * @throws com.chat.talkMe.exception.BadRequestException if rating, reason and comment are all
-     *         empty (nothing to record)
+     *                                                       empty (nothing to record)
      */
     @PostMapping
     public ResponseEntity<ResponseDto<FeedbackResponse>> submit(

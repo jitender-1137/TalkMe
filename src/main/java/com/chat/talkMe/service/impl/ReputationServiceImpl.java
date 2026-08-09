@@ -128,7 +128,7 @@ public class ReputationServiceImpl implements ReputationService {
      * @param userUuid the target user's UUID string
      * @return the target's cosmetic reputation card
      * @throws com.chat.talkMe.exception.BadRequestException if {@code userUuid} is not a valid UUID
-     * @throws com.chat.talkMe.exception.NotFoundException    if no user matches {@code userUuid}
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches {@code userUuid}
      */
     @Override
     @Transactional(readOnly = true)

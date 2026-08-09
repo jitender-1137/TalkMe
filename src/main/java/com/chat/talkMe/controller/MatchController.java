@@ -28,7 +28,7 @@ public class MatchController {
     /**
      * Return the caller's current active match session (anonymized), or null if none.
      *
-     * @param userDetails  the authenticated caller
+     * @param userDetails the authenticated caller
      * @return the active MatchSessionResponse, or null when the caller has no session
      */
     @GetMapping("/session")

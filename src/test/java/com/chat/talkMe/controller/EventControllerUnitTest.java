@@ -124,7 +124,9 @@ class EventControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A default SCHEDULED event ({@link #EVENT_UUID}) with no viewer RSVP. */
+    /**
+     * A default SCHEDULED event ({@link #EVENT_UUID}) with no viewer RSVP.
+     */
     private static EventResponse event() {
         return event(EVENT_UUID, "SCHEDULED", null);
     }

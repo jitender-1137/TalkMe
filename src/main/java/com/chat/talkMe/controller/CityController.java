@@ -82,6 +82,7 @@ public class CityController {
     // admin DENY, global kill-switch), a feature-gated leave would 403 and strand the user in
     // the roster — the only prune is presence-driven, so they'd linger until their session
     // is seen offline. hasRole('USER') keeps leave reachable regardless.
+
     /**
      * Removes the caller from a district's presence set and broadcasts a leave. Intentionally not
      * feature-gated (only {@code hasRole('USER')}) so leaving always succeeds; returns no district detail.

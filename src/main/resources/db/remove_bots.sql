@@ -30,8 +30,11 @@ END IF;
   -- Working sets -------------------------------------------------------------
   CREATE
 TEMP TABLE _bot_ids   ON COMMIT DROP
-AS SELECT id FROM users WHERE is_bot = true;
-  CREATE
+AS
+SELECT id
+FROM users
+WHERE is_bot = true;
+CREATE
 TEMP TABLE _bot_chats ON COMMIT DROP
 AS
 SELECT DISTINCT chat_id AS id

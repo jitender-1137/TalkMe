@@ -97,7 +97,7 @@ public class ChatController {
      * @param uuid        UUID of the chat, from the path
      * @param userDetails the authenticated principal, who must be a member of the chat
      * @return 200 with a {@link ChatKeyResponse}: {@code enabled=false} when encryption is off, otherwise
-     *         the base64 raw AES-256-GCM key with algo/version metadata
+     * the base64 raw AES-256-GCM key with algo/version metadata
      * @throws com.chat.talkMe.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */

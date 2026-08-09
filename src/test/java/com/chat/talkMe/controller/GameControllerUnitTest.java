@@ -111,7 +111,9 @@ class GameControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with {@code testUser} so {@code @AuthenticationPrincipal} resolves.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -119,7 +121,9 @@ class GameControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Builds a {@link GameSessionResponse} fixture (always a {@code TWO_TRUTHS} game) with the given state. */
+    /**
+     * Builds a {@link GameSessionResponse} fixture (always a {@code TWO_TRUTHS} game) with the given state.
+     */
     private static GameSessionResponse session(String state, int round, String prompt) {
         return GameSessionResponse.builder()
                 .uuid(GAME_UUID)
@@ -130,7 +134,9 @@ class GameControllerUnitTest {
                 .build();
     }
 
-    /** Convenience fixture for a round-1 {@code IN_PROGRESS} session with a sample prompt. */
+    /**
+     * Convenience fixture for a round-1 {@code IN_PROGRESS} session with a sample prompt.
+     */
     private static GameSessionResponse inProgress() {
         return session("IN_PROGRESS", 1, "Tell me two truths and a lie.");
     }

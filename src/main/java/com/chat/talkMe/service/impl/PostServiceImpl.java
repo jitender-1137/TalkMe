@@ -109,9 +109,9 @@ public class PostServiceImpl implements PostService {
      * @param request     post fields (content, media, poll, audio, audience, TTL)
      * @param currentUser the author
      * @return the created post as a response
-     * @throws com.chat.talkMe.exception.BadRequestException         empty post, or a poll with fewer than 2 options
-     * @throws com.chat.talkMe.exception.ContentModerationException   explicit text/caption/media/poll content
-     * @throws com.chat.talkMe.exception.FeatureLockedException       temporary-post TTL requested without access
+     * @throws com.chat.talkMe.exception.BadRequestException        empty post, or a poll with fewer than 2 options
+     * @throws com.chat.talkMe.exception.ContentModerationException explicit text/caption/media/poll content
+     * @throws com.chat.talkMe.exception.FeatureLockedException     temporary-post TTL requested without access
      */
     @Override
     @Transactional
@@ -303,8 +303,8 @@ public class PostServiceImpl implements PostService {
      * @param optionUuid  the chosen option's UUID
      * @param currentUser the voter
      * @return the post with refreshed poll tallies
-     * @throws com.chat.talkMe.exception.NotFoundException    post or option not found
-     * @throws com.chat.talkMe.exception.BadRequestException  post is not a poll, or option belongs to another poll
+     * @throws com.chat.talkMe.exception.NotFoundException   post or option not found
+     * @throws com.chat.talkMe.exception.BadRequestException post is not a poll, or option belongs to another poll
      */
     @Override
     @Transactional
@@ -361,7 +361,7 @@ public class PostServiceImpl implements PostService {
      * @param postUuid    the post's UUID
      * @param currentUser the viewer (drives FRIENDS-only visibility)
      * @return the post as a response
-     * @throws com.chat.talkMe.exception.NotFoundException  post missing, deleted, expired, or not visible
+     * @throws com.chat.talkMe.exception.NotFoundException post missing, deleted, expired, or not visible
      */
     @Override
     @Transactional(readOnly = true)
@@ -380,7 +380,7 @@ public class PostServiceImpl implements PostService {
      * @param shortCode   the post's short share code
      * @param currentUser the viewer (drives FRIENDS-only visibility)
      * @return the post as a response
-     * @throws com.chat.talkMe.exception.NotFoundException  post missing, deleted, expired, or not visible
+     * @throws com.chat.talkMe.exception.NotFoundException post missing, deleted, expired, or not visible
      */
     @Override
     @Transactional(readOnly = true)
@@ -398,6 +398,7 @@ public class PostServiceImpl implements PostService {
      * ACCEPTED follow in either direction); EVERYONE posts are viewable by all.
      * Non-viewers get a 404 (don't reveal the post exists).
      */
+
     /**
      * First displayable thumbnail for a post (video cover preferred), or null for
      * a text-only post. Used as the Instagram-style thumbnail on notifications.
@@ -497,7 +498,7 @@ public class PostServiceImpl implements PostService {
      * @param pageable    paging/sort
      * @param currentUser the viewer
      * @return a page of the target's visible posts
-     * @throws com.chat.talkMe.exception.NotFoundException  target user not found
+     * @throws com.chat.talkMe.exception.NotFoundException target user not found
      */
     @Override
     @Transactional(readOnly = true)
@@ -521,8 +522,8 @@ public class PostServiceImpl implements PostService {
      *
      * @param postUuid    the post's UUID
      * @param currentUser the caller (must be the author)
-     * @throws com.chat.talkMe.exception.NotFoundException   post not found
-     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the author
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.ForbiddenException caller is not the author
      */
     @Override
     @Transactional
@@ -566,7 +567,7 @@ public class PostServiceImpl implements PostService {
      *
      * @param postUuid    the post's UUID
      * @param currentUser the liker
-     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
     @Transactional
@@ -599,7 +600,7 @@ public class PostServiceImpl implements PostService {
      *
      * @param postUuid    the post's UUID
      * @param currentUser the caller
-     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
     @Transactional
@@ -618,7 +619,7 @@ public class PostServiceImpl implements PostService {
      * @param pageable    paging/sort
      * @param currentUser the caller
      * @return a page of likers
-     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
     @Transactional(readOnly = true)
@@ -641,8 +642,8 @@ public class PostServiceImpl implements PostService {
      * @param request     the comment content and optional parent id
      * @param currentUser the commenter
      * @return the created comment as a response
-     * @throws com.chat.talkMe.exception.ContentModerationException  explicit comment text
-     * @throws com.chat.talkMe.exception.NotFoundException           post not found
+     * @throws com.chat.talkMe.exception.ContentModerationException explicit comment text
+     * @throws com.chat.talkMe.exception.NotFoundException          post not found
      */
     @Override
     @Transactional
@@ -712,8 +713,8 @@ public class PostServiceImpl implements PostService {
      * @param postUuid    the owning post's UUID (unused for lookup; comment resolved by its own UUID)
      * @param commentUuid the comment's UUID
      * @param currentUser the caller (must be the comment author)
-     * @throws com.chat.talkMe.exception.NotFoundException   comment not found
-     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the comment author
+     * @throws com.chat.talkMe.exception.NotFoundException  comment not found
+     * @throws com.chat.talkMe.exception.ForbiddenException caller is not the comment author
      */
     @Override
     @Transactional
@@ -735,7 +736,7 @@ public class PostServiceImpl implements PostService {
      * @param postUuid    the owning post's UUID (unused for lookup)
      * @param commentUuid the comment's UUID
      * @param currentUser the liker
-     * @throws com.chat.talkMe.exception.NotFoundException  comment not found
+     * @throws com.chat.talkMe.exception.NotFoundException comment not found
      */
     @Override
     @Transactional
@@ -769,7 +770,7 @@ public class PostServiceImpl implements PostService {
      * @param postUuid    the owning post's UUID (unused for lookup)
      * @param commentUuid the comment's UUID
      * @param currentUser the caller
-     * @throws com.chat.talkMe.exception.NotFoundException  comment not found
+     * @throws com.chat.talkMe.exception.NotFoundException comment not found
      */
     @Override
     @Transactional
@@ -789,8 +790,8 @@ public class PostServiceImpl implements PostService {
      * @param request     the new content
      * @param currentUser the caller (must be the comment author)
      * @return the updated comment as a response
-     * @throws com.chat.talkMe.exception.NotFoundException   comment not found
-     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the comment author
+     * @throws com.chat.talkMe.exception.NotFoundException  comment not found
+     * @throws com.chat.talkMe.exception.ForbiddenException caller is not the comment author
      */
     @Override
     @Transactional
@@ -812,7 +813,7 @@ public class PostServiceImpl implements PostService {
      *
      * @param postUuid    the post's UUID
      * @param currentUser the caller
-     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
     @Transactional
@@ -833,7 +834,7 @@ public class PostServiceImpl implements PostService {
      *
      * @param postUuid    the post's UUID
      * @param currentUser the caller
-     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
     @Transactional
@@ -943,7 +944,7 @@ public class PostServiceImpl implements PostService {
      * @param pageable    paging/sort
      * @param currentUser the viewer (drives per-comment liked flags)
      * @return a page of comments
-     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
     @Transactional(readOnly = true)
@@ -963,7 +964,7 @@ public class PostServiceImpl implements PostService {
      * @param pageable    paging/sort
      * @param currentUser the viewer (drives per-comment liked flags)
      * @return a page of replies
-     * @throws com.chat.talkMe.exception.NotFoundException  parent comment not found
+     * @throws com.chat.talkMe.exception.NotFoundException parent comment not found
      */
     @Override
     @Transactional(readOnly = true)

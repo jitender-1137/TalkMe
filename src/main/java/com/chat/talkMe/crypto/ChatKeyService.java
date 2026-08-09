@@ -44,7 +44,7 @@ public class ChatKeyService {
      * @param chatId the chat's numeric id
      * @return the unwrapped {@link javax.crypto.SecretKey} for the chat
      * @throws org.springframework.dao.DataIntegrityViolationException if a concurrent insert
-     *         race cannot be resolved to a winning row
+     *                                                                 race cannot be resolved to a winning row
      */
     @Transactional
     public SecretKey getOrCreateSecretKey(Long chatId) {

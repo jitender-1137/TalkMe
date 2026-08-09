@@ -119,8 +119,8 @@ public class CompatibilityServiceImpl implements CompatibilityService {
     /**
      * Jaccard overlap (|intersection| / |union|) of two enum sets; 0 when either is null/empty.
      *
-     * @param a first set
-     * @param b second set
+     * @param a   first set
+     * @param b   second set
      * @param <E> enum type
      * @return overlap in 0..1
      */
@@ -282,12 +282,12 @@ public class CompatibilityServiceImpl implements CompatibilityService {
      * Builds the short human-readable highlight lines (shared interests/languages, matching
      * energy/mood, same country, close in age) from the users and pre-computed factors.
      *
-     * @param a first user
-     * @param b second user
-     * @param fLang language factor (unused directly; overlap recomputed by name)
-     * @param fAge age factor
-     * @param fEnergy energy factor
-     * @param fMood mood factor
+     * @param a         first user
+     * @param b         second user
+     * @param fLang     language factor (unused directly; overlap recomputed by name)
+     * @param fAge      age factor
+     * @param fEnergy   energy factor
+     * @param fMood     mood factor
      * @param fTimezone timezone/country factor
      * @return ordered highlight strings (possibly empty)
      */
@@ -320,8 +320,8 @@ public class CompatibilityServiceImpl implements CompatibilityService {
     /**
      * Up to {@code max} prettified names present in both enum sets, in {@code a}'s iteration order.
      *
-     * @param a first set (nullable)
-     * @param b second set (nullable)
+     * @param a   first set (nullable)
+     * @param b   second set (nullable)
      * @param max cap on returned names
      * @param <E> enum type
      * @return shared names (empty when none)
@@ -342,7 +342,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
      * One-sentence explanation: a strength lead keyed off the overall score plus up to three
      * highlights.
      *
-     * @param overall overall 0..100 score
+     * @param overall    overall 0..100 score
      * @param highlights highlight lines
      * @return explanation sentence
      */

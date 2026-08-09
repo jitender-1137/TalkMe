@@ -60,7 +60,7 @@ public class OciMediaStorage implements MediaStorage {
      * @param contentType the MIME type stored on the object ({@code java.lang.String})
      * @return the reference {@code <media-root>/<key>} ({@code java.lang.String})
      * @throws com.chat.talkMe.exception.FileStorageException if the key is unsafe or the
-     *                    upload fails
+     *                                                        upload fails
      */
     @Override
     public String store(Path source, String key, String contentType) {
@@ -90,7 +90,7 @@ public class OciMediaStorage implements MediaStorage {
      *
      * @param reference the stored reference ({@code java.lang.String})
      * @return an {@code java.util.Optional} of {@link MediaContent}; empty if the key is
-     *                  invalid or the fetch fails
+     * invalid or the fetch fails
      */
     @Override
     public Optional<MediaContent> open(String reference) {
@@ -126,7 +126,7 @@ public class OciMediaStorage implements MediaStorage {
      *
      * @param reference the stored reference ({@code java.lang.String})
      * @return an {@code java.util.Optional} of {@link LocalFile}; empty if the key is invalid
-     *                  or the download fails
+     * or the download fails
      */
     @Override
     public Optional<LocalFile> localCopy(String reference) {
@@ -239,7 +239,7 @@ public class OciMediaStorage implements MediaStorage {
      *
      * @param key the object key ({@code java.lang.String})
      * @return the extension including the leading dot, or {@code ".tmp"}
-     *                  ({@code java.lang.String})
+     * ({@code java.lang.String})
      */
     private static String extensionOf(String key) {
         int dot = key.lastIndexOf('.');

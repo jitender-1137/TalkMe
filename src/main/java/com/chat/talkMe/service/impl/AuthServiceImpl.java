@@ -154,15 +154,15 @@ public class AuthServiceImpl implements AuthService {
      * request IP when unset, fires a best-effort sign-in alert, and issues a token pair +
      * session (single-device: prior tokens are revoked). Transactional.
      *
-     * @param request the login credentials (email/username + password)
-     * @param userAgent the caller's User-Agent (recorded on the session + alert)
-     * @param ip the caller IP (used for lockout accounting)
+     * @param request     the login credentials (email/username + password)
+     * @param userAgent   the caller's User-Agent (recorded on the session + alert)
+     * @param ip          the caller IP (used for lockout accounting)
      * @param httpRequest the servlet request (used for IP geo-location)
      * @return the login response with user + tokens
      * @throws com.chat.talkMe.exception.UnauthorizedException (TM_024) unknown user, bad password,
-     *         or a soft-deleted account past its recovery window
-     * @throws com.chat.talkMe.exception.ForbiddenException (TM_029) guest account using this flow,
-     *         or (TM_030) a banned account
+     *                                                         or a soft-deleted account past its recovery window
+     * @throws com.chat.talkMe.exception.ForbiddenException    (TM_029) guest account using this flow,
+     *                                                         or (TM_030) a banned account
      */
     @Override
     @Transactional
@@ -253,12 +253,12 @@ public class AuthServiceImpl implements AuthService {
      * the request IP, resolves optional referral attribution, persists the user, sends the
      * verification email, and returns a login response. Transactional.
      *
-     * @param request the signup fields
-     * @param userAgent the caller's User-Agent
+     * @param request     the signup fields
+     * @param userAgent   the caller's User-Agent
      * @param httpRequest the servlet request (used for country detection)
      * @return the login response with user + tokens
-     * @throws com.chat.talkMe.exception.ConflictException (TM_047) if the email already exists
-     * @throws com.chat.talkMe.exception.BadRequestException (TM_496) if the password is breached
+     * @throws com.chat.talkMe.exception.ConflictException          (TM_047) if the email already exists
+     * @throws com.chat.talkMe.exception.BadRequestException        (TM_496) if the password is breached
      * @throws com.chat.talkMe.exception.ContentModerationException if the display name is explicit
      */
     @Override
@@ -345,8 +345,8 @@ public class AuthServiceImpl implements AuthService {
      * Creates an anonymous guest account (random {@code guest_*} username, ROLE_GUEST, unverified)
      * with detected country, and returns a login response (guest refresh-token TTL). Transactional.
      *
-     * @param request the guest details (display name, age, gender)
-     * @param userAgent the caller's User-Agent
+     * @param request     the guest details (display name, age, gender)
+     * @param userAgent   the caller's User-Agent
      * @param httpRequest the servlet request (used for country detection)
      * @return the login response with the guest user + tokens
      */
@@ -383,12 +383,12 @@ public class AuthServiceImpl implements AuthService {
      * existing account (also recovering a soft-deleted one). Sends a welcome email for brand-new
      * users, otherwise a best-effort sign-in alert. Transactional.
      *
-     * @param info the OAuth profile (provider id, email, name, picture, verified, age, gender)
-     * @param userAgent the caller's User-Agent
+     * @param info        the OAuth profile (provider id, email, name, picture, verified, age, gender)
+     * @param userAgent   the caller's User-Agent
      * @param httpRequest the callback servlet request (used for country detection)
      * @return the login response with user + tokens
      * @throws org.springframework.dao.DataIntegrityViolationException if a create race cannot be
-     *         resolved to an existing row
+     *                                                                 resolved to an existing row
      */
     @Override
     @Transactional
@@ -537,12 +537,12 @@ public class AuthServiceImpl implements AuthService {
      * rotation is flushed immediately so a concurrent refresh of the same token loses the
      * optimistic-lock race with a clean 401 rather than a 500. Transactional.
      *
-     * @param tokenStr the presented refresh token
+     * @param tokenStr  the presented refresh token
      * @param userAgent the caller's User-Agent (to match the session)
-     * @param ip the caller IP (to match the session)
+     * @param ip        the caller IP (to match the session)
      * @return the new access + refresh token pair
      * @throws com.chat.talkMe.exception.UnauthorizedException (TM_026) unknown, revoked, expired,
-     *         or concurrently-rotated token
+     *                                                         or concurrently-rotated token
      */
     @Override
     @Transactional
@@ -645,7 +645,7 @@ public class AuthServiceImpl implements AuthService {
      *
      * @param sessionUuid the session UUID
      * @param currentUser the owning user
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_053) if the session is missing
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_053) if the session is missing
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) if it belongs to another user
      */
     @Override
@@ -723,7 +723,7 @@ public class AuthServiceImpl implements AuthService {
      *
      * @param request the reset request (token + new password)
      * @throws com.chat.talkMe.exception.UnauthorizedException (TM_038) missing/invalid/expired token
-     * @throws com.chat.talkMe.exception.BadRequestException (TM_496) if the new password is breached
+     * @throws com.chat.talkMe.exception.BadRequestException   (TM_496) if the new password is breached
      */
     @Override
     @Transactional
@@ -912,11 +912,11 @@ public class AuthServiceImpl implements AuthService {
      * breached new password, then revokes all of the user's tokens (sign-out everywhere).
      * Transactional.
      *
-     * @param request the change-password request (current + new password)
+     * @param request     the change-password request (current + new password)
      * @param currentUser the signed-in user
      * @throws com.chat.talkMe.exception.UnauthorizedException (TM_042) if the current password
-     *         is incorrect
-     * @throws com.chat.talkMe.exception.BadRequestException (TM_496) if the new password is breached
+     *                                                         is incorrect
+     * @throws com.chat.talkMe.exception.BadRequestException   (TM_496) if the new password is breached
      */
     @Override
     @Transactional
@@ -943,10 +943,10 @@ public class AuthServiceImpl implements AuthService {
      * Transactional.
      *
      * @param currentUser the account owner
-     * @param password the current password for re-authentication (required for local accounts)
-     * @throws com.chat.talkMe.exception.ForbiddenException (TM_029) if the account is a guest
+     * @param password    the current password for re-authentication (required for local accounts)
+     * @throws com.chat.talkMe.exception.ForbiddenException    (TM_029) if the account is a guest
      * @throws com.chat.talkMe.exception.UnauthorizedException (TM_497) if password confirmation
-     *         is missing or wrong for a local account
+     *                                                         is missing or wrong for a local account
      */
     @Override
     @Transactional
@@ -1081,7 +1081,7 @@ public class AuthServiceImpl implements AuthService {
      * issues a new access + refresh token pair, persists a session and the user's latest activity
      * location, and returns the user DTO (with a freshly-recomputed feature set) plus tokens.
      *
-     * @param user the authenticated user
+     * @param user      the authenticated user
      * @param userAgent the caller's User-Agent (recorded on the session)
      * @param detection the resolved location (nullable) for IP/location fields
      * @return the assembled login response
@@ -1199,7 +1199,7 @@ public class AuthServiceImpl implements AuthService {
      * reputation event on reaching 100%, evicts the feature-access cache, and returns the updated
      * DTO with a fresh feature set. Transactional.
      *
-     * @param request the partial profile update
+     * @param request     the partial profile update
      * @param currentUser the signed-in user
      * @return the updated current-user DTO including features
      * @throws com.chat.talkMe.exception.NotFoundException (TM_024) if the user no longer exists

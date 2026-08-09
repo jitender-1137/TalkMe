@@ -117,7 +117,9 @@ class FlirtModeControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal. */
+    /**
+     * Seeds the {@link SecurityContextHolder} with the ROLE_USER {@link #testUser} principal.
+     */
     private void authenticate() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -168,7 +170,9 @@ class FlirtModeControllerUnitTest {
             verify(flirtModeService, never()).disable(any(), any());
         }
 
-        /** No consent row yet → every flag comes back false. */
+        /**
+         * No consent row yet → every flag comes back false.
+         */
         @Test
         void shouldReturn200WithAllFalseStateWhenNoRow() throws Exception {
             authenticate();
@@ -193,7 +197,9 @@ class FlirtModeControllerUnitTest {
                     .andExpect(jsonPath("$.data.active").value(true));
         }
 
-        /** Controller passes the raw path segment (incl. odd/unsafe chars) untouched to the service. */
+        /**
+         * Controller passes the raw path segment (incl. odd/unsafe chars) untouched to the service.
+         */
         @Test
         void shouldForwardRawPathUuidVerbatimToService() throws Exception {
             authenticate();
@@ -286,7 +292,9 @@ class FlirtModeControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }
 
-        /** No principal → current-user NPE before the service is reached → catch-all 500. */
+        /**
+         * No principal → current-user NPE before the service is reached → catch-all 500.
+         */
         @Test
         void shouldReturn500AndNotCallServiceWhenUnauthenticated() throws Exception {
             // No SecurityContext → @AuthenticationPrincipal resolves null → userDetails.getUser()
@@ -374,7 +382,9 @@ class FlirtModeControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_101"));
         }
 
-        /** Exhausted optimistic-lock retries surface as {@link ObjectOptimisticLockingFailureException} → 500. */
+        /**
+         * Exhausted optimistic-lock retries surface as {@link ObjectOptimisticLockingFailureException} → 500.
+         */
         @Test
         void shouldReturn500WhenOptimisticLockRetryExhausted() throws Exception {
             authenticate();
@@ -398,7 +408,9 @@ class FlirtModeControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }
 
-        /** No principal → current-user NPE before the service is reached → catch-all 500. */
+        /**
+         * No principal → current-user NPE before the service is reached → catch-all 500.
+         */
         @Test
         void shouldReturn500AndNotCallServiceWhenUnauthenticated() throws Exception {
             mockMvc.perform(post(BASE + "/enable"))
@@ -471,7 +483,9 @@ class FlirtModeControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }
 
-        /** No principal → current-user NPE before the service is reached → catch-all 500. */
+        /**
+         * No principal → current-user NPE before the service is reached → catch-all 500.
+         */
         @Test
         void shouldReturn500AndNotCallServiceWhenUnauthenticated() throws Exception {
             mockMvc.perform(post(BASE + "/disable"))

@@ -6,7 +6,9 @@ import com.chat.talkMe.dto.response.FriendRequestResponse;
 
 import java.util.List;
 
-/** Mutual friendships and friend requests, plus user blocking/unblocking. */
+/**
+ * Mutual friendships and friend requests, plus user blocking/unblocking.
+ */
 public interface FriendService {
     FriendRequestResponse sendFriendRequest(String receiverUuid, User currentUser);
 

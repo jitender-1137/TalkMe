@@ -130,7 +130,7 @@ public class ListenerServiceImpl implements ListenerService {
      * listener over WebSocket that they have been matched.
      *
      * @param requester the user seeking a listener
-     * @param reason     the context/reason (defaults to NEED_TO_TALK if null)
+     * @param reason    the context/reason (defaults to NEED_TO_TALK if null)
      * @return the engaged shift as a response DTO
      * @throws com.chat.talkMe.exception.NotFoundException if no listener is available, or the created
      *                                                     room cannot be found

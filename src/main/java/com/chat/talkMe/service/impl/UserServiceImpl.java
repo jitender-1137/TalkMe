@@ -124,9 +124,9 @@ public class UserServiceImpl implements UserService {
      * @param request     the fields to update
      * @param currentUser the caller
      * @return the updated user response (presence online, counts populated)
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.NotFoundException          (TM_024) when the user no longer exists
      * @throws com.chat.talkMe.exception.ContentModerationException when the display name is explicit
-     * @throws com.chat.talkMe.exception.BadRequestException (TM_099) on an attempted country change
+     * @throws com.chat.talkMe.exception.BadRequestException        (TM_099) on an attempted country change
      */
     @Override
     @Transactional
@@ -250,9 +250,9 @@ public class UserServiceImpl implements UserService {
      * @param newUsername the requested username (trimmed)
      * @param currentUser the caller
      * @return the updated user response
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.NotFoundException   (TM_024) when the user no longer exists
      * @throws com.chat.talkMe.exception.BadRequestException (TM_002) on an invalid username format
-     * @throws com.chat.talkMe.exception.ConflictException (TM_048) when the username is taken
+     * @throws com.chat.talkMe.exception.ConflictException   (TM_048) when the username is taken
      */
     @Override
     @Transactional
@@ -308,7 +308,7 @@ public class UserServiceImpl implements UserService {
      * @param currentUser the caller
      * @return the updated user response
      * @throws com.chat.talkMe.exception.BadRequestException (TM_002) on an invalid mood value
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.NotFoundException   (TM_024) when the user no longer exists
      */
     @Override
     @Transactional
@@ -335,7 +335,7 @@ public class UserServiceImpl implements UserService {
      * @param file        the uploaded image
      * @param currentUser the caller
      * @return a single-entry map {@code {"avatarUrl": <url>}}
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.NotFoundException          (TM_024) when the user no longer exists
      * @throws com.chat.talkMe.exception.ContentModerationException when the photo is explicit
      */
     @Override

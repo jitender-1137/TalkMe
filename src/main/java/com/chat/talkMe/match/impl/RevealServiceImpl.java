@@ -47,7 +47,7 @@ public class RevealServiceImpl implements RevealService {
      * either exchanges immediately (if the peer already revealed) or notifies the peer.
      *
      * @param requester the requesting username
-     * @param channel the channel to reveal (PROFILE/VOICE/PHOTO)
+     * @param channel   the channel to reveal (PROFILE/VOICE/PHOTO)
      * @throws java.lang.IllegalArgumentException if the requester has no active session
      */
     @Override
@@ -86,7 +86,7 @@ public class RevealServiceImpl implements RevealService {
      * both sides have revealed.
      *
      * @param accepter the accepting username
-     * @param channel the channel being accepted
+     * @param channel  the channel being accepted
      * @throws java.lang.IllegalArgumentException if the accepter has no active session
      */
     @Override
@@ -113,7 +113,7 @@ public class RevealServiceImpl implements RevealService {
      * with REVEAL_DECLINED (carrying whether the cap is reached).
      *
      * @param decliner the declining username
-     * @param channel the channel being declined
+     * @param channel  the channel being declined
      * @throws java.lang.IllegalArgumentException if the decliner has no active session
      */
     @Override
@@ -171,7 +171,7 @@ public class RevealServiceImpl implements RevealService {
      * Returns just the channel name when the other user is unavailable.
      *
      * @param channel the channel being revealed
-     * @param other the other peer's user entity (may be null)
+     * @param other   the other peer's user entity (may be null)
      * @return the payload map to send to the receiving peer
      */
     private Map<String, Object> grantPayload(RevealChannel channel, User other) {
@@ -225,7 +225,7 @@ public class RevealServiceImpl implements RevealService {
     /**
      * Returns the per-channel reveal-state map belonging to the given user (revealA/revealB).
      *
-     * @param session the match session
+     * @param session  the match session
      * @param username the participant whose side to select
      * @return that participant's reveal-state map
      */
@@ -236,7 +236,7 @@ public class RevealServiceImpl implements RevealService {
     /**
      * Returns the other participant relative to the given user.
      *
-     * @param session the match session
+     * @param session  the match session
      * @param username one participant's username
      * @return the peer's username
      */
@@ -260,8 +260,8 @@ public class RevealServiceImpl implements RevealService {
      * Sends a single match event with the given payload to one user's match queue.
      *
      * @param username the recipient's username
-     * @param event the event name
-     * @param payload the event payload
+     * @param event    the event name
+     * @param payload  the event payload
      */
     private void send(String username, String event, Map<String, Object> payload) {
         messagingTemplate.convertAndSendToUser(username, "/queue/match",

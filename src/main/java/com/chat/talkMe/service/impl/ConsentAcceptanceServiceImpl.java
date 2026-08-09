@@ -70,10 +70,10 @@ public class ConsentAcceptanceServiceImpl implements ConsentAcceptanceService {
      * and IP, then evicting the feature-access cache since acceptance can flip entitlement.
      * Transactional.
      *
-     * @param user the accepting user
-     * @param type the consent type
+     * @param user    the accepting user
+     * @param type    the consent type
      * @param version the version the client confirmed (nullable/blank → current required)
-     * @param ip the client IP recorded for audit
+     * @param ip      the client IP recorded for audit
      * @return the refreshed consent status DTO
      */
     @Override

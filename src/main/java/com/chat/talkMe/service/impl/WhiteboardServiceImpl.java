@@ -64,7 +64,7 @@ public class WhiteboardServiceImpl implements WhiteboardService {
      * @param me       the caller (must be an active chat member)
      * @param chatUuid the chat's UUID
      * @return the current whiteboard ops (possibly empty)
-     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.ForbiddenException  (TM_103) when the caller is not a member
      * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when {@code chatUuid} is malformed
      */
     @Override
@@ -96,7 +96,7 @@ public class WhiteboardServiceImpl implements WhiteboardService {
      * @param me  the caller (must be an active chat member)
      * @param req the stroke (chat UUID, points, color, size, tool)
      * @return the server-stamped stroke op
-     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.ForbiddenException  (TM_103) when the caller is not a member
      * @throws com.chat.talkMe.exception.BadRequestException (TM_821) on too many / malformed points
      * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when the chat id is malformed
      */
@@ -142,7 +142,7 @@ public class WhiteboardServiceImpl implements WhiteboardService {
      *
      * @param me       the caller (must be an active chat member)
      * @param chatUuid the chat's UUID
-     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.ForbiddenException  (TM_103) when the caller is not a member
      * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when {@code chatUuid} is malformed
      */
     @Override
@@ -174,7 +174,7 @@ public class WhiteboardServiceImpl implements WhiteboardService {
      * @param me       the caller (must be an active chat member)
      * @param chatUuid the chat's UUID
      * @return the server-stamped undo op
-     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.ForbiddenException  (TM_103) when the caller is not a member
      * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when {@code chatUuid} is malformed
      */
     @Override

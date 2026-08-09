@@ -159,7 +159,7 @@ public final class UploadValidator {
     /**
      * @param head the file's head bytes
      * @return {@code true} if the content looks like SVG/XML (starts with {@code <?xml},
-     *         {@code <svg}, or {@code <!doctype svg})
+     * {@code <svg}, or {@code <!doctype svg})
      */
     private static boolean looksLikeSvg(byte[] head) {
         String s = new String(head, StandardCharsets.UTF_8).trim().toLowerCase(Locale.ROOT);

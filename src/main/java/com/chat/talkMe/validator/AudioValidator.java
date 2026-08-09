@@ -35,7 +35,7 @@ public class AudioValidator implements ConstraintValidator<ValidAudio, String> {
      *
      * @param filename the filename or URL to inspect
      * @return {@code true} if non-{@code null} and its lowercased extension is a supported audio type;
-     *         {@code false} if {@code null} or it has no {@code '.'} extension
+     * {@code false} if {@code null} or it has no {@code '.'} extension
      */
     public static boolean hasAudioExtension(String filename) {
         if (filename == null) return false;

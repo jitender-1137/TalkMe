@@ -40,7 +40,7 @@ public class CaptchaServiceImpl implements CaptchaService {
      * @param token    the Turnstile response token from the client; blank/null yields false
      * @param remoteIp the caller's IP, forwarded to Cloudflare when present (optional)
      * @return true if CAPTCHA is disabled, or Cloudflare reports {@code success=true}; false on
-     *         a blank token, a failed verification, or any I/O/parse error (fail-closed)
+     * a blank token, a failed verification, or any I/O/parse error (fail-closed)
      */
     @Override
     public boolean verify(String token, String remoteIp) {

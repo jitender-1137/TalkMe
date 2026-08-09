@@ -57,10 +57,10 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * Returns the viewer-relative consent state for a chat (status, can-request/revoke flags,
      * requester/awaiting-accept flags, held-message count, decline count).
      *
-     * @param chatUuid target chat UUID
+     * @param chatUuid    target chat UUID
      * @param currentUser the requesting member
      * @return the consent state DTO
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_121) if the chat is missing
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) if the caller is not a member
      */
     @Override
@@ -76,12 +76,12 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * {@code consent_requested}. Idempotent while PENDING/GRANTED, and refused once the
      * consecutive-decline cap ({@value #MAX_DECLINES}) is reached. Transactional.
      *
-     * @param chatUuid target chat UUID
+     * @param chatUuid    target chat UUID
      * @param currentUser the requesting member
      * @return the updated consent state DTO
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_121) if the chat is missing
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member,
-     *         or (TM_494) if the chat is not 1:1
+     *                                                      or (TM_494) if the chat is not 1:1
      */
     @Override
     @Transactional
@@ -120,12 +120,12 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * other party may immediately re-request) and broadcasting {@code consent_revoked}. No-op
      * when not currently granted. Transactional.
      *
-     * @param chatUuid target chat UUID
+     * @param chatUuid    target chat UUID
      * @param currentUser the revoking member
      * @return the updated consent state DTO
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_121) if the chat is missing
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member,
-     *         or (TM_494) if the chat is not 1:1
+     *                                                      or (TM_494) if the chat is not 1:1
      */
     @Override
     @Transactional
@@ -162,13 +162,13 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * {@link MessageService#releaseHeldMessages}, and broadcasting {@code consent_granted}.
      * Idempotent when already GRANTED. Transactional.
      *
-     * @param chatUuid target chat UUID
+     * @param chatUuid    target chat UUID
      * @param currentUser the accepting member
      * @return the updated consent state DTO
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) chat missing, or (TM_491)
-     *         if there is no consent request to accept
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_121) chat missing, or (TM_491)
+     *                                                      if there is no consent request to accept
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member, (TM_494) not 1:1,
-     *         (TM_492) no pending request, or (TM_493) attempting to accept one's own request
+     *                                                      (TM_492) no pending request, or (TM_493) attempting to accept one's own request
      */
     @Override
     @Transactional
@@ -215,13 +215,13 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * incrementing the consecutive-decline count, deleting the held undelivered messages, and
      * broadcasting {@code consent_declined}. Idempotent when already DECLINED. Transactional.
      *
-     * @param chatUuid target chat UUID
+     * @param chatUuid    target chat UUID
      * @param currentUser the declining member
      * @return the updated consent state DTO
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) chat missing, or (TM_491)
-     *         if there is no consent request to decline
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_121) chat missing, or (TM_491)
+     *                                                      if there is no consent request to decline
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member, (TM_494) not 1:1,
-     *         (TM_492) no pending request, or (TM_493) attempting to decline one's own request
+     *                                                      (TM_492) no pending request, or (TM_493) attempting to decline one's own request
      */
     @Override
     @Transactional
@@ -266,10 +266,10 @@ public class ChatConsentServiceImpl implements ChatConsentService {
     /**
      * Loads a chat by UUID and asserts the caller is a member of it (IDOR guard).
      *
-     * @param chatUuid target chat UUID
+     * @param chatUuid    target chat UUID
      * @param currentUser the caller
      * @return the chat
-     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.NotFoundException  (TM_121) if the chat is missing
      * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) if the caller is not a member
      */
     private Chat loadMemberChat(String chatUuid, User currentUser) {
@@ -297,10 +297,10 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * consent entity, including the count of held messages sent by the caller and the derived
      * can-request/can-revoke/awaiting-accept flags.
      *
-     * @param chatUuid target chat UUID
-     * @param consent the current consent entity, or null when none exists
+     * @param chatUuid    target chat UUID
+     * @param consent     the current consent entity, or null when none exists
      * @param currentUser the requesting member
-     * @param chat the chat (for held-message counting)
+     * @param chat        the chat (for held-message counting)
      * @return the assembled DTO
      */
     private ConsentStateResponse toResponse(String chatUuid, ChatExplicitConsent consent, User currentUser, Chat chat) {
@@ -336,8 +336,8 @@ public class ChatConsentServiceImpl implements ChatConsentService {
      * swallows any failure.
      *
      * @param chatUuid target chat UUID
-     * @param event event name
-     * @param payload event payload
+     * @param event    event name
+     * @param payload  event payload
      */
     private void broadcastConsent(String chatUuid, String event, Map<String, Object> payload) {
         try {

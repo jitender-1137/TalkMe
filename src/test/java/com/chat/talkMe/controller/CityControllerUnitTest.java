@@ -116,7 +116,9 @@ class CityControllerUnitTest {
 
     // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-    /** Builds a district summary card (list view) for the given slug. */
+    /**
+     * Builds a district summary card (list view) for the given slug.
+     */
     private static CityDistrictResponse card(String slug) {
         return CityDistrictResponse.builder()
                 .slug(slug)
@@ -128,7 +130,9 @@ class CityControllerUnitTest {
                 .build();
     }
 
-    /** Builds a district detail (card + rooms + online roster) for the given slug. */
+    /**
+     * Builds a district detail (card + rooms + online roster) for the given slug.
+     */
     private static CityDistrictDetailResponse detail(String slug) {
         return CityDistrictDetailResponse.builder()
                 .district(card(slug))

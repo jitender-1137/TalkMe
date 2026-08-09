@@ -33,7 +33,7 @@ public class SessionCleanupServiceImpl implements SessionCleanupService {
      * online count. No-op if the session is already gone.
      *
      * @param sessionId the session id to clean up
-     * @param reason the end reason relayed to both peers (e.g. EXIT, NEW_CHAT)
+     * @param reason    the end reason relayed to both peers (e.g. EXIT, NEW_CHAT)
      */
     @Override
     public void cleanupSession(String sessionId, String reason) {

@@ -34,7 +34,7 @@ public class ChatKeyStartupCheck implements ApplicationRunner {
      *
      * @param args the Spring application arguments (unused)
      * @throws java.lang.IllegalStateException if the configured master key cannot unwrap an
-     *         existing chat key (lost/rotated/wrong-environment) or the result is malformed
+     *                                         existing chat key (lost/rotated/wrong-environment) or the result is malformed
      */
     @Override
     public void run(ApplicationArguments args) {

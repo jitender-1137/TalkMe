@@ -80,7 +80,7 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
      * @param viewer        the requesting user
      * @param otherUserUuid UUID string of the other user
      * @return the journey response (milestones + stats)
-     * @throws com.chat.talkMe.exception.ForbiddenException if the viewer is not an active friend (TM_821)
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the viewer is not an active friend (TM_821)
      * @throws com.chat.talkMe.exception.BadRequestException if the UUID is malformed (TM_820)
      * @throws com.chat.talkMe.exception.NotFoundException   if the other user does not exist (TM_822)
      */

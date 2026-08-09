@@ -37,7 +37,7 @@ public class CompatibilityController {
      * @param userUuid    UUID of the other user to compare against, from the path
      * @param userDetails the authenticated principal being compared
      * @return 200 with the {@link CompatibilityScore} (overall 0..100, per-factor breakdown, highlights,
-     *         explanation, bucket)
+     * explanation, bucket)
      * @throws com.chat.talkMe.exception.NotFoundException if no user matches {@code userUuid} (TM_024)
      * @throws java.lang.IllegalArgumentException          if {@code userUuid} is not a valid UUID
      */

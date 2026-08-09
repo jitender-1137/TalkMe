@@ -474,7 +474,9 @@ class RelationshipJourneyServiceImplTest {
             return f;
         }
 
-        /** Asserts exactly one milestone was persisted and returns it for further assertions. */
+        /**
+         * Asserts exactly one milestone was persisted and returns it for further assertions.
+         */
         private RelationshipMilestone captureSingleSave() {
             ArgumentCaptor<RelationshipMilestone> captor =
                     ArgumentCaptor.forClass(RelationshipMilestone.class);

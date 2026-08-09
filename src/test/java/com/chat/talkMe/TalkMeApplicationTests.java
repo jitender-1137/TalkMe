@@ -14,7 +14,9 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class TalkMeApplicationTests {
 
-    /** Passes when the application context loads successfully; fails if any bean fails to wire. */
+    /**
+     * Passes when the application context loads successfully; fails if any bean fails to wire.
+     */
     @Test
     void contextLoads() {
     }

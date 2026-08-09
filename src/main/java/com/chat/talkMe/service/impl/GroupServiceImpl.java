@@ -251,7 +251,7 @@ public class GroupServiceImpl implements GroupService {
      * @param currentUser the adder
      * @return the group as seen by the adder
      * @throws com.chat.talkMe.exception.ForbiddenException  caller can't add members (TM_291) or
-     *                                                        friends-only violation (TM_306)
+     *                                                       friends-only violation (TM_306)
      * @throws com.chat.talkMe.exception.BadRequestException member limit reached (TM_297)
      */
     @Override
@@ -333,7 +333,7 @@ public class GroupServiceImpl implements GroupService {
      * @param currentUser the remover (must be ADMIN or above)
      * @throws com.chat.talkMe.exception.NotFoundException  user or member row not found (TM_064 / TM_141)
      * @throws com.chat.talkMe.exception.ForbiddenException removing the owner (TM_303) or an admin
-     *                                                       when not owner (TM_304)
+     *                                                      when not owner (TM_304)
      */
     @Override
     @Transactional

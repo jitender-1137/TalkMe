@@ -53,7 +53,7 @@ public class BadgeController {
      * @param userDetails the authenticated principal (the endorser)
      * @return the resulting {@link BadgeResponse} for the endorsed trait
      * @throws com.chat.talkMe.exception.BadRequestException if the badge type is missing, the
-     *         recipient is the caller, or the recipient is not a valid target
+     *                                                       recipient is the caller, or the recipient is not a valid target
      * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not allowed to endorse
      */
     @PostMapping("/endorse")

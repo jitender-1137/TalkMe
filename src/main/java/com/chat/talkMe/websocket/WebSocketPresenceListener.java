@@ -145,7 +145,7 @@ public class WebSocketPresenceListener {
      *
      * @param principal the session principal
      * @return the domain user, or null if it is not an authenticated
-     *         {@code UsernamePasswordAuthenticationToken} carrying {@code CustomUserDetails}
+     * {@code UsernamePasswordAuthenticationToken} carrying {@code CustomUserDetails}
      */
     private User extractUser(Principal principal) {
         if (principal instanceof UsernamePasswordAuthenticationToken auth) {

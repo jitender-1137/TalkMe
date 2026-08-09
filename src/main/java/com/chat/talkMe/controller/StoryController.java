@@ -45,15 +45,15 @@ public class StoryController {
      * {@link StoryService#createStory(StoryRequest, com.chat.talkMe.domain.User)}
      * for the full rules.
      *
-     * @param request    the story payload (media URL, optional caption, audience,
-     *                   kind, and optional soundtrack); validated by bean validation
+     * @param request     the story payload (media URL, optional caption, audience,
+     *                    kind, and optional soundtrack); validated by bean validation
      * @param userDetails the authenticated principal; its user becomes the author
      * @return the created story as it should render for the author
      * @throws com.chat.talkMe.exception.ContentModerationException if the caption is explicit
-     * @throws com.chat.talkMe.exception.FeatureLockedException if a VOICE story is requested
-     *         without the VOICE_STATUS entitlement
-     * @throws com.chat.talkMe.exception.BadRequestException if a VOICE story's media is not an
-     *         audio clip
+     * @throws com.chat.talkMe.exception.FeatureLockedException     if a VOICE story is requested
+     *                                                              without the VOICE_STATUS entitlement
+     * @throws com.chat.talkMe.exception.BadRequestException        if a VOICE story's media is not an
+     *                                                              audio clip
      */
     @PostMapping
     public ResponseEntity<ResponseDto<StoryResponse>> createStory(

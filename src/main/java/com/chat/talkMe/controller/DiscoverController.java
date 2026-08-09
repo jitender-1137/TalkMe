@@ -38,7 +38,7 @@ public class DiscoverController {
      * @param interests   optional comma-separated interest names; unknown values are ignored
      * @param distance    optional max distance (accepted but not applied as a hard filter)
      * @param verified    optional filter to only verified (true) or only unverified (false) users
-     * @param isOnline     optional post-filter keeping only users whose live online flag matches
+     * @param isOnline    optional post-filter keeping only users whose live online flag matches
      * @param cursor      opaque page cursor (the zero-based page index as a string)
      * @param limit       page size; defaults to 20
      * @param minAge      optional inclusive minimum age
@@ -47,7 +47,7 @@ public class DiscoverController {
      * @param country     optional country filter; "all"/"any" means no filter
      * @param userDetails the authenticated viewer, excluded from and used to enrich the results
      * @return 200 with a paginated list of discover profiles (like/friend/request flags relative
-     *         to the viewer) plus cursor/hasNext/total pagination info
+     * to the viewer) plus cursor/hasNext/total pagination info
      */
     @GetMapping
     public ResponseEntity<ResponseDto<PaginatedResponse<DiscoverProfileResponse>>> getDiscover(

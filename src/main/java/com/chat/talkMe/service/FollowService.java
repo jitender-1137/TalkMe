@@ -5,7 +5,9 @@ import com.chat.talkMe.dto.response.AuthUserResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-/** Directional follow graph: follow/unfollow, remove followers, and follower/following listings and counts. */
+/**
+ * Directional follow graph: follow/unfollow, remove followers, and follower/following listings and counts.
+ */
 public interface FollowService {
     void followUser(String targetUserUuid, User currentUser);
 

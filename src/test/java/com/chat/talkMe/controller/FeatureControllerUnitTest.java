@@ -172,7 +172,9 @@ class FeatureControllerUnitTest {
             verify(featureAccessService).setSelfPreference(testUser, FeatureKey.NIGHT_OWL, false);
         }
 
-        /** A mixed-case path key still resolves via {@code fromWire}'s uppercasing to NIGHT_OWL. */
+        /**
+         * A mixed-case path key still resolves via {@code fromWire}'s uppercasing to NIGHT_OWL.
+         */
         @Test
         void shouldAcceptCaseInsensitiveWireKey() throws Exception {
             doNothing().when(featureAccessService).setSelfPreference(any(), any(), eq(true));
@@ -185,7 +187,9 @@ class FeatureControllerUnitTest {
             verify(featureAccessService).setSelfPreference(testUser, FeatureKey.NIGHT_OWL, true);
         }
 
-        /** Unknown wire key trips the controller's {@code fromWire} guard: 400/TM_002, service untouched. */
+        /**
+         * Unknown wire key trips the controller's {@code fromWire} guard: 400/TM_002, service untouched.
+         */
         @Test
         void shouldReturn400AndSkipServiceWhenKeyUnknown() throws Exception {
             mockMvc.perform(put(BASE + "/not_a_feature").param("enabled", "true"))
@@ -216,7 +220,9 @@ class FeatureControllerUnitTest {
         }
     }
 
-    /** Local {@link ArgumentMatchers#anyBoolean()} matcher wrapper, kept to avoid a single-use import. */
+    /**
+     * Local {@link ArgumentMatchers#anyBoolean()} matcher wrapper, kept to avoid a single-use import.
+     */
     // Local matcher helper to avoid an extra import line at top for a single use.
     private static boolean anyBoolean() {
         return ArgumentMatchers.anyBoolean();

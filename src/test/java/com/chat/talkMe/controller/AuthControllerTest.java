@@ -158,7 +158,9 @@ public class AuthControllerTest {
                 .andExpect(cookie().exists("csrf_token"));
     }
 
-    /** Signup resolves the user's country from the Cloudflare {@code CF-IPCountry} header (IN → India). */
+    /**
+     * Signup resolves the user's country from the Cloudflare {@code CF-IPCountry} header (IN → India).
+     */
     @Test
     void testSignupSuccessWithCloudflareCountry() throws Exception {
         String signupPayload = """
@@ -242,7 +244,9 @@ public class AuthControllerTest {
                 .andExpect(cookie().exists("csrf_token"));
     }
 
-    /** A body with {@code isGuest:true} routes to guest login and returns a guest user. */
+    /**
+     * A body with {@code isGuest:true} routes to guest login and returns a guest user.
+     */
     @Test
     void testLoginGuestSuccess() throws Exception {
         String loginPayload = """
@@ -264,7 +268,9 @@ public class AuthControllerTest {
                 .andExpect(cookie().exists("csrf_token"));
     }
 
-    /** Guest login also resolves country from {@code CF-IPCountry} (US → United States). */
+    /**
+     * Guest login also resolves country from {@code CF-IPCountry} (US → United States).
+     */
     @Test
     void testLoginGuestSuccessWithCloudflareCountry() throws Exception {
         String loginPayload = """
