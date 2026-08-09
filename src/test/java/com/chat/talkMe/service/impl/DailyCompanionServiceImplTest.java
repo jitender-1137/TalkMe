@@ -71,7 +71,7 @@ class DailyCompanionServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new DailyCompanionServiceImpl(dailyCompanionRepository, userRepository,
-                blockUserRepository, compatibilityService, notificationService, reputationRecorder);
+                blockUserRepository, compatibilityService, notificationService);
         me = user(1L, "alice");
     }
 

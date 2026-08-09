@@ -120,6 +120,6 @@ public class EventController {
             @PathVariable String uuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         EventResponse response = eventService.cancelEvent(uuid, userDetails.getUser());
-        return ResponseEntity.ok(SuccessResponseDto.success(response, "Event canceled", "TM_954"));
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Event cancelled", "TM_954"));
     }
 }

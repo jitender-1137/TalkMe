@@ -132,7 +132,7 @@ class GroupServiceImplTest {
     void setUp() {
         service = new GroupServiceImpl(chatRepository, chatMemberRepository, userRepository, authz,
                 chatService, messageService, presenceService, messagingTemplate, objectMapper,
-                friendRepository, auditLogRepository, notificationService, userSettingRepository,
+                friendRepository, auditLogRepository, notificationService,
                 groupInviteRepository, memberCountCache, userSettingsCache, eventServiceProvider);
 
         creator = user(1L, CREATOR_UUID, "Owner", "owner");
@@ -568,7 +568,7 @@ class GroupServiceImplTest {
             GroupServiceImpl noPresence = new GroupServiceImpl(chatRepository, chatMemberRepository,
                     userRepository, authz, chatService, messageService, null, messagingTemplate,
                     objectMapper, friendRepository, auditLogRepository, notificationService,
-                    userSettingRepository, groupInviteRepository, memberCountCache, userSettingsCache,
+                    groupInviteRepository, memberCountCache, userSettingsCache,
                     eventServiceProvider);
             Chat chat = groupChat();
             stubLoad(chat);

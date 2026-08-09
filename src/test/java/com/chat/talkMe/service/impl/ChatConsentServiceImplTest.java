@@ -82,7 +82,7 @@ class ChatConsentServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new ChatConsentServiceImpl(chatRepository, chatMemberRepository, consentRepository,
-                messageRepository, messageMapper, messagingTemplate, messageService);
+                messageRepository, messagingTemplate, messageService);
 
         me = user(1L);
         other = user(2L);

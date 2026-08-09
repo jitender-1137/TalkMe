@@ -64,7 +64,7 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
      * Follow-up style replies to keep an ongoing thread alive.
      */
     private static final List<String> FOLLOWUP_STYLE = List.of(
-            "That's fascinating — tell me more about that.",
+            "That's really interesting — tell me more about that.",
             "Love that. What got you into it?",
             "Same here, honestly. How long have you felt that way?",
             "Okay now I'm curious — what happened next?");

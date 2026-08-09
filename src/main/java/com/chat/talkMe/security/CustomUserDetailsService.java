@@ -32,10 +32,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     @NonNull
-    public UserDetails loadUserByUsername(@NonNull String usernameOrEmail) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
         // Username / email are matched case-insensitively (users may type either in
         // any case). Trim to tolerate stray whitespace from clients.
-        String key = usernameOrEmail.trim();
+        String key = usernameOrEmail == null ? "" : usernameOrEmail.trim();
         User user = userRepository.findByUsernameIgnoreCase(key)
                 .or(() -> userRepository.findByEmailIgnoreCase(key))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username or email: " + usernameOrEmail));

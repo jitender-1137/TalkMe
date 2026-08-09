@@ -25,8 +25,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     // Slow-mode: the sender's most recent message in a chat.
     Optional<Message> findFirstByChatAndSenderOrderByIdDesc(Chat chat, User sender);
 
-    Page<Message> findByChatAndIsDeletedFalse(Chat chat, Pageable pageable);
-
     /**
      * ADMIN-ONLY: every message in the chat, INCLUDING soft-deleted / blocked /
      * pending-consent ones. Never use this on a normal user path — the user-facing
@@ -61,8 +59,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     Page<Message> searchMessagesInChat(Chat chat, String query, Long userId, Instant clearedAt, Pageable pageable);
 
     Optional<Message> findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(Chat chat);
-
-    Optional<Message> findFirstByChatAndIsDeletedFalseAndCreatedAtGreaterThanOrderByCreatedAtDesc(Chat chat, Instant clearedAt);
 
     // Chat-list preview capped to the viewer's visible window: after clearedAt (if the
     // chat was cleared) and at/before leftAt (former members must NOT see messages sent

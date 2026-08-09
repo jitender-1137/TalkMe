@@ -494,7 +494,7 @@ class WebSocketChannelInterceptorUnitTest {
         @DisplayName("SEND past the per-user flood limit is dropped (null return, no exception)")
         void floodedSendDropped() {
             interceptor = newInterceptor();
-            stubRedisCount(121L); // over SEND_LIMIT (120)
+            stubRedisCount(601L); // over SEND_LIMIT (600)
 
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
             accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");

@@ -161,7 +161,7 @@ class AuthServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AuthServiceImpl(
-                userRepository, roleRepository, permissionRepository, refreshTokenRepository,
+                userRepository, roleRepository, refreshTokenRepository,
                 sessionRepository, passwordEncoder, tokenProvider, userMapper, sessionMapper,
                 countryDetectionService, loginAttemptService, redisTemplate, pwnedPasswordService,
                 emailService, webPushService, moderationService, userSettingRepository,
