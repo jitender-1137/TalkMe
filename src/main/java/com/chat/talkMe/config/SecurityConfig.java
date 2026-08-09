@@ -39,7 +39,35 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CsrfTokenFilter csrfTokenFilter;
     private final RateLimitingFilter rateLimitingFilter;
+    private final AdsProperties adsProperties;
 
+
+    /**
+     * Builds the Content-Security-Policy. When {@code adDomains} is empty (the default —
+     * house ads, or ads off), the returned policy is byte-identical to the platform's
+     * hardened baseline. When a real ad network is configured ({@code ads.csp-domains}),
+     * its hosts are appended to {@code script-src} and {@code frame-src} so the network's
+     * loader script and creative frames are allowed; {@code img-src}/{@code connect-src}
+     * already permit {@code https:}, so no widening is needed there.
+     */
+    static String buildContentSecurityPolicy(java.util.List<String> adDomains) {
+        StringBuilder ad = new StringBuilder();
+        if (adDomains != null) {
+            for (String d : adDomains) {
+                if (d != null && !d.isBlank()) ad.append(' ').append(d.trim());
+            }
+        }
+        String extra = ad.toString(); // "" when unset, else " https://a https://b"
+        return "default-src 'self'; " +
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com" + extra + "; " +
+                "style-src 'self' 'unsafe-inline'; " +
+                "img-src 'self' data: blob: https:; " +
+                "font-src 'self' data:; " +
+                "connect-src 'self' https: wss:; " +
+                "frame-src 'self' https://challenges.cloudflare.com" + extra + "; " +
+                "media-src 'self' blob: https:; " +
+                "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -82,16 +110,11 @@ public class SecurityConfig {
                                 ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                         // CSP — allows the bundled SPA, WebSocket (wss), media and the
                         // Cloudflare Turnstile widget; blocks plugins, framing and base hijack.
+                        // Ad-network domains (ads.csp-domains) are appended to script/frame/
+                        // img/connect ONLY when configured — with the default (house ads,
+                        // empty list) this header is byte-identical to the pre-ads policy.
                         .addHeaderWriter(new StaticHeadersWriter("Content-Security-Policy",
-                                "default-src 'self'; " +
-                                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; " +
-                                "style-src 'self' 'unsafe-inline'; " +
-                                "img-src 'self' data: blob: https:; " +
-                                "font-src 'self' data:; " +
-                                "connect-src 'self' https: wss:; " +
-                                "frame-src 'self' https://challenges.cloudflare.com; " +
-                                "media-src 'self' blob: https:; " +
-                                "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"))
+                                buildContentSecurityPolicy(adsProperties.getCspDomains())))
                         .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
                                 "geolocation=(), microphone=(self), camera=(self), payment=()"))
                         // Explicit MIME-sniffing block (Spring emits this by default; make it explicit).
@@ -195,6 +218,9 @@ public class SecurityConfig {
                 // authorization — see the follow-up note; that is a controller-level fix,
                 // not solvable via a security rule.
                 "/api/v1/uploads/media", "/uploads/media",
+                // Public brand assets (email logo) — must load without an auth header
+                // so email clients can fetch them. Static PNG from the jar, no PII.
+                "/api/v1/assets/**",
                 // Google OAuth2 start + callback. Root Spring Security filter endpoints
                 // (NOT under the /api/v1 @RestController prefix); listed explicitly so they
                 // never get caught by the /api/** authenticated() rule.

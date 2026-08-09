@@ -41,6 +41,24 @@ public class EmailTemplates {
     @Value("${app.frontend-base-url:http://localhost:3000}")
     private String baseUrl;
 
+    /**
+     * Public URL of the brand logo shown in the email header. Defaults to the
+     * backend's own public logo endpoint ({@code <baseUrl>/api/v1/assets/logo.png},
+     * served by PublicAssetController with no auth), so it works without a separate
+     * CDN. Override with {@code app.mail.logo-url} to point at a hosted/CDN logo.
+     */
+    @Value("${app.mail.logo-url:}")
+    private String logoUrlOverride;
+
+    /** Resolves the effective email-logo URL: the override, or the backend endpoint. */
+    private String logoUrl() {
+        if (logoUrlOverride != null && !logoUrlOverride.isBlank()) {
+            return logoUrlOverride.trim();
+        }
+        String base = baseUrl == null ? "" : baseUrl.replaceAll("/+$", "");
+        return base + "/api/v1/assets/logo.png";
+    }
+
     public EmailTemplates(MailTheme theme) {
         this.theme = theme;
     }
@@ -141,25 +159,40 @@ public class EmailTemplates {
      * {@code when} may each be null/blank and are shown only when present.
      */
     public String loginAlert(String name, String device, String location, String ip, String when, String secureLink) {
-        String rows = detailRow("When", when)
-                + detailRow("Device", device)
-                + detailRow("Location", location)
-                + detailRow("IP address", ip);
-        String detailBlock = rows.isBlank() ? "" :
+        // IG-style: one prominent "device · location" line, the timestamp below it,
+        // and the IP as a subtle line — instead of a label/value table.
+        String deviceLine = java.util.stream.Stream.of(device, location)
+                .filter(s -> s != null && !s.isBlank())
+                .map(s -> esc(s))
+                .reduce((a, b) -> a + " &middot; " + b)
+                .orElse("a new device");
+
+        String card =
                 "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
-                        + "style=\"margin:8px 0 4px;border:1px solid " + theme.cardBorder()
-                        + ";border-radius:14px;background:#fbfcfe;\"><tr><td style=\"padding:8px 18px;\">"
-                        + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">"
-                        + rows + "</table></td></tr></table>";
-        String content = h1("New sign-in to your account")
-                + p("Hi " + greetName(name) + ",")
-                + p("Your " + esc(brandName) + " account was just signed in to. If this was you, "
-                    + "you're all set — no action needed.")
-                + detailBlock
-                + p("If you don't recognise this, secure your account now by changing your password.")
+                        + "style=\"margin:20px 0;border:1px solid " + theme.cardBorder()
+                        + ";border-radius:14px;background:#fbfcfe;\"><tr><td align=\"center\" style=\"padding:22px 18px;\">"
+                        + "<div style=\"font-family:" + theme.font() + ";font-size:16px;font-weight:700;color:"
+                        + theme.ink() + ";line-height:1.4;\">" + deviceLine + "</div>"
+                        + (when == null || when.isBlank() ? "" :
+                            "<div style=\"font-family:" + theme.font() + ";font-size:13px;color:" + theme.muted()
+                            + ";margin-top:6px;\">" + esc(when) + "</div>")
+                        + (ip == null || ip.isBlank() ? "" :
+                            "<div style=\"font-family:" + theme.font() + ";font-size:12px;color:" + theme.muted()
+                            + ";margin-top:2px;\">IP&nbsp;" + esc(ip) + "</div>")
+                        + "</td></tr></table>";
+
+        String content = h1("We noticed a new login, " + greetName(name))
+                + p("We noticed a login to your " + esc(brandName)
+                    + " account from a device you don't usually use.")
+                + card
+                + p("<b>If this was you</b>, you're all set — no action is needed and you can safely ignore "
+                    + "this email.")
+                + p("<b>If this wasn't you</b>, someone else may have your password. Secure your account now: "
+                    + "we'll sign you out on every device so you can set a new password.")
                 + button("Secure my account", secureLink)
-                + p(mutedText("You can turn these sign-in alerts off in Settings → Notifications."));
-        return layout("New sign-in to your " + brandName + " account.", content);
+                + p(mutedText("You're receiving this because new-login alerts are on for your account. "
+                    + "You can turn them off in Settings &rarr; Notifications."));
+        return layout("We noticed a new login to your " + brandName + " account.", content);
     }
 
     /** Acknowledgement that a support request was received. */
@@ -200,12 +233,10 @@ public class EmailTemplates {
     // ── Shared layout ────────────────────────────────────────────────────────
 
     private String layout(String preheader, String contentHtml) {
-        String badge = brandName == null || brandName.isBlank()
-                ? "N" : esc(brandName.trim().substring(0, 1).toUpperCase());
         return LAYOUT
                 .replace("__PREHEADER__", esc(preheader))
                 .replace("__CONTENT__", contentHtml)
-                .replace("__BADGE__", badge)
+                .replace("__LOGO_URL__", attr(logoUrl()))
                 .replace("__BRAND__", esc(brandName))
                 .replace("__TAGLINE__", esc(tagline))
                 .replace("__SUPPORT__", esc(supportEmail))
@@ -238,9 +269,7 @@ public class EmailTemplates {
                   <tr><td style="background:__HEADER_A__;background:linear-gradient(120deg,__HEADER_A__ 0%,__HEADER_B__ 100%);padding:28px 32px;">
                     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
                       <td valign="middle" style="padding-right:14px;">
-                        <table role="presentation" width="46" height="46" cellpadding="0" cellspacing="0" style="width:46px;height:46px;border-radius:13px;background:rgba(255,255,255,0.16);">
-                          <tr><td align="center" valign="middle" style="height:46px;color:#ffffff;font-family:__FONT__;font-size:21px;font-weight:700;">__BADGE__</td></tr>
-                        </table>
+                        <img src="__LOGO_URL__" width="46" height="46" alt="__BRAND__" style="display:block;width:46px;height:46px;border-radius:13px;border:0;outline:none;text-decoration:none;background:rgba(255,255,255,0.16);">
                       </td>
                       <td valign="middle">
                         <div style="font-family:__FONT__;font-size:21px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">__BRAND__</div>
@@ -280,19 +309,6 @@ public class EmailTemplates {
     private String signoff(String line) {
         return "<p style=\"margin:22px 0 0;color:" + theme.muted() + ";\">" + esc(line)
                 + "<br>— The " + esc(brandName) + " Team</p>";
-    }
-
-    /** A label/value row for the login-alert detail card; blank value ⇒ row omitted. */
-    private String detailRow(String label, String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        return "<tr>"
-                + "<td valign=\"top\" style=\"width:78px;padding:6px 0;color:" + theme.muted()
-                + ";font-size:13px;\">" + esc(label) + "</td>"
-                + "<td valign=\"top\" style=\"padding:6px 0;color:" + theme.ink()
-                + ";font-size:14px;font-weight:600;\">" + esc(value) + "</td>"
-                + "</tr>";
     }
 
     private String featureList(List<String> items) {

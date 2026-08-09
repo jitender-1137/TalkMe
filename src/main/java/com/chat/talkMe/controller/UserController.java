@@ -53,6 +53,25 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Profile updated successfully", "TM_060"));
     }
 
+    /** Change the current user's username (unique; taken names — including accounts
+     *  pending deletion — are rejected, while fully-purged names are free). */
+    @PatchMapping("/me/username")
+    public ResponseEntity<ResponseDto<UserResponse>> changeUsername(
+            @Valid @RequestBody com.chat.talkMe.dto.request.ChangeUsernameRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserResponse response = userService.changeUsername(request.getUsername(), userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Username updated", "TM_060"));
+    }
+
+    /** Live availability check for the username field. */
+    @GetMapping("/me/username-available")
+    public ResponseEntity<ResponseDto<Map<String, Boolean>>> usernameAvailable(
+            @RequestParam("username") String username,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        boolean available = userService.isUsernameAvailable(username, userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(Map.of("available", available)));
+    }
+
     /** Fast, param-based mood update (feature #4) — e.g. PUT /users/me/mood?value=FLIRT. */
     @PutMapping("/me/mood")
     public ResponseEntity<ResponseDto<UserResponse>> updateMood(

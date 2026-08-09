@@ -32,6 +32,15 @@ public class FeatureFlags {
     /** Wire-name → enabled. e.g. {@code flirt_lobby: true}, {@code live_audio: false}. */
     private Map<String, Boolean> flags = new HashMap<>();
 
+    /**
+     * When true, {@link FeatureKey#FLIRT_MODE} skips the email-verified requirement, so
+     * users who have NOT verified their email can still use Flirt Mode. The 18+
+     * age-verification gate is deliberately NOT relaxed (adults-only stays enforced).
+     * Default false → current behaviour (email verification required). Bound from
+     * {@code features.allow-non-verified-flirt-mode}.
+     */
+    private boolean allowNonVerifiedFlirtMode = false;
+
     /** True when the feature (and all its ancestors) are globally enabled. */
     public boolean isGloballyEnabled(FeatureKey key) {
         if (key == null) return false;

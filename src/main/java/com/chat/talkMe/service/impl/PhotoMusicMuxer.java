@@ -72,6 +72,29 @@ public class PhotoMusicMuxer {
 
                 int clip = clipSec > 0 ? clipSec : DEFAULT_CLIP_SECONDS;
                 int start = Math.max(0, startSec);
+
+                // Detect the audio duration and validate the selected window is inside
+                // the track (the frontend also clamps; this is the server-side safety
+                // net that rejects an impossible/out-of-range selection). A probe
+                // failure (duration <= 0) is non-fatal — we defer to -t/-shortest.
+                int duration = probeDurationSeconds(audioPath);
+                if (duration > 0) {
+                    if (start >= duration) {
+                        log.warn("Photo+music mux skipped: start {}s is beyond audio duration {}s",
+                                start, duration);
+                        return null;
+                    }
+                    if (start + clip > duration) {
+                        if (duration < clip) {
+                            log.warn("Photo+music mux skipped: audio {}s shorter than the {}s clip",
+                                    duration, clip);
+                            return null;
+                        }
+                        // Window runs off the end — pull the start back so a full clip fits.
+                        start = duration - clip;
+                    }
+                }
+
                 output = Files.createTempFile("talkme-mux-", ".mp4");
 
                 if (!runFfmpeg(image.path(), audioPath, start, clip, output)) {
@@ -126,16 +149,36 @@ public class PhotoMusicMuxer {
         try {
             process = new ProcessBuilder(command)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start();
+            // Drain stderr on a daemon thread: (1) so the OS pipe buffer never fills
+            // and deadlocks waitFor(), and (2) so we can log ffmpeg's REAL error on
+            // failure instead of a bare exit code (the old DISCARD hid every cause).
+            final Process running = process;
+            final StringBuilder err = new StringBuilder();
+            Thread drain = new Thread(() -> {
+                try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(
+                        running.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        if (err.length() < 8000) err.append(line).append('\n');
+                    }
+                } catch (java.io.IOException ignored) {
+                    // stream closed on process exit
+                }
+            }, "ffmpeg-stderr");
+            drain.setDaemon(true);
+            drain.start();
+
             boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                log.warn("Photo+music mux timed out after {}s", TIMEOUT_SECONDS);
+                drain.join(2000);
+                log.warn("Photo+music mux timed out after {}s. ffmpeg: {}", TIMEOUT_SECONDS, tail(err));
                 return false;
             }
+            drain.join(2000); // stderr hits EOF once the process exits
             if (process.exitValue() != 0) {
-                log.warn("Photo+music mux ffmpeg exited {}", process.exitValue());
+                log.warn("Photo+music mux ffmpeg exited {}: {}", process.exitValue(), tail(err));
                 return false;
             }
             return true;
@@ -144,9 +187,63 @@ public class PhotoMusicMuxer {
             return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            process.destroyForcibly();
+            if (process != null) process.destroyForcibly();
             return false;
         }
+    }
+
+    /** Last ~500 chars of captured stderr — enough to see the real ffmpeg error. */
+    private static String tail(StringBuilder sb) {
+        String s = sb.toString().strip();
+        if (s.isEmpty()) return "(no stderr captured)";
+        return s.length() > 500 ? "…" + s.substring(s.length() - 500) : s;
+    }
+
+    /**
+     * Detect the audio duration in whole seconds from ffmpeg's stderr banner
+     * ({@code Duration: HH:MM:SS.xx}). Returns -1 when it can't be determined —
+     * callers treat that as "unknown" and skip range validation.
+     */
+    private int probeDurationSeconds(Path audio) {
+        Process p = null;
+        try {
+            // `ffmpeg -i <audio>` with no output prints the media info then exits
+            // non-zero ("no output file") — we only care about the printed Duration.
+            p = new ProcessBuilder(ffmpeg.path(), "-hide_banner", "-i", audio.toString())
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            final Process running = p;
+            final StringBuilder err = new StringBuilder();
+            Thread drain = new Thread(() -> {
+                try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(
+                        running.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        if (err.length() < 8000) err.append(line).append('\n');
+                    }
+                } catch (java.io.IOException ignored) {
+                    // stream closed on process exit
+                }
+            }, "ffmpeg-probe");
+            drain.setDaemon(true);
+            drain.start();
+            p.waitFor(20, TimeUnit.SECONDS);
+            drain.join(2000);
+            java.util.regex.Matcher m =
+                    java.util.regex.Pattern.compile("Duration:\\s*(\\d+):(\\d+):(\\d+)").matcher(err);
+            if (m.find()) {
+                return Integer.parseInt(m.group(1)) * 3600
+                        + Integer.parseInt(m.group(2)) * 60
+                        + Integer.parseInt(m.group(3));
+            }
+        } catch (java.io.IOException e) {
+            log.debug("Audio duration probe could not run ffmpeg: {}", e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            if (p != null) p.destroyForcibly();
+        }
+        return -1;
     }
 
     /**

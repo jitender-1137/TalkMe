@@ -55,6 +55,19 @@ public class UpdateProfileRequest {
     @Size(max = 100, message = "Education must not exceed 100 characters")
     private String education;
 
+    // ── Optional "About me" dropdown attributes (null ⇒ leave unchanged;
+    //    empty string ⇒ clear). Backed by client-side option lists. ──
+    @Size(max = 40) private String bodyType;
+    @Size(max = 40) private String hairColor;
+    @Size(max = 40) private String eyeColor;
+    @Size(max = 40) private String relationshipStatus;
+    @Size(max = 40) private String children;
+    @Size(max = 40) private String drinking;
+    @Size(max = 40) private String smoking;
+    @Size(max = 40) private String workout;
+    @Size(max = 40) private String zodiac;
+    @Size(max = 40) private String religion;
+
     private Set<Interest> interests;
 
     // ── Late-Night Social attributes (null ⇒ leave unchanged; collections replace) ──

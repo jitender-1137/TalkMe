@@ -37,10 +37,12 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
     // Per-user STOMP SEND flood limit. Sends over WebSocket (lobby DMs, typing,
     // activity, match frames) never pass through the HTTP RateLimitingFilter, so
-    // this is the only guard against a client amplifying broadcasts. Generous
-    // enough that no human reaches it (≈12 frames/sec); a real flood is orders of
-    // magnitude higher. Exceeding it DROPS the frame (connection stays alive).
-    private static final int SEND_LIMIT = 120;
+    // this is the only guard against a client amplifying broadcasts. Set well above
+    // real usage — typing/activity/presence frames are chatty, so the earlier
+    // 120/10s (~12/s) tripped during normal use. 600/10s (~60/s) leaves ample head-
+    // room for a human while still stopping a true flood (orders of magnitude higher).
+    // Exceeding it DROPS the frame (connection stays alive).
+    private static final int SEND_LIMIT = 600;
     private static final int SEND_WINDOW_SECONDS = 10;
 
     // Per-user CONNECT storm guard. The client reconnects with exponential backoff

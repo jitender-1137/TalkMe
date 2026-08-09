@@ -698,9 +698,12 @@ public class AuthServiceImpl implements AuthService {
             if (!alertsOn) {
                 return;
             }
+            // Show the time in the LOGIN LOCATION's own timezone (e.g. "August 7 at
+            // 10:42 AM (IST)"), falling back to UTC when GeoIP gave no zone.
+            java.time.ZoneId zone = detection != null ? detection.getZoneId() : java.time.ZoneOffset.UTC;
             String when = java.time.format.DateTimeFormatter
-                    .ofPattern("d MMM yyyy, HH:mm 'UTC'")
-                    .withZone(java.time.ZoneOffset.UTC)
+                    .ofPattern("MMMM d 'at' h:mm a (zzz)", java.util.Locale.ENGLISH)
+                    .withZone(zone)
                     .format(Instant.now());
             String device = friendlyDevice(userAgent);
             String location = detection != null ? detection.getDisplayLocation() : null;
@@ -959,6 +962,11 @@ public class AuthServiceImpl implements AuthService {
         return res;
     }
 
+    /** Empty/blank → null (so a cleared dropdown clears the column). */
+    private static String blankOrNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
     @Override
     @Transactional
     public AuthUserResponse updateProfile(UpdateProfileRequest request, User currentUser) {
@@ -995,6 +1003,18 @@ public class AuthServiceImpl implements AuthService {
         if (request.getEducation() != null) {
             user.setEducation(request.getEducation());
         }
+        // Optional "About me" dropdowns: null ⇒ unchanged, blank ⇒ clear.
+        if (request.getBodyType() != null) user.setBodyType(blankOrNull(request.getBodyType()));
+        if (request.getHairColor() != null) user.setHairColor(blankOrNull(request.getHairColor()));
+        if (request.getEyeColor() != null) user.setEyeColor(blankOrNull(request.getEyeColor()));
+        if (request.getRelationshipStatus() != null)
+            user.setRelationshipStatus(blankOrNull(request.getRelationshipStatus()));
+        if (request.getChildren() != null) user.setChildren(blankOrNull(request.getChildren()));
+        if (request.getDrinking() != null) user.setDrinking(blankOrNull(request.getDrinking()));
+        if (request.getSmoking() != null) user.setSmoking(blankOrNull(request.getSmoking()));
+        if (request.getWorkout() != null) user.setWorkout(blankOrNull(request.getWorkout()));
+        if (request.getZodiac() != null) user.setZodiac(blankOrNull(request.getZodiac()));
+        if (request.getReligion() != null) user.setReligion(blankOrNull(request.getReligion()));
         if (request.getInterests() != null) {
             user.getInterests().clear();
             user.getInterests().addAll(request.getInterests());

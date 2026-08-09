@@ -61,6 +61,19 @@ public class User extends BaseEntity {
     private boolean isVerified = false;
 
     /**
+     * Per-user advertising exemption. When true this user sees NO ads regardless of the
+     * global switch — the seam a future Premium/ad-free tier flips (default false ⇒ every
+     * user currently sees ads when advertising is globally on). Enforced server-side in
+     * {@code FeatureAccessService} (the {@code ads} entitlement is withheld), so it needs
+     * no client change. @ColumnDefault gives a real DB DEFAULT so ddl-auto can add this
+     * NOT NULL column to the existing, non-empty users table (Postgres backfills rows).
+     */
+    @org.hibernate.annotations.ColumnDefault("false")
+    @Column(name = "ads_free", nullable = false)
+    @Builder.Default
+    private boolean adsFree = false;
+
+    /**
      * Highest message id already covered by an "unread messages" digest email. The daily
      * digest job only emails when the user's newest unread message id exceeds this, so the
      * same still-unread messages never trigger a second email. Null ⇒ never sent a digest.
@@ -108,6 +121,38 @@ public class User extends BaseEntity {
 
     @Column(name = "education", length = 100)
     private String education;
+
+    // ── Optional "About me" profile attributes (dropdown-backed on the client;
+    //    stored as free strings like occupation/education — nullable = not set). ──
+    @Column(name = "body_type", length = 40)
+    private String bodyType;
+
+    @Column(name = "hair_color", length = 40)
+    private String hairColor;
+
+    @Column(name = "eye_color", length = 40)
+    private String eyeColor;
+
+    @Column(name = "relationship_status", length = 40)
+    private String relationshipStatus;
+
+    @Column(name = "children", length = 40)
+    private String children;
+
+    @Column(name = "drinking", length = 40)
+    private String drinking;
+
+    @Column(name = "smoking", length = 40)
+    private String smoking;
+
+    @Column(name = "workout", length = 40)
+    private String workout;
+
+    @Column(name = "zodiac", length = 40)
+    private String zodiac;
+
+    @Column(name = "religion", length = 40)
+    private String religion;
 
     @ElementCollection(targetClass = Interest.class, fetch = FetchType.EAGER)
     @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))

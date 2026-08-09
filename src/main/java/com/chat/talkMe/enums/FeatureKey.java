@@ -80,6 +80,13 @@ public enum FeatureKey {
     // ── Phase 6: Live A/V (deferred; default global-off via config) ──
     LIVE_AUDIO               (null,            true,             false,               null,                   true),
 
+    // ── Monetisation ──
+    // Single master gate for all advertising. defaultEntitled=true so that, once the
+    // global kill-switch (features.flags.ads) is on, every user sees ads unless they
+    // (or an admin) opt them out via the standard SELF/ADMIN grant. Global default is
+    // OFF in application.yml (features.flags.ads=false) — ads are dark until enabled.
+    ADS                      (null,            false,            false,               null,                   true),
+
     // ── Admin ──
     ADMIN_FEATURE_MGMT       (null,            false,            false,               "ROLE_SUPER_ADMIN",     false);
 

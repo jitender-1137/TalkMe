@@ -97,7 +97,7 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
             // Request the finer-grained fields too (city/region/lat/lon) so callers can
             // record the "closest location / area", not just the country.
             String url = "http://ip-api.com/json/" + lookupIp
-                    + "?fields=status,country,countryCode,regionName,city,lat,lon";
+                    + "?fields=status,country,countryCode,regionName,city,lat,lon,timezone";
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response != null && "success".equals(response.get("status"))) {
@@ -114,6 +114,7 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
                             .countryCode((String) response.get("countryCode"))
                             .lat(asDouble(response.get("lat")))
                             .lon(asDouble(response.get("lon")))
+                            .timezone((String) response.get("timezone"))
                             .build();
                 }
             }

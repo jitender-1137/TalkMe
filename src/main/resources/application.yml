@@ -102,6 +102,11 @@ management:
     # probes would keep failing to connect on hosts without RabbitMQ.
     rabbit:
       enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
+    # Mail is sent primarily via HTTP APIs (Resend/Brevo); SMTP is only a fallback, so
+    # a refused SMTP connection (e.g. no local mail server) must NOT mark the whole app
+    # DOWN. Off by default; set MANAGEMENT_HEALTH_MAIL=true to re-enable the check.
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL:false}
   metrics:
     tags:
       application: talkMe
@@ -124,12 +129,83 @@ management:
 # feature everywhere by flipping its env var — no deploy needed.
 features:
   enabled-by-default: ${FEATURES_ENABLED_BY_DEFAULT:true}
+  # When true, Flirt Mode skips the email-verified requirement (unverified users can
+  # flirt). The 18+ age/consent gate is NOT relaxed. Default false = verification required.
+  allow-non-verified-flirt-mode: ${FEATURE_ALLOW_NON_VERIFIED_FLIRT_MODE:true}
   flags:
     # Live multi-party audio/video is deferred (Phase 6) — stays OFF until infra exists.
     live_audio: ${FEATURE_LIVE_AUDIO:false}
     # Adult surface — global switch (still additionally gated per-user by age+consent).
     flirt_lobby: ${FEATURE_FLIRT_LOBBY:true}
     midnight_events: ${FEATURE_MIDNIGHT_EVENTS:true}
+    # Advertising — THE single master switch for all ads, controlled ONLY here (no UI).
+    # ON by default so every user currently sees ads; set FEATURE_ADS=false to go dark
+    # platform-wide. Per-user exemption is the User.adsFree flag (a future Premium tier
+    # sets it → those users see no ads). See docs/ADS_INTEGRATION_DESIGN.md.
+    ads: ${FEATURE_ADS:false}
+
+# ── Advertising customization (ads.*) ──────────────────────────────────────────
+# Everything the client's <AdSlot> reads. The on/off gate is features.flags.ads above;
+# this is pure customization (provider, cadence, caps, house creatives), overridable
+# per-env via the shown env vars — no deploy to retune. csp-domains stays EMPTY unless
+# a real network is enabled, so the emitted CSP is unchanged by default.
+ads:
+  provider: ${ADS_PROVIDER:}       # adsense | adsterra (global default; per-surface override below)
+  label: ${ADS_LABEL:Sponsored}
+  ad-choices-url: ${ADS_ADCHOICES_URL:}
+  client-id: ${ADS_CLIENT_ID:}             # e.g. AdSense ca-pub-XXXXXXXX
+  script-url: ${ADS_SCRIPT_URL:}           # global adsterra zone loader (native banner)
+  # Site-wide Adsterra formats — ONE script each for the whole app (NOT per placement).
+  popunder-script-url: ${ADS_POPUNDER_URL:}    # Adsterra Popunder loader (pop-under tab on click)
+  social-bar-script-url: ${ADS_SOCIALBAR_URL:} # Adsterra Social Bar loader (floating widget)
+  frequency-cap-per-session: ${ADS_FREQ_CAP:30}
+  csp-domains: ${ADS_CSP_DOMAINS:}         # comma-list, e.g. https://pagead2.googlesyndication.com
+  # Each placement may override `provider` and `script-url` to run a DIFFERENT network
+  # than the global one (e.g. AdSense on feed/explore + Adsterra on reels at the same
+  # time). Empty override = inherit the global ads.provider / ads.script-url above.
+  # Per placement: override provider/script-url to mix networks; pick the Adsterra
+  # `format` (native | banner) and, for banner, its width/height so it fits the space.
+  placements:
+    feed:
+      enabled: ${ADS_FEED_ENABLED:true}
+      every-n: ${ADS_FEED_EVERY_N:6}
+      max-per-session: ${ADS_FEED_MAX:12}
+      unit-id: ${ADS_FEED_UNIT:}
+      provider: ${ADS_FEED_PROVIDER:}        # blank = inherit global; or adsense|adsterra
+      script-url: ${ADS_FEED_SCRIPT_URL:}    # per-surface adsterra zone script
+      format: ${ADS_FEED_FORMAT:native}      # native | banner (adsterra)
+      width: ${ADS_FEED_WIDTH:0}             # banner width px (e.g. 336)
+      height: ${ADS_FEED_HEIGHT:0}           # banner height px (e.g. 280)
+    explore:
+      enabled: ${ADS_EXPLORE_ENABLED:true}
+      every-n: ${ADS_EXPLORE_EVERY_N:12}
+      max-per-session: ${ADS_EXPLORE_MAX:12}
+      unit-id: ${ADS_EXPLORE_UNIT:}
+      provider: ${ADS_EXPLORE_PROVIDER:}
+      script-url: ${ADS_EXPLORE_SCRIPT_URL:}
+      format: ${ADS_EXPLORE_FORMAT:native}
+      width: ${ADS_EXPLORE_WIDTH:0}
+      height: ${ADS_EXPLORE_HEIGHT:0}
+    reels:
+      enabled: ${ADS_REELS_ENABLED:true}
+      every-n: ${ADS_REELS_EVERY_N:8}
+      max-per-session: ${ADS_REELS_MAX:10}
+      unit-id: ${ADS_REELS_UNIT:}
+      provider: ${ADS_REELS_PROVIDER:}
+      script-url: ${ADS_REELS_SCRIPT_URL:}
+      format: ${ADS_REELS_FORMAT:native}
+      width: ${ADS_REELS_WIDTH:0}
+      height: ${ADS_REELS_HEIGHT:0}
+    stories:
+      enabled: ${ADS_STORIES_ENABLED:false} # intimate surface — opt-in
+      every-n: ${ADS_STORIES_EVERY_N:6}
+      max-per-session: ${ADS_STORIES_MAX:6}
+      unit-id: ${ADS_STORIES_UNIT:}
+      provider: ${ADS_STORIES_PROVIDER:}
+      script-url: ${ADS_STORIES_SCRIPT_URL:}
+      format: ${ADS_STORIES_FORMAT:native}
+      width: ${ADS_STORIES_WIDTH:0}
+      height: ${ADS_STORIES_HEIGHT:0}
 
 app:
   # Instant Translation (Phase 7). Primary = Azure AI Translator (F0 free tier = 2M chars/month);

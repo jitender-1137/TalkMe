@@ -123,6 +123,34 @@ class FeatureAccessServiceImplTest {
         }
 
         @Test
+        @DisplayName("non-ad-free user (default) sees ads → ADS true")
+        void nonAdFreeUserSeesAds() {
+            when(grantRepository.findByUser(user)).thenReturn(List.of());
+
+            assertThat(user.isAdsFree()).isFalse();
+            assertThat(service.hasAccess(user, FeatureKey.ADS)).isTrue();
+        }
+
+        @Test
+        @DisplayName("ad-free user (e.g. Premium) sees no ads → ADS false even when globally on")
+        void adFreeUserSeesNoAds() {
+            user.setAdsFree(true);
+            when(grantRepository.findByUser(user)).thenReturn(List.of());
+
+            assertThat(service.hasAccess(user, FeatureKey.ADS)).isFalse();
+        }
+
+        @Test
+        @DisplayName("ad-free exemption is a HARD gate — beats an ADMIN ALLOW grant on ads")
+        void adFreeBeatsAllowGrant() {
+            user.setAdsFree(true);
+            when(grantRepository.findByUser(user))
+                    .thenReturn(List.of(grant(FeatureKey.ADS, GrantDecision.ALLOW, GrantScope.ADMIN)));
+
+            assertThat(service.hasAccess(user, FeatureKey.ADS)).isFalse();
+        }
+
+        @Test
         @DisplayName("globally disabled key → false")
         void globallyDisabled() {
             when(grantRepository.findByUser(user)).thenReturn(List.of());

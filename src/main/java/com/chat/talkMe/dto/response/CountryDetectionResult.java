@@ -23,6 +23,23 @@ public class CountryDetectionResult {
     private String countryCode;
     private Double lat;
     private Double lon;
+    /** IANA timezone of the login location (e.g. "Asia/Kolkata"), from GeoIP. May be null. */
+    private String timezone;
+
+    /**
+     * The login location's {@link java.time.ZoneId}, or UTC when unknown/unparseable —
+     * so security emails can show the time in the user's own local zone.
+     */
+    public java.time.ZoneId getZoneId() {
+        if (timezone != null && !timezone.isBlank()) {
+            try {
+                return java.time.ZoneId.of(timezone.trim());
+            } catch (Exception ignored) {
+                // fall through to UTC
+            }
+        }
+        return java.time.ZoneOffset.UTC;
+    }
 
     /**
      * Human-readable "City, Region, Country" (drops the blanks), e.g. "Pune, Maharashtra,

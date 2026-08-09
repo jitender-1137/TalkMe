@@ -149,6 +149,11 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
 
     private boolean resolve(User user, FeatureKey key, List<UserFeatureGrant> grants, Instant now) {
         if (!featureFlags.isGloballyEnabled(key)) return false;
+        // Per-user ad exemption: an ad-free user (the seam a future Premium tier flips)
+        // NEVER sees ads — a HARD gate here (not just a rule) so not even an admin/cohort
+        // ALLOW grant can re-enable ads for them. Everyone else (adsFree=false, the default)
+        // sees ads whenever advertising is globally on.
+        if (key == FeatureKey.ADS && user.isAdsFree()) return false;
         // Sub-category roll-up: a child is only accessible if its parent is.
         if (key.getParent() != null && !resolve(user, key.getParent(), grants, now)) return false;
 
@@ -170,9 +175,18 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
 
     private boolean ruleEntitled(User user, FeatureKey key) {
         if (key.getMinRole() != null && !hasRole(user, key.getMinRole())) return false;
-        if (key.isRequiresVerified() && !user.isVerified()) return false;
+        if (key.isRequiresVerified() && !user.isVerified() && !verifiedGateBypassed(key)) return false;
         if (key.isRequiresAgeVerified() && !ageVerificationService.isAgeVerified(user)) return false;
         return key.isDefaultEntitled();
+    }
+
+    /**
+     * Config-driven relaxation of the email-verified gate. Currently only FLIRT_MODE, when
+     * {@code features.allow-non-verified-flirt-mode} is on, so unverified users can flirt.
+     * The 18+ age gate is never bypassed here.
+     */
+    private boolean verifiedGateBypassed(FeatureKey key) {
+        return key == FeatureKey.FLIRT_MODE && featureFlags.isAllowNonVerifiedFlirtMode();
     }
 
     private static boolean hasRole(User user, String roleName) {

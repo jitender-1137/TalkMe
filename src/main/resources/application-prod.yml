@@ -163,9 +163,15 @@ logging:
     com.chat.talkMe: INFO
     org.springframework.security: WARN
     org.hibernate: WARN
-  # Structured (ECS-JSON) console logs in prod for ingestion by a log platform
-  # (Elastic/Loki/Datadog). Spring Boot's built-in structured logging — no extra
-  # dependency or logback file. Override to blank to fall back to plain text.
+  # Human-readable console logs by default (neat single-line format below).
+  # For ingestion by a log platform (Elastic/Loki/Datadog), set
+  # LOG_STRUCTURED_FORMAT=ecs to emit Spring Boot's built-in ECS-JSON instead —
+  # no extra dependency or logback file needed.
   structured:
     format:
-      console: ${LOG_STRUCTURED_FORMAT:ecs}
+      console: ${LOG_STRUCTURED_FORMAT:}
+  # Clean, color-free single line: time · LEVEL · [thread] · logger · message.
+  # Color-free so it stays readable in journald / files (not just a TTY). Only
+  # applies when structured logging above is off (blank).
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

@@ -13,6 +13,10 @@ import java.util.Map;
 public interface UserService {
     UserResponse getCurrentUser(User currentUser);
     UserResponse updateProfile(UpdateProfileRequest request, User currentUser);
+    /** Change the current user's username (unique; soft-deleted names stay reserved). */
+    UserResponse changeUsername(String newUsername, User currentUser);
+    /** True when `username` is free for the current user to take (case-insensitive). */
+    boolean isUsernameAvailable(String username, User currentUser);
     /** Fast, dedicated update for the hot "change my mood" action (feature #4). */
     UserResponse updateMood(String moodValue, User currentUser);
     Map<String, String> uploadAvatar(MultipartFile file, User currentUser);

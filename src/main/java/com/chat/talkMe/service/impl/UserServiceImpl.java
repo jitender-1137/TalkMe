@@ -125,6 +125,18 @@ public class UserServiceImpl implements UserService {
         if (request.getEducation() != null) {
             user.setEducation(request.getEducation());
         }
+        // Optional "About me" dropdowns: null ⇒ unchanged, blank ⇒ clear.
+        if (request.getBodyType() != null) user.setBodyType(blankToNull(request.getBodyType()));
+        if (request.getHairColor() != null) user.setHairColor(blankToNull(request.getHairColor()));
+        if (request.getEyeColor() != null) user.setEyeColor(blankToNull(request.getEyeColor()));
+        if (request.getRelationshipStatus() != null)
+            user.setRelationshipStatus(blankToNull(request.getRelationshipStatus()));
+        if (request.getChildren() != null) user.setChildren(blankToNull(request.getChildren()));
+        if (request.getDrinking() != null) user.setDrinking(blankToNull(request.getDrinking()));
+        if (request.getSmoking() != null) user.setSmoking(blankToNull(request.getSmoking()));
+        if (request.getWorkout() != null) user.setWorkout(blankToNull(request.getWorkout()));
+        if (request.getZodiac() != null) user.setZodiac(blankToNull(request.getZodiac()));
+        if (request.getReligion() != null) user.setReligion(blankToNull(request.getReligion()));
         if (request.getInterests() != null) {
             user.getInterests().clear();
             user.getInterests().addAll(request.getInterests());
@@ -172,6 +184,52 @@ public class UserServiceImpl implements UserService {
         response.setLastSeen(Instant.now().toString());
         populateUserCounts(response, user);
         return response;
+    }
+
+    /** Empty/blank → null (so a cleared dropdown clears the column). */
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    private static final java.util.regex.Pattern USERNAME_PATTERN =
+            java.util.regex.Pattern.compile("^[a-zA-Z0-9_]{3,30}$");
+
+    @Override
+    @Transactional
+    public UserResponse changeUsername(String newUsername, User currentUser) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        String next = newUsername == null ? "" : newUsername.trim();
+        if (!USERNAME_PATTERN.matcher(next).matches()) {
+            throw new BadRequestException(
+                    "Username must be 3–30 characters — letters, numbers and underscores only.", "TM_002");
+        }
+        // Uniqueness is case-insensitive. A soft-deleted (recoverable) account still
+        // holds its real username → reserved; a purged account was renamed to
+        // "deleted_<uuid>" → its old name is free. So this check alone gives the
+        // "reserve pending-deletion, free fully-deleted" rule. No-op if unchanged.
+        if (!next.equalsIgnoreCase(user.getUsername())
+                && userRepository.existsByUsernameIgnoreCase(next)) {
+            throw new com.chat.talkMe.exception.ConflictException(
+                    "This username is already taken.", "TM_048");
+        }
+        user.setUsername(next);
+        user = userRepository.save(user);
+
+        UserResponse response = userMapper.toUserResponse(user);
+        response.setPresence("online");
+        response.setLastSeen(Instant.now().toString());
+        populateUserCounts(response, user);
+        return response;
+    }
+
+    @Override
+    public boolean isUsernameAvailable(String username, User currentUser) {
+        String candidate = username == null ? "" : username.trim();
+        if (!USERNAME_PATTERN.matcher(candidate).matches()) return false;
+        // Your current name counts as "available" (so the field validates while unchanged).
+        if (candidate.equalsIgnoreCase(currentUser.getUsername())) return true;
+        return !userRepository.existsByUsernameIgnoreCase(candidate);
     }
 
     @Override

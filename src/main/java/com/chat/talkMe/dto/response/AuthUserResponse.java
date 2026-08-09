@@ -30,7 +30,21 @@ public class AuthUserResponse {
     private String country;
     private String city;
     private String mobileNumber;
+    private String bio;
     private java.util.Set<String> interests;
+    // ── Optional "About me" attributes (self view) ──
+    private String occupation;
+    private String education;
+    private String bodyType;
+    private String hairColor;
+    private String eyeColor;
+    private String relationshipStatus;
+    private String children;
+    private String drinking;
+    private String smoking;
+    private String workout;
+    private String zodiac;
+    private String religion;
     // ── Late-Night Social attributes ──
     private String mood;
     private String conversationEnergy;
