@@ -92,7 +92,7 @@ public class WingmanController {
     /**
      * Reply suggestions given the other person's last message. Feature-gated by AI_WINGMAN.
      *
-     * @param request     body carrying the last message and optional max (default 5)
+     * @param request body carrying the last message and optional max (default 5)
      * @return 200 with the list of reply suggestions
      */
     @PostMapping("/suggest")
@@ -110,7 +110,7 @@ public class WingmanController {
      * on the text the caller supplies (their own composer draft) — no other user's data is
      * read — so it needs no relationship gate beyond the feature entitlement.
      *
-     * @param request     body carrying the draft, optional tone, and optional max (default 5)
+     * @param request body carrying the draft, optional tone, and optional max (default 5)
      * @return 200 with the list of rewritten variants
      * @throws com.chat.talkMe.exception.BadRequestException if the draft is blank or longer than 1000 chars
      */

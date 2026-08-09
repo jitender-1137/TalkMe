@@ -26,7 +26,7 @@ public enum MilestoneType {
 
     /**
      * -- GETTER --
-     *  Human-readable label surfaced on the timeline.
+     * Human-readable label surfaced on the timeline.
      */
     private final String label;
 

@@ -22,7 +22,7 @@ public enum ListenerReason {
 
     /**
      * -- GETTER --
-     *  Human-friendly label used in the support room's title.
+     * Human-friendly label used in the support room's title.
      */
     private final String label;
 
