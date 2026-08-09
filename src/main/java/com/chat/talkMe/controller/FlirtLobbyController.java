@@ -28,6 +28,12 @@ public class FlirtLobbyController {
 
     private final FlirtLobbyService flirtLobbyService;
 
+    /**
+     * Adds the current user to the flirt-lobby set and returns the current live roster.
+     *
+     * @param userDetails the authenticated user joining the lobby
+     * @return 200 with the list of online lobby members (excluding self, guests and banned users)
+     */
     @PostMapping("/enter")
     @PreAuthorize("@featureGuard.check('FLIRT_LOBBY')")
     public ResponseEntity<ResponseDto<List<NightUserCard>>> enter(
@@ -35,6 +41,12 @@ public class FlirtLobbyController {
         return ResponseEntity.ok(SuccessResponseDto.success(flirtLobbyService.enter(userDetails.getUser())));
     }
 
+    /**
+     * Returns the current live flirt-lobby roster, pruning members who have gone offline.
+     *
+     * @param userDetails the authenticated viewer, excluded from the returned roster
+     * @return 200 with the list of online lobby members (excluding self, guests and banned users)
+     */
     @GetMapping("/online")
     @PreAuthorize("@featureGuard.check('FLIRT_LOBBY')")
     public ResponseEntity<ResponseDto<List<NightUserCard>>> online(
@@ -47,6 +59,14 @@ public class FlirtLobbyController {
     // user is still online (consent revoked, grant expired, self opt-out) and leave required
     // that entitlement, the user would get 403 and stay stranded in the roster — roster() only
     // prunes OFFLINE members and there is no time-based reaper for the flirt-lobby set.
+    /**
+     * Removes the current user from the flirt-lobby set. Deliberately gated only by
+     * {@code hasRole('USER')} (not FLIRT_LOBBY) so leaving always succeeds even if the entitlement
+     * has since flipped off.
+     *
+     * @param userDetails the authenticated user leaving the lobby
+     * @return 200 with an empty payload and success code TM_000
+     */
     @PostMapping("/leave")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<Void>> leave(

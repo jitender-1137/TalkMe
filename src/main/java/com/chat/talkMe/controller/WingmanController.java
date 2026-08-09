@@ -51,6 +51,14 @@ public class WingmanController {
      * compatibility highlights), this is gated to real relationships: not yourself, neither side
      * has blocked the other, and you are friends. Otherwise anyone could harvest a stranger's
      * profile traits by UUID (IDOR).
+     *
+     * @param userUuid    the target user's UUID
+     * @param max         requested number of suggestions (clamped to 1..10, default 5)
+     * @param userDetails the authenticated principal
+     * @return 200 with the list of icebreaker suggestions
+     * @throws com.chat.talkMe.exception.NotFoundException   if the target is missing or a block hides it
+     * @throws com.chat.talkMe.exception.BadRequestException if the target is the caller themselves
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the two users are not friends
      */
     @GetMapping("/icebreakers/{userUuid}")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
@@ -82,7 +90,11 @@ public class WingmanController {
     }
 
     /**
-     * Reply suggestions given the other person's last message.
+     * Reply suggestions given the other person's last message. Feature-gated by AI_WINGMAN.
+     *
+     * @param request     body carrying the last message and optional max (default 5)
+     * @param userDetails the authenticated principal
+     * @return 200 with the list of reply suggestions
      */
     @PostMapping("/suggest")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
@@ -99,6 +111,11 @@ public class WingmanController {
      * Rewrite the caller's own draft into polished variants in a chosen tone. Operates only
      * on the text the caller supplies (their own composer draft) — no other user's data is
      * read — so it needs no relationship gate beyond the feature entitlement.
+     *
+     * @param request     body carrying the draft, optional tone, and optional max (default 5)
+     * @param userDetails the authenticated principal
+     * @return 200 with the list of rewritten variants
+     * @throws com.chat.talkMe.exception.BadRequestException if the draft is blank or longer than 1000 chars
      */
     @PostMapping("/rewrite")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")

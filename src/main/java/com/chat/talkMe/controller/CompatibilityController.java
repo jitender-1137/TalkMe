@@ -31,6 +31,16 @@ public class CompatibilityController {
     private final CompatibilityService compatibilityService;
     private final UserRepository userRepository;
 
+    /**
+     * Computes the deterministic weighted compatibility score between the caller and another user.
+     *
+     * @param userUuid    UUID of the other user to compare against, from the path
+     * @param userDetails the authenticated principal being compared
+     * @return 200 with the {@link CompatibilityScore} (overall 0..100, per-factor breakdown, highlights,
+     *         explanation, bucket)
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches {@code userUuid} (TM_024)
+     * @throws java.lang.IllegalArgumentException          if {@code userUuid} is not a valid UUID
+     */
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('COMPATIBILITY_METER')")
     public ResponseEntity<ResponseDto<CompatibilityScore>> compatibility(

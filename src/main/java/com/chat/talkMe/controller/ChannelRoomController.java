@@ -29,6 +29,15 @@ public class ChannelRoomController {
 
     private final GroupService groupService;
 
+    /**
+     * Creates a broadcast channel by forcing the request subtype to "channel" and delegating to the
+     * unified group-creation path. Channels are public/open-to-subscribe with an admins-only send policy.
+     *
+     * @param request     the group-creation payload (name, description, tags, etc.); subtype is overridden
+     *                    to "channel" before delegation
+     * @param userDetails the authenticated principal; its user becomes the channel owner
+     * @return 200 with the created {@link ChatResponse} wrapped in a success envelope (code TM_280)
+     */
     @PostMapping("/channel")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<ChatResponse>> createChannel(
@@ -39,6 +48,14 @@ public class ChannelRoomController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Channel created successfully", "TM_280"));
     }
 
+    /**
+     * Creates a public room by forcing the request subtype to "room" and delegating to the unified
+     * group-creation path. Rooms are always public, open-to-join, and allow non-friends.
+     *
+     * @param request     the group-creation payload; subtype is overridden to "room" before delegation
+     * @param userDetails the authenticated principal; its user becomes the room owner
+     * @return 200 with the created {@link ChatResponse} wrapped in a success envelope (code TM_280)
+     */
     @PostMapping("/room")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<ChatResponse>> createRoom(

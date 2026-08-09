@@ -35,6 +35,15 @@ public class AdminFeatureController {
     private final FeatureAccessService featureAccessService;
     private final UserRepository userRepository;
 
+    /**
+     * Apply a feature grant (decision/scope/cohort/expiry/note) to a target user.
+     *
+     * @param uuid    the target user's UUID
+     * @param request the validated grant request (feature key wire name + grant parameters)
+     * @return an empty success envelope confirming the grant was applied
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches the UUID
+     * @throws com.chat.talkMe.exception.BadRequestException if the feature key is unknown
+     */
     @PostMapping("/users/{uuid}")
     public ResponseEntity<ResponseDto<Void>> grant(
             @PathVariable("uuid") String uuid,
@@ -49,6 +58,15 @@ public class AdminFeatureController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Feature grant applied", "TM_000"));
     }
 
+    /**
+     * Remove an existing feature grant from a target user.
+     *
+     * @param uuid the target user's UUID
+     * @param key  the feature key wire name to revoke
+     * @return an empty success envelope confirming the grant was removed
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches the UUID
+     * @throws com.chat.talkMe.exception.BadRequestException if the feature key is unknown
+     */
     @DeleteMapping("/users/{uuid}/{key}")
     public ResponseEntity<ResponseDto<Void>> revoke(
             @PathVariable("uuid") String uuid,

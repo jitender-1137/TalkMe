@@ -29,6 +29,16 @@ public class TranslationController {
 
     private final TranslationService translationService;
 
+    /**
+     * Translate a single already-decrypted text; serves cache hits free, else calls the provider
+     * (counting one daily-cap unit). Blank input is echoed back unchanged.
+     *
+     * @param request     the text plus source/target language
+     * @param userDetails the authenticated caller (used for the per-user daily cap)
+     * @return the translation in a success envelope
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the caller's daily translation cap is
+     *                                                            exceeded (TM_TRANSLATE_CAP)
+     */
     @PostMapping
     @PreAuthorize("@featureGuard.check('INSTANT_TRANSLATE')")
     public ResponseEntity<ResponseDto<TranslateResponse>> translate(
@@ -41,6 +51,12 @@ public class TranslationController {
     /**
      * Translate many texts in one call — cache hits are free, the uncached remainder is one batch
      * provider call costing a single daily-cap unit. Used by the per-chat "translate conversation" mode.
+     *
+     * @param request     the batch of texts plus source/target language
+     * @param userDetails the authenticated caller (used for the per-user daily cap)
+     * @return the batch of translations in a success envelope
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the caller's daily translation cap is
+     *                                                            exceeded (TM_TRANSLATE_CAP)
      */
     @PostMapping("/batch")
     @PreAuthorize("@featureGuard.check('INSTANT_TRANSLATE')")

@@ -24,6 +24,11 @@ public class PublicAssetController {
 
     private final Resource logo = new ClassPathResource("mail/logo.png");
 
+    /**
+     * Serves the brand logo PNG from the classpath with a 30-day public cache; 404s if the resource is missing.
+     *
+     * @return the logo image, or 404 Not Found if the classpath resource is absent
+     */
     @GetMapping(value = "/logo.png", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<Resource> logo() {
         if (!logo.exists()) {

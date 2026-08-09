@@ -34,7 +34,15 @@ public class AnonymousComplimentController {
     private final AnonymousComplimentService complimentService;
 
     /**
-     * Send an anonymous compliment to a user.
+     * Send an anonymous compliment to a user; the sender identity is not disclosed to the recipient.
+     *
+     * @param request     the validated compliment (recipient + message)
+     * @param userDetails the authenticated principal (the sender)
+     * @return the created {@link ComplimentResponse} (sender's view)
+     * @throws com.chat.talkMe.exception.BadRequestException        if the recipient is the sender,
+     *         is not a valid target, or the message is empty
+     * @throws com.chat.talkMe.exception.ContentModerationException if the message fails moderation
+     * @throws com.chat.talkMe.exception.TooManyRequestsException   if the sender exceeds the rate limit
      */
     @PostMapping
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
@@ -47,6 +55,9 @@ public class AnonymousComplimentController {
 
     /**
      * The caller's inbox — compliments addressed to them (sender hidden unless revealed).
+     *
+     * @param userDetails the authenticated principal (the recipient)
+     * @return the list of received {@link ComplimentResponse} items
      */
     @GetMapping("/inbox")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
@@ -58,6 +69,9 @@ public class AnonymousComplimentController {
 
     /**
      * The caller's own outgoing compliments.
+     *
+     * @param userDetails the authenticated principal (the sender)
+     * @return the list of sent {@link ComplimentResponse} items
      */
     @GetMapping("/sent")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
@@ -68,7 +82,16 @@ public class AnonymousComplimentController {
     }
 
     /**
-     * Recipient requests to learn who sent a compliment (notifies the sender).
+     * Recipient requests to learn who sent a compliment (notifies the sender); idempotent if
+     * a request is already pending.
+     *
+     * @param uuid        the compliment's UUID
+     * @param userDetails the authenticated principal (must be the recipient)
+     * @return the recipient's {@link ComplimentResponse} view (sender still hidden)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the compliment does not exist
+     *         or the caller is not its recipient
+     * @throws com.chat.talkMe.exception.BadRequestException if the compliment was already
+     *         revealed or the reveal was declined
      */
     @PostMapping("/{uuid}/reveal-request")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
@@ -80,7 +103,16 @@ public class AnonymousComplimentController {
     }
 
     /**
-     * Sender accepts ({@code accept=true}) or declines ({@code accept=false}) a reveal request.
+     * Sender accepts ({@code accept=true}) or declines ({@code accept=false}) a reveal request;
+     * on accept the recipient learns the sender's identity.
+     *
+     * @param uuid        the compliment's UUID
+     * @param accept      true to reveal identity, false to decline
+     * @param userDetails the authenticated principal (must be the sender)
+     * @return the updated {@link ComplimentResponse}
+     * @throws com.chat.talkMe.exception.NotFoundException   if the compliment does not exist
+     *         or the caller is not its sender
+     * @throws com.chat.talkMe.exception.BadRequestException if there is no pending reveal request
      */
     @PostMapping("/{uuid}/reveal-response")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")

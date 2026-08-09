@@ -35,6 +35,15 @@ public class WhiteboardController {
 
     private final WhiteboardService whiteboardService;
 
+    /**
+     * Return the current op-log for a chat's shared whiteboard. Feature-gated + membership-checked.
+     *
+     * @param chatUuid    the chat's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with the list of {@link WhiteboardOp}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is not a valid UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @GetMapping("/{chatUuid}")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<List<WhiteboardOp>>> getBoard(
@@ -44,6 +53,17 @@ public class WhiteboardController {
         return ResponseEntity.ok(SuccessResponseDto.success(ops));
     }
 
+    /**
+     * Append a stroke to the whiteboard and re-broadcast it on the chat topic. Feature-gated +
+     * membership-checked.
+     *
+     * @param request     the stroke (points, style) to add
+     * @param userDetails the authenticated principal
+     * @return 200 with the created {@link WhiteboardOp}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid or the stroke
+     *                                                       exceeds the point cap / has a malformed point
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/stroke")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<WhiteboardOp>> addStroke(
@@ -53,6 +73,15 @@ public class WhiteboardController {
         return ResponseEntity.ok(SuccessResponseDto.success(op, "Stroke added", "TM_822"));
     }
 
+    /**
+     * Clear the whole whiteboard and broadcast the clear op. Feature-gated + membership-checked.
+     *
+     * @param chatUuid    the chat's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with an empty body
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is not a valid UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/{chatUuid}/clear")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<Void>> clear(
@@ -63,6 +92,15 @@ public class WhiteboardController {
         return ResponseEntity.ok(body);
     }
 
+    /**
+     * Undo the last op and broadcast the undo. Feature-gated + membership-checked.
+     *
+     * @param chatUuid    the chat's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with the resulting {@link WhiteboardOp}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is not a valid UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/{chatUuid}/undo")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<WhiteboardOp>> undo(

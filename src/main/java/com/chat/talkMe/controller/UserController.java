@@ -42,6 +42,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * User profile, account, social (block/report/mutual-friends), search, and public-profile endpoints.
+ * Class-level gate: requires ROLE_USER or ROLE_GUEST, except methods that override it with permitAll
+ * (public profile lookup, lobby) or a feature guard (smart profile card).
+ */
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -53,12 +58,27 @@ public class UserController {
     private final PostService postService;
     private final AuthService authService;
 
+    /**
+     * Return the current user's full profile.
+     *
+     * @param userDetails the authenticated principal
+     * @return 200 with the current user's {@link UserResponse}
+     */
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<UserResponse>> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse response = userService.getCurrentUser(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Update the current user's editable profile fields (country is immutable once set).
+     *
+     * @param request     the profile fields to update
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserResponse}
+     * @throws com.chat.talkMe.exception.ContentModerationException if a free-text field fails moderation
+     * @throws com.chat.talkMe.exception.BadRequestException        if the request tries to change the country
+     */
     @RequestMapping(value = "/me", method = {RequestMethod.PATCH, RequestMethod.PUT})
     public ResponseEntity<ResponseDto<UserResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
@@ -71,6 +91,12 @@ public class UserController {
     /**
      * Change the current user's username (unique; taken names — including accounts
      * pending deletion — are rejected, while fully-purged names are free).
+     *
+     * @param request     the requested new username
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the username is unchanged/invalid
+     * @throws com.chat.talkMe.exception.ConflictException   if the username is already taken
      */
     @PatchMapping("/me/username")
     public ResponseEntity<ResponseDto<UserResponse>> changeUsername(
@@ -82,6 +108,10 @@ public class UserController {
 
     /**
      * Live availability check for the username field.
+     *
+     * @param username    the candidate username to test
+     * @param userDetails the authenticated principal (own current username counts as available)
+     * @return 200 with a map {@code {"available": boolean}}
      */
     @GetMapping("/me/username-available")
     public ResponseEntity<ResponseDto<Map<String, Boolean>>> usernameAvailable(
@@ -93,6 +123,11 @@ public class UserController {
 
     /**
      * Fast, param-based mood update (feature #4) — e.g. PUT /users/me/mood?value=FLIRT.
+     *
+     * @param value       the new mood value
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the mood value is invalid
      */
     @PutMapping("/me/mood")
     public ResponseEntity<ResponseDto<UserResponse>> updateMood(
@@ -102,6 +137,14 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Mood updated", "TM_060"));
     }
 
+    /**
+     * Upload and set the current user's avatar image.
+     *
+     * @param file        the avatar image multipart file
+     * @param userDetails the authenticated principal
+     * @return 200 with a map containing the stored avatar url
+     * @throws com.chat.talkMe.exception.ContentModerationException if the image is explicit
+     */
     @PostMapping(value = "/me/avatar", consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<Map<String, String>>> uploadAvatar(
             @RequestParam("file") MultipartFile file,
@@ -111,6 +154,12 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Avatar uploaded successfully", "TM_USER_001"));
     }
 
+    /**
+     * Remove the current user's avatar.
+     *
+     * @param userDetails the authenticated principal
+     * @return 200 with an empty body
+     */
     @DeleteMapping("/me/avatar")
     public ResponseEntity<ResponseDto<Void>> removeAvatar(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.removeAvatar(userDetails.getUser());
@@ -121,6 +170,12 @@ public class UserController {
      * Soft-delete the current account. It's locked immediately and recoverable for a
      * grace period simply by logging back in; after the window it is permanently
      * anonymized by the scheduled purge job.
+     *
+     * @param request     optional body carrying the password (required to confirm for password accounts)
+     * @param userDetails the authenticated principal
+     * @return 200 with an empty body once deletion is scheduled
+     * @throws com.chat.talkMe.exception.ForbiddenException    if the account is a guest (cannot be deleted)
+     * @throws com.chat.talkMe.exception.UnauthorizedException if the supplied password does not match
      */
     @DeleteMapping("/me")
     public ResponseEntity<ResponseDto<Void>> deleteAccount(
@@ -133,6 +188,14 @@ public class UserController {
                 "TM_USER_003"));
     }
 
+    /**
+     * Fetch another user's profile by UUID (or "me"), enriched with presence, block, and friend flags.
+     *
+     * @param userId      the target user's UUID, or the literal "me"
+     * @param userDetails the authenticated principal
+     * @return 200 with the target's {@link UserResponse}
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
+     */
     @GetMapping("/{userId}")
     public ResponseEntity<ResponseDto<UserResponse>> getUserById(
             @PathVariable("userId") String userId,
@@ -147,6 +210,10 @@ public class UserController {
      * callers are allowed (method-level permitAll overrides the class-level role rule, mirroring
      * {@code /lobby}); it must ALSO be listed in SecurityConfig#unSecured so the filter chain lets
      * it through. Returns a trimmed, PII-free projection.
+     *
+     * @param username the target's username
+     * @return 200 with the {@link PublicProfileResponse} projection
+     * @throws com.chat.talkMe.exception.NotFoundException if no active, public account matches
      */
     @GetMapping("/by-username/{username}")
     @PreAuthorize("permitAll()")
@@ -157,7 +224,13 @@ public class UserController {
     }
 
     /**
-     * Smart Profile Card (feature #20) — late-night attributes + compatibility hint.
+     * Smart Profile Card (feature #20) — late-night attributes + compatibility hint. Gated by the
+     * SMART_PROFILE_CARD feature.
+     *
+     * @param userId      the target user's UUID
+     * @param userDetails the authenticated principal (the viewer scored for compatibility)
+     * @return 200 with the {@link SmartProfileCardResponse}
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
      */
     @GetMapping("/{userId}/card")
     @PreAuthorize("@featureGuard.check('SMART_PROFILE_CARD')")
@@ -168,6 +241,16 @@ public class UserController {
                 userService.getSmartProfileCard(userId, userDetails.getUser())));
     }
 
+    /**
+     * Cursor-paginated user search by name/username.
+     *
+     * @param query       the search query (minimum 2 characters)
+     * @param limit       page size (default 20)
+     * @param cursor      opaque pagination cursor; null for the first page
+     * @param userDetails the authenticated principal
+     * @return 200 with a {@link PaginatedResponse} of matching users
+     * @throws com.chat.talkMe.exception.BadRequestException if the query is shorter than 2 characters
+     */
     @GetMapping("/search")
     public ResponseEntity<ResponseDto<PaginatedResponse<UserResponse>>> searchUsers(
             @RequestParam("q") String query,
@@ -179,6 +262,15 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Block another user.
+     *
+     * @param userId      the target user's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with an empty body
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches the id
+     * @throws com.chat.talkMe.exception.BadRequestException if attempting to block yourself
+     */
     @PostMapping("/{userId}/block")
     public ResponseEntity<ResponseDto<Void>> blockUser(
             @PathVariable("userId") String userId,
@@ -188,6 +280,14 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "User blocked", "TM_067"));
     }
 
+    /**
+     * Unblock a previously blocked user.
+     *
+     * @param userId      the target user's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with an empty body
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
+     */
     @DeleteMapping("/{userId}/block")
     public ResponseEntity<ResponseDto<Void>> unblockUser(
             @PathVariable("userId") String userId,
@@ -197,6 +297,12 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "User unblocked", "TM_068"));
     }
 
+    /**
+     * List the users the current user has blocked.
+     *
+     * @param userDetails the authenticated principal
+     * @return 200 with a {@link PaginatedResponse} of blocked users
+     */
     @GetMapping("/blocked")
     public ResponseEntity<ResponseDto<PaginatedResponse<BlockedUserResponse>>> getBlockedUsers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -205,6 +311,16 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * File a moderation report against another user (one open report per reporter→reported pair).
+     *
+     * @param userId      the reported user's UUID
+     * @param payload     body with optional "reason" (default "other") and "description"
+     * @param userDetails the authenticated principal (the reporter)
+     * @return 200 with an empty body
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
+     * @throws com.chat.talkMe.exception.ConflictException if an open report already exists for this pair
+     */
     @PostMapping("/{userId}/report")
     public ResponseEntity<ResponseDto<Void>> reportUser(
             @PathVariable("userId") String userId,
@@ -218,6 +334,15 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Report submitted", "TM_REPORT_001"));
     }
 
+    /**
+     * Paginated profile feed of a user's posts (newest first).
+     *
+     * @param userId      the target user's UUID
+     * @param pageable    pagination/sort (default size 20, createdAt DESC)
+     * @param userDetails the authenticated principal (the viewer)
+     * @return 200 with a {@link Page} of {@link PostResponse}
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
+     */
     @GetMapping("/{userId}/posts")
     public ResponseEntity<ResponseDto<Page<PostResponse>>> getUserPosts(
             @PathVariable("userId") String userId,
@@ -228,6 +353,14 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Fetch a user's profile by UUID (alias of {@link #getUserById} for the /profile route).
+     *
+     * @param userId      the target user's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with the target's {@link UserResponse}
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
+     */
     @GetMapping("/{userId}/profile")
     public ResponseEntity<ResponseDto<UserResponse>> getUserProfile(
             @PathVariable("userId") String userId,
@@ -237,6 +370,14 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Mutual friends between the current user and the target user.
+     *
+     * @param userId      the target user's UUID
+     * @param userDetails the authenticated principal
+     * @return 200 with a {@link MutualFriendsResponse} (count + sample)
+     * @throws com.chat.talkMe.exception.NotFoundException if no user matches the id
+     */
     @GetMapping("/{userId}/mutual-friends")
     public ResponseEntity<ResponseDto<MutualFriendsResponse>> getMutualFriends(
             @PathVariable("userId") String userId,
@@ -246,6 +387,13 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * List currently-visible lobby users. Public (permitAll); the principal may be null for
+     * anonymous callers.
+     *
+     * @param userDetails the authenticated principal, or null when anonymous
+     * @return 200 with the list of lobby {@link UserResponse}
+     */
     @GetMapping("/lobby")
     @PreAuthorize("permitAll()")
     public ResponseEntity<ResponseDto<List<UserResponse>>> getLobbyUsers(

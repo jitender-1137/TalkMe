@@ -38,6 +38,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Default {@link StoryService} implementation: content moderation, voice-status gating,
+ * photo+music muxing, owner-excluded view counting, and viewer-relative response mapping.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -53,6 +57,22 @@ public class StoryServiceImpl implements StoryService {
     private final NotificationService notificationService;
     private final FeatureAccessService featureAccessService;
 
+    /**
+     * Creates a 24-hour story for the given user.
+     *
+     * <p>The caption is moderated and rejected if explicit. A VOICE story requires the
+     * VOICE_STATUS entitlement and an audio-clip media URL; a visual photo paired with a
+     * soundtrack is muxed into an auto-playing video. Followers and following are notified
+     * best-effort (a notification failure never fails the post).
+     *
+     * @param request     the story payload (media URL, caption, audience, kind, optional audio)
+     * @param currentUser the authenticated author
+     * @return the created story rendered for the author (owner flags populated)
+     * @throws ContentModerationException if the caption is explicit
+     * @throws FeatureLockedException     if a VOICE story is requested without the VOICE_STATUS
+     *                                    entitlement
+     * @throws BadRequestException        if a VOICE story's media is not an audio clip
+     */
     @Override
     @Transactional
     public StoryResponse createStory(StoryRequest request, User currentUser) {
@@ -129,6 +149,14 @@ public class StoryServiceImpl implements StoryService {
         return mapToStoryResponse(story, currentUser);
     }
 
+    /**
+     * Returns every currently-active (non-expired, non-deleted) story visible to the viewer,
+     * newest first. FRIENDS-audience stories are included only when the viewer is the author or
+     * has an accepted follow relationship in either direction (see {@link #canViewStory}).
+     *
+     * @param currentUser the viewer
+     * @return the visible active stories, newest first (empty when none)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<StoryResponse> getActiveStories(User currentUser) {
@@ -140,8 +168,14 @@ public class StoryServiceImpl implements StoryService {
     }
 
     /**
-     * A FRIENDS story is visible to its author or an accepted follower/following (an
-     * ACCEPTED follow in either direction); EVERYONE stories are visible to all.
+     * Applies the audience rule for a single story. EVERYONE stories are visible to
+     * all; a FRIENDS story is visible only to its author or to a user with an
+     * accepted follow relationship in either direction (follower→author or
+     * author→follower).
+     *
+     * @param story  the story whose visibility is being checked
+     * @param viewer the prospective viewer; a {@code null} viewer can only see EVERYONE stories
+     * @return {@code true} if the viewer may see the story; otherwise {@code false}
      */
     private boolean canViewStory(Story story, User viewer) {
         if (story.getAudience() != PostAudience.FRIENDS) return true;
@@ -151,6 +185,14 @@ public class StoryServiceImpl implements StoryService {
                 || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(story.getUser(), viewer, "ACCEPTED");
     }
 
+    /**
+     * Soft-deletes a story. Only the author may delete their own story.
+     *
+     * @param storyUuid   UUID string of the story to delete
+     * @param currentUser the caller; must be the story's author
+     * @throws NotFoundException  if no such story exists
+     * @throws ForbiddenException if the caller is not the author
+     */
     @Override
     @Transactional
     public void deleteStory(String storyUuid, User currentUser) {
@@ -165,6 +207,14 @@ public class StoryServiceImpl implements StoryService {
         storyRepository.save(story);
     }
 
+    /**
+     * Records a view of a story by the given user. No-op when the viewer is the author (owners
+     * never count as viewers, Instagram-style) or has already viewed the story (one view per user).
+     *
+     * @param storyUuid   UUID string of the story that was opened
+     * @param currentUser the viewer
+     * @throws NotFoundException if no such story exists
+     */
     @Override
     @Transactional
     public void viewStory(String storyUuid, User currentUser) {
@@ -188,6 +238,16 @@ public class StoryServiceImpl implements StoryService {
         storyViewRepository.save(view);
     }
 
+    /**
+     * Owner-only "seen by" list: the story's viewers with per-viewer view timestamps, most
+     * recent first.
+     *
+     * @param storyUuid   UUID string of the story
+     * @param currentUser the caller; must be the story's author
+     * @return the viewers, most-recently-viewed first (empty when none)
+     * @throws NotFoundException  if no such story exists
+     * @throws ForbiddenException if the caller is not the author
+     */
     @Override
     @Transactional(readOnly = true)
     public List<StoryViewerResponse> getStoryViewers(String storyUuid, User currentUser) {
@@ -207,6 +267,13 @@ public class StoryServiceImpl implements StoryService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns the user's OWN stories, newest first, <strong>including expired</strong> ones —
+     * the profile "My Stories" archive.
+     *
+     * @param currentUser the user whose archive is requested
+     * @return the user's non-deleted stories (active and expired), newest first
+     */
     @Override
     @Transactional(readOnly = true)
     public List<StoryResponse> getMyStories(User currentUser) {
@@ -216,6 +283,16 @@ public class StoryServiceImpl implements StoryService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Builds the API response for a story, relative to the requesting user. Populates
+     * viewer-specific flags — {@code viewedByMe} and {@code owner} — plus the author's
+     * "friends-only messaging" hint and the total distinct {@code viewCount} (only
+     * meaningful to the owner's UI, but always included as it's a cheap count).
+     *
+     * @param story       the story entity to convert
+     * @param currentUser the user the response is being rendered for
+     * @return the story response with viewer-relative flags populated
+     */
     private StoryResponse mapToStoryResponse(Story story, User currentUser) {
         boolean viewed = storyViewRepository.existsByStoryAndUser(story, currentUser);
         boolean isOwner = story.getUser().getId().equals(currentUser.getId());

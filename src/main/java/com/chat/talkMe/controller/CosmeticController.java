@@ -36,6 +36,9 @@ public class CosmeticController {
 
     /**
      * Full catalog with owned/locked/equipped flags for the caller.
+     *
+     * @param userDetails the authenticated principal
+     * @return the list of {@link CosmeticResponse} for the whole catalog
      */
     @GetMapping("/catalog")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
@@ -47,6 +50,9 @@ public class CosmeticController {
 
     /**
      * The caller's owned cosmetics.
+     *
+     * @param userDetails the authenticated principal
+     * @return the list of {@link CosmeticResponse} the caller owns
      */
     @GetMapping("/me")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
@@ -58,6 +64,13 @@ public class CosmeticController {
 
     /**
      * Equip a cosmetic the caller owns. Body: {@code {"code": "..."}}.
+     *
+     * @param body        request body carrying the cosmetic {@code code}
+     * @param userDetails the authenticated principal
+     * @return the caller's cosmetics list reflecting the new equipped state
+     * @throws com.chat.talkMe.exception.BadRequestException if the code is missing or the cosmetic
+     *         is not yet unlocked by the caller
+     * @throws com.chat.talkMe.exception.NotFoundException   if the code matches no known cosmetic
      */
     @PutMapping("/equip")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
@@ -71,6 +84,11 @@ public class CosmeticController {
 
     /**
      * Unequip whatever is equipped in the given slot.
+     *
+     * @param slot        the cosmetic slot name (parsed to {@link CosmeticType})
+     * @param userDetails the authenticated principal
+     * @return the caller's cosmetics list reflecting the cleared slot
+     * @throws com.chat.talkMe.exception.BadRequestException if the slot name is unknown
      */
     @DeleteMapping("/equip/{slot}")
     @PreAuthorize("@featureGuard.check('COSMETICS')")

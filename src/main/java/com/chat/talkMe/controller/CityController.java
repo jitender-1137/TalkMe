@@ -32,6 +32,8 @@ public class CityController {
 
     /**
      * The city map: every district with its live count + curated room count.
+     *
+     * @return 200 with the list of {@link CityDistrictResponse} district cards
      */
     @GetMapping
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
@@ -41,6 +43,11 @@ public class CityController {
 
     /**
      * One district: card + curated rooms + live roster.
+     *
+     * @param slug        the district slug, from the path
+     * @param userDetails the authenticated principal requesting the district
+     * @return 200 with the {@link CityDistrictDetailResponse} (card, curated rooms, online usernames)
+     * @throws com.chat.talkMe.exception.NotFoundException if the slug matches no known district (TM_970)
      */
     @GetMapping("/{slug}")
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
@@ -53,6 +60,11 @@ public class CityController {
 
     /**
      * Announce presence in a district (joins the Redis presence set, broadcasts a join).
+     *
+     * @param slug        the district slug, from the path
+     * @param userDetails the authenticated principal entering the district
+     * @return 200 with the refreshed {@link CityDistrictDetailResponse} (message code TM_971)
+     * @throws com.chat.talkMe.exception.NotFoundException if the slug matches no known district (TM_970)
      */
     @PostMapping("/{slug}/enter")
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
@@ -70,6 +82,15 @@ public class CityController {
     // admin DENY, global kill-switch), a feature-gated leave would 403 and strand the user in
     // the roster — the only prune is presence-driven, so they'd linger until their session
     // is seen offline. hasRole('USER') keeps leave reachable regardless.
+    /**
+     * Removes the caller from a district's presence set and broadcasts a leave. Intentionally not
+     * feature-gated (only {@code hasRole('USER')}) so leaving always succeeds; returns no district detail.
+     *
+     * @param slug        the district slug, from the path
+     * @param userDetails the authenticated principal leaving the district
+     * @return 200 with an empty payload (message code TM_972)
+     * @throws com.chat.talkMe.exception.NotFoundException if the slug matches no known district (TM_970)
+     */
     @PostMapping("/{slug}/leave")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<Void>> leave(

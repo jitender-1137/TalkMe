@@ -25,6 +25,13 @@ public class StarredMessagesController {
 
     private final MessageService messageService;
 
+    /**
+     * The caller's starred messages across all chats, newest first (each flagged starred).
+     *
+     * @param limit       max messages to return (default 100; clamped to 1..200, non-positive → 100)
+     * @param userDetails the authenticated caller
+     * @return the caller's starred messages in a success envelope
+     */
     @GetMapping("/starred")
     public ResponseEntity<ResponseDto<List<MessageResponse>>> getStarred(
             @RequestParam(value = "limit", defaultValue = "100") int limit,

@@ -25,6 +25,18 @@ public class ConversationSummaryController {
 
     private final ConversationSummaryService conversationSummaryService;
 
+    /**
+     * Builds the read-only "Our Story" summary for a 1:1 chat: message counts, photos shared, active
+     * days, first-message time, days-known, shared interests, and a generated headline.
+     *
+     * @param chatUuid    UUID of the target chat, from the path
+     * @param userDetails the authenticated principal, who must be an active member of the chat
+     * @return 200 with the {@link ConversationSummaryResponse}
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat is missing/deleted or the UUID is
+     *                                                      malformed (TM_024)
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not an active member (TM_026)
+     *                                                      or the chat is multi-party (TM_026)
+     */
     @GetMapping("/{chatUuid}/summary")
     @PreAuthorize("@featureGuard.check('CONVERSATION_SUMMARY')")
     public ResponseEntity<ResponseDto<ConversationSummaryResponse>> summary(

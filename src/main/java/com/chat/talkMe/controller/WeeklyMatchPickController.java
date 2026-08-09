@@ -27,6 +27,13 @@ public class WeeklyMatchPickController {
 
     private final WeeklyMatchPickService weeklyMatchPickService;
 
+    /**
+     * Return the current ISO week's curated, ranked most-compatible users for the signed-in user.
+     * Gated by the WEEKLY_PICKS feature.
+     *
+     * @param userDetails the authenticated principal
+     * @return 200 with the ranked list of {@link WeeklyMatchPickResponse}
+     */
     @GetMapping
     @PreAuthorize("@featureGuard.check('WEEKLY_PICKS')")
     public ResponseEntity<ResponseDto<List<WeeklyMatchPickResponse>>> current(

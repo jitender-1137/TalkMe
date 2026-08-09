@@ -34,6 +34,9 @@ public class BadgeController {
 
     /**
      * All badges for a user (earned + in-progress endorsement counts).
+     *
+     * @param userUuid the target user's UUID
+     * @return the list of {@link BadgeResponse} for that user
      */
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('BADGES')")
@@ -45,6 +48,13 @@ public class BadgeController {
 
     /**
      * Endorse a peer for a trait; returns the resulting badge state.
+     *
+     * @param request     the validated endorsement request (recipient UUID + badge type)
+     * @param userDetails the authenticated principal (the endorser)
+     * @return the resulting {@link BadgeResponse} for the endorsed trait
+     * @throws com.chat.talkMe.exception.BadRequestException if the badge type is missing, the
+     *         recipient is the caller, or the recipient is not a valid target
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not allowed to endorse
      */
     @PostMapping("/endorse")
     @PreAuthorize("@featureGuard.check('BADGES')")

@@ -33,6 +33,15 @@ public class MusicSessionController {
 
     private final MusicSessionService musicSessionService;
 
+    /**
+     * Returns the current shared music session state for the chat so a joining client can align its clock.
+     *
+     * @param chatId      UUID of the chat whose session is read
+     * @param userDetails authenticated caller (must be a member of the chat)
+     * @return the current {@link MusicSessionState}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is not a valid UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @GetMapping
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> getSession(
@@ -42,6 +51,16 @@ public class MusicSessionController {
                 musicSessionService.getSession(userDetails.getUser(), chatId)));
     }
 
+    /**
+     * Starts (or switches) playback of a track and broadcasts the new state to the chat's music topic.
+     *
+     * @param chatId      UUID of the chat
+     * @param request     the track url and start position to play
+     * @param userDetails authenticated caller (must be a member of the chat)
+     * @return the updated {@link MusicSessionState}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid or no playable track url given
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/play")
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> play(
@@ -52,6 +71,16 @@ public class MusicSessionController {
         return ResponseEntity.ok(SuccessResponseDto.success(state, "Playing", "TM_000"));
     }
 
+    /**
+     * Pauses playback at an optional reported position and broadcasts the paused state to the chat.
+     *
+     * @param chatId      UUID of the chat
+     * @param request     optional body carrying the position (seconds) at which playback was paused; may be null
+     * @param userDetails authenticated caller (must be a member of the chat)
+     * @return the updated {@link MusicSessionState}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid or there is no active session
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/pause")
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> pause(
@@ -63,6 +92,17 @@ public class MusicSessionController {
         return ResponseEntity.ok(SuccessResponseDto.success(state, "Paused", "TM_000"));
     }
 
+    /**
+     * Seeks the shared playhead to a new position and broadcasts the updated state to the chat.
+     *
+     * @param chatId      UUID of the chat
+     * @param request     body carrying the target position in seconds
+     * @param userDetails authenticated caller (must be a member of the chat)
+     * @return the updated {@link MusicSessionState}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid, position is missing, or no
+     *                                                       active session exists
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/seek")
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> seek(
@@ -74,6 +114,16 @@ public class MusicSessionController {
         return ResponseEntity.ok(SuccessResponseDto.success(state, "Seeked", "TM_000"));
     }
 
+    /**
+     * Emits an emoji reaction to the current track and broadcasts it to the chat's music topic.
+     *
+     * @param chatId      UUID of the chat
+     * @param request     body carrying the emoji to react with
+     * @param userDetails authenticated caller (must be a member of the chat)
+     * @return the updated {@link MusicSessionState}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid or the emoji is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member of the chat
+     */
     @PostMapping("/react")
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> react(

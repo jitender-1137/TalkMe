@@ -27,6 +27,12 @@ public class NightOwlController {
 
     private final NightOwlService nightOwlService;
 
+    /**
+     * Returns the Night Owl lobby dashboard for the current user. Gated by the NIGHT_OWL entitlement.
+     *
+     * @param userDetails authenticated caller
+     * @return the assembled {@link NightOwlDashboardResponse}
+     */
     @GetMapping("/dashboard")
     @PreAuthorize("@featureGuard.check('NIGHT_OWL')")
     public ResponseEntity<ResponseDto<NightOwlDashboardResponse>> dashboard(
@@ -36,7 +42,10 @@ public class NightOwlController {
     }
 
     /**
-     * Trending / curated interest rooms rail (feature #23).
+     * Trending / curated interest rooms rail (feature #23). Gated by the INTEREST_ROOMS entitlement.
+     *
+     * @param limit maximum number of room cards to return (default 20)
+     * @return the trending {@link TrendingRoomCard} list
      */
     @GetMapping("/trending-rooms")
     @PreAuthorize("@featureGuard.check('INTEREST_ROOMS')")

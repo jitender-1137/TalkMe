@@ -32,6 +32,12 @@ import java.nio.file.Paths;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Media upload + serve endpoints. Validates size and real content type, moderates publicly-visible
+ * uploads, stores files via the active {@link StorageService}/{@link MediaStorage} backend, and
+ * records admin-only ownership rows. No class-level auth gate; the upload derives owner ids from the
+ * authenticated principal.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/uploads")
@@ -56,6 +62,21 @@ public class UploadController {
      */
     private static final Set<String> MODERATED_CONTEXTS = Set.of("profile", "post", "story");
 
+    /**
+     * Upload a single media file: enforce per-type size caps, verify the real content type from
+     * magic bytes, hard-block NSFW uploads for publicly-visible contexts (profile/post/story),
+     * store the file under a server-derived subfolder, and record a best-effort ownership row.
+     *
+     * @param file        the multipart file to store
+     * @param type        media type hint ("image" | "video"); drives size caps and validation
+     * @param context     destination category (conversation|post|story|profile|stranger|lobby); optional
+     * @param contextId   client-supplied id used only for the conversation context (validated as a UUID)
+     * @param userDetails the authenticated principal; owner ids are derived from it, never the client
+     * @return 200 with the stored file's url, name, actual stored size, and mime type
+     * @throws com.chat.talkMe.exception.ServiceException            if the file exceeds its per-type size cap (413)
+     * @throws com.chat.talkMe.exception.ContentModerationException  if a moderated-context image is explicit
+     * @throws com.chat.talkMe.exception.FileStorageException        if the file cannot be stored
+     */
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<UploadResponse>> uploadFile(
             @RequestParam("file") MultipartFile file,
@@ -127,6 +148,14 @@ public class UploadController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "File uploaded successfully", "TM_167"));
     }
 
+    /**
+     * Serve a stored media file by path via the active storage backend (traversal-guarded), forcing
+     * download + a locked-down CSP for scriptable types (SVG/HTML/XML). Returns 404 if not found and
+     * 500 on backend error.
+     *
+     * @param path the media path relative to the storage root
+     * @return 200 with the file resource, 404 if missing, or 500 on error
+     */
     @GetMapping("/media")
     public ResponseEntity<Resource> getMedia(@RequestParam("path") String path) {
         try {

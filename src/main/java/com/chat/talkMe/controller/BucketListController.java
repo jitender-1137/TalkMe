@@ -31,6 +31,15 @@ public class BucketListController {
 
     private final BucketListService bucketListService;
 
+    /**
+     * Fetch the shared bucket list for a chat (created on first access if absent).
+     *
+     * @param chatId      the chat's id
+     * @param userDetails the authenticated principal (must be a chat member)
+     * @return the {@link BucketListResponse} for the chat
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @GetMapping
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> getList(
@@ -40,6 +49,16 @@ public class BucketListController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Add an item to the chat's bucket list; broadcasts the refreshed list over WS.
+     *
+     * @param chatId      the chat's id
+     * @param request     the validated item request (item text)
+     * @param userDetails the authenticated principal (must be a chat member)
+     * @return the updated {@link BucketListResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id is invalid or text is empty
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @PostMapping("/items")
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> addItem(
@@ -51,6 +70,16 @@ public class BucketListController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Item added", "TM_813"));
     }
 
+    /**
+     * Toggle an item's done/undone state; broadcasts the refreshed list over WS.
+     *
+     * @param chatId      the chat's id
+     * @param itemUuid    the bucket-list item's id
+     * @param userDetails the authenticated principal (must be a chat member)
+     * @return the updated {@link BucketListResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id or item id is invalid
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @PostMapping("/items/{itemUuid}/toggle")
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> toggleItem(
@@ -62,6 +91,16 @@ public class BucketListController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Item updated", "TM_814"));
     }
 
+    /**
+     * Remove an item from the chat's bucket list; broadcasts the refreshed list over WS.
+     *
+     * @param chatId      the chat's id
+     * @param itemUuid    the bucket-list item's id
+     * @param userDetails the authenticated principal (must be a chat member)
+     * @return the updated {@link BucketListResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the chat id or item id is invalid
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @DeleteMapping("/items/{itemUuid}")
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> removeItem(

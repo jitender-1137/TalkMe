@@ -25,6 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 
+/**
+ * User presence: live status plus the privacy toggles (Ghost, Invisible, Hide-last-seen) and presence lookup.
+ * The single privacy rule lives in the service so every consumer masks status/last-seen consistently.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/presence")
@@ -34,6 +38,14 @@ public class PresenceController {
     private final PresenceService presenceService;
     private final UserRepository userRepository;
 
+    /**
+     * Sets the caller's presence status (ONLINE, OFFLINE, AWAY, IDLE, INVISIBLE).
+     *
+     * @param statusStr   the status name (case-insensitive)
+     * @param userDetails authenticated caller
+     * @return an empty success response
+     * @throws com.chat.talkMe.exception.BadRequestException if the status value is not one of the allowed names
+     */
     @PutMapping("/status")
     public ResponseEntity<ResponseDto<Void>> setStatus(
             @RequestParam("status") String statusStr,
@@ -50,6 +62,13 @@ public class PresenceController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Presence status updated successfully", "TM_PRESENCE_001"));
     }
 
+    /**
+     * Toggles Ghost Mode (receipts-only; suppresses outbound presence) for the caller.
+     *
+     * @param enabled     whether to enable Ghost Mode
+     * @param userDetails authenticated caller
+     * @return an empty success response
+     */
     @PutMapping("/ghost")
     public ResponseEntity<ResponseDto<Void>> toggleGhostMode(
             @RequestParam("enabled") boolean enabled,
@@ -59,6 +78,13 @@ public class PresenceController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, msg, "TM_PRESENCE_002"));
     }
 
+    /**
+     * Toggles Invisible Mode (appear offline to others) for the caller.
+     *
+     * @param enabled     whether to enable Invisible Mode
+     * @param userDetails authenticated caller
+     * @return an empty success response
+     */
     @PutMapping("/invisible")
     public ResponseEntity<ResponseDto<Void>> toggleInvisibleMode(
             @RequestParam("enabled") boolean enabled,
@@ -68,6 +94,13 @@ public class PresenceController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, msg, "TM_PRESENCE_003"));
     }
 
+    /**
+     * Toggles Hide-last-seen (others cannot see the caller's last-seen timestamp) for the caller.
+     *
+     * @param enabled     whether to hide last-seen
+     * @param userDetails authenticated caller
+     * @return an empty success response
+     */
     @PutMapping("/hide-last-seen")
     public ResponseEntity<ResponseDto<Void>> toggleHideLastSeen(
             @RequestParam("enabled") boolean enabled,
@@ -77,6 +110,12 @@ public class PresenceController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, msg, "TM_PRESENCE_005"));
     }
 
+    /**
+     * Resets the caller's presence privacy properties back to defaults.
+     *
+     * @param userDetails authenticated caller
+     * @return an empty success response
+     */
     @DeleteMapping("/reset")
     public ResponseEntity<ResponseDto<Void>> resetPresence(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -84,6 +123,15 @@ public class PresenceController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Presence properties reset successfully", "TM_PRESENCE_004"));
     }
 
+    /**
+     * Returns presence for a user by username. The owner sees their true live status and durable privacy flags;
+     * other viewers see the privacy-masked apparent status/last-seen with flags hidden.
+     *
+     * @param username    the target user's username
+     * @param userDetails authenticated caller
+     * @return the {@link PresenceResponse}, viewer-relative
+     * @throws com.chat.talkMe.exception.NotFoundException if no user has that username
+     */
     @GetMapping("/{username}")
     public ResponseEntity<ResponseDto<PresenceResponse>> getPresence(
             @PathVariable("username") String username,

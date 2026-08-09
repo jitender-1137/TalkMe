@@ -28,6 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+/**
+ * Web Push subscription lifecycle plus installation reporting, unread recount, and service-worker delivery acks.
+ */
 @RestController
 @RequestMapping("/push")
 @RequiredArgsConstructor
@@ -42,6 +45,8 @@ public class PushController {
 
     /**
      * VAPID public key the browser needs to create a push subscription.
+     *
+     * @return a map holding the {@code publicKey}
      */
     @GetMapping("/vapid-public-key")
     public ResponseEntity<ResponseDto<Map<String, String>>> getVapidPublicKey() {
@@ -49,6 +54,15 @@ public class PushController {
                 Map.of("publicKey", webPushProperties.getVapid().getPublicKey())));
     }
 
+    /**
+     * Saves (or updates) a browser push subscription for the caller. The endpoint is SSRF-guarded.
+     *
+     * @param request     the push subscription (endpoint, p256dh, auth, installation type)
+     * @param userDetails authenticated caller
+     * @return an empty success response
+     * @throws com.chat.talkMe.exception.BadRequestException if the subscription endpoint fails the SSRF safe-https
+     *                                                       check
+     */
     @PostMapping("/subscribe")
     public ResponseEntity<ResponseDto<Void>> subscribe(
             @Valid @RequestBody SavePushSubscriptionRequest request,
@@ -57,6 +71,12 @@ public class PushController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Push subscription saved", "TM_280"));
     }
 
+    /**
+     * Removes a push subscription by its endpoint.
+     *
+     * @param endpoint the push subscription endpoint to remove
+     * @return an empty success response
+     */
     @DeleteMapping("/subscribe")
     public ResponseEntity<ResponseDto<Void>> unsubscribe(@RequestParam("endpoint") String endpoint) {
         webPushService.removeSubscription(endpoint);
@@ -64,7 +84,11 @@ public class PushController {
     }
 
     /**
-     * Report how the user is accessing the app (BROWSER / PWA / IOS_HOME).
+     * Reports how the user is accessing the app (BROWSER / PWA / IOS_HOME) and persists it on the user.
+     *
+     * @param request     the installation type payload
+     * @param userDetails authenticated caller
+     * @return an empty success response
      */
     @PutMapping("/installation")
     public ResponseEntity<ResponseDto<Void>> updateInstallation(
@@ -78,6 +102,9 @@ public class PushController {
 
     /**
      * Authoritative unread total (recomputed) — used on load and after reconnect/offline.
+     *
+     * @param userDetails authenticated caller
+     * @return a map holding {@code totalUnread}
      */
     @GetMapping("/unread-count")
     public ResponseEntity<ResponseDto<Map<String, Integer>>> getUnreadCount(
@@ -96,6 +123,9 @@ public class PushController {
      * Public (no Bearer auth): the signed, short-lived delivery token in the body
      * IS the authorization — it only grants "mark this one chat delivered for this
      * one user". Best-effort: always returns 200 so the SW never retries noisily.
+     *
+     * @param body request body carrying the signed {@code token} (subject username + {@code chatUuid} claim)
+     * @return an empty success response (always 200, even when the token is missing or invalid)
      */
     @PostMapping("/delivered")
     public ResponseEntity<ResponseDto<Void>> ackDelivered(@RequestBody Map<String, String> body) {

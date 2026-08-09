@@ -28,6 +28,13 @@ public class ConsentController {
 
     private final ConsentAcceptanceService consentAcceptanceService;
 
+    /**
+     * Returns the caller's user-level consent status: per-type acceptance flags, the currently required
+     * versions, plus derived age-verification and flirt-lobby-readiness flags.
+     *
+     * @param userDetails the authenticated principal whose consent status is returned
+     * @return 200 with the {@link ConsentStatusResponse}
+     */
     @GetMapping("/status")
     public ResponseEntity<ResponseDto<ConsentStatusResponse>> status(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -35,6 +42,16 @@ public class ConsentController {
                 consentAcceptanceService.getStatus(userDetails.getUser())));
     }
 
+    /**
+     * Records the caller's acceptance of a consent type at the given version (falling back to the current
+     * required version when none is supplied), stamps the client IP for audit, and evicts feature-access
+     * cache since consent can flip entitlements.
+     *
+     * @param request     the consent type and the version the user confirmed
+     * @param userDetails the authenticated principal accepting consent
+     * @param httpRequest the servlet request, used to derive the client IP (X-Forwarded-For or remote addr)
+     * @return 200 with the refreshed {@link ConsentStatusResponse} (message code TM_000)
+     */
     @PostMapping("/accept")
     public ResponseEntity<ResponseDto<ConsentStatusResponse>> accept(
             @Valid @RequestBody ConsentAcceptRequest request,

@@ -45,6 +45,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Authentication and account/session management: signup, login (credentials + guest),
+ * token refresh/logout, current-user profile, session revocation, and password/email flows.
+ * Auth forms are CAPTCHA + honeypot gated; refresh/CSRF tokens are managed via HttpOnly cookies.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/auth")
@@ -129,6 +134,18 @@ public class AuthController {
         return request.getRemoteAddr();
     }
 
+    /**
+     * Register a new user, then set refresh/CSRF auth cookies and return the login payload.
+     *
+     * @param request      the validated signup request (includes CAPTCHA token + honeypot)
+     * @param userAgent    the caller's User-Agent header (recorded on the session)
+     * @param httpRequest  the servlet request (used for client IP + human verification)
+     * @param httpResponse the servlet response (auth cookies are written to it)
+     * @return the {@link LoginResponse} with tokens and user profile
+     * @throws com.chat.talkMe.exception.BadRequestException        if honeypot/CAPTCHA verification fails
+     * @throws com.chat.talkMe.exception.ConflictException          if the username or email is taken
+     * @throws com.chat.talkMe.exception.ContentModerationException if the chosen username fails moderation
+     */
     @PostMapping("/signup")
     public ResponseEntity<ResponseDto<LoginResponse>> signup(
             @Valid @RequestBody SignupRequest request,
@@ -145,6 +162,21 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(loginResponse, "User Registered Successfully", "TM_001"));
     }
 
+    /**
+     * Unified login: routes to guest login when the body carries {@code isGuest:true}, otherwise
+     * standard credential login; sets refresh/CSRF cookies on success.
+     *
+     * @param bodyRaw      the raw JSON body (parsed dynamically for guest vs. credential login)
+     * @param userAgent    the caller's User-Agent header (recorded on the session)
+     * @param httpRequest  the servlet request (used for client IP + human verification)
+     * @param httpResponse the servlet response (auth cookies are written to it)
+     * @return the {@link LoginResponse} with tokens and user profile
+     * @throws com.chat.talkMe.exception.BadRequestException   if honeypot/CAPTCHA verification fails
+     * @throws com.chat.talkMe.exception.UnauthorizedException if the credentials are invalid or the
+     *         account is deleted
+     * @throws com.chat.talkMe.exception.ForbiddenException    if the account is suspended or a
+     *         non-guest account uses the guest flow (and vice versa)
+     */
     @PostMapping("/login")
     public ResponseEntity<ResponseDto<LoginResponse>> login(
             @RequestBody String bodyRaw, // Allows parsing dynamic requests for guest mode
@@ -188,6 +220,17 @@ public class AuthController {
         }
     }
 
+    /**
+     * Rotate the access/refresh token pair using the refresh-token cookie; re-issues both cookies.
+     *
+     * @param refreshToken the refresh token read from the {@code refreshToken} cookie
+     * @param userAgent    the caller's User-Agent header (validated against the session)
+     * @param httpRequest  the servlet request (used for client IP)
+     * @param httpResponse the servlet response (rotated auth cookies are written to it)
+     * @return the fresh {@link JwtTokensResponse}
+     * @throws com.chat.talkMe.exception.UnauthorizedException if the cookie is missing, or the
+     *         refresh token is invalid/expired
+     */
     @PostMapping("/refresh")
     public ResponseEntity<ResponseDto<JwtTokensResponse>> refresh(
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
@@ -208,6 +251,13 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(tokensResponse, "Token Refreshed Successfully", "TM_023"));
     }
 
+    /**
+     * Invalidate the current refresh token (if present) and clear the auth cookies.
+     *
+     * @param refreshToken the refresh token from the {@code refreshToken} cookie (may be null/blank)
+     * @param httpResponse the servlet response (auth cookies are cleared on it)
+     * @return an empty success envelope confirming logout
+     */
     @PostMapping("/logout")
     public ResponseEntity<ResponseDto<Void>> logout(
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
@@ -221,12 +271,25 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Logout Successful", "TM_003"));
     }
 
+    /**
+     * Return the authenticated user's own profile.
+     *
+     * @param userDetails the authenticated principal
+     * @return the {@link AuthUserResponse} for the current user
+     */
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<AuthUserResponse>> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
         AuthUserResponse response = authService.getCurrentUser(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Update the authenticated user's editable profile fields.
+     *
+     * @param request     the validated profile-update request
+     * @param userDetails the authenticated principal
+     * @return the updated {@link AuthUserResponse}
+     */
     @PutMapping("/me")
     public ResponseEntity<ResponseDto<AuthUserResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
@@ -235,6 +298,12 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Profile updated successfully", "TM_060"));
     }
 
+    /**
+     * List the authenticated user's active login sessions.
+     *
+     * @param userDetails the authenticated principal
+     * @return the list of {@link SessionResponse} for the user
+     */
     @GetMapping("/sessions")
     public ResponseEntity<ResponseDto<List<SessionResponse>>> getSessions(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -242,6 +311,14 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Revoke (terminate) one of the authenticated user's sessions.
+     *
+     * @param sessionUuid the UUID of the session to revoke
+     * @param userDetails the authenticated principal (must own the session)
+     * @return an empty success envelope confirming termination
+     * @throws com.chat.talkMe.exception.ForbiddenException if the session belongs to another user
+     */
     @DeleteMapping("/sessions/{id}")
     public ResponseEntity<ResponseDto<Void>> revokeSession(
             @PathVariable("id") String sessionUuid,
@@ -250,24 +327,54 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Session terminated successfully", "TM_051"));
     }
 
+    /**
+     * Revoke all of the authenticated user's other sessions.
+     *
+     * @param userDetails the authenticated principal
+     * @return an empty success envelope confirming the other sessions were revoked
+     */
     @PostMapping("/sessions/revoke-all")
     public ResponseEntity<ResponseDto<Void>> revokeAllSessions(@AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.revokeAllSessions(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "All other sessions revoked successfully", "TM_052"));
     }
 
+    /**
+     * Begin the password-reset flow by emailing a reset link (responds success regardless of
+     * whether the address exists, to avoid account enumeration).
+     *
+     * @param request the validated forgot-password request (email)
+     * @return an empty success envelope
+     */
     @PostMapping("/forgot-password")
     public ResponseEntity<ResponseDto<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Password reset link sent successfully", "TM_036"));
     }
 
+    /**
+     * Complete a password reset using the emailed reset token and a new password.
+     *
+     * @param request the validated reset request (token + new password)
+     * @return an empty success envelope confirming the reset
+     * @throws com.chat.talkMe.exception.UnauthorizedException if the reset token is invalid or expired
+     * @throws com.chat.talkMe.exception.BadRequestException   if the new password fails policy checks
+     */
     @PostMapping("/reset-password")
     public ResponseEntity<ResponseDto<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Password reset successful", "TM_037"));
     }
 
+    /**
+     * Change the authenticated user's password after verifying their current password.
+     *
+     * @param request     the validated change-password request (current + new password)
+     * @param userDetails the authenticated principal
+     * @return an empty success envelope confirming the change
+     * @throws com.chat.talkMe.exception.UnauthorizedException if the current password is incorrect
+     * @throws com.chat.talkMe.exception.BadRequestException   if the new password fails policy checks
+     */
     @PostMapping("/change-password")
     public ResponseEntity<ResponseDto<Void>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
@@ -278,6 +385,10 @@ public class AuthController {
 
     /**
      * Confirm an email-verification token (from the link in the verification email).
+     *
+     * @param request the validated request carrying the verification token
+     * @return an empty success envelope confirming verification
+     * @throws com.chat.talkMe.exception.UnauthorizedException if the token is invalid or expired
      */
     @PostMapping("/verify-email")
     public ResponseEntity<ResponseDto<Void>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
@@ -287,6 +398,10 @@ public class AuthController {
 
     /**
      * Re-send the verification email to the authenticated (still-unverified) user.
+     *
+     * @param userDetails the authenticated principal
+     * @return an empty success envelope confirming the email was sent
+     * @throws com.chat.talkMe.exception.BadRequestException if the user's email is already verified
      */
     @PostMapping("/resend-verification")
     public ResponseEntity<ResponseDto<Void>> resendVerification(

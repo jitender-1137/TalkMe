@@ -32,6 +32,17 @@ public class FlirtModeController {
 
     private final FlirtModeService flirtModeService;
 
+    /**
+     * Returns the caller's viewer-relative flirt-mode state for a 1:1 chat.
+     *
+     * @param chatUuid    the UUID of the PRIVATE chat
+     * @param userDetails the authenticated caller, who must be a member of the chat
+     * @return 200 with the viewer-relative flirt-mode state (myEnabled/otherEnabled/active)
+     * @throws com.chat.talkMe.exception.BadRequestException if the id is malformed or the chat is
+     *         not a 1:1 PRIVATE chat
+     * @throws com.chat.talkMe.exception.NotFoundException   if no chat matches the UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @GetMapping("/{chatUuid}/flirt-mode")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<FlirtModeResponse>> getState(
@@ -41,6 +52,18 @@ public class FlirtModeController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Sets the caller's flirt-mode consent to ON for a 1:1 chat; mode is ACTIVE only when both
+     * participants have enabled it. Pushes each participant their own state over WebSocket.
+     *
+     * @param chatUuid    the UUID of the PRIVATE chat
+     * @param userDetails the authenticated caller, who must be a member of the chat
+     * @return 200 with the caller's updated viewer-relative state and success code TM_832
+     * @throws com.chat.talkMe.exception.BadRequestException if the id is malformed or the chat is
+     *         not a 1:1 PRIVATE chat
+     * @throws com.chat.talkMe.exception.NotFoundException   if no chat matches the UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @PostMapping("/{chatUuid}/flirt-mode/enable")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<FlirtModeResponse>> enable(
@@ -50,6 +73,18 @@ public class FlirtModeController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Flirt mode enabled", "TM_832"));
     }
 
+    /**
+     * Sets the caller's flirt-mode consent to OFF for a 1:1 chat, deactivating the mode. Pushes
+     * each participant their own state over WebSocket.
+     *
+     * @param chatUuid    the UUID of the PRIVATE chat
+     * @param userDetails the authenticated caller, who must be a member of the chat
+     * @return 200 with the caller's updated viewer-relative state and success code TM_833
+     * @throws com.chat.talkMe.exception.BadRequestException if the id is malformed or the chat is
+     *         not a 1:1 PRIVATE chat
+     * @throws com.chat.talkMe.exception.NotFoundException   if no chat matches the UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @PostMapping("/{chatUuid}/flirt-mode/disable")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<FlirtModeResponse>> disable(

@@ -29,7 +29,11 @@ public class SleepRoomController {
     private final SleepRoomService sleepRoomService;
 
     /**
-     * Create a sleep companion room (optional {@code name}).
+     * Create a sleep companion room (public ROOM in SLEEP_COMPANION mode) owned by the caller.
+     *
+     * @param userDetails the authenticated caller (becomes the room owner)
+     * @param name        optional room name
+     * @return the created sleep room in a success envelope (message "Sleep room created", TM_994)
      */
     @PostMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
@@ -42,6 +46,9 @@ public class SleepRoomController {
 
     /**
      * List active sleep companion rooms.
+     *
+     * @param userDetails the authenticated caller
+     * @return the active sleep rooms in a success envelope
      */
     @GetMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")

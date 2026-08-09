@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Per-user application settings: read the full settings blob and update it, plus dedicated
+ * param-based endpoints for the messaging-privacy and group-add-privacy preferences. No class-level
+ * auth gate; settings resolve against the authenticated principal.
+ */
 @RestController
 @RequestMapping("/settings")
 @RequiredArgsConstructor
@@ -24,6 +29,12 @@ public class UserSettingController {
 
     private final UserSettingService userSettingService;
 
+    /**
+     * Return the current user's settings.
+     *
+     * @param userDetails the authenticated principal
+     * @return 200 with the {@link UserSettingResponse}
+     */
     @GetMapping
     public ResponseEntity<ResponseDto<UserSettingResponse>> getSettings(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -31,6 +42,14 @@ public class UserSettingController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Update the current user's settings from the supplied request.
+     *
+     * @param request     the settings fields to apply
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserSettingResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if a supplied enum value is invalid
+     */
     @PutMapping
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateSettings(
             @Valid @RequestBody UpdateSettingRequest request,
@@ -41,6 +60,11 @@ public class UserSettingController {
 
     /**
      * Dedicated, param-based update for the "who can message me" preference.
+     *
+     * @param value       the new messaging-privacy value (e.g. EVERYONE | FRIENDS_ONLY)
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserSettingResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the value is not a valid option
      */
     @PutMapping("/messaging-privacy")
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateMessagingPrivacy(
@@ -53,6 +77,11 @@ public class UserSettingController {
 
     /**
      * Dedicated, param-based update for the "who can add me to groups/rooms" preference.
+     *
+     * @param value       the new group-add-privacy value
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserSettingResponse}
+     * @throws com.chat.talkMe.exception.BadRequestException if the value is not a valid option
      */
     @PutMapping("/group-add-privacy")
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateGroupAddPrivacy(

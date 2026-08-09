@@ -26,6 +26,12 @@ public class StreakController {
 
     private final StreakService streakService;
 
+    /**
+     * The caller's current daily-streak card (current streak, longest, freeze state).
+     *
+     * @param userDetails the authenticated caller
+     * @return the caller's streak response in a success envelope
+     */
     @GetMapping
     @PreAuthorize("@featureGuard.check('STREAKS')")
     public ResponseEntity<ResponseDto<StreakResponse>> getStreak(
@@ -34,6 +40,12 @@ public class StreakController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * Record a daily check-in for the caller and return the updated streak card.
+     *
+     * @param userDetails the authenticated caller
+     * @return the updated streak response (message "Streak updated", TM_950)
+     */
     @PostMapping("/checkin")
     @PreAuthorize("@featureGuard.check('STREAKS')")
     public ResponseEntity<ResponseDto<StreakResponse>> checkIn(

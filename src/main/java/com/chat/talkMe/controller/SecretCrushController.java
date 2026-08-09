@@ -33,7 +33,17 @@ public class SecretCrushController {
     private final SecretCrushService secretCrushService;
 
     /**
-     * Crush on a user; returns a match (with partner + compatibility) iff it's mutual.
+     * Crush on a user; returns a match (with partner + compatibility) iff it's mutual, else a
+     * non-matched result (also non-matched, silently, if a block exists in either direction).
+     *
+     * @param userUuid    UUID of the user to crush on
+     * @param userDetails the authenticated caller (the crusher)
+     * @return the crush/match result in a success envelope
+     * @throws com.chat.talkMe.exception.BadRequestException      if the UUID is invalid (TM_913), the target is
+     *                                                            the caller (TM_910), or the target is a guest or
+     *                                                            banned (TM_911)
+     * @throws com.chat.talkMe.exception.NotFoundException        if no user has that UUID (TM_404)
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the caller is at the active-crush cap (TM_912)
      */
     @PostMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
@@ -45,7 +55,14 @@ public class SecretCrushController {
     }
 
     /**
-     * Withdraw the caller's crush on a user.
+     * Withdraw the caller's crush on a user; if it was a mutual match, demotes the partner's side
+     * back to one-sided and notifies them. No-op if no crush exists.
+     *
+     * @param userUuid    UUID of the user to withdraw the crush from
+     * @param userDetails the authenticated caller (the crusher)
+     * @return an empty success envelope (message "Crush withdrawn", TM_000)
+     * @throws com.chat.talkMe.exception.BadRequestException if the UUID is invalid (TM_913)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user has that UUID (TM_404)
      */
     @DeleteMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
@@ -57,7 +74,10 @@ public class SecretCrushController {
     }
 
     /**
-     * The caller's OWN outgoing crushes plus their matches.
+     * The caller's OWN outgoing crushes plus their matches (partner identity disclosed only for matches).
+     *
+     * @param userDetails the authenticated caller
+     * @return the caller's crushes and matches in a success envelope
      */
     @GetMapping("/mine")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")

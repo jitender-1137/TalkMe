@@ -9,19 +9,15 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/** Data access for {@link StoryView} rows (one per story+viewer) backing view counts and the "seen by" list. */
 @Repository
 public interface StoryViewRepository extends JpaRepository<StoryView, Long> {
+
     Optional<StoryView> findByStoryAndUser(Story story, User user);
 
     boolean existsByStoryAndUser(Story story, User user);
 
-    /**
-     * Total number of distinct viewers of a story (owner's "seen by" count).
-     */
     long countByStory(Story story);
 
-    /**
-     * Viewers of a story, most-recent first (for the owner's "seen by" list).
-     */
     List<StoryView> findByStoryOrderByViewedAtDesc(Story story);
 }

@@ -28,6 +28,17 @@ public class LiveController {
 
     private final LiveAudioService liveAudioService;
 
+    /**
+     * Mint a LiveKit access token scoping the caller to their chat's voice room.
+     *
+     * @param request      validated body carrying the target {@code chatUuid}
+     * @param userDetails  the authenticated caller (must be a member of the chat)
+     * @return the minted token plus ws URL, room, and identity (TM_982)
+     * @throws com.chat.talkMe.exception.BadRequestException live audio not enabled/configured (TM_980),
+     *                                                       or bad chat id (TM_400)
+     * @throws com.chat.talkMe.exception.NotFoundException   chat not found (TM_981)
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a member of the chat (TM_103)
+     */
     @PostMapping("/token")
     @PreAuthorize("@featureGuard.check('LIVE_AUDIO')")
     public ResponseEntity<ResponseDto<LiveTokenResponse>> token(

@@ -28,6 +28,12 @@ public class AdsController {
     private final AdsProperties adsProperties;
     private final FeatureFlags featureFlags;
 
+    /**
+     * Return the global advertising configuration (provider, script URLs, placements,
+     * frequency cap) plus the {@code enabled} flag from the {@code ADS} global kill-switch.
+     *
+     * @return the {@link AdsConfigResponse} client-facing ad configuration
+     */
     @GetMapping("/config")
     public ResponseEntity<ResponseDto<AdsConfigResponse>> getConfig() {
         AdsConfigResponse res = AdsConfigResponse.builder()

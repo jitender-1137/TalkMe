@@ -26,6 +26,12 @@ public class ReferralController {
 
     private final ReferralService referralService;
 
+    /**
+     * The caller's referral summary — their share link username plus attribution counts (no rewards).
+     *
+     * @param userDetails the authenticated caller
+     * @return the caller's referral summary wrapped in a success envelope
+     */
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<ReferralSummaryResponse>> getMySummary(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

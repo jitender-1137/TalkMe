@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Music track search, proxying the key-less iTunes Search API to our track shape. Gated by
+ * {@code hasRole('USER')}.
+ */
 @RestController
 @RequestMapping("/music")
 @RequiredArgsConstructor
@@ -22,6 +26,13 @@ public class MusicController {
 
     private final MusicService musicService;
 
+    /**
+     * Search music tracks (returns only playable-preview results; empty list on blank query/errors).
+     *
+     * @param query  the search term
+     * @param limit  max results (defaults to 24, clamped to 1..50 by the service)
+     * @return matching tracks wrapped in a success envelope
+     */
     @GetMapping("/search")
     public ResponseEntity<ResponseDto<List<MusicTrackResponse>>> search(
             @RequestParam("q") String query,

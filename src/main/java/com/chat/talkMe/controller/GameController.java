@@ -32,6 +32,16 @@ public class GameController {
 
     private final GameService gameService;
 
+    /**
+     * Start a game in a chat, retiring any existing live session for that chat first.
+     *
+     * @param request      validated body carrying {@code chatId} and {@code gameType}
+     * @param userDetails  the authenticated caller (must be a member of the chat)
+     * @return the newly started game session (TM_000)
+     * @throws com.chat.talkMe.exception.BadRequestException chatId/gameType missing, or no prompts
+     *                                                       exist for the game type (TM_400)
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a member of the chat (TM_103)
+     */
     @PostMapping("/start")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> start(
@@ -42,6 +52,17 @@ public class GameController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Game started", "TM_000"));
     }
 
+    /**
+     * Advance the game to the next prompt/round; ends the game when the prompt bank is exhausted.
+     *
+     * @param uuid         UUID of the game session
+     * @param userDetails  the authenticated caller (must be a member of the game's chat)
+     * @return the updated game session
+     * @throws com.chat.talkMe.exception.BadRequestException invalid session id, or game not in
+     *                                                       progress (TM_400)
+     * @throws com.chat.talkMe.exception.NotFoundException   game session not found
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a member of the chat (TM_103)
+     */
     @PostMapping("/{uuid}/next")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> next(
@@ -51,6 +72,16 @@ public class GameController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
+    /**
+     * End a game session (marks it ENDED).
+     *
+     * @param uuid         UUID of the game session
+     * @param userDetails  the authenticated caller (must be a member of the game's chat)
+     * @return the ended game session (TM_000)
+     * @throws com.chat.talkMe.exception.BadRequestException invalid session id (TM_400)
+     * @throws com.chat.talkMe.exception.NotFoundException   game session not found
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a member of the chat (TM_103)
+     */
     @PostMapping("/{uuid}/end")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> end(
@@ -60,6 +91,15 @@ public class GameController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Game ended", "TM_000"));
     }
 
+    /**
+     * Return the current live (non-ended) game session for a chat, or null if none.
+     *
+     * @param chatId       UUID of the chat to inspect
+     * @param userDetails  the authenticated caller (must be a member of the chat)
+     * @return the active game session, or null when no game is running
+     * @throws com.chat.talkMe.exception.BadRequestException chatId missing (TM_400)
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a member of the chat (TM_103)
+     */
     @GetMapping("/active")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> active(
