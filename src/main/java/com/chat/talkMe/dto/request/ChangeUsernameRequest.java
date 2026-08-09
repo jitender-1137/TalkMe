@@ -6,7 +6,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Body for changing the current user's username (PATCH /users/me/username). */
+/**
+ * Body for changing the current user's username (PATCH /users/me/username).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

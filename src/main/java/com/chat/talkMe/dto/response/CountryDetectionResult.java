@@ -1,11 +1,12 @@
 package com.chat.talkMe.dto.response;
 
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 @Data
 @Builder
@@ -25,7 +26,9 @@ public class CountryDetectionResult {
     private String countryCode;
     private Double lat;
     private Double lon;
-    /** IANA timezone of the login location (e.g. "Asia/Kolkata"), from GeoIP. May be null. */
+    /**
+     * IANA timezone of the login location (e.g. "Asia/Kolkata"), from GeoIP. May be null.
+     */
     private String timezone;
 
     /**

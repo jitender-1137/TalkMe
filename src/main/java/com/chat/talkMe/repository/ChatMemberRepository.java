@@ -39,7 +39,7 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
      */
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ChatMember m SET m.lastReadMessageId = :maxId " +
-           "WHERE m.chat = :chat AND m.user = :user " +
-           "AND (m.lastReadMessageId IS NULL OR m.lastReadMessageId < :maxId)")
+            "WHERE m.chat = :chat AND m.user = :user " +
+            "AND (m.lastReadMessageId IS NULL OR m.lastReadMessageId < :maxId)")
     int advanceReadWatermark(@Param("chat") Chat chat, @Param("user") User user, @Param("maxId") Long maxId);
 }

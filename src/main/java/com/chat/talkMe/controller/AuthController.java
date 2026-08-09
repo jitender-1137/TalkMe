@@ -276,14 +276,18 @@ public class AuthController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Password changed successfully", "TM_043"));
     }
 
-    /** Confirm an email-verification token (from the link in the verification email). */
+    /**
+     * Confirm an email-verification token (from the link in the verification email).
+     */
     @PostMapping("/verify-email")
     public ResponseEntity<ResponseDto<Void>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         authService.verifyEmail(request.getToken());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Email verified successfully", "TM_405"));
     }
 
-    /** Re-send the verification email to the authenticated (still-unverified) user. */
+    /**
+     * Re-send the verification email to the authenticated (still-unverified) user.
+     */
     @PostMapping("/resend-verification")
     public ResponseEntity<ResponseDto<Void>> resendVerification(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

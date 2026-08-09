@@ -11,5 +11,6 @@ import java.util.Optional;
 @Repository
 public interface MatchRequestRepository extends JpaRepository<MatchRequest, Long> {
     Optional<MatchRequest> findByUserAndStatus(User user, String status);
+
     List<MatchRequest> findByStatus(String status);
 }

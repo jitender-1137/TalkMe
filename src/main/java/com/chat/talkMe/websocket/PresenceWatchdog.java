@@ -1,8 +1,7 @@
 package com.chat.talkMe.websocket;
 
-import com.chat.talkMe.util.BackgroundTaskErrors;
-
 import com.chat.talkMe.service.PresenceService;
+import com.chat.talkMe.util.BackgroundTaskErrors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,7 +26,9 @@ public class PresenceWatchdog {
 
     private final PresenceService presenceService;
 
-    /** Two missed 30s heartbeats → offline. */
+    /**
+     * Two missed 30s heartbeats → offline.
+     */
     private static final Duration TIMEOUT = Duration.ofSeconds(60);
 
     @Scheduled(fixedDelayString = "${presence.watchdog.interval-ms:20000}")

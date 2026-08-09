@@ -17,9 +17,13 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.reputation")
 public class ReputationProperties {
 
-    /** Max net points a single user can earn per day, across all event types. */
+    /**
+     * Max net points a single user can earn per day, across all event types.
+     */
     private int dailyCap = 150;
 
-    /** Diminishing-returns factor: the n-th same-type event today is worth raw/(1 + factor·n). */
+    /**
+     * Diminishing-returns factor: the n-th same-type event today is worth raw/(1 + factor·n).
+     */
     private double diminishingFactor = 0.4;
 }

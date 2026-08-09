@@ -8,15 +8,16 @@
 
 Sends a friend request to another user.
 
-*   **URL:** `POST /api/v1/friends/requests`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/friends/requests`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "receiverId": "f8a42b10-671c-43fe-a5fe-e8a6eb4862b2"
@@ -24,6 +25,7 @@ Sends a friend request to another user.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -56,14 +58,15 @@ Sends a friend request to another user.
 
 Accepts an incoming pending friend request.
 
-*   **URL:** `PUT /api/v1/friends/requests/{id}/accept`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/friends/requests/{id}/accept`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -79,14 +82,15 @@ Accepts an incoming pending friend request.
 
 Declines an incoming pending friend request.
 
-*   **URL:** `PUT /api/v1/friends/requests/{id}/decline`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/friends/requests/{id}/decline`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -102,14 +106,15 @@ Declines an incoming pending friend request.
 
 Cancels an outgoing pending friend request.
 
-*   **URL:** `DELETE /api/v1/friends/requests/{id}/cancel`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/friends/requests/{id}/cancel`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -125,10 +130,11 @@ Cancels an outgoing pending friend request.
 
 Gets a list of all current friends.
 
-*   **URL:** `GET /api/v1/friends`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/friends`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -159,10 +165,11 @@ Gets a list of all current friends.
 
 Gets a list of all incoming pending friend requests.
 
-*   **URL:** `GET /api/v1/friends/requests`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/friends/requests`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -197,14 +204,15 @@ Gets a list of all incoming pending friend requests.
 
 Deletes a friend relation (unfriends a user).
 
-*   **URL:** `DELETE /api/v1/friends/{id}`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/friends/{id}`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -220,14 +228,15 @@ Deletes a friend relation (unfriends a user).
 
 Blocks a friend by UUID.
 
-*   **URL:** `POST /api/v1/friends/block/{id}`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/friends/block/{id}`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -243,14 +252,15 @@ Blocks a friend by UUID.
 
 Unblocks a friend by UUID.
 
-*   **URL:** `DELETE /api/v1/friends/block/{id}`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/friends/block/{id}`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

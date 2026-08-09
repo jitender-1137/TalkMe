@@ -20,6 +20,8 @@ public interface EventRsvpRepository extends JpaRepository<EventRsvp, Long> {
 
     List<EventRsvp> findByEvent(ScheduledEvent event);
 
-    /** RSVPs to notify when an event goes live (GOING + INTERESTED). */
+    /**
+     * RSVPs to notify when an event goes live (GOING + INTERESTED).
+     */
     List<EventRsvp> findByEventAndStatusIn(ScheduledEvent event, Collection<RsvpStatus> statuses);
 }

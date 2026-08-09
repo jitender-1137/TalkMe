@@ -1,8 +1,20 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.CosmeticType;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
@@ -26,7 +38,9 @@ public class UserCosmetic extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** References {@link UnlockableCosmetic#getCode()}. */
+    /**
+     * References {@link UnlockableCosmetic#getCode()}.
+     */
     @Column(name = "cosmetic_code", nullable = false, length = 80)
     private String cosmeticCode;
 
@@ -34,7 +48,9 @@ public class UserCosmetic extends BaseEntity {
     @ColumnDefault("false")
     private boolean equipped;
 
-    /** Equip slot, mirrors the catalog cosmetic's {@link CosmeticType}. */
+    /**
+     * Equip slot, mirrors the catalog cosmetic's {@link CosmeticType}.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "slot", nullable = false, length = 30)
     private CosmeticType slot;

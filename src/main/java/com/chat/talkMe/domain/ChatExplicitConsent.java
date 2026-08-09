@@ -1,9 +1,23 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.ConsentStatus;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+
 import java.time.Instant;
 
 /**
@@ -28,7 +42,9 @@ public class ChatExplicitConsent extends BaseEntity {
     @Builder.Default
     private ConsentStatus status = ConsentStatus.NONE;
 
-    /** The user who initiated the (single) consent request. Enforces "one request only". */
+    /**
+     * The user who initiated the (single) consent request. Enforces "one request only".
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requested_by")
     private User requestedBy;

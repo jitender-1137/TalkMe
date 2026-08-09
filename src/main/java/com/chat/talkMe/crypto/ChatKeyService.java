@@ -30,7 +30,9 @@ public class ChatKeyService {
     private final MasterKeyService masterKeyService;
     private final SecureRandom random = new SecureRandom();
 
-    /** chatId → unwrapped data key (in-memory cache). */
+    /**
+     * chatId → unwrapped data key (in-memory cache).
+     */
     private final Map<Long, SecretKey> cache = new ConcurrentHashMap<>();
 
     @Transactional
@@ -62,7 +64,9 @@ public class ChatKeyService {
         return key;
     }
 
-    /** Raw data key (base64) handed to an authorized client to decrypt/encrypt locally. */
+    /**
+     * Raw data key (base64) handed to an authorized client to decrypt/encrypt locally.
+     */
     @Transactional
     public String getRawKeyBase64(Long chatId) {
         return Base64.getEncoder().encodeToString(getOrCreateSecretKey(chatId).getEncoded());

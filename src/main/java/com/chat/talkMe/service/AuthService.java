@@ -2,23 +2,26 @@ package com.chat.talkMe.service;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.OAuthUserInfo;
-import com.chat.talkMe.dto.request.LoginRequest;
-import com.chat.talkMe.dto.request.SignupRequest;
-import com.chat.talkMe.dto.request.GuestLoginRequest;
-import com.chat.talkMe.dto.request.ForgotPasswordRequest;
-import com.chat.talkMe.dto.request.ResetPasswordRequest;
 import com.chat.talkMe.dto.request.ChangePasswordRequest;
+import com.chat.talkMe.dto.request.ForgotPasswordRequest;
+import com.chat.talkMe.dto.request.GuestLoginRequest;
+import com.chat.talkMe.dto.request.LoginRequest;
+import com.chat.talkMe.dto.request.ResetPasswordRequest;
+import com.chat.talkMe.dto.request.SignupRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.JwtTokensResponse;
 import com.chat.talkMe.dto.response.LoginResponse;
 import com.chat.talkMe.dto.response.SessionResponse;
 import jakarta.servlet.http.HttpServletRequest;
+
 import java.util.List;
 
 public interface AuthService {
     LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest);
+
     LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest);
+
     LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, HttpServletRequest httpRequest);
 
     /**
@@ -29,12 +32,19 @@ public interface AuthService {
      */
     LoginResponse oauthLogin(OAuthUserInfo info, String userAgent,
                              HttpServletRequest httpRequest);
+
     JwtTokensResponse refresh(String refreshToken, String userAgent, String ip);
+
     void logout(String refreshToken);
+
     List<SessionResponse> getSessions(User currentUser);
+
     void revokeSession(String sessionUuid, User currentUser);
+
     void revokeAllSessions(User currentUser);
+
     void forgotPassword(ForgotPasswordRequest request);
+
     void resetPassword(ResetPasswordRequest request);
 
     /**
@@ -43,11 +53,15 @@ public interface AuthService {
      */
     void verifyEmail(String token);
 
-    /** Re-send the verification email to the authenticated (still-unverified) user. */
+    /**
+     * Re-send the verification email to the authenticated (still-unverified) user.
+     */
     void resendVerificationEmail(User currentUser);
 
     void changePassword(ChangePasswordRequest request, User currentUser);
+
     AuthUserResponse getCurrentUser(User currentUser);
+
     AuthUserResponse updateProfile(UpdateProfileRequest request, User currentUser);
 
     /**
@@ -60,6 +74,7 @@ public interface AuthService {
     /**
      * Permanently purge accounts whose deletion window has elapsed (irreversible
      * anonymization + credential destruction). Driven by a scheduled reaper.
+     *
      * @return number of accounts purged.
      */
     int purgeExpiredDeletedAccounts();

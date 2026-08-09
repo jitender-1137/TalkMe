@@ -47,7 +47,15 @@ public enum ReputationEventType {
         this.perSourceCap = perSourceCap;
     }
 
-    public int getRawWeight() { return rawWeight; }
-    public int getDailyCap() { return dailyCap; }
-    public int getPerSourceCap() { return perSourceCap; }
+    public int getRawWeight() {
+        return rawWeight;
+    }
+
+    public int getDailyCap() {
+        return dailyCap;
+    }
+
+    public int getPerSourceCap() {
+        return perSourceCap;
+    }
 }

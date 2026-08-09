@@ -11,7 +11,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
@@ -28,7 +34,9 @@ public class CosmeticController {
 
     private final CosmeticService cosmeticService;
 
-    /** Full catalog with owned/locked/equipped flags for the caller. */
+    /**
+     * Full catalog with owned/locked/equipped flags for the caller.
+     */
     @GetMapping("/catalog")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> catalog(
@@ -37,7 +45,9 @@ public class CosmeticController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
-    /** The caller's owned cosmetics. */
+    /**
+     * The caller's owned cosmetics.
+     */
     @GetMapping("/me")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> mine(
@@ -46,7 +56,9 @@ public class CosmeticController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
-    /** Equip a cosmetic the caller owns. Body: {@code {"code": "..."}}. */
+    /**
+     * Equip a cosmetic the caller owns. Body: {@code {"code": "..."}}.
+     */
     @PutMapping("/equip")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> equip(
@@ -57,7 +69,9 @@ public class CosmeticController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Cosmetic equipped", "TM_066"));
     }
 
-    /** Unequip whatever is equipped in the given slot. */
+    /**
+     * Unequip whatever is equipped in the given slot.
+     */
     @DeleteMapping("/equip/{slot}")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> unequip(

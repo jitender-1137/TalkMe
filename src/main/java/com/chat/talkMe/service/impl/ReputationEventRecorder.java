@@ -28,7 +28,7 @@ import java.time.ZoneOffset;
  *       {@code raw / (1 + factor·n)}, so mass-spamming yields almost nothing.</li>
  *   <li><b>Per-type + global daily caps</b> — bound velocity, time-gating high levels.</li>
  * </ul>
- *
+ * <p>
  * Runs async on the shared broadcast pool and opens its own transaction (the original
  * one has already committed). {@code fallbackExecution=true} so it still records when a
  * producer runs outside a transaction.

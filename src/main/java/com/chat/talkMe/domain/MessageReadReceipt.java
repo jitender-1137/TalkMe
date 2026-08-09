@@ -1,17 +1,29 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 
 @Entity
 @Table(name = "message_read_receipts", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_read_receipt_message_user", columnNames = {"message_id", "user_id"})
+        @UniqueConstraint(name = "uk_read_receipt_message_user", columnNames = {"message_id", "user_id"})
 }, indexes = {
-    // Per-user unread/status scans (countTotalUnreadForUser NOT EXISTS subquery,
-    // delivery-status aggregation). The unique constraint leads with message_id,
-    // so user-first filters need their own index.
-    @Index(name = "idx_read_receipt_user_status", columnList = "user_id, status")
+        // Per-user unread/status scans (countTotalUnreadForUser NOT EXISTS subquery,
+        // delivery-status aggregation). The unique constraint leads with message_id,
+        // so user-first filters need their own index.
+        @Index(name = "idx_read_receipt_user_status", columnList = "user_id, status")
 })
 @Getter
 @Setter

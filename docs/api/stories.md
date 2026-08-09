@@ -8,15 +8,16 @@
 
 Publishes a new story (disappearing photo or video status) visible to the user's friends.
 
-*   **URL:** `POST /api/v1/stories`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/stories`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "mediaUrl": "https://api.talkme.app/api/v1/uploads/story_9281.jpg",
@@ -25,6 +26,7 @@ Publishes a new story (disappearing photo or video status) visible to the user's
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -61,10 +63,11 @@ Publishes a new story (disappearing photo or video status) visible to the user's
 
 Retrieves a list of active (non-expired) stories from the user and their friends.
 
-*   **URL:** `GET /api/v1/stories/active`
-*   **Authentication Required:** Yes (Role: `USER`)
+* **URL:** `GET /api/v1/stories/active`
+* **Authentication Required:** Yes (Role: `USER`)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -125,14 +128,15 @@ Retrieves a list of active (non-expired) stories from the user and their friends
 
 Deletes a story posted by the current authenticated user.
 
-*   **URL:** `DELETE /api/v1/stories/{id}`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/stories/{id}`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -148,14 +152,15 @@ Deletes a story posted by the current authenticated user.
 
 Marks a specific story as viewed by the current user.
 
-*   **URL:** `POST /api/v1/stories/{id}/view`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/stories/{id}/view`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -171,10 +176,11 @@ Marks a specific story as viewed by the current user.
 
 Retrieves the list of users who have viewed a specific story (only available to the story owner).
 
-*   **URL:** `GET /api/v1/stories/{id}/viewers`
-*   **Authentication Required:** Yes (Role: `USER`)
+* **URL:** `GET /api/v1/stories/{id}/viewers`
+* **Authentication Required:** Yes (Role: `USER`)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

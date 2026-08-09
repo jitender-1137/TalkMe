@@ -50,11 +50,16 @@ class EventTransitionWorkerTest {
     private static final UUID EVENT_UUID = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
     private static final String ROOM_UUID = "bbbbbbbb-0000-0000-0000-000000000002";
 
-    @Mock private ScheduledEventRepository scheduledEventRepository;
-    @Mock private EventRsvpRepository eventRsvpRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private GroupService groupService;
-    @Mock private NotificationService notificationService;
+    @Mock
+    private ScheduledEventRepository scheduledEventRepository;
+    @Mock
+    private EventRsvpRepository eventRsvpRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private GroupService groupService;
+    @Mock
+    private NotificationService notificationService;
 
     private EventTransitionWorker worker;
 

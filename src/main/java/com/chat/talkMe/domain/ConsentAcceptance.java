@@ -1,8 +1,21 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.ConsentType;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 
@@ -33,14 +46,18 @@ public class ConsentAcceptance extends BaseEntity {
     @Column(name = "consent_type", nullable = false, length = 30)
     private ConsentType consentType;
 
-    /** Named consentVersion to avoid clashing with BaseEntity's optimistic-lock {@code version}. */
+    /**
+     * Named consentVersion to avoid clashing with BaseEntity's optimistic-lock {@code version}.
+     */
     @Column(name = "consent_version", nullable = false, length = 20)
     private String consentVersion;
 
     @Column(name = "accepted_at", nullable = false)
     private Instant acceptedAt;
 
-    /** IP at acceptance time, for audit. Best-effort. */
+    /**
+     * IP at acceptance time, for audit. Best-effort.
+     */
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 }

@@ -32,7 +32,9 @@ public class GameServiceImpl implements GameService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
 
-    /** IDOR guard: the caller must be a member of the chat the game runs in. */
+    /**
+     * IDOR guard: the caller must be a member of the chat the game runs in.
+     */
     private void requireChatMember(User user, String chatId) {
         boolean member;
         try {

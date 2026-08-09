@@ -25,7 +25,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -122,7 +121,9 @@ class FlirtModeServiceImplTest {
         return chatOf(ChatType.PRIVATE, a, b);
     }
 
-    /** A flirt-mode row keyed low=10 / high=20 with the given per-side flags (active derived). */
+    /**
+     * A flirt-mode row keyed low=10 / high=20 with the given per-side flags (active derived).
+     */
     private static ChatFlirtMode row(boolean enabledByLow, boolean enabledByHigh) {
         ChatFlirtMode r = ChatFlirtMode.builder()
                 .lowUserId(LOW_ID)

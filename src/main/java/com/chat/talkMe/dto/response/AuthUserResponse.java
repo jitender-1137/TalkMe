@@ -1,11 +1,13 @@
 package com.chat.talkMe.dto.response;
-import java.util.List;
-import java.util.Set;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.List;
+import java.util.Set;
 
 @Data
 @Builder
@@ -24,7 +26,7 @@ public class AuthUserResponse {
     private String gender;
     @JsonProperty("isVerified")
     private boolean isVerified;
-    
+
     @JsonProperty("isGuest")
     private boolean isGuest;
     private String createdAt;
@@ -56,11 +58,15 @@ public class AuthUserResponse {
     private int profileCompletion;
     private String presence; // "online", "idle", "offline"
     private String lastSeen;
-    /** True when this user restricts messaging to friends — drives the avatar lock badge. */
+    /**
+     * True when this user restricts messaging to friends — drives the avatar lock badge.
+     */
     @JsonProperty("messagingFriendsOnly")
     private Boolean messagingFriendsOnly;
-    /** Granted role names — kept in sync with UserResponse so the /admin guard works
-     *  even from the /auth/me-seeded profile cache (before /users/me refetches). */
+    /**
+     * Granted role names — kept in sync with UserResponse so the /admin guard works
+     * even from the /auth/me-seeded profile cache (before /users/me refetches).
+     */
     private List<String> roles;
     /**
      * Effective feature wire-names this user may use. Self-only: populated ONLY on the

@@ -57,16 +57,26 @@ public class UpdateProfileRequest {
 
     // ── Optional "About me" dropdown attributes (null ⇒ leave unchanged;
     //    empty string ⇒ clear). Backed by client-side option lists. ──
-    @Size(max = 40) private String bodyType;
-    @Size(max = 40) private String hairColor;
-    @Size(max = 40) private String eyeColor;
-    @Size(max = 40) private String relationshipStatus;
-    @Size(max = 40) private String children;
-    @Size(max = 40) private String drinking;
-    @Size(max = 40) private String smoking;
-    @Size(max = 40) private String workout;
-    @Size(max = 40) private String zodiac;
-    @Size(max = 40) private String religion;
+    @Size(max = 40)
+    private String bodyType;
+    @Size(max = 40)
+    private String hairColor;
+    @Size(max = 40)
+    private String eyeColor;
+    @Size(max = 40)
+    private String relationshipStatus;
+    @Size(max = 40)
+    private String children;
+    @Size(max = 40)
+    private String drinking;
+    @Size(max = 40)
+    private String smoking;
+    @Size(max = 40)
+    private String workout;
+    @Size(max = 40)
+    private String zodiac;
+    @Size(max = 40)
+    private String religion;
 
     private Set<Interest> interests;
 
@@ -75,10 +85,14 @@ public class UpdateProfileRequest {
     private ConversationEnergy conversationEnergy;
     private Set<Language> languages;
     private Set<LookingForTag> lookingFor;
-    /** Personality trait → 0..100 score. Out-of-range values are clamped server-side. */
+    /**
+     * Personality trait → 0..100 score. Out-of-range values are clamped server-side.
+     */
     private Map<PersonalityTrait, Integer> personality;
 
-    /** Async voice-introduction clip (feature #16): URL from the upload endpoint + duration. */
+    /**
+     * Async voice-introduction clip (feature #16): URL from the upload endpoint + duration.
+     */
     @Size(max = 512, message = "Voice intro URL must not exceed 512 characters")
     private String voiceIntroUrl;
     private Integer voiceIntroDurationMs;

@@ -42,9 +42,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("StorageServiceImpl (unit)")
 class StorageServiceImplTest {
 
-    @Mock private MediaStorage mediaStorage;
-    @Mock private FfmpegSupport ffmpeg;
-    @Mock private MultipartFile file;
+    @Mock
+    private MediaStorage mediaStorage;
+    @Mock
+    private FfmpegSupport ffmpeg;
+    @Mock
+    private MultipartFile file;
 
     private StorageServiceImpl service;
 

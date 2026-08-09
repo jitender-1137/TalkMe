@@ -24,16 +24,16 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
      * Paths excluded from CSRF validation.
      * These are all public endpoints where no CSRF cookie exists yet
      * (unauthenticated callers, no prior login cookie issued).
-     *
+     * <p>
      * Rules:
-     *  - /api/v1/auth/login      — no cookie exists yet, issues cookie after login
-     *  - /api/v1/auth/signup     — no cookie exists yet, issues cookie after signup
-     *  - /api/v1/auth/refresh    — uses HttpOnly refreshToken cookie, not CSRF-dependent
-     *  - /api/v1/auth/forgot-password  — public, unauthenticated, no cookie issued yet
-     *  - /api/v1/auth/reset-password   — public, unauthenticated, uses one-time token in body
-     *  - /api/v1/push/delivered        — POSTed by the service worker (closed-tab push
-     *      delivery ack); it has no access to the csrf_token cookie/header and is instead
-     *      authorized by the signed delivery token in the body, so CSRF doesn't apply.
+     * - /api/v1/auth/login      — no cookie exists yet, issues cookie after login
+     * - /api/v1/auth/signup     — no cookie exists yet, issues cookie after signup
+     * - /api/v1/auth/refresh    — uses HttpOnly refreshToken cookie, not CSRF-dependent
+     * - /api/v1/auth/forgot-password  — public, unauthenticated, no cookie issued yet
+     * - /api/v1/auth/reset-password   — public, unauthenticated, uses one-time token in body
+     * - /api/v1/push/delivered        — POSTed by the service worker (closed-tab push
+     * delivery ack); it has no access to the csrf_token cookie/header and is instead
+     * authorized by the signed delivery token in the body, so CSRF doesn't apply.
      */
     private static final Set<String> EXCLUDED_PATHS = Set.of(
             "/api/v1/auth/login",

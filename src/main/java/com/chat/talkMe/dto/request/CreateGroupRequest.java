@@ -21,24 +21,38 @@ public class CreateGroupRequest {
 
     private String imageUrl;
 
-    /** Initial member user uuids (creator is added as OWNER automatically). */
+    /**
+     * Initial member user uuids (creator is added as OWNER automatically).
+     */
     private List<String> memberIds;
 
-    /** "group" | "channel" | "room" (defaults to group). */
+    /**
+     * "group" | "channel" | "room" (defaults to group).
+     */
     private String subtype;
 
-    /** Room/channel discovery category (free-form label). */
+    /**
+     * Room/channel discovery category (free-form label).
+     */
     private String category;
 
-    /** Room/channel interest tags (enum names of com.chat.talkMe.enums.Interest). */
+    /**
+     * Room/channel interest tags (enum names of com.chat.talkMe.enums.Interest).
+     */
     private List<String> tags;
 
-    /** true = any user can be added; false/null = only the creator's friends. */
+    /**
+     * true = any user can be added; false/null = only the creator's friends.
+     */
     private Boolean allowNonFriends;
 
-    /** true = mature/explicit ("non-clear") content allowed; false/null = hard-blocked. */
+    /**
+     * true = mature/explicit ("non-clear") content allowed; false/null = hard-blocked.
+     */
     private Boolean allowExplicitContent;
 
-    /** PRIVATE | PUBLIC (defaults to PRIVATE). */
+    /**
+     * PRIVATE | PUBLIC (defaults to PRIVATE).
+     */
     private String visibility;
 }

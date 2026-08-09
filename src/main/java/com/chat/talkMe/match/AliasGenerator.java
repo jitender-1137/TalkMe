@@ -14,9 +14,12 @@ public final class AliasGenerator {
             "Sage", "Aster", "Vega", "Zephyr", "Koi", "Iris", "Orbit", "Frost", "Cobra", "Lumen",
     };
 
-    private AliasGenerator() {}
+    private AliasGenerator() {
+    }
 
-    /** slot 0 = userA, slot 1 = userB. */
+    /**
+     * slot 0 = userA, slot 1 = userB.
+     */
     public static String alias(String sessionId, int slot) {
         // Mask the sign bit — Math.abs(Integer.MIN_VALUE) stays negative and would yield a
         // negative array index. floorMod + a masked hash guarantee non-negative results.

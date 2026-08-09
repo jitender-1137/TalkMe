@@ -19,7 +19,9 @@ public interface UserReputationRepository extends JpaRepository<UserReputation, 
 
     boolean existsByUser(User user);
 
-    /** Ids of users who already have a reputation snapshot — the aggregation job's work set. */
+    /**
+     * Ids of users who already have a reputation snapshot — the aggregation job's work set.
+     */
     @Query("select r.user.id from UserReputation r")
     List<Long> findAllUserIds();
 }

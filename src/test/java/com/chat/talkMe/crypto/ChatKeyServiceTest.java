@@ -19,8 +19,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -39,12 +37,16 @@ class ChatKeyServiceTest {
 
     private static final long CHAT_ID = 7L;
 
-    @Mock private ChatKeyRepository chatKeyRepository;
-    @Mock private MasterKeyService masterKeyService;
+    @Mock
+    private ChatKeyRepository chatKeyRepository;
+    @Mock
+    private MasterKeyService masterKeyService;
 
     private ChatKeyService service;
 
-    /** Real 32-byte AES key material used as the "unwrapped" value the master returns. */
+    /**
+     * Real 32-byte AES key material used as the "unwrapped" value the master returns.
+     */
     private final byte[] rawKey = "0123456789abcdef0123456789abcdef".getBytes();
 
     @BeforeEach

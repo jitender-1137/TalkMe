@@ -18,17 +18,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("SecurityConfig CSP builder")
 class SecurityConfigCspTest {
 
-    /** The exact CSP the app shipped before ads existed — do not edit to match code. */
+    /**
+     * The exact CSP the app shipped before ads existed — do not edit to match code.
+     */
     private static final String BASELINE =
             "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; " +
-            "style-src 'self' 'unsafe-inline'; " +
-            "img-src 'self' data: blob: https:; " +
-            "font-src 'self' data:; " +
-            "connect-src 'self' https: wss:; " +
-            "frame-src 'self' https://challenges.cloudflare.com; " +
-            "media-src 'self' blob: https:; " +
-            "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; " +
+                    "style-src 'self' 'unsafe-inline'; " +
+                    "img-src 'self' data: blob: https:; " +
+                    "font-src 'self' data:; " +
+                    "connect-src 'self' https: wss:; " +
+                    "frame-src 'self' https://challenges.cloudflare.com; " +
+                    "media-src 'self' blob: https:; " +
+                    "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
 
     @Nested
     @DisplayName("no ad domains (default)")

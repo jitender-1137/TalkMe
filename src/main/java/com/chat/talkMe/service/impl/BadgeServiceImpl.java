@@ -39,7 +39,9 @@ import java.util.UUID;
 @Transactional
 public class BadgeServiceImpl implements BadgeService {
 
-    /** Distinct peer endorsements required before a badge is awarded. */
+    /**
+     * Distinct peer endorsements required before a badge is awarded.
+     */
     private static final int AWARD_THRESHOLD = 3;
 
     private final UserBadgeRepository userBadgeRepository;

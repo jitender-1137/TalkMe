@@ -47,9 +47,12 @@ class ConsentAcceptanceServiceImplTest {
     private static final String V_GUIDE = "guide-v1";
     private static final String V_FLIRT = "flirt-v1";
 
-    @Mock private ConsentAcceptanceRepository consentRepository;
-    @Mock private ConsentProperties consentProperties;
-    @Mock private FeatureAccessCache featureAccessCache;
+    @Mock
+    private ConsentAcceptanceRepository consentRepository;
+    @Mock
+    private ConsentProperties consentProperties;
+    @Mock
+    private FeatureAccessCache featureAccessCache;
 
     private ConsentAcceptanceServiceImpl service;
 
@@ -74,7 +77,9 @@ class ConsentAcceptanceServiceImplTest {
                 .build();
     }
 
-    /** Stub the stored acceptance for a given type (null version ⇒ no row). */
+    /**
+     * Stub the stored acceptance for a given type (null version ⇒ no row).
+     */
     private void stub(ConsentType type, String storedVersion) {
         when(consentRepository.findByUserAndConsentType(user, type))
                 .thenReturn(storedVersion == null ? Optional.empty() : Optional.of(record(type, storedVersion)));

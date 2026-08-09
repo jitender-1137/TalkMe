@@ -40,7 +40,9 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
         return StatusUpdateEvent.EVENT_TYPE;
     }
 
-    /** Live-path delivery: broadcast and mark the outbox row published. */
+    /**
+     * Live-path delivery: broadcast and mark the outbox row published.
+     */
     @Transactional
     public void deliverOnce(StatusUpdateEvent event) {
         broadcastEvent(event);
@@ -49,7 +51,9 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
         }
     }
 
-    /** Catch-up re-drive of one row ({@link OutboxDispatcher} owns lock + PUBLISHED). */
+    /**
+     * Catch-up re-drive of one row ({@link OutboxDispatcher} owns lock + PUBLISHED).
+     */
     @Override
     public void broadcast(OutboxEvent row) throws Exception {
         StatusUpdateEvent event = objectMapper.readValue(row.getPayload(), StatusUpdateEvent.class);

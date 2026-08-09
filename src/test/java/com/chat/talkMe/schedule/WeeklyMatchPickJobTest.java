@@ -37,9 +37,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("WeeklyMatchPickJob (unit)")
 class WeeklyMatchPickJobTest {
 
-    @Mock private WeeklyMatchPickService weeklyMatchPickService;
-    @Mock private WeeklyMatchPickRepository weeklyMatchPickRepository;
-    @Mock private UserRepository userRepository;
+    @Mock
+    private WeeklyMatchPickService weeklyMatchPickService;
+    @Mock
+    private WeeklyMatchPickRepository weeklyMatchPickRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private WeeklyMatchPickJob job;
 

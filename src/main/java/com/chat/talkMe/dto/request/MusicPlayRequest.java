@@ -17,10 +17,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class MusicPlayRequest {
 
-    /** Optional opaque track id (e.g. iTunes trackId). Used to detect a same-track resume. */
+    /**
+     * Optional opaque track id (e.g. iTunes trackId). Used to detect a same-track resume.
+     */
     private String trackId;
 
-    /** Playable audio/preview URL. Required. */
+    /**
+     * Playable audio/preview URL. Required.
+     */
     private String url;
 
     private String title;

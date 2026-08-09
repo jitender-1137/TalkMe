@@ -127,7 +127,9 @@ public class UnreadDigestService {
         return true;
     }
 
-    /** One preview row per sender (most recent kept), capped at {@code maxPreviews}. */
+    /**
+     * One preview row per sender (most recent kept), capped at {@code maxPreviews}.
+     */
     private List<EmailUnreadPreview> buildPreviews(List<Message> recentNewestFirst) {
         Map<Long, EmailUnreadPreview> bySender = new LinkedHashMap<>();
         for (Message m : recentNewestFirst) {
@@ -144,8 +146,10 @@ public class UnreadDigestService {
         return new ArrayList<>(bySender.values());
     }
 
-    /** Plain-text preview; media/blank messages fall back to a generic label.
-     *  Decrypts here (email leaves the app, so there's no client to decrypt). */
+    /**
+     * Plain-text preview; media/blank messages fall back to a generic label.
+     * Decrypts here (email leaves the app, so there's no client to decrypt).
+     */
     private String snippet(Message m) {
         Long chatId = m.getChat() != null ? m.getChat().getId() : null;
         String content = messageCryptoService.decrypt(chatId, m.getContent());

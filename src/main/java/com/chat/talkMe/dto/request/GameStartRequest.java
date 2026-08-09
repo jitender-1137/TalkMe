@@ -8,14 +8,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Body for POST /games/start (feature #13). */
+/**
+ * Body for POST /games/start (feature #13).
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class GameStartRequest {
 
-    /** UUID (as String) of the private chat the game runs in. */
+    /**
+     * UUID (as String) of the private chat the game runs in.
+     */
     @NotBlank
     private String chatId;
 

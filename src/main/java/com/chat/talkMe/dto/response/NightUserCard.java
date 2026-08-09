@@ -5,7 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Lightweight user tile for the Night Owl Lobby (feature #2). */
+/**
+ * Lightweight user tile for the Night Owl Lobby (feature #2).
+ */
 @Data
 @Builder
 @NoArgsConstructor

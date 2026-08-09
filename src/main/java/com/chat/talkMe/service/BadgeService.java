@@ -14,9 +14,13 @@ import java.util.List;
  */
 public interface BadgeService {
 
-    /** All badges for a user by uuid (earned + in-progress endorsement counts). */
+    /**
+     * All badges for a user by uuid (earned + in-progress endorsement counts).
+     */
     List<BadgeResponse> listBadges(String userUuid);
 
-    /** Endorse a user for a trait; returns the resulting badge state for that trait. */
+    /**
+     * Endorse a user for a trait; returns the resulting badge state for that trait.
+     */
     BadgeResponse endorse(User endorser, String recipientUuid, BadgeType badgeType);
 }

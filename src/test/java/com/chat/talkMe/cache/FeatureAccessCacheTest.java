@@ -19,7 +19,6 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,8 +39,10 @@ class FeatureAccessCacheTest {
     private static final String EPOCH_KEY = "feature:flags:epoch";
     private static final Duration TTL = Duration.ofMinutes(30);
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private FeatureAccessCache cache;
 

@@ -506,7 +506,9 @@ class BadgeControllerUnitTest {
         }
     }
 
-    /** Minimal JSON string literal encoder for embedding an arbitrary payload in a body. */
+    /**
+     * Minimal JSON string literal encoder for embedding an arbitrary payload in a body.
+     */
     private static String quote(String s) {
         StringBuilder sb = new StringBuilder("\"");
         for (char c : s.toCharArray()) {

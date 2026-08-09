@@ -18,6 +18,7 @@ import java.util.Set;
  *
  * <p>Iterates active friendships and calls {@link RelationshipJourneyService#materializeFor}
  * once per unique pair. Each call runs in its own transaction (the service is {@code
+ *
  * @Transactional} and this job is not), so one bad pair never aborts the batch, and the
  * upserts are idempotent so re-runs never duplicate a milestone.
  *
@@ -33,7 +34,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RelationshipJourneyJob {
 
-    /** Upper bound on friendship rows scanned per run — keeps the batch cost bounded. */
+    /**
+     * Upper bound on friendship rows scanned per run — keeps the batch cost bounded.
+     */
     private static final int MAX_FRIENDSHIP_ROWS = 5000;
 
     private final FriendRepository friendRepository;

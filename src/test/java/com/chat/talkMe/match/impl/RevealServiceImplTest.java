@@ -43,9 +43,12 @@ class RevealServiceImplTest {
     private static final String A = "alice";
     private static final String B = "bob";
 
-    @Mock private SessionService sessionService;
-    @Mock private UserRepository userRepository;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private RevealServiceImpl service;
 

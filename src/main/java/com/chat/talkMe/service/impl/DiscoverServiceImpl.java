@@ -1,9 +1,11 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.domain.DiscoverLike;
+import com.chat.talkMe.domain.FriendRequest;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.DiscoverProfileResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
+import com.chat.talkMe.enums.FriendRequestStatus;
 import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.exception.NotFoundException;
@@ -16,10 +18,7 @@ import com.chat.talkMe.service.DiscoverService;
 import com.chat.talkMe.service.PresenceService;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
-import com.chat.talkMe.domain.FriendRequest;
-import com.chat.talkMe.enums.FriendRequestStatus;
 import jakarta.persistence.criteria.Predicate;
-import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +27,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -114,9 +114,9 @@ public class DiscoverServiceImpl implements DiscoverService {
             if (query != null && !query.isBlank()) {
                 String pattern = "%" + query.toLowerCase() + "%";
                 predicates.add(cb.or(
-                    cb.like(cb.lower(root.get("username")), pattern),
-                    cb.like(cb.lower(root.get("name")), pattern),
-                    cb.like(cb.lower(root.get("email")), pattern)
+                        cb.like(cb.lower(root.get("username")), pattern),
+                        cb.like(cb.lower(root.get("name")), pattern),
+                        cb.like(cb.lower(root.get("email")), pattern)
                 ));
             }
 
@@ -182,8 +182,8 @@ public class DiscoverServiceImpl implements DiscoverService {
                 // DESC). Then most-recently-active first, name as the final tiebreaker.
                 Expression<Integer> lastSeenNullRank =
                         cb.<Integer>selectCase()
-                            .when(cb.isNull(lastSeen), 1)
-                            .otherwise(0);
+                                .when(cb.isNull(lastSeen), 1)
+                                .otherwise(0);
 
                 q.orderBy(
                         cb.asc(presenceRank),
@@ -200,7 +200,7 @@ public class DiscoverServiceImpl implements DiscoverService {
         Set<Long> friendsOnlyIds = userPage.getContent().isEmpty()
                 ? Collections.emptySet()
                 : userSettingRepository.findFriendsOnlyUserIds(
-                        userPage.getContent().stream().map(User::getId).collect(Collectors.toList()));
+                userPage.getContent().stream().map(User::getId).collect(Collectors.toList()));
 
         List<DiscoverProfileResponse> items = userPage.getContent().stream()
                 .map(u -> {

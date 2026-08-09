@@ -65,15 +65,24 @@ class StoryServiceImplTest {
     private static final UUID STORY_UUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final String STORY_UUID_STR = STORY_UUID.toString();
 
-    @Mock private StoryRepository storyRepository;
-    @Mock private StoryViewRepository storyViewRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private ContentModerationService moderationService;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private PhotoMusicMuxer photoMusicMuxer;
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private NotificationService notificationService;
-    @Mock private FeatureAccessService featureAccessService;
+    @Mock
+    private StoryRepository storyRepository;
+    @Mock
+    private StoryViewRepository storyViewRepository;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private PhotoMusicMuxer photoMusicMuxer;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private FeatureAccessService featureAccessService;
 
     private StoryServiceImpl service;
 
@@ -114,7 +123,9 @@ class StoryServiceImplTest {
         return s;
     }
 
-    /** Make {@code save} return a persisted-looking Story (uuid + createdAt populated). */
+    /**
+     * Make {@code save} return a persisted-looking Story (uuid + createdAt populated).
+     */
     private void stubSaveEchoesWithUuid() {
         when(storyRepository.save(any(Story.class))).thenAnswer(inv -> {
             Story s = inv.getArgument(0);

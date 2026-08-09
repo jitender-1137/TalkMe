@@ -32,21 +32,12 @@ import com.chat.talkMe.dto.response.AdminPostCommentView;
 import com.chat.talkMe.dto.response.AdminPostLikeView;
 import com.chat.talkMe.dto.response.AdminPostView;
 import com.chat.talkMe.dto.response.AdminReportView;
+import com.chat.talkMe.dto.response.AdminStatsResponse;
 import com.chat.talkMe.dto.response.AdminStorageListResponse;
 import com.chat.talkMe.dto.response.AdminStorageObjectView;
 import com.chat.talkMe.dto.response.AdminTimeseriesPoint;
 import com.chat.talkMe.dto.response.AdminTimeseriesResult;
 import com.chat.talkMe.dto.response.AdminUserFullView;
-import com.chat.talkMe.storage.MediaKeys;
-import com.chat.talkMe.storage.MediaStorage;
-import com.chat.talkMe.storage.StorageProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Predicate;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import com.chat.talkMe.dto.response.AdminStatsResponse;
 import com.chat.talkMe.dto.response.AdminUserView;
 import com.chat.talkMe.dto.response.LabelCount;
 import com.chat.talkMe.dto.response.PaginatedResponse;
@@ -82,7 +73,12 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.AdminService;
 import com.chat.talkMe.service.PresenceService;
-import java.util.stream.Stream;
+import com.chat.talkMe.storage.MediaKeys;
+import com.chat.talkMe.storage.MediaStorage;
+import com.chat.talkMe.storage.StorageProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -95,6 +91,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -113,6 +112,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -151,23 +151,33 @@ public class AdminServiceImpl implements AdminService {
     private final StorageProperties storageProperties;
     private final MediaAssetRepository mediaAssetRepository;
 
-    /**
+    /*
      * Redis-backed read-through cache for the expensive analytics aggregates, so the
      * dashboard's auto-refresh polling doesn't re-run a dozen GROUP BY / COUNT queries
      * against Postgres every few seconds. Short TTLs keep it near-real-time; a Redis
      * outage transparently falls back to the live DB query.
      */
-    /** Namespace cache keys with a generation counter so one INCR invalidates ALL of them. */
+    /**
+     * Namespace cache keys with a generation counter so one INCR invalidates ALL of them.
+     */
     private String genKey(String base) {
         String gen = null;
-        try { gen = redisTemplate.opsForValue().get("admin:cachegen"); } catch (Exception ignored) {}
+        try {
+            gen = redisTemplate.opsForValue().get("admin:cachegen");
+        } catch (Exception ignored) {
+        }
         return "admin:g" + (gen == null ? "0" : gen) + ":" + base;
     }
 
-    /** Bump the generation → every cached analytics/stats/timeseries value is instantly stale. */
+    /**
+     * Bump the generation → every cached analytics/stats/timeseries value is instantly stale.
+     */
     private void bumpCacheGen() {
-        try { redisTemplate.opsForValue().increment("admin:cachegen"); }
-        catch (Exception e) { log.debug("[AdminCache] gen bump failed: {}", e.getMessage()); }
+        try {
+            redisTemplate.opsForValue().increment("admin:cachegen");
+        } catch (Exception e) {
+            log.debug("[AdminCache] gen bump failed: {}", e.getMessage());
+        }
     }
 
     private <T> T cached(String key, long ttlSeconds, Class<T> type, Supplier<T> loader) {
@@ -187,7 +197,9 @@ public class AdminServiceImpl implements AdminService {
         return value;
     }
 
-    /** Roles an admin may grant/revoke from the dashboard. */
+    /**
+     * Roles an admin may grant/revoke from the dashboard.
+     */
     private static final Set<String> ASSIGNABLE_ROLES =
             Set.of("ROLE_SUPER_ADMIN", "ROLE_MODERATOR", "ROLE_USER");
 
@@ -252,7 +264,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    /** Translate the filter DTO into a JPA Specification over User. */
+    /**
+     * Translate the filter DTO into a JPA Specification over User.
+     */
     private Specification<User> buildUserSpec(
             AdminUserFilter f) {
         return (root, cq, cb) -> {
@@ -318,16 +332,22 @@ public class AdminServiceImpl implements AdminService {
         };
     }
 
-    /** Parse yyyy-MM-dd or an ISO instant. endOfDay=true pushes a bare date to 23:59:59. */
+    /**
+     * Parse yyyy-MM-dd or an ISO instant. endOfDay=true pushes a bare date to 23:59:59.
+     */
     private Instant parseFilterInstant(String s, boolean endOfDay) {
         if (s == null || s.isBlank()) return null;
         String v = s.trim();
-        try { return Instant.parse(v); } catch (Exception ignored) {}
+        try {
+            return Instant.parse(v);
+        } catch (Exception ignored) {
+        }
         try {
             LocalDate d = LocalDate.parse(v);
             return (endOfDay ? d.atTime(23, 59, 59) : d.atStartOfDay())
                     .toInstant(ZoneOffset.UTC);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return null;
     }
 
@@ -429,8 +449,9 @@ public class AdminServiceImpl implements AdminService {
 
         ChatType chatType = null;
         if (type != null && !type.isBlank() && !type.equalsIgnoreCase("all")) {
-            try { chatType = ChatType.valueOf(type.trim().toUpperCase()); }
-            catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
+            try {
+                chatType = ChatType.valueOf(type.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
         }
         String q = (query == null || query.isBlank()) ? null : "%" + query.trim().toLowerCase() + "%";
 
@@ -598,8 +619,8 @@ public class AdminServiceImpl implements AdminService {
         Map<String, String> adminUuidByUsername = adminUsernames.isEmpty()
                 ? Map.of()
                 : userRepository.findByUsernameIn(adminUsernames).stream()
-                    .filter(u -> u.getUuid() != null)
-                    .collect(Collectors.toMap(User::getUsername, u -> u.getUuid().toString(), (x, y) -> x));
+                  .filter(u -> u.getUuid() != null)
+                  .collect(Collectors.toMap(User::getUsername, u -> u.getUuid().toString(), (x, y) -> x));
         List<AdminAuditView> items = result.getContent().stream()
                 .map(a -> AdminAuditView.builder()
                         .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
@@ -644,12 +665,16 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
     }
 
-    /** A user's uuid string, or null. */
+    /**
+     * A user's uuid string, or null.
+     */
     private static String uuidOf(User u) {
         return u != null && u.getUuid() != null ? u.getUuid().toString() : null;
     }
 
-    /** Resolve a username to its uuid string (for cross-linking stored username columns). */
+    /**
+     * Resolve a username to its uuid string (for cross-linking stored username columns).
+     */
     private String usernameToUuid(String username) {
         if (username == null || username.isBlank()) return null;
         return userRepository.findByUsernameIgnoreCase(username).map(AdminServiceImpl::uuidOf).orElse(null);
@@ -748,8 +773,13 @@ public class AdminServiceImpl implements AdminService {
         }
         if (req.getInterests() != null) {
             u.setInterests(req.getInterests().stream()
-                    .map(s -> { try { return Interest.valueOf(s.trim().toUpperCase()); }
-                                catch (IllegalArgumentException e) { return null; } })
+                    .map(s -> {
+                        try {
+                            return Interest.valueOf(s.trim().toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            return null;
+                        }
+                    })
                     .filter(Objects::nonNull)
                     .collect(Collectors.toCollection(HashSet::new)));
         }
@@ -801,8 +831,11 @@ public class AdminServiceImpl implements AdminService {
         return out;
     }
 
-    /** A resolved time window: where it starts, bucket size, count and label granularity. */
-    private record RangeSpec(Instant since, long bucketMillis, int buckets, String granularity) {}
+    /**
+     * A resolved time window: where it starts, bucket size, count and label granularity.
+     */
+    private record RangeSpec(Instant since, long bucketMillis, int buckets, String granularity) {
+    }
 
     private static final long MIN = 60_000L, HOUR = 3_600_000L, DAY = 86_400_000L;
 
@@ -810,15 +843,15 @@ public class AdminServiceImpl implements AdminService {
         Instant now = Instant.now();
         String r = range == null ? "30d" : range.trim().toLowerCase();
         return switch (r) {
-            case "1h"          -> spec(now, 5 * MIN, 12, "hour");   // 12 × 5 min
-            case "6h"          -> spec(now, 30 * MIN, 12, "hour");  // 12 × 30 min
-            case "12h"         -> spec(now, HOUR, 12, "hour");      // 12 × 1 h
-            case "24h", "1d"   -> spec(now, 2 * HOUR, 12, "hour");  // 12 × 2 h
-            case "7d", "1w"    -> spec(now, DAY, 7, "day");
-            case "90d", "3m"   -> spec(now, DAY, 90, "day");
-            case "1y", "365d"  -> spec(now, 7 * DAY, 52, "day");    // weekly buckets
-            case "30d", "1m"   -> spec(now, DAY, 30, "day");
-            default             -> spec(now, DAY, 30, "day");
+            case "1h" -> spec(now, 5 * MIN, 12, "hour");   // 12 × 5 min
+            case "6h" -> spec(now, 30 * MIN, 12, "hour");  // 12 × 30 min
+            case "12h" -> spec(now, HOUR, 12, "hour");      // 12 × 1 h
+            case "24h", "1d" -> spec(now, 2 * HOUR, 12, "hour");  // 12 × 2 h
+            case "7d", "1w" -> spec(now, DAY, 7, "day");
+            case "90d", "3m" -> spec(now, DAY, 90, "day");
+            case "1y", "365d" -> spec(now, 7 * DAY, 52, "day");    // weekly buckets
+            case "30d", "1m" -> spec(now, DAY, 30, "day");
+            default -> spec(now, DAY, 30, "day");
         };
     }
 
@@ -827,7 +860,9 @@ public class AdminServiceImpl implements AdminService {
         return new RangeSpec(since, bucketMillis, buckets, gran);
     }
 
-    /** Bucket raw timestamps into fixed windows, zero-filled; labels are ISO bucket-starts. */
+    /**
+     * Bucket raw timestamps into fixed windows, zero-filled; labels are ISO bucket-starts.
+     */
     private List<AdminTimeseriesPoint> bucketize(List<Instant> times, RangeSpec spec) {
         long[] counts = new long[spec.buckets()];
         long start = spec.since().toEpochMilli();
@@ -858,7 +893,9 @@ public class AdminServiceImpl implements AdminService {
         };
     }
 
-    /** Human-readable bucket size, e.g. 3600000 → "1h", 86400000 → "1d". */
+    /**
+     * Human-readable bucket size, e.g. 3600000 → "1h", 86400000 → "1d".
+     */
     private String describeBucket(long ms) {
         if (ms % (7 * DAY) == 0) return (ms / (7 * DAY)) + "w";
         if (ms % DAY == 0) return (ms / DAY) + "d";
@@ -866,7 +903,9 @@ public class AdminServiceImpl implements AdminService {
         return Math.max(1, ms / MIN) + "m";
     }
 
-    /** Snap an arbitrary bucket size to the nearest supported interval key. */
+    /**
+     * Snap an arbitrary bucket size to the nearest supported interval key.
+     */
     private String snapInterval(long span) {
         long target = Math.max(MIN, span / 40); // aim for ~40 buckets
         long[] opts = {5 * MIN, 15 * MIN, 30 * MIN, HOUR, 6 * HOUR, 12 * HOUR, DAY, 7 * DAY};
@@ -877,8 +916,11 @@ public class AdminServiceImpl implements AdminService {
 
     private Instant parseInstant(String iso, Instant fallback) {
         if (iso == null || iso.isBlank()) return fallback;
-        try { return Instant.parse(iso.trim()); }
-        catch (Exception e) { return fallback; }
+        try {
+            return Instant.parse(iso.trim());
+        } catch (Exception e) {
+            return fallback;
+        }
     }
 
     private RangeSpec resolveWindow(String range, String interval, String fromIso, String toIso) {
@@ -1032,7 +1074,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    /** Map a JPA {@code GROUP BY} result ([label, count]) to sorted LabelCounts. */
+    /**
+     * Map a JPA {@code GROUP BY} result ([label, count]) to sorted LabelCounts.
+     */
     private List<LabelCount> toLabelCounts(List<Object[]> rows) {
         return rows.stream()
                 .map(r -> {
@@ -1049,7 +1093,9 @@ public class AdminServiceImpl implements AdminService {
         return in.size() <= n ? in : new ArrayList<>(in.subList(0, n));
     }
 
-    /** Bucket users by how many friends they have (0 bucket derived from total). */
+    /**
+     * Bucket users by how many friends they have (0 bucket derived from total).
+     */
     private List<LabelCount> friendCountDistribution(long totalUsers) {
         long[] buckets = new long[6]; // 0 | 1-5 | 6-10 | 11-25 | 26-50 | 50+
         long usersWithFriends = 0;
@@ -1071,7 +1117,9 @@ public class AdminServiceImpl implements AdminService {
         return out;
     }
 
-    /** Most-connected users first — the roots of the friends hierarchy. */
+    /**
+     * Most-connected users first — the roots of the friends hierarchy.
+     */
     private List<AdminConnectorView> topConnectors(int n) {
         return friendRepository.topConnectors(PageRequest.of(0, Math.max(1, n))).stream()
                 .map(row -> connectorView((User) row[0], ((Number) row[1]).longValue()))
@@ -1152,9 +1200,9 @@ public class AdminServiceImpl implements AdminService {
         User a = p.getUser();
         List<AdminPostView.Media> media = p.getMedia() == null ? List.of()
                 : p.getMedia().stream()
-                    .map(m -> new AdminPostView.Media(
-                            m.getMediaUrl(), m.getMediaType()))
-                    .collect(Collectors.toList());
+                  .map(m -> new AdminPostView.Media(
+                          m.getMediaUrl(), m.getMediaType()))
+                  .collect(Collectors.toList());
         return AdminPostView.builder()
                 .id(p.getUuid() != null ? p.getUuid().toString() : String.valueOf(p.getId()))
                 .shortCode(p.getShortCode())
@@ -1311,7 +1359,9 @@ public class AdminServiceImpl implements AdminService {
         return toFeedbackView(f);
     }
 
-    /** Returns null for blank/"ALL" so the caller skips that filter. */
+    /**
+     * Returns null for blank/"ALL" so the caller skips that filter.
+     */
     private static FeedbackType parseFeedbackType(String raw) {
         if (raw == null) return null;
         String v = raw.trim().toUpperCase();
@@ -1338,15 +1388,15 @@ public class AdminServiceImpl implements AdminService {
         User u = f.getUser();
         AdminFeedbackView.Author author = u == null ? null
                 : AdminFeedbackView.Author.builder()
-                        .id(u.getUuid() != null ? u.getUuid().toString() : null)
-                        .username(u.getUsername())
-                        .name(u.getName())
-                        .avatar(u.getProfileImage())
-                        .email(u.getEmail())
-                        .country(u.getCountry())
-                        .verified(u.isVerified())
-                        .guest(u.isGuest())
-                        .build();
+                  .id(u.getUuid() != null ? u.getUuid().toString() : null)
+                  .username(u.getUsername())
+                  .name(u.getName())
+                  .avatar(u.getProfileImage())
+                  .email(u.getEmail())
+                  .country(u.getCountry())
+                  .verified(u.isVerified())
+                  .guest(u.isGuest())
+                  .build();
         return AdminFeedbackView.builder()
                 .id(f.getUuid() != null ? f.getUuid().toString() : null)
                 .rating(f.getRating())
@@ -1368,14 +1418,14 @@ public class AdminServiceImpl implements AdminService {
 
         AdminReportView.Session sessionView = session == null ? null
                 : AdminReportView.Session.builder()
-                    .id(session.getUuid() != null ? session.getUuid().toString() : null)
-                    .hostUsername(session.getHost() != null ? session.getHost().getUsername() : null)
-                    .hostId(uuidOf(session.getHost()))
-                    .peerUsername(session.getPeer() != null ? session.getPeer().getUsername() : null)
-                    .peerId(uuidOf(session.getPeer()))
-                    .active(session.isActive())
-                    .endedAt(session.getEndedAt() != null ? session.getEndedAt().toString() : null)
-                    .build();
+                  .id(session.getUuid() != null ? session.getUuid().toString() : null)
+                  .hostUsername(session.getHost() != null ? session.getHost().getUsername() : null)
+                  .hostId(uuidOf(session.getHost()))
+                  .peerUsername(session.getPeer() != null ? session.getPeer().getUsername() : null)
+                  .peerId(uuidOf(session.getPeer()))
+                  .active(session.isActive())
+                  .endedAt(session.getEndedAt() != null ? session.getEndedAt().toString() : null)
+                  .build();
 
         return AdminReportView.builder()
                 .id(r.getUuid() != null ? r.getUuid().toString() : String.valueOf(r.getId()))
@@ -1410,7 +1460,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    /** Shared PaginatedResponse assembler for the page-numbered admin lists. */
+    /**
+     * Shared PaginatedResponse assembler for the page-numbered admin lists.
+     */
     private <T> PaginatedResponse<T> page(List<T> items, Page<?> result, int page) {
         return PaginatedResponse.<T>builder()
                 .items(items)
@@ -1446,8 +1498,9 @@ public class AdminServiceImpl implements AdminService {
         }
         MessageType mt = null;
         if (type != null && !type.isBlank()) {
-            try { mt = MessageType.valueOf(type.trim().toUpperCase()); }
-            catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
+            try {
+                mt = MessageType.valueOf(type.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
         }
         audit(adminUsername, "VIEW_ATTACHMENTS", "ATTACHMENT",
                 userUuid != null ? userUuid : "all", "type=" + type + " page=" + page);
@@ -1482,16 +1535,16 @@ public class AdminServiceImpl implements AdminService {
 
         List<AdminAttachmentView.SharedUser> sharedWith =
                 chat == null || chat.getMembers() == null ? List.of()
-                : chat.getMembers().stream()
-                    .map(ChatMember::getUser)
-                    .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
-                    .map(mu -> AdminAttachmentView.SharedUser.builder()
-                            .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
-                            .username(mu.getUsername())
-                            .name(mu.getName())
-                            .avatar(mu.getProfileImage())
-                            .build())
-                    .collect(Collectors.toList());
+                        : chat.getMembers().stream()
+                          .map(ChatMember::getUser)
+                          .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
+                          .map(mu -> AdminAttachmentView.SharedUser.builder()
+                                     .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                                     .username(mu.getUsername())
+                                     .name(mu.getName())
+                                     .avatar(mu.getProfileImage())
+                                     .build())
+                          .collect(Collectors.toList());
 
         return AdminAttachmentView.builder()
                 .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
@@ -1516,11 +1569,17 @@ public class AdminServiceImpl implements AdminService {
 
     // ── Storage reconciliation (storage-truth Attachments gallery) ─────────────
 
-    /** Chat-media top-level folders — an unreferenced object here is a true orphan. */
+    /**
+     * Chat-media top-level folders — an unreferenced object here is a true orphan.
+     */
     private static final Set<String> CHAT_MEDIA_CATEGORIES = Set.of("conversations", "lobby", "strangers");
 
-    /** Cached reconcile of one storage prefix (OCI list can be slow — TTL-guarded). */
-    private record StorageSnapshot(long builtAtMs, List<AdminStorageObjectView> objects) {}
+    /**
+     * Cached reconcile of one storage prefix (OCI list can be slow — TTL-guarded).
+     */
+    private record StorageSnapshot(long builtAtMs, List<AdminStorageObjectView> objects) {
+    }
+
     private final ConcurrentHashMap<String, StorageSnapshot> storageCache =
             new ConcurrentHashMap<>();
     private static final long STORAGE_CACHE_TTL_MS = 60_000L;
@@ -1549,8 +1608,8 @@ public class AdminServiceImpl implements AdminService {
         if (!q.isEmpty()) {
             stream = stream.filter(o ->
                     contains(o.getKey(), q) || contains(o.getFileName(), q)
-                    || contains(o.getSenderUsername(), q) || contains(o.getSenderName(), q)
-                    || contains(o.getChatName(), q));
+                            || contains(o.getSenderUsername(), q) || contains(o.getSenderName(), q)
+                            || contains(o.getChatName(), q));
         }
         List<AdminStorageObjectView> base = stream.collect(Collectors.toList());
 
@@ -1748,7 +1807,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    /** Map a chat's {@link MessageAttachment} to the shared media-asset view (owner = sender). */
+    /**
+     * Map a chat's {@link MessageAttachment} to the shared media-asset view (owner = sender).
+     */
     private AdminMediaAssetView toChatMediaView(
             MessageAttachment a, Chat chat) {
         Message m = a.getMessage();
@@ -1790,7 +1851,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    /** Serve URL for a stored reference (same shape the storage gallery uses). */
+    /**
+     * Serve URL for a stored reference (same shape the storage gallery uses).
+     */
     private static String mediaServeUrl(String reference) {
         if (reference == null) return null;
         return "/api/v1/uploads/media?path=" + URLEncoder.encode(
@@ -1844,7 +1907,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    /** Coarse media kind from the upload type / mime / key — image/video/audio/file. */
+    /**
+     * Coarse media kind from the upload type / mime / key — image/video/audio/file.
+     */
     private static String mediaKind(String uploadType, String contentType, String key) {
         String t = uploadType != null ? uploadType.toLowerCase() : "";
         if (t.equals("image") || t.equals("video") || t.equals("audio")) return t;
@@ -1852,7 +1917,9 @@ public class AdminServiceImpl implements AdminService {
         return kindOf(key != null ? key : "", contentType);
     }
 
-    /** List + DB-reconcile a prefix, TTL-cached (OCI ListObjects is expensive). */
+    /**
+     * List + DB-reconcile a prefix, TTL-cached (OCI ListObjects is expensive).
+     */
     private List<AdminStorageObjectView> reconcileStorage(String prefix) {
         String cacheKey = prefix == null ? "" : prefix;
         StorageSnapshot cached = storageCache.get(cacheKey);
@@ -1929,50 +1996,50 @@ public class AdminServiceImpl implements AdminService {
                 // Receivers = everyone in the chat other than the sender.
                 List<AdminStorageObjectView.SharedUser> receivers =
                         chat == null || chat.getMembers() == null ? List.of()
-                        : chat.getMembers().stream()
-                            .map(ChatMember::getUser)
-                            .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
-                            .map(mu -> AdminStorageObjectView.SharedUser.builder()
-                                    .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
-                                    .username(mu.getUsername())
-                                    .name(mu.getName())
-                                    .avatar(mu.getProfileImage())
-                                    .build())
-                            .collect(Collectors.toList());
+                                : chat.getMembers().stream()
+                                  .map(ChatMember::getUser)
+                                  .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
+                                  .map(mu -> AdminStorageObjectView.SharedUser.builder()
+                                             .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                                             .username(mu.getUsername())
+                                             .name(mu.getName())
+                                             .avatar(mu.getProfileImage())
+                                             .build())
+                                  .collect(Collectors.toList());
 
                 // DB is authoritative for linked attachments — classify by message type +
                 // mimeType + name (so a voice note's .webm isn't mistaken for a video).
                 b.kind(kindForLinked(m != null ? m.getMessageType() : null, att.getMimeType(), decryptedName, key))
-                 .attachmentId(att.getUuid() != null ? att.getUuid().toString() : String.valueOf(att.getId()))
-                 .messageId(m != null && m.getUuid() != null ? m.getUuid().toString() : null)
-                 .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
-                 .chatName(chat != null ? chat.getName() : null)
-                 .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
-                 .strangerMode(chat != null && chat.getChatType() == ChatType.STRANGER)
-                 .ownerSource("MESSAGE_ATTACHMENT")
-                 .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
-                 .senderUsername(sender != null ? sender.getUsername() : null)
-                 .senderName(sender != null ? sender.getName() : null)
-                 .senderAvatar(sender != null ? sender.getProfileImage() : null)
-                 .receivers(receivers)
-                 .fileName(decryptedName)
-                 .mimeType(att.getMimeType())
-                 .duration(att.getDuration())
-                 .fileSize(att.getFileSize() != null ? att.getFileSize() : 0L)
-                 .thumbnailUrl(att.getThumbnailUrl() != null ? safeDecrypt(chatId, att.getThumbnailUrl()) : null)
-                 // Rich message context — the message this file was sent in.
-                 .caption(m != null && m.getContent() != null ? safeDecrypt(chatId, m.getContent()) : null)
-                 .messageType(m != null && m.getMessageType() != null ? m.getMessageType().name() : null)
-                 .forwarded(m != null && m.isForwarded())
-                 .edited(m != null && m.isEdited())
-                 .moderationStatus(m != null && m.getModerationStatus() != null ? m.getModerationStatus().name() : null)
-                 .reactionCount(m != null && m.getReactions() != null ? m.getReactions().size() : 0)
-                 .selfDestructSeconds(m != null ? m.getSelfDestructSeconds() : null)
-                 .selfDestructExpired(m != null && m.isSelfDestructExpired())
-                 .sentAt(m != null && m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
-                 .createdAt(att.getCreatedAt() != null ? att.getCreatedAt().toString() : null)
-                 .updatedAt(att.getUpdatedAt() != null ? att.getUpdatedAt().toString() : null)
-                 .deleted(m != null && m.isDeleted());
+                        .attachmentId(att.getUuid() != null ? att.getUuid().toString() : String.valueOf(att.getId()))
+                        .messageId(m != null && m.getUuid() != null ? m.getUuid().toString() : null)
+                        .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
+                        .chatName(chat != null ? chat.getName() : null)
+                        .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
+                        .strangerMode(chat != null && chat.getChatType() == ChatType.STRANGER)
+                        .ownerSource("MESSAGE_ATTACHMENT")
+                        .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
+                        .senderUsername(sender != null ? sender.getUsername() : null)
+                        .senderName(sender != null ? sender.getName() : null)
+                        .senderAvatar(sender != null ? sender.getProfileImage() : null)
+                        .receivers(receivers)
+                        .fileName(decryptedName)
+                        .mimeType(att.getMimeType())
+                        .duration(att.getDuration())
+                        .fileSize(att.getFileSize() != null ? att.getFileSize() : 0L)
+                        .thumbnailUrl(att.getThumbnailUrl() != null ? safeDecrypt(chatId, att.getThumbnailUrl()) : null)
+                        // Rich message context — the message this file was sent in.
+                        .caption(m != null && m.getContent() != null ? safeDecrypt(chatId, m.getContent()) : null)
+                        .messageType(m != null && m.getMessageType() != null ? m.getMessageType().name() : null)
+                        .forwarded(m != null && m.isForwarded())
+                        .edited(m != null && m.isEdited())
+                        .moderationStatus(m != null && m.getModerationStatus() != null ? m.getModerationStatus().name() : null)
+                        .reactionCount(m != null && m.getReactions() != null ? m.getReactions().size() : 0)
+                        .selfDestructSeconds(m != null ? m.getSelfDestructSeconds() : null)
+                        .selfDestructExpired(m != null && m.isSelfDestructExpired())
+                        .sentAt(m != null && m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                        .createdAt(att.getCreatedAt() != null ? att.getCreatedAt().toString() : null)
+                        .updatedAt(att.getUpdatedAt() != null ? att.getUpdatedAt().toString() : null)
+                        .deleted(m != null && m.isDeleted());
             } else {
                 // Orphan / non-chat object — best-effort classify from the extension.
                 b.kind(kindOf(key, o.contentType()));
@@ -1985,7 +2052,9 @@ public class AdminServiceImpl implements AdminService {
         return out;
     }
 
-    /** Owner-in-path storage categories: the 2nd key segment is the uploader's User.uuid. */
+    /**
+     * Owner-in-path storage categories: the 2nd key segment is the uploader's User.uuid.
+     */
     private static final Set<String> OWNER_IN_PATH_CATEGORIES = Set.of("lobby", "profiles", "posts", "stories");
 
     /**
@@ -2006,14 +2075,14 @@ public class AdminServiceImpl implements AdminService {
             User owner = asset.getOwner();
             boolean anon = asset.getContext() != null && asset.getContext().isAnonymousToPeer();
             b.ownerSource("UPLOAD_RECORD")
-             .strangerMode(anon)
-             .chatType(asset.getContext() != null ? asset.getContext().name() : null)
-             .chatId(asset.getContextId())
-             .uploadedAt(asset.getCreatedAt() != null ? asset.getCreatedAt().toString() : null)
-             .fileName(asset.getOriginalFileName())
-             .mimeType(asset.getContentType())
-             .messageType(asset.getUploadType() != null ? asset.getUploadType().toUpperCase() : null)
-             .fileSize(asset.getFileSize() != null ? asset.getFileSize() : 0L);
+                    .strangerMode(anon)
+                    .chatType(asset.getContext() != null ? asset.getContext().name() : null)
+                    .chatId(asset.getContextId())
+                    .uploadedAt(asset.getCreatedAt() != null ? asset.getCreatedAt().toString() : null)
+                    .fileName(asset.getOriginalFileName())
+                    .mimeType(asset.getContentType())
+                    .messageType(asset.getUploadType() != null ? asset.getUploadType().toUpperCase() : null)
+                    .fileSize(asset.getFileSize() != null ? asset.getFileSize() : 0L);
             applyOwner(b, owner);
             return;
         }
@@ -2039,23 +2108,28 @@ public class AdminServiceImpl implements AdminService {
     private void applyOwner(AdminStorageObjectView.AdminStorageObjectViewBuilder b, User owner) {
         if (owner == null) return;
         b.senderId(owner.getUuid() != null ? owner.getUuid().toString() : null)
-         .senderUsername(owner.getUsername())
-         .senderName(owner.getName())
-         .senderAvatar(owner.getProfileImage());
+                .senderUsername(owner.getUsername())
+                .senderName(owner.getName())
+                .senderAvatar(owner.getProfileImage());
     }
 
-    /** UUID → User with a per-reconcile cache; null on missing/invalid uuid. */
+    /**
+     * UUID → User with a per-reconcile cache; null on missing/invalid uuid.
+     */
     private User lookupUser(String uuid, Map<String, User> cache) {
         if (uuid == null || uuid.isBlank()) return null;
         if (cache.containsKey(uuid)) return cache.get(uuid);
         User u = null;
-        try { u = userRepository.findByUuid(UUID.fromString(uuid)).orElse(null); }
-        catch (RuntimeException ignored) { /* not a uuid (IllegalArgumentException) / lookup fail */ }
+        try {
+            u = userRepository.findByUuid(UUID.fromString(uuid)).orElse(null);
+        } catch (RuntimeException ignored) { /* not a uuid (IllegalArgumentException) / lookup fail */ }
         cache.put(uuid, u);
         return u;
     }
 
-    /** The nth {@code /}-separated segment of a key, or null. */
+    /**
+     * The nth {@code /}-separated segment of a key, or null.
+     */
     private static String segment(String key, int index) {
         if (key == null) return null;
         String[] parts = key.split("/");
@@ -2063,8 +2137,11 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private String safeDecrypt(Long chatId, String value) {
-        try { return messageCryptoService.decrypt(chatId, value); }
-        catch (RuntimeException e) { return value; }
+        try {
+            return messageCryptoService.decrypt(chatId, value);
+        } catch (RuntimeException e) {
+            return value;
+        }
     }
 
     private static boolean contains(String haystack, String needleLower) {
@@ -2155,15 +2232,15 @@ public class AdminServiceImpl implements AdminService {
     private AdminChatView toChatView(Chat chat) {
         List<AdminChatView.Member> members = chat.getMembers() == null ? List.of()
                 : chat.getMembers().stream()
-                    .map(ChatMember::getUser)
-                    .filter(mu -> mu != null)
-                    .map(mu -> AdminChatView.Member.builder()
-                            .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
-                            .username(mu.getUsername())
-                            .name(mu.getName())
-                            .avatar(mu.getProfileImage())
-                            .build())
-                    .collect(Collectors.toList());
+                  .map(ChatMember::getUser)
+                  .filter(mu -> mu != null)
+                  .map(mu -> AdminChatView.Member.builder()
+                             .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                             .username(mu.getUsername())
+                             .name(mu.getName())
+                             .avatar(mu.getProfileImage())
+                             .build())
+                  .collect(Collectors.toList());
         String name = chat.getName();
         if (name == null || name.isBlank()) {
             name = members.stream().map(AdminChatView.Member::getName)

@@ -32,7 +32,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,10 +50,14 @@ class GameServiceImplTest {
     private static final String SESSION_ID = "22222222-2222-2222-2222-222222222222";
     private static final UUID SESSION_UUID = UUID.fromString(SESSION_ID);
 
-    @Mock private GameSessionRepository gameSessionRepository;
-    @Mock private ReputationRecorder reputationRecorder;
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private GameSessionRepository gameSessionRepository;
+    @Mock
+    private ReputationRecorder reputationRecorder;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
     private GameServiceImpl service;
     private User user;
@@ -72,13 +75,17 @@ class GameServiceImplTest {
         chat.setUuid(CHAT_UUID);
     }
 
-    /** Stub the chat-member guard to pass for CHAT_UUID. */
+    /**
+     * Stub the chat-member guard to pass for CHAT_UUID.
+     */
     private void stubMember() {
         when(chatRepository.findByUuid(CHAT_UUID)).thenReturn(Optional.of(chat));
         when(chatMemberRepository.findByChatAndUser(chat, user)).thenReturn(Optional.of(new ChatMember()));
     }
 
-    /** save() echoes the argument back, minting a uuid if the entity is new (mirrors JPA persist). */
+    /**
+     * save() echoes the argument back, minting a uuid if the entity is new (mirrors JPA persist).
+     */
     private void stubSaveEcho() {
         when(gameSessionRepository.save(any(GameSession.class))).thenAnswer(inv -> {
             GameSession s = inv.getArgument(0);

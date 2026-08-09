@@ -118,7 +118,9 @@ class WhiteboardServiceImplTest {
         return chat;
     }
 
-    /** Arrange the happy IDOR path: a live chat with an active member row for {@code me}. */
+    /**
+     * Arrange the happy IDOR path: a live chat with an active member row for {@code me}.
+     */
     private Chat arrangeActiveMember() {
         Chat chat = activeChat();
         ChatMember member = new ChatMember(); // active: leftAt=null, isBanned=false, isDeleted=false
@@ -575,7 +577,8 @@ class WhiteboardServiceImplTest {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.increment(anyString())).thenReturn(3L);
             when(objectMapper.writeValueAsString(any()))
-                    .thenThrow(new JsonProcessingException("boom") {});
+                    .thenThrow(new JsonProcessingException("boom") {
+                    });
 
             WhiteboardOp op = service.addStroke(me, simpleStroke());
 

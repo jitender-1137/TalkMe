@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
 import java.util.Map;
 
 @Slf4j
@@ -16,7 +17,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MatchConsentServiceImpl implements MatchConsentService {
 
-    /** Mirrors the 1:1 consent cap so the experience is consistent across surfaces. */
+    /**
+     * Mirrors the 1:1 consent cap so the experience is consistent across surfaces.
+     */
     private static final int MAX_DECLINES = 3;
 
     private final SessionService sessionService;

@@ -3,7 +3,9 @@ package com.chat.talkMe.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
-/** A comment (or reply) on a post, for the admin news view. */
+/**
+ * A comment (or reply) on a post, for the admin news view.
+ */
 @Data
 @Builder
 public class AdminPostCommentView {

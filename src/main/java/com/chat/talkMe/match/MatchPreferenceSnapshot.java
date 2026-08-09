@@ -45,12 +45,16 @@ public class MatchPreferenceSnapshot {
     @Builder.Default
     private MatchMode mode = MatchMode.QUICK;
 
-    /** Timed-session duration in minutes for COFFEE/CHEMISTRY (5/10/15). */
+    /**
+     * Timed-session duration in minutes for COFFEE/CHEMISTRY (5/10/15).
+     */
     private Integer durationMin;
 
     private long enqueuedAtEpochMs;
 
-    /** True when this snapshot carries no meaningful filters (legacy blind-match path). */
+    /**
+     * True when this snapshot carries no meaningful filters (legacy blind-match path).
+     */
     public boolean hasNoFilters() {
         return (genderPref == null || genderPref == GenderPreference.ANY)
                 && ageMin == null && ageMax == null

@@ -3,7 +3,9 @@ package com.chat.talkMe.service;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.LiveTokenResponse;
 
-/** Mints short-lived LiveKit room tokens for a chat's live-audio room (Phase 6). */
+/**
+ * Mints short-lived LiveKit room tokens for a chat's live-audio room (Phase 6).
+ */
 public interface LiveAudioService {
 
     /**

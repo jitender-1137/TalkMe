@@ -6,13 +6,16 @@
 
 ## 🔐 Token Security Model
 
-| Token | Transport | Readable by JS? | Notes |
-|---|---|---|---|
-| `accessToken` | Response body | ✅ Yes | Short-lived JWT (15 min). Used as `Authorization: Bearer <token>` header. |
-| `refreshToken` | `HttpOnly` cookie | ❌ No | Long-lived opaque token. Set by server. Never exposed in response body. |
-| `csrf_token` | `HttpOnly` cookie | ❌ No | CSRF protection token. Set by server on login/refresh. Client must mirror it in `X-CSRF-Token` header on mutating requests. |
+| Token          | Transport         | Readable by JS? | Notes                                                                                                                       |
+|----------------|-------------------|-----------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `accessToken`  | Response body     | ✅ Yes           | Short-lived JWT (15 min). Used as `Authorization: Bearer <token>` header.                                                   |
+| `refreshToken` | `HttpOnly` cookie | ❌ No            | Long-lived opaque token. Set by server. Never exposed in response body.                                                     |
+| `csrf_token`   | `HttpOnly` cookie | ❌ No            | CSRF protection token. Set by server on login/refresh. Client must mirror it in `X-CSRF-Token` header on mutating requests. |
 
-> **How CSRF works**: On login/refresh the server sets a `csrf_token` HttpOnly cookie. The client reads this cookie value (via a separate non-HttpOnly mirror cookie or a prior API response) and echoes it in the `X-CSRF-Token` request header on all `POST`, `PUT`, `PATCH`, `DELETE` calls. The server compares the header value against the cookie value to validate origin.
+> **How CSRF works**: On login/refresh the server sets a `csrf_token` HttpOnly cookie. The client reads this cookie
+> value (via a separate non-HttpOnly mirror cookie or a prior API response) and echoes it in the `X-CSRF-Token` request
+> header on all `POST`, `PUT`, `PATCH`, `DELETE` calls. The server compares the header value against the cookie value to
+> validate origin.
 
 ---
 
@@ -20,12 +23,13 @@
 
 Registers a new user account.
 
-*   **URL:** `POST /api/v1/auth/signup`
-*   **Authentication Required:** No
-*   **Headers:**
-    *   `Content-Type: application/json`
+* **URL:** `POST /api/v1/auth/signup`
+* **Authentication Required:** No
+* **Headers:**
+    * `Content-Type: application/json`
 
 ### Request Body
+
 ```json
 {
   "username": "johndoe",
@@ -38,12 +42,14 @@ Registers a new user account.
 ```
 
 ### Response Cookies Set by Server
-| Cookie | Attributes | Description |
-|---|---|---|
+
+| Cookie         | Attributes                                             | Description              |
+|----------------|--------------------------------------------------------|--------------------------|
 | `refreshToken` | `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | Long-lived refresh token |
-| `csrf_token` | `HttpOnly; Secure; SameSite=Strict; Path=/` | CSRF protection token |
+| `csrf_token`   | `HttpOnly; Secure; SameSite=Strict; Path=/`            | CSRF protection token    |
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -68,7 +74,8 @@ Registers a new user account.
 }
 ```
 
-> **Note:** `refreshToken` and `csrf_token` are **not** present in the response body. They are sent exclusively via `Set-Cookie` response headers by the server.
+> **Note:** `refreshToken` and `csrf_token` are **not** present in the response body. They are sent exclusively via
+`Set-Cookie` response headers by the server.
 
 ---
 
@@ -76,12 +83,13 @@ Registers a new user account.
 
 Authenticates a user via credentials or starts a guest session.
 
-*   **URL:** `POST /api/v1/auth/login`
-*   **Authentication Required:** No
-*   **Headers:**
-    *   `Content-Type: application/json`
+* **URL:** `POST /api/v1/auth/login`
+* **Authentication Required:** No
+* **Headers:**
+    * `Content-Type: application/json`
 
 ### Request Body (Standard credentials)
+
 ```json
 {
   "username": "johndoe",
@@ -90,6 +98,7 @@ Authenticates a user via credentials or starts a guest session.
 ```
 
 ### Request Body (Guest Mode)
+
 ```json
 {
   "isGuest": true,
@@ -100,12 +109,14 @@ Authenticates a user via credentials or starts a guest session.
 ```
 
 ### Response Cookies Set by Server
-| Cookie | Attributes | Description |
-|---|---|---|
+
+| Cookie         | Attributes                                             | Description              |
+|----------------|--------------------------------------------------------|--------------------------|
 | `refreshToken` | `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | Long-lived refresh token |
-| `csrf_token` | `HttpOnly; Secure; SameSite=Strict; Path=/` | CSRF protection token |
+| `csrf_token`   | `HttpOnly; Secure; SameSite=Strict; Path=/`            | CSRF protection token    |
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -130,26 +141,30 @@ Authenticates a user via credentials or starts a guest session.
 }
 ```
 
-> **Note:** `refreshToken` and `csrf_token` are **not** present in the response body. They are sent exclusively via `Set-Cookie` response headers by the server.
+> **Note:** `refreshToken` and `csrf_token` are **not** present in the response body. They are sent exclusively via
+`Set-Cookie` response headers by the server.
 
 ---
 
 ## 3. Refresh Token
 
-Rotates the access token using the `refreshToken` HttpOnly cookie. Also rotates the refresh token and CSRF token cookies (refresh token rotation).
+Rotates the access token using the `refreshToken` HttpOnly cookie. Also rotates the refresh token and CSRF token
+cookies (refresh token rotation).
 
-*   **URL:** `POST /api/v1/auth/refresh`
-*   **Authentication Required:** No
-*   **Request Cookies Required:**
-    *   `refreshToken=<token>` — automatically sent by browser from the HttpOnly cookie set on login.
+* **URL:** `POST /api/v1/auth/refresh`
+* **Authentication Required:** No
+* **Request Cookies Required:**
+    * `refreshToken=<token>` — automatically sent by browser from the HttpOnly cookie set on login.
 
 ### Response Cookies Rotated by Server
-| Cookie | Attributes | Description |
-|---|---|---|
+
+| Cookie         | Attributes                                             | Description                                     |
+|----------------|--------------------------------------------------------|-------------------------------------------------|
 | `refreshToken` | `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | New rotated refresh token (old one invalidated) |
-| `csrf_token` | `HttpOnly; Secure; SameSite=Strict; Path=/` | New rotated CSRF token |
+| `csrf_token`   | `HttpOnly; Secure; SameSite=Strict; Path=/`            | New rotated CSRF token                          |
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -162,7 +177,8 @@ Rotates the access token using the `refreshToken` HttpOnly cookie. Also rotates 
 }
 ```
 
-> **Note:** The new `refreshToken` and new `csrf_token` are **not** in the response body. They are rotated via `Set-Cookie` response headers. The old refresh token is immediately invalidated server-side.
+> **Note:** The new `refreshToken` and new `csrf_token` are **not** in the response body. They are rotated via
+`Set-Cookie` response headers. The old refresh token is immediately invalidated server-side.
 
 ---
 
@@ -170,22 +186,24 @@ Rotates the access token using the `refreshToken` HttpOnly cookie. Also rotates 
 
 Terminates the active session and clears all auth cookies.
 
-*   **URL:** `POST /api/v1/auth/logout`
-*   **Authentication Required:** Yes
-*   **Request Cookies Required:**
-    *   `refreshToken=<token>`
-*   **Headers:**
-    *   `X-CSRF-Token: <token>` (mirrored from `csrf_token` cookie)
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/auth/logout`
+* **Authentication Required:** Yes
+* **Request Cookies Required:**
+    * `refreshToken=<token>`
+* **Headers:**
+    * `X-CSRF-Token: <token>` (mirrored from `csrf_token` cookie)
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Response Cookies Cleared by Server
-| Cookie | Action |
-|---|---|
+
+| Cookie         | Action                |
+|----------------|-----------------------|
 | `refreshToken` | Cleared (`Max-Age=0`) |
-| `csrf_token` | Cleared (`Max-Age=0`) |
+| `csrf_token`   | Cleared (`Max-Age=0`) |
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -201,10 +219,11 @@ Terminates the active session and clears all auth cookies.
 
 Returns the authenticated user's metadata.
 
-*   **URL:** `GET /api/v1/auth/me`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/auth/me`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -233,15 +252,16 @@ Returns the authenticated user's metadata.
 
 Modifies current profile info.
 
-*   **URL:** `PUT /api/v1/auth/me`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/auth/me`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "name": "Johnathan Doe",
@@ -254,6 +274,7 @@ Modifies current profile info.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -282,10 +303,11 @@ Modifies current profile info.
 
 Retrieves active device sessions logged in for the current user.
 
-*   **URL:** `GET /api/v1/auth/sessions`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/auth/sessions`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -314,14 +336,15 @@ Retrieves active device sessions logged in for the current user.
 
 Terminates a specific login session.
 
-*   **URL:** `DELETE /api/v1/auth/sessions/{id}`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/auth/sessions/{id}`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -337,14 +360,15 @@ Terminates a specific login session.
 
 Invalidates all sessions except the current one.
 
-*   **URL:** `POST /api/v1/auth/sessions/revoke-all`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/auth/sessions/revoke-all`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -360,12 +384,13 @@ Invalidates all sessions except the current one.
 
 Triggers password reset link.
 
-*   **URL:** `POST /api/v1/auth/forgot-password`
-*   **Authentication Required:** No
-*   **Headers:**
-    *   `Content-Type: application/json`
+* **URL:** `POST /api/v1/auth/forgot-password`
+* **Authentication Required:** No
+* **Headers:**
+    * `Content-Type: application/json`
 
 ### Request Body
+
 ```json
 {
   "email": "johndoe@example.com"
@@ -373,6 +398,7 @@ Triggers password reset link.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -388,12 +414,13 @@ Triggers password reset link.
 
 Updates password using the reset token.
 
-*   **URL:** `POST /api/v1/auth/reset-password`
-*   **Authentication Required:** No
-*   **Headers:**
-    *   `Content-Type: application/json`
+* **URL:** `POST /api/v1/auth/reset-password`
+* **Authentication Required:** No
+* **Headers:**
+    * `Content-Type: application/json`
 
 ### Request Body
+
 ```json
 {
   "token": "reset-token-value",
@@ -402,6 +429,7 @@ Updates password using the reset token.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -417,15 +445,16 @@ Updates password using the reset token.
 
 Changes password while logged in.
 
-*   **URL:** `POST /api/v1/auth/change-password`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/auth/change-password`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "oldPassword": "Password123!",
@@ -434,6 +463,7 @@ Changes password while logged in.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

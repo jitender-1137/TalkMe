@@ -31,7 +31,9 @@ public interface MediaStorage {
      */
     String store(Path source, String key, String contentType);
 
-    /** Open a stored reference for streaming to a client. Empty if it cannot be resolved. */
+    /**
+     * Open a stored reference for streaming to a client. Empty if it cannot be resolved.
+     */
     Optional<MediaContent> open(String reference);
 
     /**
@@ -43,7 +45,9 @@ public interface MediaStorage {
      */
     Optional<LocalFile> localCopy(String reference);
 
-    /** Delete the object/file for a stored reference. Best-effort; never throws. */
+    /**
+     * Delete the object/file for a stored reference. Best-effort; never throws.
+     */
     void delete(String reference);
 
     /**
@@ -55,16 +59,25 @@ public interface MediaStorage {
      */
     List<StoredObject> list(String prefix);
 
-    /** A readable media object plus the metadata needed to serve it. */
-    record MediaContent(Resource resource, String contentType, long contentLength) {}
+    /**
+     * A readable media object plus the metadata needed to serve it.
+     */
+    record MediaContent(Resource resource, String contentType, long contentLength) {
+    }
 
-    /** A stored object's metadata (no bytes) — one row in a {@link #list(String)}. */
+    /**
+     * A stored object's metadata (no bytes) — one row in a {@link #list(String)}.
+     */
     record StoredObject(String reference, String key, long size,
-                        Instant lastModified, String contentType) {}
+                        Instant lastModified, String contentType) {
+    }
 
-    /** A local file handle whose {@link #close()} deletes it only if it is a temp copy. */
+    /**
+     * A local file handle whose {@link #close()} deletes it only if it is a temp copy.
+     */
     interface LocalFile extends Closeable {
         Path path();
+
         @Override
         void close();
     }

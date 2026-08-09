@@ -41,8 +41,10 @@ class ReputationCacheTest {
     private static final String KEY = "reputation:snapshot:" + USER_ID;
     private static final Duration TTL = Duration.ofHours(6);
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ReputationCache cache;

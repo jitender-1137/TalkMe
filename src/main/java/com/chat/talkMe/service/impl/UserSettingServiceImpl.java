@@ -147,7 +147,9 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
     }
 
-    /** Keep the night window within 0–23. */
+    /**
+     * Keep the night window within 0–23.
+     */
     private int clampHour(int hour) {
         return Math.max(0, Math.min(23, hour));
     }

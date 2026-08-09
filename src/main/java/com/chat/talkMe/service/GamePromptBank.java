@@ -13,7 +13,8 @@ import java.util.Map;
  */
 public final class GamePromptBank {
 
-    private GamePromptBank() {}
+    private GamePromptBank() {
+    }
 
     private static final Map<GameType, List<String>> PROMPTS = Map.of(
             GameType.TWO_TRUTHS, List.of(
@@ -88,7 +89,9 @@ public final class GamePromptBank {
             )
     );
 
-    /** Ordered prompt list for a game type (never null). */
+    /**
+     * Ordered prompt list for a game type (never null).
+     */
     public static List<String> promptsFor(GameType type) {
         return PROMPTS.getOrDefault(type, List.of());
     }
@@ -97,7 +100,9 @@ public final class GamePromptBank {
         return promptsFor(type).size();
     }
 
-    /** Prompt at the given round index, or null when out of range. */
+    /**
+     * Prompt at the given round index, or null when out of range.
+     */
     public static String promptAt(GameType type, int index) {
         List<String> list = promptsFor(type);
         if (index < 0 || index >= list.size()) return null;

@@ -42,8 +42,10 @@ class CaptchaServiceImplTest {
     private static final String VERIFY_URL =
             "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-    @Mock private CaptchaProperties properties;
-    @Mock private HttpClient httpClient;
+    @Mock
+    private CaptchaProperties properties;
+    @Mock
+    private HttpClient httpClient;
 
     private CaptchaServiceImpl service;
 

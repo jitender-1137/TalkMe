@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
  * Heuristic 18+ check: the account has an age on file ≥ 18 AND has explicitly accepted
  * the AGE_18_PLUS consent at the current version. The explicit acceptance (not just a
  * profile age) is what makes this suitable for gating adult surfaces.
- *
+ * <p>
  * Provider-agnostic: a real ID/KYC provider can be introduced behind this interface
  * later (e.g. requiring a verified document) without touching callers such as
  * {@code FeatureAccessService}.

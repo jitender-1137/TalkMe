@@ -44,12 +44,18 @@ class MessageDeliveryServiceTest {
 
     private static final String DEDUP_PREFIX = "delivery:dedup:";
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private MessageBroadcaster broadcaster;
-    @Mock private RedisMessageCache cache;
-    @Mock private OutboxEventRepository outboxRepo;
-    @Mock private ObjectMapper objectMapper;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private MessageBroadcaster broadcaster;
+    @Mock
+    private RedisMessageCache cache;
+    @Mock
+    private OutboxEventRepository outboxRepo;
+    @Mock
+    private ObjectMapper objectMapper;
 
     private MessageDeliveryService service;
 

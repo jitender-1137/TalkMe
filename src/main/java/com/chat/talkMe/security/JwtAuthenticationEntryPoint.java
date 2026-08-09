@@ -19,12 +19,12 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
             throws IOException {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType("application/json");
-        
+
         ResponseDto<Void> responseDto = ResponseDto.error(
-                "Session expired or unauthorized. Please sign in again.", 
+                "Session expired or unauthorized. Please sign in again.",
                 "TM_105"
         );
-        
+
         ObjectMapper mapper = new ObjectMapper();
         response.getWriter().write(mapper.writeValueAsString(responseDto));
     }

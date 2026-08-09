@@ -39,9 +39,12 @@ class BlockCacheTest {
     private static final long BLOCKER_ID = 10L;
     private static final Duration TTL = Duration.ofMinutes(15);
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private BlockUserRepository blockUserRepository;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private BlockUserRepository blockUserRepository;
 
     private BlockCache cache;
 

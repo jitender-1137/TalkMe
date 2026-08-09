@@ -1,7 +1,16 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "post_media")
@@ -38,11 +47,15 @@ public class PostMedia extends BaseEntity {
     @Column(name = "muted")
     private Boolean muted;
 
-    /** URL of a captured frame used as the video's cover/poster. */
+    /**
+     * URL of a captured frame used as the video's cover/poster.
+     */
     @Column(name = "cover_image_url", length = 512)
     private String coverImageUrl;
 
-    /** Id of a CSS filter preset (see UI video-filters); applied at playback. */
+    /**
+     * Id of a CSS filter preset (see UI video-filters); applied at playback.
+     */
     @Column(name = "filter_name", length = 60)
     private String filterName;
 }

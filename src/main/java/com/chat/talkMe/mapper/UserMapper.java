@@ -5,14 +5,15 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.enums.Interest;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface UserMapper {
@@ -73,7 +74,9 @@ public interface UserMapper {
         return stringInterests;
     }
 
-    /** Generic enum-set → name-set (languages, looking-for). */
+    /**
+     * Generic enum-set → name-set (languages, looking-for).
+     */
     default <E extends Enum<E>> Set<String> mapEnumSet(Set<E> values) {
         if (values == null) return Collections.emptySet();
         Set<String> out = new LinkedHashSet<>();

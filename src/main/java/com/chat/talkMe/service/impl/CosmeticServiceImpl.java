@@ -159,7 +159,9 @@ public class CosmeticServiceImpl implements CosmeticService {
         return new HashSet<>();
     }
 
-    /** Whether the user currently satisfies a cosmetic's unlock condition. */
+    /**
+     * Whether the user currently satisfies a cosmetic's unlock condition.
+     */
     private boolean isUnlocked(UnlockableCosmetic c, UserReputation rep, Set<String> ownedBadgeCodes) {
         int level = rep != null ? rep.getLevel() : 1;
         int prestige = rep != null ? rep.getPrestigeCount() : 0;

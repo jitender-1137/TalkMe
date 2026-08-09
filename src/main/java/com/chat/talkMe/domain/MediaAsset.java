@@ -1,8 +1,20 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.MediaContext;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * An admin-only ownership record written for EVERY upload, keyed by its storage key.
@@ -35,35 +47,49 @@ import lombok.*;
 @AllArgsConstructor
 public class MediaAsset extends BaseEntity {
 
-    /** Object key under the media root, e.g. {@code strangers/<uuid>.jpg}. Uniqueness is
-     *  enforced by the named unique index on the {@code @Table} (not a second @Column
-     *  constraint — that would create a redundant duplicate index under ddl-auto). */
+    /**
+     * Object key under the media root, e.g. {@code strangers/<uuid>.jpg}. Uniqueness is
+     * enforced by the named unique index on the {@code @Table} (not a second @Column
+     * constraint — that would create a redundant duplicate index under ddl-auto).
+     */
     @Column(name = "storage_key", nullable = false, columnDefinition = "TEXT")
     private String storageKey;
 
-    /** Full stored reference ({@code <mediaRoot>/<key>}) as returned by the backend. */
+    /**
+     * Full stored reference ({@code <mediaRoot>/<key>}) as returned by the backend.
+     */
     @Column(name = "reference", nullable = false, columnDefinition = "TEXT")
     private String reference;
 
-    /** The authenticated uploader. Nullable only defensively (should always be set). */
+    /**
+     * The authenticated uploader. Nullable only defensively (should always be set).
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private User owner;
 
-    /** Where the file was uploaded — mirrors the storage folder. */
+    /**
+     * Where the file was uploaded — mirrors the storage folder.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "context", length = 20, nullable = false)
     private MediaContext context;
 
-    /** For CONVERSATION uploads, the (validated) chat UUID; null otherwise. */
+    /**
+     * For CONVERSATION uploads, the (validated) chat UUID; null otherwise.
+     */
     @Column(name = "context_id", length = 64)
     private String contextId;
 
-    /** The upload {@code type} param (image / video / audio / file). */
+    /**
+     * The upload {@code type} param (image / video / audio / file).
+     */
     @Column(name = "upload_type", length = 32)
     private String uploadType;
 
-    /** Client-reported original filename, for admin display. */
+    /**
+     * Client-reported original filename, for admin display.
+     */
     @Column(name = "original_file_name", length = 512)
     private String originalFileName;
 

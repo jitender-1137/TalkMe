@@ -37,8 +37,10 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
     private static final String COOKIE_NAME =
             HttpCookieOAuth2AuthorizationRequestRepository.COOKIE_NAME;
 
-    @Mock private HttpServletRequest request;
-    @Mock private HttpServletResponse response;
+    @Mock
+    private HttpServletRequest request;
+    @Mock
+    private HttpServletResponse response;
 
     private HttpCookieOAuth2AuthorizationRequestRepository repo;
 
@@ -59,7 +61,9 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
                 .build();
     }
 
-    /** Runs save, extracts the base64 cookie value from the Set-Cookie header. */
+    /**
+     * Runs save, extracts the base64 cookie value from the Set-Cookie header.
+     */
     private String saveAndCapture(OAuth2AuthorizationRequest authRequest) {
         repo.saveAuthorizationRequest(authRequest, request, response);
         ArgumentCaptor<String> cap = ArgumentCaptor.forClass(String.class);

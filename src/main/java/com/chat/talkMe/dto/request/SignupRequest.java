@@ -40,13 +40,19 @@ public class SignupRequest {
     @ValidGender
     private String gender;
 
-    /** Cloudflare Turnstile token (verified server-side). */
+    /**
+     * Cloudflare Turnstile token (verified server-side).
+     */
     private String captchaToken;
 
-    /** Honeypot — must stay empty; bots tend to fill every field. */
+    /**
+     * Honeypot — must stay empty; bots tend to fill every field.
+     */
     private String website;
 
-    /** Optional: the username of whoever invited this user (from their /@username link). */
+    /**
+     * Optional: the username of whoever invited this user (from their /@username link).
+     */
     @Size(max = 50, message = "Invalid referrer")
     private String referredByUsername;
 }

@@ -122,7 +122,9 @@ class MusicSessionControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A "live", playing session state. */
+    /**
+     * A "live", playing session state.
+     */
     private static MusicSessionState playingState() {
         return MusicSessionState.builder()
                 .trackId("itunes-42")
@@ -138,7 +140,9 @@ class MusicSessionControllerUnitTest {
                 .build();
     }
 
-    /** The empty (not-playing) shell the service hands back when there is no live session. */
+    /**
+     * The empty (not-playing) shell the service hands back when there is no live session.
+     */
     private static MusicSessionState notPlayingShell() {
         return MusicSessionState.builder()
                 .playing(false)

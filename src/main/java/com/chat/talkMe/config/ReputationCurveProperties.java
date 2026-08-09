@@ -19,16 +19,24 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.reputation.curve")
 public class ReputationCurveProperties {
 
-    /** Curve scale. */
+    /**
+     * Curve scale.
+     */
     private double k = 6;
 
-    /** Curve exponent. */
+    /**
+     * Curve exponent.
+     */
     private double p = 1.9;
 
-    /** Hard safety cap so the level loop can never run away. */
+    /**
+     * Hard safety cap so the level loop can never run away.
+     */
     private static final int MAX_LEVEL = 500;
 
-    /** Cumulative lifetime points required to reach level {@code L}. Level 1 costs 0. */
+    /**
+     * Cumulative lifetime points required to reach level {@code L}. Level 1 costs 0.
+     */
     public long totalXpForLevel(int L) {
         if (L <= 1) {
             return 0L;
@@ -36,7 +44,9 @@ public class ReputationCurveProperties {
         return Math.round(k * Math.pow(L - 1, p));
     }
 
-    /** Highest level {@code L} (>=1) whose {@link #totalXpForLevel(int)} is {@code <= points}. */
+    /**
+     * Highest level {@code L} (>=1) whose {@link #totalXpForLevel(int)} is {@code <= points}.
+     */
     public int levelForPoints(long points) {
         int level = 1;
         for (int L = 2; L <= MAX_LEVEL; L++) {

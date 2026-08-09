@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,13 +33,20 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @DisplayName("MatchWebSocketController (unit)")
 class MatchWebSocketControllerUnitTest {
 
-    @Mock private MatchmakingService matchmakingService;
-    @Mock private ChatRoutingService chatRoutingService;
-    @Mock private ImagePermissionService imagePermissionService;
-    @Mock private MatchConsentService matchConsentService;
-    @Mock private MatchMessageBufferService matchMessageBuffer;
-    @Mock private RevealService revealService;
-    @Mock private MatchTimerService matchTimerService;
+    @Mock
+    private MatchmakingService matchmakingService;
+    @Mock
+    private ChatRoutingService chatRoutingService;
+    @Mock
+    private ImagePermissionService imagePermissionService;
+    @Mock
+    private MatchConsentService matchConsentService;
+    @Mock
+    private MatchMessageBufferService matchMessageBuffer;
+    @Mock
+    private RevealService revealService;
+    @Mock
+    private MatchTimerService matchTimerService;
 
     @InjectMocks
     private MatchWebSocketController controller;

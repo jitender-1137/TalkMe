@@ -3,8 +3,21 @@ package com.chat.talkMe.domain;
 import com.chat.talkMe.enums.FeatureKey;
 import com.chat.talkMe.enums.GrantDecision;
 import com.chat.talkMe.enums.GrantScope;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
@@ -48,14 +61,18 @@ public class UserFeatureGrant extends BaseEntity {
     @Builder.Default
     private GrantScope scope = GrantScope.SELF;
 
-    /** Optional beta/rollout tag for COHORT grants. */
+    /**
+     * Optional beta/rollout tag for COHORT grants.
+     */
     @Column(name = "cohort", length = 60)
     private String cohort;
 
     @Column(name = "note", length = 255)
     private String note;
 
-    /** Null = permanent; otherwise the grant is ignored once past this instant. */
+    /**
+     * Null = permanent; otherwise the grant is ignored once past this instant.
+     */
     @Column(name = "expires_at")
     private Instant expiresAt;
 

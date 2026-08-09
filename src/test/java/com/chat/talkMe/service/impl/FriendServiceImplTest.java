@@ -64,18 +64,30 @@ import static org.mockito.Mockito.when;
 @DisplayName("FriendServiceImpl (unit)")
 class FriendServiceImplTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private FriendRequestRepository friendRequestRepository;
-    @Mock private BlockUserRepository blockUserRepository;
-    @Mock private BlockCache blockCache;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private FriendRequestMapper friendRequestMapper;
-    @Mock private UserMapper userMapper;
-    @Mock private PresenceService presenceService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private FriendRequestRepository friendRequestRepository;
+    @Mock
+    private BlockUserRepository blockUserRepository;
+    @Mock
+    private BlockCache blockCache;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private FriendRequestMapper friendRequestMapper;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private FriendServiceImpl service;
 
@@ -104,7 +116,9 @@ class FriendServiceImplTest {
         return r;
     }
 
-    /** Lets the anti-spam quota pass (count = 1 → also triggers the expire()). */
+    /**
+     * Lets the anti-spam quota pass (count = 1 → also triggers the expire()).
+     */
     private void quotaAllows() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.increment(anyString())).thenReturn(1L);

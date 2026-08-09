@@ -23,7 +23,8 @@ import static org.mockito.Mockito.verify;
 @DisplayName("MessageEventConsumer (unit)")
 class MessageEventConsumerTest {
 
-    @Mock private MessageDeliveryService deliveryService;
+    @Mock
+    private MessageDeliveryService deliveryService;
 
     private MessageEventConsumer consumer;
 

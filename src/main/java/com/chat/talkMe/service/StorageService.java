@@ -4,7 +4,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface StorageService {
 
-    /** Store under the media root (no subfolder). Back-compat for uncategorized uploads. */
+    /**
+     * Store under the media root (no subfolder). Back-compat for uncategorized uploads.
+     */
     String storeFile(MultipartFile file, String type);
 
     /**

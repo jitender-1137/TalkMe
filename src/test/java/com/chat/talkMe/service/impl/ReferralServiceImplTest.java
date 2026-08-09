@@ -32,7 +32,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("ReferralServiceImpl (unit)")
 class ReferralServiceImplTest {
 
-    @Mock private UserRepository userRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private ReferralServiceImpl service;
 

@@ -39,9 +39,12 @@ class RedisMessageCacheTest {
     private static final Duration TTL = Duration.ofDays(7);
     private static final String CHAT_UUID = "chat-abc";
 
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private HashOperations<String, Object, Object> hashOps;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private HashOperations<String, Object, Object> hashOps;
 
     private RedisMessageCache cache;
 

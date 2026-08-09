@@ -52,13 +52,20 @@ import static org.mockito.Mockito.when;
 @DisplayName("SecretCrushServiceImpl (unit)")
 class SecretCrushServiceImplTest {
 
-    @Mock private SecretCrushRepository secretCrushRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private CompatibilityService compatibilityService;
-    @Mock private NotificationService notificationService;
-    @Mock private ReputationRecorder reputationRecorder;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private BlockUserRepository blockUserRepository;
+    @Mock
+    private SecretCrushRepository secretCrushRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private CompatibilityService compatibilityService;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private ReputationRecorder reputationRecorder;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private BlockUserRepository blockUserRepository;
 
     private SecretCrushServiceImpl service;
 
@@ -94,7 +101,9 @@ class SecretCrushServiceImplTest {
         return CompatibilityScore.builder().overall(overall).build();
     }
 
-    /** Resolve the target uuid to the target user and clear both block directions. */
+    /**
+     * Resolve the target uuid to the target user and clear both block directions.
+     */
     private void resolvableTargetWithNoBlocks() {
         when(userRepository.findByUuid(target.getUuid())).thenReturn(Optional.of(target));
         when(blockUserRepository.existsByUserAndBlocked(crusher, target)).thenReturn(false);

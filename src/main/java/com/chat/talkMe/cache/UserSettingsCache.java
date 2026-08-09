@@ -14,13 +14,13 @@ import java.time.Duration;
 /**
  * Redis cache of a user's rarely-changing privacy flags (messaging privacy +
  * group-add privacy).
- *
+ * <p>
  * These are read on hot paths — the chat-list build reads the OTHER party's
  * {@code messagingFriendsOnly} for every 1:1 conversation (an N+1 across the list),
  * and group member-adds read the target's {@code groupAddPrivacy}. Settings change
  * very rarely, so caching them (with an explicit evict on write + a safety TTL) cuts
  * a lot of repeated {@code SELECT}s without risking stale behaviour beyond the TTL.
- *
+ * <p>
  * Value format: {@code "<MESSAGING_PRIVACY>|<GROUP_ADD_PRIVACY>"} (enum names).
  */
 @Slf4j
@@ -34,7 +34,8 @@ public class UserSettingsCache {
     private final StringRedisTemplate redis;
     private final UserSettingRepository userSettingRepository;
 
-    private record Flags(MessagingPrivacy messaging, GroupAddPrivacy groupAdd) {}
+    private record Flags(MessagingPrivacy messaging, GroupAddPrivacy groupAdd) {
+    }
 
     private static String key(Long userId) {
         return KEY_PREFIX + userId;
@@ -78,7 +79,9 @@ public class UserSettingsCache {
         return load(user).groupAdd();
     }
 
-    /** Invalidate after a settings write. Best-effort. */
+    /**
+     * Invalidate after a settings write. Best-effort.
+     */
     public void evict(Long userId) {
         if (userId == null) return;
         try {

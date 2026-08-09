@@ -6,6 +6,8 @@ public enum MessageType {
     VIDEO,
     AUDIO,
     DOCUMENT,
-    /** Group event message ("X added Y", "Z left"…). Payload JSON lives in content. */
+    /**
+     * Group event message ("X added Y", "Z left"…). Payload JSON lives in content.
+     */
     SYSTEM
 }

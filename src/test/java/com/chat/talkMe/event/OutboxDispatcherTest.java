@@ -36,8 +36,10 @@ class OutboxDispatcherTest {
 
     private static final String TYPE = "message.send";
 
-    @Mock private OutboxEventRepository outboxRepo;
-    @Mock private OutboxDeliveryHandler handler;
+    @Mock
+    private OutboxEventRepository outboxRepo;
+    @Mock
+    private OutboxDeliveryHandler handler;
 
     private OutboxDispatcher dispatcher;
 

@@ -49,7 +49,9 @@ public enum CityLocation {
         return tagline;
     }
 
-    /** Case-insensitive lookup by slug; null when unknown. */
+    /**
+     * Case-insensitive lookup by slug; null when unknown.
+     */
     public static CityLocation fromSlug(String slug) {
         if (slug == null) return null;
         for (CityLocation loc : values()) {

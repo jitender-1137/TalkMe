@@ -102,28 +102,50 @@ import static org.mockito.Mockito.when;
 @DisplayName("MessageServiceImpl (unit)")
 class MessageServiceImplTest {
 
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
-    @Mock private MessageRepository messageRepository;
-    @Mock private MessageAttachmentRepository messageAttachmentRepository;
-    @Mock private MessageReadReceiptRepository readReceiptRepository;
-    @Mock private MessageReactionRepository messageReactionRepository;
-    @Mock private MessageStarRepository messageStarRepository;
-    @Mock private MessageMapper messageMapper;
-    @Mock private BlockUserRepository blockUserRepository;
-    @Mock private ApplicationEventPublisher eventPublisher;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private OutboxEventRepository outboxEventRepository;
-    @Mock private ObjectMapper objectMapper;
-    @Mock private PresenceService presenceService;
-    @Mock private ContentModerationService moderationService;
-    @Mock private ChatExplicitConsentRepository consentRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private GroupAuthzService groupAuthzService;
-    @Mock private UserRepository userRepository;
-    @Mock private MessageCryptoService messageCryptoService;
-    @Mock private MediaStorage mediaStorage;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private MessageAttachmentRepository messageAttachmentRepository;
+    @Mock
+    private MessageReadReceiptRepository readReceiptRepository;
+    @Mock
+    private MessageReactionRepository messageReactionRepository;
+    @Mock
+    private MessageStarRepository messageStarRepository;
+    @Mock
+    private MessageMapper messageMapper;
+    @Mock
+    private BlockUserRepository blockUserRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private OutboxEventRepository outboxEventRepository;
+    @Mock
+    private ObjectMapper objectMapper;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private ChatExplicitConsentRepository consentRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private GroupAuthzService groupAuthzService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private MessageCryptoService messageCryptoService;
+    @Mock
+    private MediaStorage mediaStorage;
 
     private MessageServiceImpl service;
 
@@ -180,7 +202,9 @@ class MessageServiceImplTest {
         return chat;
     }
 
-    /** A 2-party chat (currentUser + otherUser) of the given type with both members active. */
+    /**
+     * A 2-party chat (currentUser + otherUser) of the given type with both members active.
+     */
     private Chat twoPartyChat(long id, ChatType type) {
         Chat chat = chat(id, type);
         chat.getMembers().add(member(chat, currentUser, MemberRole.MEMBER));

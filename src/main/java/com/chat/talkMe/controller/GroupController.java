@@ -14,7 +14,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
@@ -103,7 +112,9 @@ public class GroupController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Ownership transferred", "TM_286"));
     }
 
-    /** Discover public channels/rooms. type=channel|room (omit for both). */
+    /**
+     * Discover public channels/rooms. type=channel|room (omit for both).
+     */
     @GetMapping("/discover")
     public ResponseEntity<ResponseDto<List<ChatResponse>>> discover(
             @RequestParam(value = "type", required = false) String type,
@@ -114,7 +125,9 @@ public class GroupController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
-    /** Join a public, open channel/room. */
+    /**
+     * Join a public, open channel/room.
+     */
     @PostMapping("/{id}/join")
     public ResponseEntity<ResponseDto<ChatResponse>> join(
             @PathVariable("id") String uuid,
@@ -123,7 +136,9 @@ public class GroupController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Joined", "TM_282"));
     }
 
-    /** Accept a pending group invitation (join the group). */
+    /**
+     * Accept a pending group invitation (join the group).
+     */
     @PostMapping("/{id}/invite/accept")
     public ResponseEntity<ResponseDto<ChatResponse>> acceptInvite(
             @PathVariable("id") String uuid,
@@ -132,7 +147,9 @@ public class GroupController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Invite accepted", "TM_283"));
     }
 
-    /** Decline a pending group invitation. */
+    /**
+     * Decline a pending group invitation.
+     */
     @PostMapping("/{id}/invite/decline")
     public ResponseEntity<ResponseDto<Void>> declineInvite(
             @PathVariable("id") String uuid,
@@ -141,7 +158,9 @@ public class GroupController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Invite declined", "TM_284"));
     }
 
-    /** Report a group/channel/room. */
+    /**
+     * Report a group/channel/room.
+     */
     @PostMapping("/{id}/report")
     public ResponseEntity<ResponseDto<Void>> report(
             @PathVariable("id") String uuid,

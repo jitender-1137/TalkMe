@@ -43,20 +43,20 @@ Config lives in `application.yml` under `app.ai` (all overridable via env). It's
 **primary → fallback chain**: Groq is tried first; Hugging Face is used only if
 Groq errors / rate-limits / times out / returns nothing.
 
-| Env var                  | Default                                | Meaning                                   |
-| ------------------------ | -------------------------------------- | ----------------------------------------- |
-| `AI_SUGGESTIONS_ENABLED` | `false`                                | Master switch                             |
-| `AI_TIMEOUT_MS`          | `8000`                                 | Per-provider give-up time                 |
-| `AI_CONTEXT_MESSAGES`    | `10`                                   | Recent messages sent as context           |
-| `AI_SUGGESTIONS_COUNT`   | `3`                                    | How many chips to ask for                 |
-| **Primary (Groq)** |||
-| `AI_API_KEY`             | *(empty)*                              | Groq key (`gsk_...`) — **required**       |
-| `AI_BASE_URL`            | `https://api.groq.com/openai/v1`       | Primary endpoint                          |
-| `AI_MODEL`               | `llama-3.1-8b-instant`                 | Primary model                             |
-| **Fallback (Hugging Face)** |||
-| `AI_FALLBACK_API_KEY`    | *(empty)*                              | HF token (`hf_...`) — blank = fallback off |
-| `AI_FALLBACK_BASE_URL`   | `https://router.huggingface.co/v1`     | Fallback endpoint                         |
-| `AI_FALLBACK_MODEL`      | `Qwen/Qwen2.5-7B-Instruct`             | Fallback model (ungated)                  |
+| Env var                     | Default                            | Meaning                                    |
+|-----------------------------|------------------------------------|--------------------------------------------|
+| `AI_SUGGESTIONS_ENABLED`    | `false`                            | Master switch                              |
+| `AI_TIMEOUT_MS`             | `8000`                             | Per-provider give-up time                  |
+| `AI_CONTEXT_MESSAGES`       | `10`                               | Recent messages sent as context            |
+| `AI_SUGGESTIONS_COUNT`      | `3`                                | How many chips to ask for                  |
+| **Primary (Groq)**          |                                    |                                            |
+| `AI_API_KEY`                | *(empty)*                          | Groq key (`gsk_...`) — **required**        |
+| `AI_BASE_URL`               | `https://api.groq.com/openai/v1`   | Primary endpoint                           |
+| `AI_MODEL`                  | `llama-3.1-8b-instant`             | Primary model                              |
+| **Fallback (Hugging Face)** |                                    |                                            |
+| `AI_FALLBACK_API_KEY`       | *(empty)*                          | HF token (`hf_...`) — blank = fallback off |
+| `AI_FALLBACK_BASE_URL`      | `https://router.huggingface.co/v1` | Fallback endpoint                          |
+| `AI_FALLBACK_MODEL`         | `Qwen/Qwen2.5-7B-Instruct`         | Fallback model (ungated)                   |
 
 Minimal setup (Groq only):
 
@@ -72,6 +72,7 @@ AI_FALLBACK_API_KEY=hf_your_token_here      # from huggingface.co/settings/token
 ```
 
 ### Model choices
+
 - Primary (Groq): `llama-3.1-8b-instant` (default; 14,400 req/day + 500K tokens/day
   free, fast), `llama-3.3-70b-versatile` (best quality, but only ~1K req / 100K
   tokens per day free), `qwen-2.5-32b`, `gemma2-9b-it`.
@@ -81,6 +82,7 @@ AI_FALLBACK_API_KEY=hf_your_token_here      # from huggingface.co/settings/token
   credit is tiny (~$0.10/mo) then pay-as-you-go — it's a safety net, not a workhorse.
 
 ### How the fallback behaves
+
 - Groq returns suggestions → used; HF is **not** called.
 - Groq fails/empty **and** `AI_FALLBACK_API_KEY` is set → HF is tried.
 - Both fail → endpoint returns `[]` and the client shows local rule-based chips.
@@ -125,12 +127,12 @@ suggestions on your own last message). Watch backend logs for
 The backend just calls `{base-url}/chat/completions`, so any OpenAI-compatible
 provider works by changing three values:
 
-| Provider   | `AI_BASE_URL`                                   | Notes                          |
-| ---------- | ----------------------------------------------- | ------------------------------ |
-| Groq       | `https://api.groq.com/openai/v1`                | default                        |
-| OpenRouter | `https://openrouter.ai/api/v1`                  | use a `:free` model id         |
-| Cloudflare | `https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1` | Workers AI            |
-| Ollama     | `http://localhost:11434/v1`                     | local, no key                  |
+| Provider   | `AI_BASE_URL`                                              | Notes                  |
+|------------|------------------------------------------------------------|------------------------|
+| Groq       | `https://api.groq.com/openai/v1`                           | default                |
+| OpenRouter | `https://openrouter.ai/api/v1`                             | use a `:free` model id |
+| Cloudflare | `https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1` | Workers AI             |
+| Ollama     | `http://localhost:11434/v1`                                | local, no key          |
 
 ---
 

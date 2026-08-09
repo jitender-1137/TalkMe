@@ -53,10 +53,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("NotificationServiceImpl (unit)")
 class NotificationServiceImplTest {
 
-    @Mock private NotificationRepository notificationRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private NotificationRepository notificationRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private NotificationServiceImpl service;
 
@@ -82,7 +86,9 @@ class NotificationServiceImplTest {
         return n;
     }
 
-    /** Make repository.save echo the argument back with a uuid assigned (mirrors @PrePersist). */
+    /**
+     * Make repository.save echo the argument back with a uuid assigned (mirrors @PrePersist).
+     */
     private void saveEchoesWithUuid() {
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> {
             Notification n = inv.getArgument(0);

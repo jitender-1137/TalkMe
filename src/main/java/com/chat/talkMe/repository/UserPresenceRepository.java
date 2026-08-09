@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface UserPresenceRepository extends JpaRepository<UserPresence, Long> {
     Optional<UserPresence> findByUser(User user);
+
     long countByStatus(String status);
 
     // Atomic updates for the high-churn presence paths (connect/disconnect).
@@ -26,6 +27,6 @@ public interface UserPresenceRepository extends JpaRepository<UserPresence, Long
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE UserPresence p SET p.status = :status, p.lastSeenAt = :lastSeen, " +
-           "p.ghostModeEnabled = false, p.invisibleModeEnabled = false WHERE p.user.id = :userId")
+            "p.ghostModeEnabled = false, p.invisibleModeEnabled = false WHERE p.user.id = :userId")
     void resetPresence(@Param("userId") Long userId, @Param("status") String status, @Param("lastSeen") Instant lastSeen);
 }

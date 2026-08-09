@@ -3,8 +3,17 @@ package com.chat.talkMe.domain;
 import com.chat.talkMe.enums.CosmeticRarity;
 import com.chat.talkMe.enums.CosmeticType;
 import com.chat.talkMe.enums.CosmeticUnlockType;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
@@ -22,7 +31,9 @@ import org.hibernate.annotations.ColumnDefault;
 @AllArgsConstructor
 public class UnlockableCosmetic extends BaseEntity {
 
-    /** Stable machine code, unique. The join key used by . */
+    /**
+     * Stable machine code, unique. The join key used by .
+     */
     @Column(name = "code", nullable = false, unique = true, length = 80)
     private String code;
 
@@ -41,12 +52,16 @@ public class UnlockableCosmetic extends BaseEntity {
     @Column(name = "unlock_type", nullable = false, length = 30)
     private CosmeticUnlockType unlockType;
 
-    /** Interpreted per {@link CosmeticUnlockType} (level / star ordinal / prestige count). */
+    /**
+     * Interpreted per {@link CosmeticUnlockType} (level / star ordinal / prestige count).
+     */
     @Column(name = "unlock_threshold", nullable = false)
     @ColumnDefault("0")
     private int unlockThreshold;
 
-    /** Opaque asset reference (CSS class, gradient token, sprite id, etc.). */
+    /**
+     * Opaque asset reference (CSS class, gradient token, sprite id, etc.).
+     */
     @Column(name = "asset_ref")
     private String assetRef;
 

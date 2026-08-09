@@ -11,6 +11,8 @@ import java.util.List;
  */
 public interface FlirtLobbyService {
     List<NightUserCard> enter(User user);
+
     void leave(User user);
+
     List<NightUserCard> roster(User viewer);
 }

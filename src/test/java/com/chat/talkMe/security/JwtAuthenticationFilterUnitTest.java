@@ -34,9 +34,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("JwtAuthenticationFilter (unit)")
 class JwtAuthenticationFilterUnitTest {
 
-    @Mock private JwtTokenProvider tokenProvider;
-    @Mock private CustomUserDetailsService userDetailsService;
-    @Mock private FilterChain chain;
+    @Mock
+    private JwtTokenProvider tokenProvider;
+    @Mock
+    private CustomUserDetailsService userDetailsService;
+    @Mock
+    private FilterChain chain;
 
     private JwtAuthenticationFilter filter;
     private MockHttpServletRequest request;

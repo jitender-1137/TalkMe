@@ -5,7 +5,7 @@ package com.chat.talkMe.enums;
  * OWNER  — creator; full control, exactly one per chat, can transfer/delete.
  * ADMIN  — can manage members/settings/messages per the chat's settings.
  * MEMBER — regular participant.
- *
+ * <p>
  * Maps onto {@code ChatMember.isAdmin} for 1:1 back-compat: isAdmin is kept in
  * sync as {@code role == OWNER || role == ADMIN}.
  */

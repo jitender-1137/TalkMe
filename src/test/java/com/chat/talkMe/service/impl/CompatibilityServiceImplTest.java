@@ -8,11 +8,11 @@ import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.Language;
 import com.chat.talkMe.enums.Mood;
 import com.chat.talkMe.enums.PersonalityTrait;
+import org.hibernate.collection.spi.PersistentMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.hibernate.collection.spi.PersistentMap;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +44,9 @@ class CompatibilityServiceImplTest {
         service = new CompatibilityServiceImpl(weights);
     }
 
-    /** Bare user: empty (initialized) collections, all scalars null. */
+    /**
+     * Bare user: empty (initialized) collections, all scalars null.
+     */
     private static User user() {
         return User.builder().username("u").name("U").build();
     }
@@ -403,7 +405,9 @@ class CompatibilityServiceImplTest {
             return m;
         }
 
-        /** Every trait explicitly mapped to {@code v} (defeats the getOrDefault-50 fallback). */
+        /**
+         * Every trait explicitly mapped to {@code v} (defeats the getOrDefault-50 fallback).
+         */
         private Map<PersonalityTrait, Integer> allTraits(int v) {
             Map<PersonalityTrait, Integer> m = new EnumMap<>(PersonalityTrait.class);
             for (PersonalityTrait t : PersonalityTrait.values()) {
@@ -570,7 +574,9 @@ class CompatibilityServiceImplTest {
             assertThat(s.getExplanation()).isEqualTo("Some things in common.");
         }
 
-        /** A profile that scores 100 on every factor against a copy of itself. */
+        /**
+         * A profile that scores 100 on every factor against a copy of itself.
+         */
         private User alignedUser() {
             User u = user();
             u.setInterests(EnumSet.of(Interest.MUSIC, Interest.ART, Interest.GAMING));

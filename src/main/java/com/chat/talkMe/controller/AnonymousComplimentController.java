@@ -33,7 +33,9 @@ public class AnonymousComplimentController {
 
     private final AnonymousComplimentService complimentService;
 
-    /** Send an anonymous compliment to a user. */
+    /**
+     * Send an anonymous compliment to a user.
+     */
     @PostMapping
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<ComplimentResponse>> send(
@@ -43,7 +45,9 @@ public class AnonymousComplimentController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Compliment sent", "TM_000"));
     }
 
-    /** The caller's inbox — compliments addressed to them (sender hidden unless revealed). */
+    /**
+     * The caller's inbox — compliments addressed to them (sender hidden unless revealed).
+     */
     @GetMapping("/inbox")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<List<ComplimentResponse>>> inbox(
@@ -52,7 +56,9 @@ public class AnonymousComplimentController {
         return ResponseEntity.ok(SuccessResponseDto.success(inbox));
     }
 
-    /** The caller's own outgoing compliments. */
+    /**
+     * The caller's own outgoing compliments.
+     */
     @GetMapping("/sent")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<List<ComplimentResponse>>> sent(
@@ -61,7 +67,9 @@ public class AnonymousComplimentController {
         return ResponseEntity.ok(SuccessResponseDto.success(sent));
     }
 
-    /** Recipient requests to learn who sent a compliment (notifies the sender). */
+    /**
+     * Recipient requests to learn who sent a compliment (notifies the sender).
+     */
     @PostMapping("/{uuid}/reveal-request")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<ComplimentResponse>> requestReveal(
@@ -71,7 +79,9 @@ public class AnonymousComplimentController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Reveal requested", "TM_000"));
     }
 
-    /** Sender accepts ({@code accept=true}) or declines ({@code accept=false}) a reveal request. */
+    /**
+     * Sender accepts ({@code accept=true}) or declines ({@code accept=false}) a reveal request.
+     */
     @PostMapping("/{uuid}/reveal-response")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<ComplimentResponse>> respondReveal(

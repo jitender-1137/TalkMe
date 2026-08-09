@@ -49,7 +49,9 @@ class HeuristicWingmanServiceImplTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Minimal user; interests/languages/mood left null so shared-signal openers stay empty. */
+    /**
+     * Minimal user; interests/languages/mood left null so shared-signal openers stay empty.
+     */
     private static User wingmanUser(String username) {
         User u = User.builder()
                 .username(username).email(username + "@e.com").name("User " + username)

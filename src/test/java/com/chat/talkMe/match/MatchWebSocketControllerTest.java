@@ -18,7 +18,6 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -43,14 +42,22 @@ class MatchWebSocketControllerTest {
 
     private static final String USER = "alice";
 
-    @Mock private MatchmakingService matchmakingService;
-    @Mock private ChatRoutingService chatRoutingService;
-    @Mock private ImagePermissionService imagePermissionService;
-    @Mock private MatchConsentService matchConsentService;
-    @Mock private MatchMessageBufferService matchMessageBuffer;
-    @Mock private RevealService revealService;
-    @Mock private MatchTimerService matchTimerService;
-    @Mock private Principal principal;
+    @Mock
+    private MatchmakingService matchmakingService;
+    @Mock
+    private ChatRoutingService chatRoutingService;
+    @Mock
+    private ImagePermissionService imagePermissionService;
+    @Mock
+    private MatchConsentService matchConsentService;
+    @Mock
+    private MatchMessageBufferService matchMessageBuffer;
+    @Mock
+    private RevealService revealService;
+    @Mock
+    private MatchTimerService matchTimerService;
+    @Mock
+    private Principal principal;
 
     private MatchWebSocketController controller;
 
@@ -61,7 +68,9 @@ class MatchWebSocketControllerTest {
                 matchTimerService);
     }
 
-    /** Wires the mocked principal to return the test username. */
+    /**
+     * Wires the mocked principal to return the test username.
+     */
     private void authenticated() {
         when(principal.getName()).thenReturn(USER);
     }

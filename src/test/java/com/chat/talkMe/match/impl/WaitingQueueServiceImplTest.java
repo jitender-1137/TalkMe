@@ -13,8 +13,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -38,9 +36,12 @@ class WaitingQueueServiceImplTest {
     private static final String SET_KEY = "matchmaking:queue:set";
     private static final String USER = "alice";
 
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private ListOperations<String, String> listOps;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private ListOperations<String, String> listOps;
 
     private WaitingQueueServiceImpl service;
 

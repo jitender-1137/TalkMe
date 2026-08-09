@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -53,7 +52,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ReputationServiceImpl implements ReputationService {
 
-    /** Coarse magnitude thresholds (in awarded points) for the opaque contributor breakdown. */
+    /**
+     * Coarse magnitude thresholds (in awarded points) for the opaque contributor breakdown.
+     */
     private static final long MAG_HIGH = 200L;
     private static final long MAG_MED = 50L;
 
@@ -64,13 +65,16 @@ public class ReputationServiceImpl implements ReputationService {
     private final ReputationCache reputationCache;
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
-    /** Lazy self-reference so read paths can call {@link #recomputeFor} through the proxy — each
-     *  recompute then runs in its OWN transaction, so a lost optimistic-lock/unique race rolls
-     *  back cleanly and the caller can fail open instead of poisoning the request's transaction. */
+    /**
+     * Lazy self-reference so read paths can call {@link #recomputeFor} through the proxy — each
+     * recompute then runs in its OWN transaction, so a lost optimistic-lock/unique race rolls
+     * back cleanly and the caller can fail open instead of poisoning the request's transaction.
+     */
     private final ObjectProvider<ReputationService> selfProvider;
 
     // ---- Human-readable labels for each contributing action (no weights exposed) -----------
     private static final Map<ReputationEventType, String> LABELS = new EnumMap<>(ReputationEventType.class);
+
     static {
         LABELS.put(ReputationEventType.ACCOUNT_AGE_DAY, "Account longevity");
         LABELS.put(ReputationEventType.PROFILE_COMPLETED, "Complete profile");
@@ -251,7 +255,9 @@ public class ReputationServiceImpl implements ReputationService {
         return rep;
     }
 
-    /** Derive level / star / progress fields from {@code lifetimePoints}. */
+    /**
+     * Derive level / star / progress fields from {@code lifetimePoints}.
+     */
     private void applyLevelCurve(UserReputation rep) {
         int newLevel = curve.levelForPoints(rep.getLifetimePoints());
         long base = curve.totalXpForLevel(newLevel);
@@ -284,7 +290,9 @@ public class ReputationServiceImpl implements ReputationService {
         return reputationRepository.save(rep);
     }
 
-    /** Build the opaque contributor breakdown JSON: {@code [{label, magnitude}]}, labels only. */
+    /**
+     * Build the opaque contributor breakdown JSON: {@code [{label, magnitude}]}, labels only.
+     */
     private String buildContributorsJson(Long userId, long maxId) {
         try {
             List<Object[]> rows = ledgerRepository.sumAwardedPerTypeUpToId(userId, maxId);
@@ -336,7 +344,9 @@ public class ReputationServiceImpl implements ReputationService {
                 .build();
     }
 
-    /** Transient level-1 / BRONZE snapshot response for a user with no persisted row yet. */
+    /**
+     * Transient level-1 / BRONZE snapshot response for a user with no persisted row yet.
+     */
     private ReputationResponse defaultResponse(User user) {
         int nextSpan = (int) Math.max(0, curve.totalXpForLevel(2) - curve.totalXpForLevel(1));
         return ReputationResponse.builder()
@@ -351,7 +361,9 @@ public class ReputationServiceImpl implements ReputationService {
                 .build();
     }
 
-    /** In-memory (unsaved) level-1 baseline used as the fail-open fallback for {@code why}. */
+    /**
+     * In-memory (unsaved) level-1 baseline used as the fail-open fallback for {@code why}.
+     */
     private UserReputation transientDefault(User user) {
         return UserReputation.builder()
                 .user(user)

@@ -22,15 +22,23 @@ public interface MusicSessionService {
      */
     MusicSessionState getSession(User user, String chatId);
 
-    /** Start/resume playback of a track (from the request's track fields) and broadcast it. */
+    /**
+     * Start/resume playback of a track (from the request's track fields) and broadcast it.
+     */
     MusicSessionState play(User user, String chatId, MusicPlayRequest request);
 
-    /** Pause the live session at {@code positionSec} (null keeps the current position). */
+    /**
+     * Pause the live session at {@code positionSec} (null keeps the current position).
+     */
     MusicSessionState pause(User user, String chatId, Double positionSec);
 
-    /** Move the live session's playhead to {@code positionSec} (required). */
+    /**
+     * Move the live session's playhead to {@code positionSec} (required).
+     */
     MusicSessionState seek(User user, String chatId, Double positionSec);
 
-    /** Broadcast an ephemeral emoji reaction to whatever is currently playing. */
+    /**
+     * Broadcast an ephemeral emoji reaction to whatever is currently playing.
+     */
     MusicSessionState react(User user, String chatId, String emoji);
 }

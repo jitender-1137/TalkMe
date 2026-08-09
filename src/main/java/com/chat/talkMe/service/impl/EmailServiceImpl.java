@@ -58,7 +58,9 @@ public class EmailServiceImpl implements EmailService {
     private static final String RESEND_ENDPOINT = "https://api.resend.com/emails";
     private static final String BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
-    /** Parses {@code Display Name <mailbox@domain>} into name + address. */
+    /**
+     * Parses {@code Display Name <mailbox@domain>} into name + address.
+     */
     private static final Pattern FROM_PATTERN = Pattern.compile("^\\s*(.*?)\\s*<\\s*(.+?)\\s*>\\s*$");
 
     private final ObjectMapper objectMapper;
@@ -68,7 +70,9 @@ public class EmailServiceImpl implements EmailService {
     private final UserRepository userRepository;
     private final DisposableEmailDomains disposableDomains;
 
-    /** Delivery policy per email type: only TRANSACTIONAL requires a verified recipient. */
+    /**
+     * Delivery policy per email type: only TRANSACTIONAL requires a verified recipient.
+     */
     private enum MailCategory {
         VERIFICATION,     // the verify link itself — must reach unverified users
         WELCOME,          // sent right after verifying — recipient is already verified
@@ -80,7 +84,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
 
-    /** When true, TRANSACTIONAL emails are only sent to verified addresses. */
+    /**
+     * When true, TRANSACTIONAL emails are only sent to verified addresses.
+     */
     @Value("${app.mail.require-verification:true}")
     private boolean requireVerification;
 
@@ -238,7 +244,9 @@ public class EmailServiceImpl implements EmailService {
         deliver(toEmail, toName, subject, html, MailCategory.TRANSACTIONAL);
     }
 
-    /** Masks an email for logs: "jane.doe@example.com" → "ja***@example.com". */
+    /**
+     * Masks an email for logs: "jane.doe@example.com" → "ja***@example.com".
+     */
     private static String maskEmail(String email) {
         if (email == null || email.isBlank()) return "(none)";
         int at = email.indexOf('@');
@@ -281,7 +289,9 @@ public class EmailServiceImpl implements EmailService {
         return true;
     }
 
-    /** Whether the account behind this address exists and has a verified email. */
+    /**
+     * Whether the account behind this address exists and has a verified email.
+     */
     private boolean isVerifiedRecipient(String toEmail) {
         try {
             return userRepository.findByEmailIgnoreCase(toEmail == null ? "" : toEmail.trim())
@@ -293,7 +303,9 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
-    /** Walks the provider chain; best-effort — logs and swallows total failure. */
+    /**
+     * Walks the provider chain; best-effort — logs and swallows total failure.
+     */
     private void deliver(String toEmail, String toName, String subject, String html, MailCategory category) {
         if (!deliverable(toEmail, category)) {
             return;

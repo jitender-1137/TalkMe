@@ -38,8 +38,10 @@ public class TranslationController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
-    /** Translate many texts in one call — cache hits are free, the uncached remainder is one batch
-     *  provider call costing a single daily-cap unit. Used by the per-chat "translate conversation" mode. */
+    /**
+     * Translate many texts in one call — cache hits are free, the uncached remainder is one batch
+     * provider call costing a single daily-cap unit. Used by the per-chat "translate conversation" mode.
+     */
     @PostMapping("/batch")
     @PreAuthorize("@featureGuard.check('INSTANT_TRANSLATE')")
     public ResponseEntity<ResponseDto<TranslateBatchResponse>> translateBatch(

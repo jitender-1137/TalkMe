@@ -29,9 +29,12 @@ public final class SsrfGuard {
     private static final int CONNECT_TIMEOUT_MS = 5_000;
     private static final int READ_TIMEOUT_MS = 15_000;
 
-    private SsrfGuard() {}
+    private SsrfGuard() {
+    }
 
-    /** Throws {@link IllegalArgumentException} if {@code rawUrl} is unsafe to fetch. */
+    /**
+     * Throws {@link IllegalArgumentException} if {@code rawUrl} is unsafe to fetch.
+     */
     public static void assertSafe(String rawUrl) {
         if (rawUrl == null || rawUrl.isBlank()) {
             throw new IllegalArgumentException("URL is required");
@@ -63,7 +66,9 @@ public final class SsrfGuard {
         }
     }
 
-    /** Same as {@link #assertSafe} but additionally requires HTTPS. */
+    /**
+     * Same as {@link #assertSafe} but additionally requires HTTPS.
+     */
     public static void assertSafeHttps(String rawUrl) {
         assertSafe(rawUrl);
         if (!rawUrl.trim().regionMatches(true, 0, "https://", 0, 8)) {
@@ -71,7 +76,9 @@ public final class SsrfGuard {
         }
     }
 
-    /** Validates the URL then opens a non-redirecting stream to it. */
+    /**
+     * Validates the URL then opens a non-redirecting stream to it.
+     */
     public static InputStream openStream(String rawUrl) throws IOException {
         assertSafe(rawUrl);
         HttpURLConnection conn = (HttpURLConnection) URI.create(rawUrl.trim()).toURL().openConnection();
@@ -100,7 +107,9 @@ public final class SsrfGuard {
                 || isUniqueLocalIpv6(addr);
     }
 
-    /** IPv6 Unique Local Addresses (fc00::/7) aren't covered by isSiteLocalAddress. */
+    /**
+     * IPv6 Unique Local Addresses (fc00::/7) aren't covered by isSiteLocalAddress.
+     */
     private static boolean isUniqueLocalIpv6(InetAddress addr) {
         byte[] bytes = addr.getAddress();
         return bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;

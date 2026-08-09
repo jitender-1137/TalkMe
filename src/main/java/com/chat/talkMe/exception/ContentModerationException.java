@@ -6,6 +6,7 @@ package com.chat.talkMe.exception;
  * {@code GlobalExceptionHandler.handleServiceException}.
  */
 public class ContentModerationException extends ServiceException {
+    private static final long serialVersionUID = 1L;
     public ContentModerationException(String message) {
         super(422, message, "TM_490");
     }

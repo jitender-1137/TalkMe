@@ -95,7 +95,9 @@ public class NightCitySeeder implements ApplicationRunner {
         chatRepository.save(chat);
     }
 
-    /** First configured super-admin email, else the most-recently-joined real account, else null. */
+    /**
+     * First configured super-admin email, else the most-recently-joined real account, else null.
+     */
     private User resolveHost() {
         if (superAdminEmails != null && !superAdminEmails.isBlank()) {
             for (String raw : superAdminEmails.split(",")) {

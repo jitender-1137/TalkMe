@@ -121,7 +121,9 @@ class ConversationSummaryControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A fully-populated "Our Story" card for a 1:1 chat with Bob. */
+    /**
+     * A fully-populated "Our Story" card for a 1:1 chat with Bob.
+     */
     private static ConversationSummaryResponse fullSummary() {
         return ConversationSummaryResponse.builder()
                 .chatUuid(CHAT_UUID)

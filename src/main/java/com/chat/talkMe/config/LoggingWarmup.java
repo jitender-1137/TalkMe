@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Eagerly loads logback's throwable-rendering classes at startup.
- *
+ * <p>
  * The app runs as a Spring Boot fat jar, which loads classes LAZILY from nested
  * jars. {@code ch.qos.logback.classic.spi.ThrowableProxy} (and friends) are only
  * needed the first time a stack trace is logged — which in production is often when
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * was replaced/redeployed WHILE the JVM was still running, that first lazy load
  * fails with {@code NoClassDefFoundError: .../ThrowableProxy}, killing the Tomcat
  * worker thread (seen in prod as "Exception in thread http-nio-...").
- *
+ * <p>
  * Loading these classes now — while the jar is healthy — makes them resident for the
  * life of the JVM, so a later on-disk jar swap can't break exception logging. This is
  * defence-in-depth: the real fix is to deploy WITHOUT overwriting the running jar

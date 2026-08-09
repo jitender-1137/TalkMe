@@ -1,6 +1,8 @@
 package com.chat.talkMe.enums;
 
-/** The flavour of a matchmaking session. QUICK is the legacy blind-FIFO path. */
+/**
+ * The flavour of a matchmaking session. QUICK is the legacy blind-FIFO path.
+ */
 public enum MatchMode {
     QUICK,
     FLIRT,

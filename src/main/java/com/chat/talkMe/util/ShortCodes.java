@@ -15,9 +15,12 @@ public final class ShortCodes {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int DEFAULT_LENGTH = 10;
 
-    private ShortCodes() {}
+    private ShortCodes() {
+    }
 
-    /** A single random base62 code of the given length. */
+    /**
+     * A single random base62 code of the given length.
+     */
     public static String random(int length) {
         StringBuilder sb = new StringBuilder(length);
         for (int i = 0; i < length; i++) {

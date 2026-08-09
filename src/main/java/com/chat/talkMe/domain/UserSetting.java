@@ -3,8 +3,19 @@ package com.chat.talkMe.domain;
 import com.chat.talkMe.enums.GroupAddPrivacy;
 import com.chat.talkMe.enums.MessagingPrivacy;
 import com.chat.talkMe.enums.NightOwlMode;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 @Entity
@@ -69,19 +80,25 @@ public class UserSetting extends BaseEntity {
     // existing rows a value when ddl-auto adds the NOT NULL column (do NOT also put a
     // "default" in columnDefinition — see the messaging_privacy note above).
 
-    /** New-sign-in security alert emails. */
+    /**
+     * New-sign-in security alert emails.
+     */
     @ColumnDefault("true")
     @Column(name = "email_login_alerts", nullable = false)
     @Builder.Default
     private boolean emailLoginAlerts = true;
 
-    /** "You have unread messages" digest emails. */
+    /**
+     * "You have unread messages" digest emails.
+     */
     @ColumnDefault("true")
     @Column(name = "email_unread_messages", nullable = false)
     @Builder.Default
     private boolean emailUnreadMessages = true;
 
-    /** Product news / announcement emails. */
+    /**
+     * Product news / announcement emails.
+     */
     @ColumnDefault("true")
     @Column(name = "email_announcements", nullable = false)
     @Builder.Default
@@ -97,23 +114,31 @@ public class UserSetting extends BaseEntity {
     @Builder.Default
     private NightOwlMode nightOwlMode = NightOwlMode.AUTO;
 
-    /** Local hour Night Owl auto-activates (0–23). */
+    /**
+     * Local hour Night Owl auto-activates (0–23).
+     */
     @ColumnDefault("22")
     @Column(name = "night_start_hour", nullable = false)
     @Builder.Default
     private int nightStartHour = 22;
 
-    /** Local hour Night Owl auto-deactivates (0–23), wrapping past midnight. */
+    /**
+     * Local hour Night Owl auto-deactivates (0–23), wrapping past midnight.
+     */
     @ColumnDefault("5")
     @Column(name = "night_end_hour", nullable = false)
     @Builder.Default
     private int nightEndHour = 5;
 
-    /** Optional ambient-sound preset id for the night experience (null = none). */
+    /**
+     * Optional ambient-sound preset id for the night experience (null = none).
+     */
     @Column(name = "night_ambient_sound", length = 30)
     private String nightAmbientSound;
 
-    /** Optional night accent hex (e.g. "#8b74ff"); null = use the default night accent. */
+    /**
+     * Optional night accent hex (e.g. "#8b74ff"); null = use the default night accent.
+     */
     @Column(name = "night_accent", length = 9)
     private String nightAccent;
 }

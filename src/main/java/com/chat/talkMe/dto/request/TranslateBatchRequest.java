@@ -24,30 +24,42 @@ import java.util.List;
 @AllArgsConstructor
 public class TranslateBatchRequest {
 
-    /** Items to translate (capped to keep the provider payload sane). */
+    /**
+     * Items to translate (capped to keep the provider payload sane).
+     */
     @NotEmpty
     @Size(max = 100)
     @Valid
     private List<Item> items;
 
-    /** Target language code (e.g. "es", "fr", "hi") — same for every item in the batch. */
+    /**
+     * Target language code (e.g. "es", "fr", "hi") — same for every item in the batch.
+     */
     @NotBlank
     private String target;
 
-    /** Source language code; optional — null/blank means auto-detect. */
+    /**
+     * Source language code; optional — null/blank means auto-detect.
+     */
     private String source;
 
-    /** A single text to translate, tagged with a caller id (typically the message id). */
+    /**
+     * A single text to translate, tagged with a caller id (typically the message id).
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Item {
 
-        /** Caller-chosen id echoed back on the matching result (e.g. the message id). */
+        /**
+         * Caller-chosen id echoed back on the matching result (e.g. the message id).
+         */
         @NotBlank
         private String id;
 
-        /** Plaintext to translate (blank items are echoed back unchanged). */
+        /**
+         * Plaintext to translate (blank items are echoed back unchanged).
+         */
         @Size(max = 5000)
         private String text;
     }

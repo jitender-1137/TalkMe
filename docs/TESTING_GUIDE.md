@@ -45,6 +45,7 @@ Build & run: `cd TalkMe && ./gradlew test`. Batch run:
 ## 2. The enumeration checklist (apply to EVERY public method)
 
 ### Positive cases (happy paths)
+
 1. **Nominal success** — typical valid input → correct return value / DTO shape.
 2. **Every valid branch** — each mode/flag/type combination (group vs 1:1, enabled vs
    disabled, cursor present vs absent, etc.).
@@ -55,6 +56,7 @@ Build & run: `cd TalkMe && ./gradlew test`. Batch run:
 5. **Side effects** — verify the save (captor), emissions, cache evictions, outbox writes.
 
 ### Negative cases (one test per distinct outcome)
+
 6. **Null / missing** required argument.
 7. **Not found** — entity/UUID absent → `NotFoundException` + exact `TM_###`.
 8. **Authorization / ownership** — acting on another user's resource, non-member, blocked

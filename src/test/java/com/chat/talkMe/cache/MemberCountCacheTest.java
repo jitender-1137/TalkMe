@@ -18,7 +18,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,9 +37,12 @@ class MemberCountCacheTest {
     private static final UUID CHAT_UUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final String KEY = "chat:mc:" + CHAT_UUID;
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
     private MemberCountCache cache;
 

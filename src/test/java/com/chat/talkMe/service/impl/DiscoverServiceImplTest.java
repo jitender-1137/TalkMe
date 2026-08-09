@@ -58,12 +58,18 @@ import static org.mockito.Mockito.when;
 @DisplayName("DiscoverServiceImpl (unit)")
 class DiscoverServiceImplTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private DiscoverLikeRepository discoverLikeRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private FriendRequestRepository friendRequestRepository;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private PresenceService presenceService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private DiscoverLikeRepository discoverLikeRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private FriendRequestRepository friendRequestRepository;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private PresenceService presenceService;
 
     private DiscoverServiceImpl service;
 
@@ -89,7 +95,9 @@ class DiscoverServiceImplTest {
         return new PageImpl<>(content, PageRequest.of(pageNo, size), total);
     }
 
-    /** Stub the two presence sets always read at the top of getDiscover. */
+    /**
+     * Stub the two presence sets always read at the top of getDiscover.
+     */
     private void stubPresenceSets() {
         lenient().when(presenceService.getOnlineUsernames()).thenReturn(Collections.emptySet());
         lenient().when(presenceService.getAwayUsernames()).thenReturn(Collections.emptySet());
@@ -376,7 +384,9 @@ class DiscoverServiceImplTest {
         }
     }
 
-    /** Wire the per-user enrichment lookups to neutral/false values (target is OFFLINE). */
+    /**
+     * Wire the per-user enrichment lookups to neutral/false values (target is OFFLINE).
+     */
     private void wireNeutralEnrichment(User target) {
         when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
         when(friendRepository.findFriendsByUser(target)).thenReturn(List.of());

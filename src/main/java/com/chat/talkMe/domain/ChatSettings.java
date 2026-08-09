@@ -27,35 +27,45 @@ import org.hibernate.annotations.ColumnDefault;
 @AllArgsConstructor
 public class ChatSettings {
 
-    /** Who may post. CHANNEL forces ADMINS_ONLY at the service layer. */
+    /**
+     * Who may post. CHANNEL forces ADMINS_ONLY at the service layer.
+     */
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'EVERYONE'")
     @Column(name = "settings_who_can_send", nullable = false, length = 20)
     @Builder.Default
     private SendPolicy whoCanSend = SendPolicy.EVERYONE;
 
-    /** Minimum role required to add members. */
+    /**
+     * Minimum role required to add members.
+     */
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'MEMBER'")
     @Column(name = "settings_who_can_add_members", nullable = false, length = 20)
     @Builder.Default
     private MemberRole whoCanAddMembers = MemberRole.MEMBER;
 
-    /** Minimum role required to edit name/description/avatar/settings. */
+    /**
+     * Minimum role required to edit name/description/avatar/settings.
+     */
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'ADMIN'")
     @Column(name = "settings_who_can_edit_info", nullable = false, length = 20)
     @Builder.Default
     private MemberRole whoCanEditInfo = MemberRole.ADMIN;
 
-    /** Minimum role required to pin/unpin messages. */
+    /**
+     * Minimum role required to pin/unpin messages.
+     */
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'ADMIN'")
     @Column(name = "settings_who_can_pin", nullable = false, length = 20)
     @Builder.Default
     private MemberRole whoCanPin = MemberRole.ADMIN;
 
-    /** Minimum seconds between a member's messages; 0 = off. */
+    /**
+     * Minimum seconds between a member's messages; 0 = off.
+     */
     @ColumnDefault("0")
     @Column(name = "settings_slow_mode_seconds", nullable = false)
     @Builder.Default

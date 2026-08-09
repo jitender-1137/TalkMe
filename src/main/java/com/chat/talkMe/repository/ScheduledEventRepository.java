@@ -15,15 +15,23 @@ public interface ScheduledEventRepository extends JpaRepository<ScheduledEvent, 
 
     Optional<ScheduledEvent> findByUuid(UUID uuid);
 
-    /** Resolve the event that owns a spun-up room (for the room-join attendance hook). */
+    /**
+     * Resolve the event that owns a spun-up room (for the room-join attendance hook).
+     */
     Optional<ScheduledEvent> findByRoomChatUuid(String roomChatUuid);
 
-    /** Upcoming events (not yet started), soonest first. */
+    /**
+     * Upcoming events (not yet started), soonest first.
+     */
     List<ScheduledEvent> findByStatusAndStartAtAfterOrderByStartAtAsc(EventStatus status, Instant now);
 
-    /** Events whose start time has arrived and still awaiting their room (orchestrator start feed). */
+    /**
+     * Events whose start time has arrived and still awaiting their room (orchestrator start feed).
+     */
     List<ScheduledEvent> findByStatusAndStartAtLessThanEqual(EventStatus status, Instant now);
 
-    /** Live events whose (non-null) close time has elapsed (orchestrator end feed). */
+    /**
+     * Live events whose (non-null) close time has elapsed (orchestrator end feed).
+     */
     List<ScheduledEvent> findByStatusAndEndAtIsNotNullAndEndAtLessThanEqual(EventStatus status, Instant now);
 }

@@ -5,11 +5,11 @@ import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.exception.ForbiddenException;
-import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.repository.ChatMemberRepository;
-import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
 
 /**
  * Centralized authorization for group/channel/room actions. Every membership,
@@ -21,7 +21,9 @@ public class GroupAuthzService {
 
     private final ChatMemberRepository chatMemberRepository;
 
-    /** The caller's membership, or 403 if not an active member. */
+    /**
+     * The caller's membership, or 403 if not an active member.
+     */
     public ChatMember requireMember(Chat chat, User user) {
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, user)
                 .filter(m -> !m.isDeleted() && m.getLeftAt() == null)
@@ -32,7 +34,9 @@ public class GroupAuthzService {
         return member;
     }
 
-    /** The caller's membership, or 403 if their role is below {@code minRole}. */
+    /**
+     * The caller's membership, or 403 if their role is below {@code minRole}.
+     */
     public ChatMember requireRole(Chat chat, User user, MemberRole minRole) {
         ChatMember member = requireMember(chat, user);
         if (!member.getRole().atLeast(minRole)) {
@@ -41,7 +45,9 @@ public class GroupAuthzService {
         return member;
     }
 
-    /** True if the user may currently post in the chat (role/send-policy/ban/mute aware). */
+    /**
+     * True if the user may currently post in the chat (role/send-policy/ban/mute aware).
+     */
     public boolean canSend(Chat chat, ChatMember member) {
         if (member == null || member.isBanned()) return false;
         if (member.getMutedUntil() != null && member.getMutedUntil().isAfter(Instant.now())) return false;

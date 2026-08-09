@@ -17,15 +17,21 @@ public interface EventService {
 
     EventResponse createEvent(CreateEventRequest request, User host);
 
-    /** Upcoming (not-yet-started) events, soonest first, enriched with the viewer's RSVP + counts. */
+    /**
+     * Upcoming (not-yet-started) events, soonest first, enriched with the viewer's RSVP + counts.
+     */
     List<EventResponse> listUpcoming(User viewer);
 
     EventResponse getEvent(String eventUuid, User viewer);
 
-    /** Set/change the caller's RSVP. {@code status} = GOING | INTERESTED | DECLINED. */
+    /**
+     * Set/change the caller's RSVP. {@code status} = GOING | INTERESTED | DECLINED.
+     */
     EventResponse rsvp(User user, String eventUuid, String status);
 
-    /** Cancel a SCHEDULED/LIVE event. Host only. */
+    /**
+     * Cancel a SCHEDULED/LIVE event. Host only.
+     */
     EventResponse cancelEvent(String eventUuid, User host);
 
     /**
@@ -49,6 +55,8 @@ public interface EventService {
      */
     int startDueEvents();
 
-    /** Orchestrator hook: flip LIVE events whose {@code endAt} has elapsed to ENDED. Returns count. */
+    /**
+     * Orchestrator hook: flip LIVE events whose {@code endAt} has elapsed to ENDED. Returns count.
+     */
     int endDueEvents();
 }

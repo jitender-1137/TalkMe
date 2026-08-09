@@ -13,11 +13,14 @@ import java.time.Instant;
  */
 public interface DailyCompanionService {
 
-    /** The caller's companion for today (or an empty card when none is assigned yet). */
+    /**
+     * The caller's companion for today (or an empty card when none is assigned yet).
+     */
     DailyCompanionResponse getToday(User user);
 
     /**
      * Apply the user's decision to today's companion.
+     *
      * @param action one of {@code STAY_FRIENDS}, {@code CONTINUE}, {@code END}.
      */
     DailyCompanionResponse act(User user, String action);
@@ -29,6 +32,8 @@ public interface DailyCompanionService {
      */
     DailyCompanion assignFor(User user);
 
-    /** Flip ACTIVE pairings past their 24h window to EXPIRED. Returns the number reaped. */
+    /**
+     * Flip ACTIVE pairings past their 24h window to EXPIRED. Returns the number reaped.
+     */
     int reapExpired(Instant now);
 }

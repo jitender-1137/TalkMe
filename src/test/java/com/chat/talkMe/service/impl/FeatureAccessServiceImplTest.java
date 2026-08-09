@@ -59,10 +59,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("FeatureAccessServiceImpl (unit)")
 class FeatureAccessServiceImplTest {
 
-    @Mock private FeatureFlags featureFlags;
-    @Mock private UserFeatureGrantRepository grantRepository;
-    @Mock private FeatureAccessCache cache;
-    @Mock private AgeVerificationService ageVerificationService;
+    @Mock
+    private FeatureFlags featureFlags;
+    @Mock
+    private UserFeatureGrantRepository grantRepository;
+    @Mock
+    private FeatureAccessCache cache;
+    @Mock
+    private AgeVerificationService ageVerificationService;
 
     private FeatureAccessServiceImpl service;
 

@@ -1,11 +1,10 @@
 package com.chat.talkMe.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.Set;
@@ -38,13 +37,13 @@ public class DiscoverProfileResponse {
     private List<String> images;
     @JsonProperty("isVerified")
     private boolean isVerified;
-    
+
     @JsonProperty("isOnline")
     private boolean isOnline;
-    
+
     @JsonProperty("isLiked")
     private boolean isLiked;
-    
+
     @JsonProperty("isFriend")
     private boolean isFriend;
     private int mutualFriendsCount;
@@ -52,7 +51,9 @@ public class DiscoverProfileResponse {
     @JsonProperty("isRequestSent")
     private boolean isRequestSent;
     private String pendingRequestId;
-    /** True when this user restricts messaging to friends — drives the avatar lock badge. */
+    /**
+     * True when this user restricts messaging to friends — drives the avatar lock badge.
+     */
     @JsonProperty("messagingFriendsOnly")
     private Boolean messagingFriendsOnly;
 }

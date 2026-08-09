@@ -64,13 +64,20 @@ class EventServiceImplTest {
     private static final UUID ROOM_UUID = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000002");
     private static final String ROOM_UUID_STR = ROOM_UUID.toString();
 
-    @Mock private ScheduledEventRepository scheduledEventRepository;
-    @Mock private EventRsvpRepository eventRsvpRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
-    @Mock private ReputationRecorder reputationRecorder;
-    @Mock private EventTransitionWorker transitionWorker;
+    @Mock
+    private ScheduledEventRepository scheduledEventRepository;
+    @Mock
+    private EventRsvpRepository eventRsvpRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private ReputationRecorder reputationRecorder;
+    @Mock
+    private EventTransitionWorker transitionWorker;
 
     private EventServiceImpl service;
 
@@ -101,7 +108,9 @@ class EventServiceImplTest {
         return e;
     }
 
-    /** Default counts used by the private toResponse mapper so it never NPEs. */
+    /**
+     * Default counts used by the private toResponse mapper so it never NPEs.
+     */
     private void stubResponseCounts() {
         lenient().when(eventRsvpRepository.countByEventAndStatus(any(), any())).thenReturn(0L);
         lenient().when(eventRsvpRepository.findByEventAndUser(any(), any())).thenReturn(Optional.empty());

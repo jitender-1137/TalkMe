@@ -3,7 +3,9 @@ package com.chat.talkMe.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
-/** One admin audit-trail entry for the dashboard. */
+/**
+ * One admin audit-trail entry for the dashboard.
+ */
 @Data
 @Builder
 public class AdminAuditView {

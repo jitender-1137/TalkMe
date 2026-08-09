@@ -6,12 +6,14 @@
 
 ## 1. Get User Settings
 
-Retrieves the app configuration preferences (theme, language, alerts/notifications, safe search filters, sound options) for the authenticated user.
+Retrieves the app configuration preferences (theme, language, alerts/notifications, safe search filters, sound options)
+for the authenticated user.
 
-*   **URL:** `GET /api/v1/settings`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **URL:** `GET /api/v1/settings`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -34,15 +36,16 @@ Retrieves the app configuration preferences (theme, language, alerts/notificatio
 
 Modifies the app configuration preferences for the authenticated user.
 
-*   **URL:** `PUT /api/v1/settings`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/settings`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "theme": "LIGHT",
@@ -54,6 +57,7 @@ Modifies the app configuration preferences for the authenticated user.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

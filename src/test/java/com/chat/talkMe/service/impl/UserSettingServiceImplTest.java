@@ -49,8 +49,10 @@ class UserSettingServiceImplTest {
     private static final long USER_ID = 1L;
     private static final UUID FIXED_UUID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private UserSettingsCache userSettingsCache;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private UserSettingsCache userSettingsCache;
 
     private UserSettingServiceImpl service;
 
@@ -71,7 +73,9 @@ class UserSettingServiceImplTest {
         });
     }
 
-    /** A fully-populated, non-default settings row (all values distinct from the defaults). */
+    /**
+     * A fully-populated, non-default settings row (all values distinct from the defaults).
+     */
     private UserSetting existingSettings() {
         UserSetting s = UserSetting.builder()
                 .user(user)

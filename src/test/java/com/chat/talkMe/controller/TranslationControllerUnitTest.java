@@ -11,7 +11,6 @@ import com.chat.talkMe.exception.GlobalExceptionHandler;
 import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.TranslationService;
-import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -118,7 +118,9 @@ class TranslationControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A live provider translation result. */
+    /**
+     * A live provider translation result.
+     */
     private static TranslateResponse translated(String text) {
         return TranslateResponse.builder()
                 .translatedText(text)

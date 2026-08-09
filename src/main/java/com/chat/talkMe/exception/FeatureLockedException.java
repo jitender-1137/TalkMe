@@ -7,6 +7,7 @@ package com.chat.talkMe.exception;
  * {@code GlobalExceptionHandler.handleServiceException}.
  */
 public class FeatureLockedException extends ServiceException {
+    private static final long serialVersionUID = 1L;
 
     public static final String CODE = "TM_FEATURE_LOCKED";
 

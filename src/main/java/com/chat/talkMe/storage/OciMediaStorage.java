@@ -84,6 +84,7 @@ public class OciMediaStorage implements MediaStorage {
                 public long contentLength() {
                     return len; // known up front — avoids Spring draining the stream
                 }
+
                 @Override
                 public String getFilename() {
                     int slash = key.lastIndexOf('/');
@@ -111,7 +112,9 @@ public class OciMediaStorage implements MediaStorage {
             return Optional.of(new TempLocalFile(tmp));
         } catch (IOException | RuntimeException e) {
             if (tmp != null) {
-                try { Files.deleteIfExists(tmp); } catch (IOException ignored) { /* best-effort */ }
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException ignored) { /* best-effort */ }
             }
             log.warn("OCI download failed for {}: {}", reference, e.getMessage());
             return Optional.empty();
@@ -183,11 +186,15 @@ public class OciMediaStorage implements MediaStorage {
         return (dot > slash && dot >= 0) ? key.substring(dot) : ".tmp";
     }
 
-    /** A temp download — {@link #close()} deletes it. */
+    /**
+     * A temp download — {@link #close()} deletes it.
+     */
     private record TempLocalFile(Path path) implements LocalFile {
         @Override
         public void close() {
-            try { Files.deleteIfExists(path); } catch (IOException ignored) { /* best-effort */ }
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException ignored) { /* best-effort */ }
         }
     }
 }

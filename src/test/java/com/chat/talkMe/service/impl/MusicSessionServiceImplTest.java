@@ -59,11 +59,16 @@ class MusicSessionServiceImplTest {
     private static final Duration TTL = Duration.ofHours(6);
     private static final String HOST = "alice";
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
     private ObjectMapper objectMapper;
     private MusicSessionServiceImpl service;
@@ -86,19 +91,25 @@ class MusicSessionServiceImplTest {
         chat.setUuid(UUID.fromString(CHAT_ID));
     }
 
-    /** Make the caller a member of the chat behind {@code CHAT_ID}. */
+    /**
+     * Make the caller a member of the chat behind {@code CHAT_ID}.
+     */
     private void asMember() {
         when(chatRepository.findByUuid(UUID.fromString(CHAT_ID))).thenReturn(Optional.of(chat));
         when(chatMemberRepository.findByChatAndUser(chat, user))
                 .thenReturn(Optional.of(new ChatMember()));
     }
 
-    /** Stub the shared Redis value ops so read/write are routed through {@link #valueOps}. */
+    /**
+     * Stub the shared Redis value ops so read/write are routed through {@link #valueOps}.
+     */
     private void withValueOps() {
         lenient().when(redis.opsForValue()).thenReturn(valueOps);
     }
 
-    /** Serialize a state exactly as the impl would, so a stubbed GET round-trips cleanly. */
+    /**
+     * Serialize a state exactly as the impl would, so a stubbed GET round-trips cleanly.
+     */
     private String json(MusicSessionState state) {
         try {
             return objectMapper.writeValueAsString(state);

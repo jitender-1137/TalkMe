@@ -1,18 +1,16 @@
 package com.chat.talkMe.controller;
 
-import com.chat.talkMe.domain.Role;
-import com.chat.talkMe.domain.User;
-import com.chat.talkMe.domain.Session;
 import com.chat.talkMe.domain.RefreshToken;
-import com.chat.talkMe.repository.RoleRepository;
-import com.chat.talkMe.repository.UserRepository;
-import com.chat.talkMe.repository.SessionRepository;
+import com.chat.talkMe.domain.Role;
+import com.chat.talkMe.domain.Session;
+import com.chat.talkMe.domain.User;
 import com.chat.talkMe.repository.RefreshTokenRepository;
+import com.chat.talkMe.repository.RoleRepository;
+import com.chat.talkMe.repository.SessionRepository;
+import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.PwnedPasswordService;
 import jakarta.servlet.http.Cookie;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,14 +28,21 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -122,8 +127,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(signupPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("User Registered Successfully"))
@@ -146,9 +151,9 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .header("CF-IPCountry", "IN")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(signupPayload))
+                        .header("CF-IPCountry", "IN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.user.country").value("India"));
@@ -168,8 +173,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(signupPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(signupPayload))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_047"));
@@ -189,8 +194,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(invalidPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidPayload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("VE_101"));
@@ -206,8 +211,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(loginPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.user.username").value("testuser"))
@@ -227,8 +232,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(loginPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.user.guest").value(true))
@@ -248,9 +253,9 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .header("CF-IPCountry", "US")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(loginPayload))
+                        .header("CF-IPCountry", "US")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginPayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.user.country").value("United States"));
@@ -266,8 +271,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(loginPayload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginPayload))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_024"));
@@ -285,7 +290,7 @@ public class AuthControllerTest {
         Cookie refreshCookie = new Cookie("refreshToken", tokenStr);
 
         mockMvc.perform(post("/api/v1/auth/refresh")
-                .cookie(refreshCookie))
+                        .cookie(refreshCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.messageCode").value("TM_023"))
@@ -314,10 +319,10 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/logout")
-                .with(user(testUserDetails()))
-                .cookie(refreshCookie)
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .with(user(testUserDetails()))
+                        .cookie(refreshCookie)
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Logout Successful"))
@@ -328,7 +333,7 @@ public class AuthControllerTest {
     @Test
     void testGetMeSuccess() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.username").value("testuser"));
@@ -346,11 +351,11 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(put("/api/v1/auth/me")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updatePayload))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Updated Auth Name"));
@@ -366,7 +371,7 @@ public class AuthControllerTest {
                 .build());
 
         mockMvc.perform(get("/api/v1/auth/sessions")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].ipAddress").value("127.0.0.1"));
@@ -385,9 +390,9 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(delete("/api/v1/auth/sessions/" + sessionUuid)
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .with(user(testUserDetails())))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Session terminated successfully"));
@@ -398,9 +403,9 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/sessions/revoke-all")
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .with(user(testUserDetails())))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("All other sessions revoked successfully"));
@@ -415,8 +420,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/forgot-password")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.messageCode").value("TM_036"));
@@ -440,8 +445,8 @@ public class AuthControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/auth/reset-password")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Password reset successful"));
@@ -459,11 +464,11 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/change-password")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Password changed successfully"));
@@ -481,11 +486,11 @@ public class AuthControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(post("/api/v1/auth/change-password")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_042"));

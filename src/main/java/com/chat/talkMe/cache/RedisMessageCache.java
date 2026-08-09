@@ -44,14 +44,14 @@ public class RedisMessageCache {
         // Last-message cache: used by the chat-list API to show preview text + timestamp.
         String lastMsgKey = "chat:" + event.getChatUuid() + ":lastmsg";
         Map<String, String> fields = new HashMap<>();
-        fields.put("id",          msg.getId() != null   ? msg.getId()           : "");
-        fields.put("clientId",    msg.getClientId() != null ? msg.getClientId() : "");
-        fields.put("content",     msg.getContent() != null  ? msg.getContent()  : "");
-        fields.put("sender",      event.getSenderName() != null ? event.getSenderName() : "");
-        fields.put("createdAt",   msg.getCreatedAt() != null   ? msg.getCreatedAt()     : "");
-        fields.put("messageType", msg.getMessageType() != null ? msg.getMessageType()   : "TEXT");
-        fields.put("seqNum",      msg.getSequenceNumber() != null
-                                      ? msg.getSequenceNumber().toString() : "");
+        fields.put("id", msg.getId() != null ? msg.getId() : "");
+        fields.put("clientId", msg.getClientId() != null ? msg.getClientId() : "");
+        fields.put("content", msg.getContent() != null ? msg.getContent() : "");
+        fields.put("sender", event.getSenderName() != null ? event.getSenderName() : "");
+        fields.put("createdAt", msg.getCreatedAt() != null ? msg.getCreatedAt() : "");
+        fields.put("messageType", msg.getMessageType() != null ? msg.getMessageType() : "TEXT");
+        fields.put("seqNum", msg.getSequenceNumber() != null
+                ? msg.getSequenceNumber().toString() : "");
         redisTemplate.opsForHash().putAll(lastMsgKey, fields);
         redisTemplate.expire(lastMsgKey, TTL);
 
@@ -68,19 +68,29 @@ public class RedisMessageCache {
         }
     }
 
-    /** Returns last-message fields for the chat, or an empty map on a cache miss. */
+    /**
+     * Returns last-message fields for the chat, or an empty map on a cache miss.
+     */
     public Map<Object, Object> getLastMessage(String chatUuid) {
         return redisTemplate.opsForHash().entries("chat:" + chatUuid + ":lastmsg");
     }
 
-    /** Returns the cached unread count for a user in a chat, or 0 on a cache miss. */
+    /**
+     * Returns the cached unread count for a user in a chat, or 0 on a cache miss.
+     */
     public long getUnreadCount(String username, String chatUuid) {
         String val = redisTemplate.opsForValue().get("user:" + username + ":unread:" + chatUuid);
         if (val == null) return 0;
-        try { return Long.parseLong(val); } catch (NumberFormatException e) { return 0; }
+        try {
+            return Long.parseLong(val);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
-    /** Resets the unread counter to zero (call when a user marks a chat as read). */
+    /**
+     * Resets the unread counter to zero (call when a user marks a chat as read).
+     */
     public void clearUnreadCount(String username, String chatUuid) {
         redisTemplate.delete("user:" + username + ":unread:" + chatUuid);
     }

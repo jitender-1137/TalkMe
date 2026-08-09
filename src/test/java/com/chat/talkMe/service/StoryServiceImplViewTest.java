@@ -49,15 +49,24 @@ class StoryServiceImplViewTest {
 
     private static final String STORY_UUID = "11111111-1111-1111-1111-111111111111";
 
-    @Mock private StoryRepository storyRepository;
-    @Mock private StoryViewRepository storyViewRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private ContentModerationService moderationService;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private PhotoMusicMuxer photoMusicMuxer;
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private NotificationService notificationService;
-    @Mock private FeatureAccessService featureAccessService;
+    @Mock
+    private StoryRepository storyRepository;
+    @Mock
+    private StoryViewRepository storyViewRepository;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private PhotoMusicMuxer photoMusicMuxer;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private FeatureAccessService featureAccessService;
 
     @InjectMocks
     private StoryServiceImpl storyService;

@@ -38,9 +38,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("MessageBroadcaster (unit)")
 class MessageBroadcasterTest {
 
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private UserRepository userRepository;
-    @Mock private NotificationDispatchService notificationDispatchService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private NotificationDispatchService notificationDispatchService;
 
     private MessageBroadcaster broadcaster;
 

@@ -1,9 +1,12 @@
 package com.chat.talkMe.dto.request;
 
-import java.util.List;
 import lombok.Data;
 
-/** SuperAdmin edit-profile payload. All fields optional — only non-null ones apply. */
+import java.util.List;
+
+/**
+ * SuperAdmin edit-profile payload. All fields optional — only non-null ones apply.
+ */
 @Data
 public class AdminUpdateUserRequest {
     private String name;

@@ -53,14 +53,22 @@ import static org.mockito.Mockito.when;
 @DisplayName("NotificationDispatchServiceImpl (unit)")
 class NotificationDispatchServiceImplTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private MessageRepository messageRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private MessageCryptoService messageCryptoService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private WebPushService webPushService;
-    @Mock private WebPushProperties webPushProperties;
-    @Mock private JwtTokenProvider jwtTokenProvider;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private MessageCryptoService messageCryptoService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private WebPushService webPushService;
+    @Mock
+    private WebPushProperties webPushProperties;
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

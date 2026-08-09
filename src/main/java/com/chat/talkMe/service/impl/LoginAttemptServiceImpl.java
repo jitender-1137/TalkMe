@@ -22,11 +22,17 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
 
     private final StringRedisTemplate redisTemplate;
 
-    /** Lock an account after this many failures within the window. */
+    /**
+     * Lock an account after this many failures within the window.
+     */
     private static final int USER_MAX_ATTEMPTS = 5;
-    /** Lock an IP after this many failures within the window (looser — shared NAT). */
+    /**
+     * Lock an IP after this many failures within the window (looser — shared NAT).
+     */
     private static final int IP_MAX_ATTEMPTS = 20;
-    /** Sliding lockout window in seconds. */
+    /**
+     * Sliding lockout window in seconds.
+     */
     private static final long WINDOW_SECONDS = 15 * 60;
 
     @Override

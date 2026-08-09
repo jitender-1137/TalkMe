@@ -1,11 +1,15 @@
 package com.chat.talkMe.dto.response;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-/** Everything-in-one analytics payload for the SuperAdmin Reports page. */
+/**
+ * Everything-in-one analytics payload for the SuperAdmin Reports page.
+ */
 @Data
 @Builder
 @NoArgsConstructor

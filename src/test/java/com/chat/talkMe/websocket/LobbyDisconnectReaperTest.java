@@ -48,10 +48,14 @@ class LobbyDisconnectReaperTest {
     private static final String SESSIONS_PREFIX = "presence:sessions:";
     private static final String ALICE = "alice";
 
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ZSetOperations<String, String> zSetOps;
-    @Mock private SetOperations<String, String> setOps;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ZSetOperations<String, String> zSetOps;
+    @Mock
+    private SetOperations<String, String> setOps;
 
     private LobbyDisconnectReaper newReaper() {
         return new LobbyDisconnectReaper(redisTemplate, messagingTemplate);

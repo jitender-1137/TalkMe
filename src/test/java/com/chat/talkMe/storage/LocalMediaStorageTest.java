@@ -42,7 +42,9 @@ class LocalMediaStorageTest {
         storage = new LocalMediaStorage(props);
     }
 
-    /** Creates a source file in the temp area (outside the store) with the given bytes. */
+    /**
+     * Creates a source file in the temp area (outside the store) with the given bytes.
+     */
     private Path sourceFile(String name, String content) throws IOException {
         Path src = Files.createTempFile("src-", "-" + name);
         Files.writeString(src, content);

@@ -6,7 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Body for POST /auth/verify-email — carries the one-time verification token. */
+/**
+ * Body for POST /auth/verify-email — carries the one-time verification token.
+ */
 @Data
 @Builder
 @NoArgsConstructor

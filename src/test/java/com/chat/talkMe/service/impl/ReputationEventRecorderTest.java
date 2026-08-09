@@ -46,8 +46,10 @@ class ReputationEventRecorderTest {
     private static final Instant WHEN = Instant.parse("2026-07-30T10:00:00Z");
     private static final LocalDate DAY = LocalDate.of(2026, 7, 30);
 
-    @Mock private ReputationEventRepository ledger;
-    @Mock private ReputationProperties props;
+    @Mock
+    private ReputationEventRepository ledger;
+    @Mock
+    private ReputationProperties props;
 
     private ReputationEventRecorder recorder;
 
@@ -63,7 +65,9 @@ class ReputationEventRecorderTest {
         return new ReputationSignal(USER, type, sourceRef, WHEN);
     }
 
-    /** Arm the ledger read stubs so the compute path runs; individual tests override as needed. */
+    /**
+     * Arm the ledger read stubs so the compute path runs; individual tests override as needed.
+     */
     private void armLedger(long typeCountToday, int sumForType, int sumForDay) {
         when(ledger.existsByDedupeKey(anyString())).thenReturn(false);
         when(ledger.countByUserIdAndTypeAndDayBucket(anyLong(), any(), any())).thenReturn(typeCountToday);

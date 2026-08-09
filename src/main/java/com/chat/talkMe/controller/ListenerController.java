@@ -31,7 +31,9 @@ public class ListenerController {
 
     private final ListenerService listenerService;
 
-    /** Go on duty as a listener. */
+    /**
+     * Go on duty as a listener.
+     */
     @PostMapping("/available")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<ListenerShiftResponse>> goAvailable(
@@ -40,7 +42,9 @@ public class ListenerController {
         return ResponseEntity.ok(SuccessResponseDto.success(shift, "You're now available to listen", "TM_990"));
     }
 
-    /** Clock off duty. */
+    /**
+     * Clock off duty.
+     */
     @PostMapping("/end")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<Void>> end(
@@ -49,7 +53,9 @@ public class ListenerController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Listening shift ended", "TM_991"));
     }
 
-    /** Match me with an available listener and open a private, non-recorded room. */
+    /**
+     * Match me with an available listener and open a private, non-recorded room.
+     */
     @PostMapping("/request")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<ListenerShiftResponse>> request(
@@ -61,11 +67,15 @@ public class ListenerController {
         return ResponseEntity.ok(SuccessResponseDto.success(match, "Connected you with a listener", "TM_992"));
     }
 
-    /** Optional body for {@link #request}: a {@code reason} hint (see ListenerReason wire names). */
+    /**
+     * Optional body for {@link #request}: a {@code reason} hint (see ListenerReason wire names).
+     */
     public record RequestListenerBody(String reason) {
     }
 
-    /** The current live queue of available listeners. */
+    /**
+     * The current live queue of available listeners.
+     */
     @GetMapping("/available")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<List<ListenerShiftResponse>>> listAvailable(

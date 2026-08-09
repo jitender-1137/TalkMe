@@ -46,9 +46,9 @@ public class ChatKeyStartupCheck implements ApplicationRunner {
         } catch (Exception e) {
             throw new IllegalStateException(
                     "CRYPTO_MASTER_KEY cannot decrypt existing chat keys — it appears to be lost, "
-                    + "changed, or from another environment. Starting with the wrong master key would "
-                    + "make all encrypted chats unreadable. Restore the correct key (or run a re-wrap "
-                    + "migration). Refusing to start.", e);
+                            + "changed, or from another environment. Starting with the wrong master key would "
+                            + "make all encrypted chats unreadable. Restore the correct key (or run a re-wrap "
+                            + "migration). Refusing to start.", e);
         }
     }
 }

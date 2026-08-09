@@ -29,19 +29,25 @@ public interface ReputationEventRepository extends JpaRepository<ReputationEvent
 
     // --- Aggregation / snapshot support (features #30/#31) --------------------------------
 
-    /** Sum of counted, awarded points for a user from ledger rows newer than a cursor id. */
+    /**
+     * Sum of counted, awarded points for a user from ledger rows newer than a cursor id.
+     */
     @Query("select coalesce(sum(e.awardedWeight), 0) from ReputationEvent e " +
             "where e.userId = :userId and e.counted = true and e.id > :sinceId")
     long sumAwardedForUserSinceId(@Param("userId") Long userId, @Param("sinceId") long sinceId);
 
-    /** Bounded delta sum ({@code sinceId < id <= maxId}) — prevents double-counting a row
-     *  committed between reading maxId and summing (the cursor only advances to maxId). */
+    /**
+     * Bounded delta sum ({@code sinceId < id <= maxId}) — prevents double-counting a row
+     * committed between reading maxId and summing (the cursor only advances to maxId).
+     */
     @Query("select coalesce(sum(e.awardedWeight), 0) from ReputationEvent e " +
             "where e.userId = :userId and e.counted = true and e.id > :sinceId and e.id <= :maxId")
     long sumAwardedForUserBetweenIds(@Param("userId") Long userId,
                                      @Param("sinceId") long sinceId, @Param("maxId") long maxId);
 
-    /** Highest ledger id for a user (0 if none) — used only for the cosmetic contributor breakdown. */
+    /**
+     * Highest ledger id for a user (0 if none) — used only for the cosmetic contributor breakdown.
+     */
     @Query("select coalesce(max(e.id), 0) from ReputationEvent e where e.userId = :userId")
     long findMaxIdForUser(@Param("userId") Long userId);
 
@@ -53,12 +59,16 @@ public interface ReputationEventRepository extends JpaRepository<ReputationEvent
     @Query("select e.id from ReputationEvent e where e.userId = :userId and e.snapshotApplied = false")
     List<Long> findUnappliedIds(@Param("userId") Long userId);
 
-    /** Sum of counted, awarded points across the given ledger rows (0 if none/empty). */
+    /**
+     * Sum of counted, awarded points across the given ledger rows (0 if none/empty).
+     */
     @Query("select coalesce(sum(e.awardedWeight), 0) from ReputationEvent e " +
             "where e.id in :ids and e.counted = true")
     long sumAwardedByIds(@Param("ids") Collection<Long> ids);
 
-    /** Flag the given ledger rows as folded into the owner's snapshot. */
+    /**
+     * Flag the given ledger rows as folded into the owner's snapshot.
+     */
     @Modifying
     @Query("update ReputationEvent e set e.snapshotApplied = true where e.id in :ids")
     void markSnapshotApplied(@Param("ids") Collection<Long> ids);
@@ -72,7 +82,9 @@ public interface ReputationEventRepository extends JpaRepository<ReputationEvent
             "group by e.type")
     List<Object[]> sumAwardedPerTypeUpToId(@Param("userId") Long userId, @Param("maxId") long maxId);
 
-    /** Distinct user ids that have any ledger activity — the aggregation job's candidate set. */
+    /**
+     * Distinct user ids that have any ledger activity — the aggregation job's candidate set.
+     */
     @Query("select distinct e.userId from ReputationEvent e")
     List<Long> findDistinctUserIds();
 }

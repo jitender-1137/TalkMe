@@ -21,21 +21,36 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StatusUpdateEvent implements Serializable {
+    private static final long serialVersionUID = 1L;
 
-    /** Outbox event type for status changes. */
+    /**
+     * Outbox event type for status changes.
+     */
     public static final String EVENT_TYPE = "message.status";
-    /** WebSocket event names (must match what the client listens for). */
+    /**
+     * WebSocket event names (must match what the client listens for).
+     */
     public static final String READ = "messages_read";
     public static final String DELIVERED = "messages_delivered";
 
-    /** Unique outbox key for this status change (a generated UUID). */
+    /**
+     * Unique outbox key for this status change (a generated UUID).
+     */
     private String eventKey;
-    /** Chat the status change applies to. */
+    /**
+     * Chat the status change applies to.
+     */
     private String chatUuid;
-    /** {@link #READ} or {@link #DELIVERED}. */
+    /**
+     * {@link #READ} or {@link #DELIVERED}.
+     */
     private String eventName;
-    /** UUID of the user who read/received (the {@code readBy}/{@code deliveredBy} field). */
+    /**
+     * UUID of the user who read/received (the {@code readBy}/{@code deliveredBy} field).
+     */
     private String actorUuid;
-    /** DB id of that user, for the unread recompute on a read event (nullable). */
+    /**
+     * DB id of that user, for the unread recompute on a read event (nullable).
+     */
     private Long actorUserId;
 }

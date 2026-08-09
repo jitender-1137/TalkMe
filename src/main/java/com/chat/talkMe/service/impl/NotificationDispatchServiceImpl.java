@@ -5,7 +5,6 @@ import com.chat.talkMe.crypto.MessageCryptoService;
 import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.MessageResponse;
-import com.chat.talkMe.enums.InstallationType;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.repository.UserRepository;
@@ -13,7 +12,6 @@ import com.chat.talkMe.security.JwtTokenProvider;
 import com.chat.talkMe.service.NotificationDispatchService;
 import com.chat.talkMe.service.WebPushService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -22,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service

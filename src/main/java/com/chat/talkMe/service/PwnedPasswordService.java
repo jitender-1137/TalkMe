@@ -36,7 +36,9 @@ public class PwnedPasswordService {
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
 
-    /** @return true only if the password is known-breached (so the caller should reject it). */
+    /**
+     * @return true only if the password is known-breached (so the caller should reject it).
+     */
     public boolean isBreached(String password) {
         if (!enabled || password == null || password.isEmpty()) {
             return false;

@@ -7,7 +7,6 @@ import com.chat.talkMe.repository.UserPresenceRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.websocket.PresenceNotification;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,7 +23,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -229,7 +228,9 @@ public class PresenceServiceImpl implements PresenceService {
         broadcastPresence(user, readFlags(user), PresenceStatus.OFFLINE, lastSeen);
     }
 
-    /** Raw persisted status from the Redis cache (no privacy/invisible masking). */
+    /**
+     * Raw persisted status from the Redis cache (no privacy/invisible masking).
+     */
     private PresenceStatus rawStatus(String username) {
         Object s = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "status");
         if (s == null) {
@@ -471,7 +472,11 @@ public class PresenceServiceImpl implements PresenceService {
         } catch (Exception e) {
             // Cold fallback to DB.
             UserPresence up = presenceServiceHelper.getOrCreateUserPresence(ensureManagedUser(user));
-            try { return PresenceStatus.valueOf(up.getStatus()); } catch (Exception ex) { return PresenceStatus.OFFLINE; }
+            try {
+                return PresenceStatus.valueOf(up.getStatus());
+            } catch (Exception ex) {
+                return PresenceStatus.OFFLINE;
+            }
         }
     }
 
@@ -479,7 +484,9 @@ public class PresenceServiceImpl implements PresenceService {
     public Instant getLastSeen(User user) {
         Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + user.getUsername(), "lastSeenAt");
         if (ls != null) {
-            try { return Instant.parse(ls.toString()); } catch (Exception ignored) { /* fall through */ }
+            try {
+                return Instant.parse(ls.toString());
+            } catch (Exception ignored) { /* fall through */ }
         }
         // Cold fallback to DB (Redis evicted / first read after restart).
         UserPresence up = presenceServiceHelper.getOrCreateUserPresence(ensureManagedUser(user));
@@ -629,8 +636,11 @@ public class PresenceServiceImpl implements PresenceService {
         return presenceServiceHelper.getOrCreateUserPresence(managedUser);
     }
 
-    /** Privacy flags (Ghost / Invisible / Hide-last-seen) — read from Redis, not the DB. */
-    private record PresenceFlags(boolean ghost, boolean invisible, boolean hideLastSeen) {}
+    /**
+     * Privacy flags (Ghost / Invisible / Hide-last-seen) — read from Redis, not the DB.
+     */
+    private record PresenceFlags(boolean ghost, boolean invisible, boolean hideLastSeen) {
+    }
 
     /**
      * Current live status from Redis (the source of truth). Falls back to the supplied
@@ -658,11 +668,15 @@ public class PresenceServiceImpl implements PresenceService {
         redisTemplate.expire(redisKey, CACHE_TTL);
     }
 
-    /** Current live last-seen from Redis (source of truth), with a DB-value fallback. */
+    /**
+     * Current live last-seen from Redis (source of truth), with a DB-value fallback.
+     */
     private Instant liveLastSeen(String username, Instant dbFallback) {
         Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "lastSeenAt");
         if (ls != null) {
-            try { return Instant.parse(ls.toString()); } catch (Exception ignored) { /* fall through */ }
+            try {
+                return Instant.parse(ls.toString());
+            } catch (Exception ignored) { /* fall through */ }
         }
         return dbFallback != null ? dbFallback : Instant.now();
     }

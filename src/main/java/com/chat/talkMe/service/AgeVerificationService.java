@@ -11,6 +11,8 @@ import com.chat.talkMe.domain.User;
  */
 public interface AgeVerificationService {
 
-    /** True when the user is verified to be 18+. */
+    /**
+     * True when the user is verified to be 18+.
+     */
     boolean isAgeVerified(User user);
 }

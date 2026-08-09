@@ -9,7 +9,8 @@ import com.chat.talkMe.domain.User;
  */
 public final class ProfileCompletion {
 
-    private ProfileCompletion() {}
+    private ProfileCompletion() {
+    }
 
     public static int compute(User user) {
         if (user == null) return 0;

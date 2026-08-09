@@ -19,8 +19,12 @@ import java.util.Map;
 public class ConsentStatusResponse {
     private Map<String, Boolean> accepted;
     private Map<String, String> requiredVersions;
-    /** Convenience: true when age + guidelines + flirt-lobby consents are all current. */
+    /**
+     * Convenience: true when age + guidelines + flirt-lobby consents are all current.
+     */
     private boolean flirtLobbyReady;
-    /** True when the underlying account is age-verified (age on file ≥ 18 + AGE_18_PLUS consent). */
+    /**
+     * True when the underlying account is age-verified (age on file ≥ 18 + AGE_18_PLUS consent).
+     */
     private boolean ageVerified;
 }

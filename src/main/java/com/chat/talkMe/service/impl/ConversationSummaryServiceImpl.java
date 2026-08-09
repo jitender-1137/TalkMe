@@ -4,7 +4,6 @@ import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.ConversationSummaryResponse;
-import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
@@ -13,7 +12,6 @@ import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.MessageAttachmentRepository;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.service.ConversationSummaryService;
-import java.util.function.LongSupplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.LongSupplier;
 
 /**
  * Read-only "Our Story" summary (feature #3.3). Everything here is a cheap COUNT/MIN over

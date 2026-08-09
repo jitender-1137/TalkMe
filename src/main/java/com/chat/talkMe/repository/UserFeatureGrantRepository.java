@@ -4,9 +4,9 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserFeatureGrant;
 import com.chat.talkMe.enums.FeatureKey;
 import com.chat.talkMe.enums.GrantScope;
-import java.util.Collection;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,6 +18,8 @@ public interface UserFeatureGrantRepository extends JpaRepository<UserFeatureGra
 
     void deleteByUserAndFeatureKey(User user, FeatureKey key);
 
-    /** Admin revoke: clear ADMIN/COHORT grants but PRESERVE the user's own SELF opt-out. */
+    /**
+     * Admin revoke: clear ADMIN/COHORT grants but PRESERVE the user's own SELF opt-out.
+     */
     void deleteByUserAndFeatureKeyAndScopeIn(User user, FeatureKey key, Collection<GrantScope> scopes);
 }

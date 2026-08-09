@@ -1,11 +1,11 @@
 package com.chat.talkMe.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Set;
 
@@ -48,13 +48,15 @@ public class UserResponse {
     private int profileCompletion;
     @JsonProperty("isVerified")
     private boolean isVerified;
-    
+
     @JsonProperty("isGuest")
     private boolean isGuest;
-    
+
     @JsonProperty("isBlocked")
     private boolean isBlocked;
-    /** Whether the requesting user and this user are friends (drives friends-only UI). */
+    /**
+     * Whether the requesting user and this user are friends (drives friends-only UI).
+     */
     @JsonProperty("isFriend")
     private boolean isFriend;
     /**
@@ -64,18 +66,22 @@ public class UserResponse {
      */
     @JsonProperty("canMessage")
     private Boolean canMessage;
-    /** True when this user restricts messaging to friends — drives the avatar lock badge. */
+    /**
+     * True when this user restricts messaging to friends — drives the avatar lock badge.
+     */
     @JsonProperty("messagingFriendsOnly")
     private Boolean messagingFriendsOnly;
     private String presence; // "online", "idle", "offline"
     private String lastSeen; // ISO 8601 string or null
     private String createdAt;
     private String updatedAt;
-    
+
     private long followersCount;
     private long followingCount;
     private long postsCount;
 
-    /** Granted role names (e.g. ["ROLE_USER","ROLE_SUPER_ADMIN"]) — drives the admin UI guard. */
+    /**
+     * Granted role names (e.g. ["ROLE_USER","ROLE_SUPER_ADMIN"]) — drives the admin UI guard.
+     */
     private List<String> roles;
 }

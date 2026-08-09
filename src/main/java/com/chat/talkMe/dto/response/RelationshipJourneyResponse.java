@@ -21,6 +21,8 @@ public class RelationshipJourneyResponse {
 
     private String otherUserUuid;
     private List<MilestoneResponse> milestones;
-    /** Aggregate friendship stats (messages/photos/games/days). Null if not computable. */
+    /**
+     * Aggregate friendship stats (messages/photos/games/days). Null if not computable.
+     */
     private RelationshipStatsResponse stats;
 }

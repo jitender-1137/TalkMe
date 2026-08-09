@@ -248,7 +248,7 @@ static def getPnpmExecutable() {
     if (os.contains('windows')) {
         return 'pnpm.cmd'
     }
-    
+
     // Check common locations for pnpm
     def paths = ['/opt/homebrew/bin/pnpm', '/usr/local/bin/pnpm', '/usr/bin/pnpm', 'pnpm']
     for (path in paths) {

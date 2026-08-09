@@ -11,5 +11,6 @@ import java.util.Optional;
 @Repository
 public interface PostBookmarkRepository extends JpaRepository<PostBookmark, Long> {
     Optional<PostBookmark> findByPostAndUser(Post post, User user);
+
     boolean existsByPostAndUser(Post post, User user);
 }

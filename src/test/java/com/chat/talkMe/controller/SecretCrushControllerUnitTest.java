@@ -121,7 +121,9 @@ class SecretCrushControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A one-sided crush entry: reveals nothing about reciprocity. */
+    /**
+     * A one-sided crush entry: reveals nothing about reciprocity.
+     */
     private static SecretCrushMatchResponse oneSided(String partnerUuid, String partnerUsername) {
         return SecretCrushMatchResponse.builder()
                 .matched(false)
@@ -130,7 +132,9 @@ class SecretCrushControllerUnitTest {
                 .build();
     }
 
-    /** A confirmed mutual match, with partner card + compatibility populated. */
+    /**
+     * A confirmed mutual match, with partner card + compatibility populated.
+     */
     private static SecretCrushMatchResponse matched() {
         return SecretCrushMatchResponse.builder()
                 .matched(true)

@@ -32,9 +32,11 @@ import static org.mockito.Mockito.when;
 @DisplayName("FeedbackServiceImpl.submit")
 class FeedbackServiceImplTest {
 
-    @Mock private FeedbackRepository feedbackRepository;
+    @Mock
+    private FeedbackRepository feedbackRepository;
 
-    @InjectMocks private FeedbackServiceImpl service;
+    @InjectMocks
+    private FeedbackServiceImpl service;
 
     private User user;
 

@@ -27,7 +27,9 @@ public class ProfileViewController {
 
     private final ProfileViewService profileViewService;
 
-    /** Record that the current user opened {@code userId}'s profile or photo. Best-effort. */
+    /**
+     * Record that the current user opened {@code userId}'s profile or photo. Best-effort.
+     */
     @PostMapping("/{userId}")
     public ResponseEntity<ResponseDto<Void>> recordView(
             @PathVariable("userId") String userUuid,
@@ -43,21 +45,27 @@ public class ProfileViewController {
         return ResponseEntity.ok(ResponseDto.<Void>success(null, "View recorded", "TM_000"));
     }
 
-    /** Who recently viewed my profile. */
+    /**
+     * Who recently viewed my profile.
+     */
     @GetMapping
     public ResponseEntity<ResponseDto<List<ProfileViewResponse>>> getViewers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ResponseDto.success(profileViewService.getViewers(userDetails.getUser())));
     }
 
-    /** Total + unseen viewer counts (badge). */
+    /**
+     * Total + unseen viewer counts (badge).
+     */
     @GetMapping("/count")
     public ResponseEntity<ResponseDto<ProfileViewCountResponse>> getCount(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ResponseDto.success(profileViewService.getCounts(userDetails.getUser())));
     }
 
-    /** Clear the "new viewers" badge. */
+    /**
+     * Clear the "new viewers" badge.
+     */
     @PostMapping("/mark-seen")
     public ResponseEntity<ResponseDto<Void>> markSeen(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

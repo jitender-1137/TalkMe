@@ -28,7 +28,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("AgeVerificationServiceImpl (unit)")
 class AgeVerificationServiceImplTest {
 
-    @Mock private ConsentAcceptanceService consentAcceptanceService;
+    @Mock
+    private ConsentAcceptanceService consentAcceptanceService;
 
     private AgeVerificationServiceImpl service;
 

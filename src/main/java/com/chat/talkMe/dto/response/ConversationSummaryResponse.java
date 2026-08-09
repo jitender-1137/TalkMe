@@ -35,6 +35,8 @@ public class ConversationSummaryResponse {
     // Shared signal.
     private List<String> sharedInterests;
 
-    /** A friendly, generated one-liner headline for the card. */
+    /**
+     * A friendly, generated one-liner headline for the card.
+     */
     private String headline;
 }

@@ -131,7 +131,9 @@ class AnonymousComplimentControllerUnitTest {
         return "{\"recipientUuid\":\"" + recipientUuid + "\",\"message\":\"" + message + "\"}";
     }
 
-    /** The sender's own "sent" view: recipient card shown, sender identity omitted (fromMe=true). */
+    /**
+     * The sender's own "sent" view: recipient card shown, sender identity omitted (fromMe=true).
+     */
     private static ComplimentResponse sentView() {
         return ComplimentResponse.builder()
                 .uuid(COMPLIMENT_UUID)
@@ -145,7 +147,9 @@ class AnonymousComplimentControllerUnitTest {
                 .build();
     }
 
-    /** A recipient's inbox view of a still-anonymous (SENT) compliment — sender fields NULL. */
+    /**
+     * A recipient's inbox view of a still-anonymous (SENT) compliment — sender fields NULL.
+     */
     private static ComplimentResponse inboxAnonymous() {
         return ComplimentResponse.builder()
                 .uuid(COMPLIMENT_UUID)
@@ -156,7 +160,9 @@ class AnonymousComplimentControllerUnitTest {
                 .build();
     }
 
-    /** A recipient's inbox view of a REVEALED compliment — the one state that exposes the sender. */
+    /**
+     * A recipient's inbox view of a REVEALED compliment — the one state that exposes the sender.
+     */
     private static ComplimentResponse inboxRevealed() {
         return ComplimentResponse.builder()
                 .uuid(COMPLIMENT_UUID)

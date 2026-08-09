@@ -22,72 +22,73 @@ const PORT = process.env.PORT || 8081;
 const THRESHOLD = parseFloat(process.env.NSFW_THRESHOLD || "0.7");
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({limit: "1mb"}));
 // Raw body for multipart-less binary posts (optional).
-app.use(express.raw({ type: "application/octet-stream", limit: "20mb" }));
+app.use(express.raw({type: "application/octet-stream", limit: "20mb"}));
 
 let model = null;
+
 async function getModel() {
-  if (!model) {
-    await tf.setBackend("cpu");
-    await tf.ready();
-    model = await nsfw.load(); // MobileNetV2 (bundled)
-  }
-  return model;
+    if (!model) {
+        await tf.setBackend("cpu");
+        await tf.ready();
+        model = await nsfw.load(); // MobileNetV2 (bundled)
+    }
+    return model;
 }
 
 // Decode any common image format to an int32 RGB tensor [height, width, 3].
 // Replaces tf.node.decodeImage (only available in the native tfjs-node build).
 async function decodeImage(buf) {
-  const { data, info } = await sharp(buf)
-    .removeAlpha() // drop alpha so we always get 3 channels
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return tf.tensor3d(new Int32Array(data), [info.height, info.width, info.channels], "int32");
+    const {data, info} = await sharp(buf)
+        .removeAlpha() // drop alpha so we always get 3 channels
+        .raw()
+        .toBuffer({resolveWithObject: true});
+    return tf.tensor3d(new Int32Array(data), [info.height, info.width, info.channels], "int32");
 }
 
 function isNsfw(scores) {
-  const s = (k) => scores[k] || 0;
-  return s("Porn") + s("Hentai") + 0.5 * s("Sexy") >= THRESHOLD;
+    const s = (k) => scores[k] || 0;
+    return s("Porn") + s("Hentai") + 0.5 * s("Sexy") >= THRESHOLD;
 }
 
 async function classifyBuffer(buf) {
-  const m = await getModel();
-  const image = await decodeImage(buf);
-  try {
-    const preds = await m.classify(image);
-    const scores = {};
-    for (const p of preds) scores[p.className] = p.probability;
-    return { nsfw: isNsfw(scores), scores };
-  } finally {
-    image.dispose();
-  }
+    const m = await getModel();
+    const image = await decodeImage(buf);
+    try {
+        const preds = await m.classify(image);
+        const scores = {};
+        for (const p of preds) scores[p.className] = p.probability;
+        return {nsfw: isNsfw(scores), scores};
+    } finally {
+        image.dispose();
+    }
 }
 
-app.get("/health", (_req, res) => res.json({ ok: true, threshold: THRESHOLD }));
+app.get("/health", (_req, res) => res.json({ok: true, threshold: THRESHOLD}));
 
 app.post("/classify", async (req, res) => {
-  try {
-    let buf = null;
-    if (req.is("application/json") && req.body && req.body.path) {
-      if (!fs.existsSync(req.body.path)) return res.status(404).json({ error: "file not found" });
-      buf = fs.readFileSync(req.body.path);
-    } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
-      buf = req.body;
-    }
-    if (!buf) return res.status(400).json({ error: "no image provided" });
+    try {
+        let buf = null;
+        if (req.is("application/json") && req.body && req.body.path) {
+            if (!fs.existsSync(req.body.path)) return res.status(404).json({error: "file not found"});
+            buf = fs.readFileSync(req.body.path);
+        } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+            buf = req.body;
+        }
+        if (!buf) return res.status(400).json({error: "no image provided"});
 
-    const result = await classifyBuffer(buf);
-    return res.json(result);
-  } catch (e) {
-    console.error("[nsfw] classify error:", e.message);
-    return res.status(422).json({ error: "could not classify image" });
-  }
+        const result = await classifyBuffer(buf);
+        return res.json(result);
+    } catch (e) {
+        console.error("[nsfw] classify error:", e.message);
+        return res.status(422).json({error: "could not classify image"});
+    }
 });
 
 getModel()
-  .then(() => app.listen(PORT, () => console.log(`[nsfw] listening on :${PORT} (threshold ${THRESHOLD})`)))
-  .catch((e) => {
-    console.error("[nsfw] failed to load model:", e);
-    process.exit(1);
-  });
+    .then(() => app.listen(PORT, () => console.log(`[nsfw] listening on :${PORT} (threshold ${THRESHOLD})`)))
+    .catch((e) => {
+        console.error("[nsfw] failed to load model:", e);
+        process.exit(1);
+    });

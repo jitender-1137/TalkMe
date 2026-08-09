@@ -5,7 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Platform overview metrics for the SuperAdmin dashboard. */
+/**
+ * Platform overview metrics for the SuperAdmin dashboard.
+ */
 @Data
 @Builder
 @NoArgsConstructor

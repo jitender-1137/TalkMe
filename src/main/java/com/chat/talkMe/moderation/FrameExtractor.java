@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** Extracts a few evenly-spaced frames from a video using the app's bundled ffmpeg. */
+/**
+ * Extracts a few evenly-spaced frames from a video using the app's bundled ffmpeg.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -23,7 +25,9 @@ public class FrameExtractor {
     private static final int FRAME_COUNT = 5;
     private static final long TIMEOUT_SECONDS = 60;
 
-    /** Returns paths to extracted JPEG frames (caller must delete them via {@link #cleanup}). */
+    /**
+     * Returns paths to extracted JPEG frames (caller must delete them via {@link #cleanup}).
+     */
     public List<Path> extract(Path video) {
         List<Path> frames = new ArrayList<>();
         try {

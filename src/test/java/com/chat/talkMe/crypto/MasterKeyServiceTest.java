@@ -22,7 +22,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("MasterKeyService (unit)")
 class MasterKeyServiceTest {
 
-    /** A deterministic, valid 32-byte AES-256 key, base64-encoded. */
+    /**
+     * A deterministic, valid 32-byte AES-256 key, base64-encoded.
+     */
     private static final String VALID_KEY_B64 =
             Base64.getEncoder().encodeToString("0123456789abcdef0123456789abcdef".getBytes());
 

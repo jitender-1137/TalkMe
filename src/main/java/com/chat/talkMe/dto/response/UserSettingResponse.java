@@ -16,7 +16,9 @@ public class UserSettingResponse {
     private boolean notificationsEnabled;
     private boolean safeModeEnabled;
     private boolean soundEnabled;
-    /** "EVERYONE" or "FRIENDS_ONLY". */
+    /**
+     * "EVERYONE" or "FRIENDS_ONLY".
+     */
     private String messagingPrivacy;
     private String groupAddPrivacy;
 

@@ -37,17 +37,23 @@ import java.time.Instant;
 @AllArgsConstructor
 public class AnonymousCompliment extends BaseEntity {
 
-    /** The author of the compliment — hidden from the recipient unless a reveal is accepted. */
+    /**
+     * The author of the compliment — hidden from the recipient unless a reveal is accepted.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sender_id", nullable = false)
     private User sender;
 
-    /** The user the compliment is for. Known to the sender; not secret. */
+    /**
+     * The user the compliment is for. Known to the sender; not secret.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "recipient_id", nullable = false)
     private User recipient;
 
-    /** The compliment text shown to the recipient. */
+    /**
+     * The compliment text shown to the recipient.
+     */
     @Column(name = "message", length = 500)
     private String message;
 
@@ -57,7 +63,9 @@ public class AnonymousCompliment extends BaseEntity {
     @Builder.Default
     private ComplimentStatus status = ComplimentStatus.SENT;
 
-    /** When the sender accepted the reveal; null unless {@code status == REVEALED}. */
+    /**
+     * When the sender accepted the reveal; null unless {@code status == REVEALED}.
+     */
     @Column(name = "revealed_at")
     private Instant revealedAt;
 }

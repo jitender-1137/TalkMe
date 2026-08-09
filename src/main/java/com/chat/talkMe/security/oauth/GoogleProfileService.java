@@ -26,8 +26,11 @@ public class GoogleProfileService {
 
     private final RestClient restClient = RestClient.create();
 
-    /** Age (from birthday) + gender, either of which may be null when unavailable. */
-    public record Extended(Integer age, String gender) {}
+    /**
+     * Age (from birthday) + gender, either of which may be null when unavailable.
+     */
+    public record Extended(Integer age, String gender) {
+    }
 
     public Extended fetch(String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
@@ -50,7 +53,9 @@ public class GoogleProfileService {
         }
     }
 
-    /** First birthday entry that carries a year → age in whole years. */
+    /**
+     * First birthday entry that carries a year → age in whole years.
+     */
     private Integer parseAge(JsonNode birthdays) {
         if (birthdays == null || !birthdays.isArray()) return null;
         for (JsonNode b : birthdays) {
@@ -70,7 +75,9 @@ public class GoogleProfileService {
         return null;
     }
 
-    /** Normalize Google's gender ("male"/"female"/…) to the app's lowercase value. */
+    /**
+     * Normalize Google's gender ("male"/"female"/…) to the app's lowercase value.
+     */
     private String parseGender(JsonNode genders) {
         if (genders == null || !genders.isArray() || genders.isEmpty()) return null;
         String value = genders.get(0).path("value").asText(null);

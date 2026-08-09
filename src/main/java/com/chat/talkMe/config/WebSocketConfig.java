@@ -1,7 +1,6 @@
 package com.chat.talkMe.config;
 
 import com.chat.talkMe.security.WebSocketChannelInterceptor;
-import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +12,8 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
+
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSocketMessageBroker

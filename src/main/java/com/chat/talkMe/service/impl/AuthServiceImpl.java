@@ -15,15 +15,16 @@ import com.chat.talkMe.dto.request.ResetPasswordRequest;
 import com.chat.talkMe.dto.request.SignupRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.AuthUserResponse;
+import com.chat.talkMe.dto.response.CountryDetectionResult;
 import com.chat.talkMe.dto.response.JwtTokensResponse;
 import com.chat.talkMe.dto.response.LoginResponse;
 import com.chat.talkMe.dto.response.SessionResponse;
 import com.chat.talkMe.enums.ReputationEventType;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
-import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.mapper.SessionMapper;
 import com.chat.talkMe.mapper.UserMapper;
@@ -36,6 +37,7 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.security.JwtTokenProvider;
 import com.chat.talkMe.service.AuthService;
+import com.chat.talkMe.service.CountryDetectionService;
 import com.chat.talkMe.service.EmailService;
 import com.chat.talkMe.service.FeatureAccessService;
 import com.chat.talkMe.service.LoginAttemptService;
@@ -43,8 +45,6 @@ import com.chat.talkMe.service.PwnedPasswordService;
 import com.chat.talkMe.service.ReputationRecorder;
 import com.chat.talkMe.service.WebPushService;
 import com.chat.talkMe.util.ProfileCompletion;
-import com.chat.talkMe.dto.response.CountryDetectionResult;
-import com.chat.talkMe.service.CountryDetectionService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,12 +61,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.HexFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -122,12 +122,18 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.frontend-base-url:http://localhost:3000}")
     private String frontendBaseUrl;
 
-    /** Redis key prefix for one-time password-reset tokens (value = user UUID). */
+    /**
+     * Redis key prefix for one-time password-reset tokens (value = user UUID).
+     */
     private static final String PWRESET_KEY_PREFIX = "pwreset:token:";
-    /** Redis key prefix for one-time email-verification tokens (value = user UUID). */
+    /**
+     * Redis key prefix for one-time email-verification tokens (value = user UUID).
+     */
     private static final String EMAILVERIFY_KEY_PREFIX = "emailverify:token:";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-    /** Minimum seconds between transactional emails to the same recipient. */
+    /**
+     * Minimum seconds between transactional emails to the same recipient.
+     */
     private static final int MAIL_COOLDOWN_SECONDS = 60;
 
     @Override
@@ -481,10 +487,10 @@ public class AuthServiceImpl implements AuthService {
 
         // Invalidate old token and replace
         token.setRevoked(true);
-        
+
         // Generate new access token
         String newAccessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest());
-        
+
         // Generate rotated refresh token
         long expiryMs = user.isGuest() ? guestRefreshTokenExpirationMs : refreshTokenExpirationMs;
         String newRefreshTokenStr = UUID.randomUUID().toString();
@@ -686,7 +692,9 @@ public class AuthServiceImpl implements AuthService {
         sendVerificationEmail(currentUser);
     }
 
-    /** Mints a one-time verification token, stores it in Redis, and emails the link. */
+    /**
+     * Mints a one-time verification token, stores it in Redis, and emails the link.
+     */
     private void sendVerificationEmail(User user) {
         if (user.getEmail() == null || user.getEmail().isBlank()) {
             return;
@@ -706,7 +714,9 @@ public class AuthServiceImpl implements AuthService {
         log.info("Verification email sent for user '{}'", user.getUsername());
     }
 
-    /** Sends a new-sign-in alert if the user hasn't opted out. Best-effort, never throws. */
+    /**
+     * Sends a new-sign-in alert if the user hasn't opted out. Best-effort, never throws.
+     */
     private void maybeSendLoginAlert(User user, String userAgent, CountryDetectionResult detection) {
         try {
             if (user.getEmail() == null || user.getEmail().isBlank()) {
@@ -735,22 +745,24 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    /** Best-effort friendly device label from a raw User-Agent string. */
+    /**
+     * Best-effort friendly device label from a raw User-Agent string.
+     */
     private static String friendlyDevice(String userAgent) {
         if (userAgent == null || userAgent.isBlank()) {
             return null;
         }
         String os = userAgent.contains("Windows") ? "Windows"
                 : userAgent.contains("iPhone") ? "iPhone"
-                : userAgent.contains("iPad") ? "iPad"
-                : userAgent.contains("Android") ? "Android"
-                : (userAgent.contains("Mac OS") || userAgent.contains("Macintosh")) ? "Mac"
-                : userAgent.contains("Linux") ? "Linux" : null;
+                  : userAgent.contains("iPad") ? "iPad"
+                    : userAgent.contains("Android") ? "Android"
+                      : (userAgent.contains("Mac OS") || userAgent.contains("Macintosh")) ? "Mac"
+                        : userAgent.contains("Linux") ? "Linux" : null;
         String browser = userAgent.contains("Edg") ? "Edge"
                 : userAgent.contains("OPR") || userAgent.contains("Opera") ? "Opera"
-                : userAgent.contains("Chrome") ? "Chrome"
-                : userAgent.contains("Firefox") ? "Firefox"
-                : userAgent.contains("Safari") ? "Safari" : null;
+                  : userAgent.contains("Chrome") ? "Chrome"
+                    : userAgent.contains("Firefox") ? "Firefox"
+                      : userAgent.contains("Safari") ? "Safari" : null;
         if (os == null && browser == null) {
             return userAgent.length() > 60 ? userAgent.substring(0, 60) + "…" : userAgent;
         }
@@ -857,7 +869,9 @@ public class AuthServiceImpl implements AuthService {
         user.setDeletionRequestedAt(null);
     }
 
-    /** 256-bit URL-safe random token for password resets. */
+    /**
+     * 256-bit URL-safe random token for password resets.
+     */
     private String generateSecureToken() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
@@ -982,7 +996,9 @@ public class AuthServiceImpl implements AuthService {
         return res;
     }
 
-    /** Empty/blank → null (so a cleared dropdown clears the column). */
+    /**
+     * Empty/blank → null (so a cleared dropdown clears the column).
+     */
     private static String blankOrNull(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
     }

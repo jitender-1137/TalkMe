@@ -1,29 +1,53 @@
 package com.chat.talkMe.service.impl;
 
-import com.chat.talkMe.domain.*;
+import com.chat.talkMe.domain.AudioTrack;
+import com.chat.talkMe.domain.Poll;
+import com.chat.talkMe.domain.PollOption;
+import com.chat.talkMe.domain.PollVote;
+import com.chat.talkMe.domain.Post;
+import com.chat.talkMe.domain.PostBookmark;
+import com.chat.talkMe.domain.PostComment;
+import com.chat.talkMe.domain.PostCommentLike;
+import com.chat.talkMe.domain.PostLike;
+import com.chat.talkMe.domain.PostMedia;
+import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.PostCommentRequest;
 import com.chat.talkMe.dto.request.PostRequest;
-import com.chat.talkMe.dto.response.AuthUserResponse;
-import com.chat.talkMe.dto.response.PostCommentResponse;
 import com.chat.talkMe.dto.response.AudioTrackDto;
+import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.PollOptionResponse;
 import com.chat.talkMe.dto.response.PollResponse;
+import com.chat.talkMe.dto.response.PostCommentResponse;
 import com.chat.talkMe.dto.response.PostMediaResponse;
 import com.chat.talkMe.dto.response.PostResponse;
 import com.chat.talkMe.enums.FeatureKey;
 import com.chat.talkMe.enums.MessageType;
 import com.chat.talkMe.enums.MessagingPrivacy;
 import com.chat.talkMe.enums.PostAudience;
-import com.chat.talkMe.exception.*;
+import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ContentModerationException;
+import com.chat.talkMe.exception.FeatureLockedException;
+import com.chat.talkMe.exception.ForbiddenException;
+import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
 import com.chat.talkMe.moderation.ContentModerationService;
-import com.chat.talkMe.repository.*;
+import com.chat.talkMe.repository.PollOptionRepository;
+import com.chat.talkMe.repository.PollRepository;
+import com.chat.talkMe.repository.PollVoteRepository;
+import com.chat.talkMe.repository.PostBookmarkRepository;
+import com.chat.talkMe.repository.PostCommentLikeRepository;
+import com.chat.talkMe.repository.PostCommentRepository;
+import com.chat.talkMe.repository.PostLikeRepository;
+import com.chat.talkMe.repository.PostMediaRepository;
+import com.chat.talkMe.repository.PostRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
+import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.FeatureAccessService;
+import com.chat.talkMe.service.NotificationService;
 import com.chat.talkMe.service.PostService;
 import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.util.ShortCodes;
-import java.time.Instant;
-import com.chat.talkMe.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,7 +56,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -61,10 +85,14 @@ public class PostServiceImpl implements PostService {
     private final UserFollowRepository userFollowRepository;
     private final FeatureAccessService featureAccessService;
 
-    /** Temporary-post TTL bounds (feature #22): 5 minutes … 7 days. */
+    /**
+     * Temporary-post TTL bounds (feature #22): 5 minutes … 7 days.
+     */
     private static final long TEMP_POST_MIN_SECONDS = 300L;
     private static final long TEMP_POST_MAX_SECONDS = 7L * 24 * 60 * 60;
-    /** Reaper page size — bound the per-tick work like OutboxPublisherJob. */
+    /**
+     * Reaper page size — bound the per-tick work like OutboxPublisherJob.
+     */
     private static final int EXPIRY_REAP_BATCH = 200;
 
     @Override
@@ -188,9 +216,9 @@ public class PostServiceImpl implements PostService {
         if (request.getPoll() != null) {
             var pollReq = request.getPoll();
             List<String> options = pollReq.getOptions() == null ? List.of() : pollReq.getOptions().stream()
-                    .filter(o -> o != null && !o.isBlank())
-                    .map(String::trim)
-                    .collect(Collectors.toList());
+                                                                              .filter(o -> o != null && !o.isBlank())
+                                                                              .map(String::trim)
+                                                                              .collect(Collectors.toList());
             if (options.size() < 2) {
                 throw new BadRequestException("A poll needs at least 2 options", "TM_225");
             }
@@ -320,13 +348,15 @@ public class PostServiceImpl implements PostService {
         return mapToPostResponse(post, currentUser);
     }
 
-    /**
+    /*
      * A FRIENDS-only post is viewable by its author or an accepted friend (an
      * ACCEPTED follow in either direction); EVERYONE posts are viewable by all.
      * Non-viewers get a 404 (don't reveal the post exists).
      */
-    /** First displayable thumbnail for a post (video cover preferred), or null for
-     *  a text-only post. Used as the Instagram-style thumbnail on notifications. */
+    /**
+     * First displayable thumbnail for a post (video cover preferred), or null for
+     * a text-only post. Used as the Instagram-style thumbnail on notifications.
+     */
     private String firstThumb(Post post) {
         if (post.getMedia() == null || post.getMedia().isEmpty()) {
             return null;
@@ -448,16 +478,16 @@ public class PostServiceImpl implements PostService {
 
         PostLike like = PostLike.builder().post(post).user(currentUser).build();
         postLikeRepository.save(like);
-        
+
         if (!post.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
-                post.getUser(),
-                "New like",
-                currentUser.getName() + " liked your post.",
-                "LIKE",
-                post.getUuid().toString(),
-                currentUser,
-                firstThumb(post)
+                    post.getUser(),
+                    "New like",
+                    currentUser.getName() + " liked your post.",
+                    "LIKE",
+                    post.getUuid().toString(),
+                    currentUser,
+                    firstThumb(post)
             );
         }
     }
@@ -518,13 +548,13 @@ public class PostServiceImpl implements PostService {
         // self-comments.
         if (!post.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
-                post.getUser(),
-                "New comment",
-                currentUser.getName() + " commented on your post" + quoted,
-                "COMMENT",
-                post.getUuid().toString(),
-                currentUser,
-                firstThumb(post)
+                    post.getUser(),
+                    "New comment",
+                    currentUser.getName() + " commented on your post" + quoted,
+                    "COMMENT",
+                    post.getUuid().toString(),
+                    currentUser,
+                    firstThumb(post)
             );
         }
 
@@ -534,13 +564,13 @@ public class PostServiceImpl implements PostService {
                 && !parent.getUser().getId().equals(currentUser.getId())
                 && !parent.getUser().getId().equals(post.getUser().getId())) {
             notificationService.createNotification(
-                parent.getUser(),
-                "New reply",
-                currentUser.getName() + " replied to your comment" + quoted,
-                "COMMENT",
-                post.getUuid().toString(),
-                currentUser,
-                firstThumb(post)
+                    parent.getUser(),
+                    "New reply",
+                    currentUser.getName() + " replied to your comment" + quoted,
+                    "COMMENT",
+                    post.getUuid().toString(),
+                    currentUser,
+                    firstThumb(post)
             );
         }
 
@@ -576,13 +606,13 @@ public class PostServiceImpl implements PostService {
 
         if (!comment.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
-                comment.getUser(),
-                "New like",
-                currentUser.getName() + " liked your comment.",
-                "LIKE",
-                comment.getPost().getUuid().toString(),
-                currentUser,
-                firstThumb(comment.getPost())
+                    comment.getUser(),
+                    "New like",
+                    currentUser.getName() + " liked your comment.",
+                    "LIKE",
+                    comment.getPost().getUuid().toString(),
+                    currentUser,
+                    firstThumb(comment.getPost())
             );
         }
     }
@@ -636,7 +666,9 @@ public class PostServiceImpl implements PostService {
                 .ifPresent(postBookmarkRepository::delete);
     }
 
-    /** Whether a user restricts messaging to friends (drives the avatar lock badge). */
+    /**
+     * Whether a user restricts messaging to friends (drives the avatar lock badge).
+     */
     private boolean isFriendsOnly(User user) {
         return userSettingRepository.findByUser(user)
                 .map(s -> s.getMessagingPrivacy() == MessagingPrivacy.FRIENDS_ONLY)
@@ -688,7 +720,9 @@ public class PostServiceImpl implements PostService {
                 .build();
     }
 
-    /** Map a poll (or null) to its response, resolving per-option counts and the caller's vote. */
+    /**
+     * Map a poll (or null) to its response, resolving per-option counts and the caller's vote.
+     */
     private PollResponse mapToPollResponse(Poll poll, User currentUser) {
         if (poll == null) {
             return null;

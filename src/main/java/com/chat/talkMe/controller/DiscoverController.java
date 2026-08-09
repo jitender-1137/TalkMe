@@ -10,7 +10,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/discover")
@@ -45,7 +51,7 @@ public class DiscoverController {
     public ResponseEntity<ResponseDto<Void>> likeProfile(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         discoverService.likeProfile(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "User profile liked", "TM_DISCOVER_002"));
     }
@@ -54,7 +60,7 @@ public class DiscoverController {
     public ResponseEntity<ResponseDto<Void>> unlikeProfile(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         discoverService.unlikeProfile(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "User profile unliked", "TM_DISCOVER_003"));
     }

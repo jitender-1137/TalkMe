@@ -43,12 +43,16 @@ import org.hibernate.annotations.ColumnDefault;
 @AllArgsConstructor
 public class SecretCrush extends BaseEntity {
 
-    /** The user placing the crush — the only party allowed to read this row. */
+    /**
+     * The user placing the crush — the only party allowed to read this row.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "crusher_id", nullable = false)
     private User crusher;
 
-    /** The user being crushed on. Never told about this row unless a match occurs. */
+    /**
+     * The user being crushed on. Never told about this row unless a match occurs.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "target_id", nullable = false)
     private User target;

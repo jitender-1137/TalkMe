@@ -8,14 +8,15 @@
 
 Retrieves a paginated list of notifications for the authenticated user.
 
-*   **URL:** `GET /api/v1/notifications`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
-*   **Query Parameters:**
-    *   `page` (number, optional, default: 0)
-    *   `size` (number, optional, default: 20)
-    *   `sort` (string, optional, default: `createdAt,desc`)
+* **URL:** `GET /api/v1/notifications`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **Query Parameters:**
+    * `page` (number, optional, default: 0)
+    * `size` (number, optional, default: 20)
+    * `sort` (string, optional, default: `createdAt,desc`)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -58,14 +59,15 @@ Retrieves a paginated list of notifications for the authenticated user.
 
 Marks a specific notification as read.
 
-*   **URL:** `PUT /api/v1/notifications/{id}/read`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/notifications/{id}/read`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -81,14 +83,15 @@ Marks a specific notification as read.
 
 Marks all notifications for the authenticated user as read.
 
-*   **URL:** `PUT /api/v1/notifications/read-all`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/notifications/read-all`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

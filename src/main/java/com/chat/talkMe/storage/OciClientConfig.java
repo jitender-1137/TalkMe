@@ -45,7 +45,9 @@ public class OciClientConfig {
         return client;
     }
 
-    /** Expand a leading {@code ~} to the current user's home directory. */
+    /**
+     * Expand a leading {@code ~} to the current user's home directory.
+     */
     private static String expandHome(String path) {
         if (path != null && path.startsWith("~")) {
             return System.getProperty("user.home") + path.substring(1);

@@ -117,7 +117,9 @@ public class TranslationServiceImpl implements TranslationService {
         return result;
     }
 
-    /** Fail-open response: hand back the original text so the UI degrades gracefully. */
+    /**
+     * Fail-open response: hand back the original text so the UI degrades gracefully.
+     */
     private TranslateResponse echo(String text, String target, String source) {
         return TranslateResponse.builder()
                 .translatedText(text)

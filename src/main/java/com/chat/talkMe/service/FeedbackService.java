@@ -6,6 +6,8 @@ import com.chat.talkMe.dto.response.FeedbackResponse;
 
 public interface FeedbackService {
 
-    /** Persist a piece of feedback authored by {@code currentUser}. */
+    /**
+     * Persist a piece of feedback authored by {@code currentUser}.
+     */
     FeedbackResponse submit(FeedbackRequest request, User currentUser);
 }

@@ -2,6 +2,7 @@ package com.chat.talkMe.validator;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+
 import java.util.regex.Pattern;
 
 public class UsernameValidator implements ConstraintValidator<ValidUsername, String> {

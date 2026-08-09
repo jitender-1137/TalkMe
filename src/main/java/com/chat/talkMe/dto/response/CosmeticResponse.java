@@ -28,12 +28,18 @@ public class CosmeticResponse {
     private int unlockThreshold;
     private String assetRef;
 
-    /** True if the caller owns this cosmetic. */
+    /**
+     * True if the caller owns this cosmetic.
+     */
     private boolean owned;
 
-    /** True if the caller has this cosmetic equipped. */
+    /**
+     * True if the caller has this cosmetic equipped.
+     */
     private boolean equipped;
 
-    /** True if the caller has NOT yet met the unlock requirement. */
+    /**
+     * True if the caller has NOT yet met the unlock requirement.
+     */
     private boolean locked;
 }

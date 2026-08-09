@@ -1,6 +1,7 @@
 package com.chat.talkMe.exception;
 
 public class ConflictException extends ServiceException {
+    private static final long serialVersionUID = 1L;
     public ConflictException(String message, String messageCode) {
         super(409, message, messageCode);
     }

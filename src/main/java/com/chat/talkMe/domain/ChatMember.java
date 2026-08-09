@@ -1,8 +1,19 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.MemberRole;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
@@ -44,7 +55,9 @@ public class ChatMember extends BaseEntity {
     @Builder.Default
     private Instant joinedAt = Instant.now();
 
-    /** Per-member notification silence (this member's own preference). */
+    /**
+     * Per-member notification silence (this member's own preference).
+     */
     @Column(name = "is_muted", nullable = false)
     @Builder.Default
     private boolean isMuted = false;
@@ -62,11 +75,15 @@ public class ChatMember extends BaseEntity {
 
     // ── Group additions ────────────────────────────────────────────────────────
 
-    /** Admin action: temporarily restrict this member from posting (null = not muted-in-group). */
+    /**
+     * Admin action: temporarily restrict this member from posting (null = not muted-in-group).
+     */
     @Column(name = "muted_until")
     private Instant mutedUntil;
 
-    /** Admin action: banned from the group (rejected at send and re-join). */
+    /**
+     * Admin action: banned from the group (rejected at send and re-join).
+     */
     @ColumnDefault("false")
     @Column(name = "is_banned", nullable = false)
     @Builder.Default

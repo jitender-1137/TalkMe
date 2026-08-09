@@ -39,7 +39,11 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -155,7 +159,7 @@ public class UserControllerTest {
     @Test
     void testGetMeSuccess() throws Exception {
         mockMvc.perform(get("/api/v1/users/me")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.username").value("testuser"))
@@ -182,11 +186,11 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(patch("/api/v1/users/me")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updatePayload))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Updated Name"))
@@ -205,11 +209,11 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(patch("/api/v1/users/me")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updatePayload))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updatePayload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("VE_101"));
@@ -232,10 +236,10 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/users/me/avatar")
-                .file(file)
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .file(file)
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.avatarUrl").value("http://example.com/avatar.jpg"));
@@ -246,9 +250,9 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/users/me/avatar")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isInternalServerError());
     }
 
@@ -257,9 +261,9 @@ public class UserControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(delete("/api/v1/users/me/avatar")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Avatar removed"));
@@ -269,7 +273,7 @@ public class UserControllerTest {
     void testGetUserByIdSuccess() throws Exception {
         String targetUuid = targetUser.getUuid().toString();
         mockMvc.perform(get("/api/v1/users/" + targetUuid)
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.username").value("targetuser"));
@@ -279,7 +283,7 @@ public class UserControllerTest {
     void testGetUserByIdNotFound() throws Exception {
         String randomUuid = UUID.randomUUID().toString();
         mockMvc.perform(get("/api/v1/users/" + randomUuid)
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_USER_NOT_FOUND"));
@@ -288,7 +292,7 @@ public class UserControllerTest {
     @Test
     void testGetUserByIdInvalidUuid() throws Exception {
         mockMvc.perform(get("/api/v1/users/invalid-uuid-string")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_INVALID_UUID"));
@@ -298,7 +302,7 @@ public class UserControllerTest {
     void testGetUserProfileSuccess() throws Exception {
         String targetUuid = targetUser.getUuid().toString();
         mockMvc.perform(get("/api/v1/users/" + targetUuid + "/profile")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.username").value("targetuser"));
@@ -307,9 +311,9 @@ public class UserControllerTest {
     @Test
     void testSearchUsersSuccess() throws Exception {
         mockMvc.perform(get("/api/v1/users/search")
-                .param("q", "target")
-                .param("limit", "10")
-                .with(user(testUserDetails())))
+                        .param("q", "target")
+                        .param("limit", "10")
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.items[0].username").value("targetuser"));
@@ -318,8 +322,8 @@ public class UserControllerTest {
     @Test
     void testSearchUsersQueryTooShort() throws Exception {
         mockMvc.perform(get("/api/v1/users/search")
-                .param("q", "t")
-                .with(user(testUserDetails())))
+                        .param("q", "t")
+                        .with(user(testUserDetails())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_070"));
@@ -331,9 +335,9 @@ public class UserControllerTest {
         String targetUuid = targetUser.getUuid().toString();
 
         mockMvc.perform(post("/api/v1/users/" + targetUuid + "/block")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("User blocked"));
@@ -345,9 +349,9 @@ public class UserControllerTest {
         String selfUuid = testUser.getUuid().toString();
 
         mockMvc.perform(post("/api/v1/users/" + selfUuid + "/block")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_071"));
@@ -361,9 +365,9 @@ public class UserControllerTest {
         blockUserRepository.save(BlockUser.builder().user(testUser).blocked(targetUser).build());
 
         mockMvc.perform(delete("/api/v1/users/" + targetUuid + "/block")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("User unblocked"));
@@ -374,7 +378,7 @@ public class UserControllerTest {
         blockUserRepository.save(BlockUser.builder().user(testUser).blocked(targetUser).build());
 
         mockMvc.perform(get("/api/v1/users/blocked")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.items[0].name").value("Target User"));
@@ -392,11 +396,11 @@ public class UserControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/users/" + targetUuid + "/report")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Report submitted"));
@@ -411,7 +415,7 @@ public class UserControllerTest {
 
         String targetUuid = targetUser.getUuid().toString();
         mockMvc.perform(get("/api/v1/users/" + targetUuid + "/posts")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.content[0].content").value("Hello World from target user"));
@@ -427,7 +431,7 @@ public class UserControllerTest {
 
         String targetUuid = targetUser.getUuid().toString();
         mockMvc.perform(get("/api/v1/users/" + targetUuid + "/mutual-friends")
-                .with(user(testUserDetails())))
+                        .with(user(testUserDetails())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.count").value(1))

@@ -25,10 +25,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("OAuth2LoginFailureHandler (unit)")
 class OAuth2LoginFailureHandlerTest {
 
-    @Mock private HttpServletRequest request;
-    @Mock private HttpServletResponse response;
-    @Mock private RedirectStrategy redirectStrategy;
-    @Mock private AuthenticationException exception;
+    @Mock
+    private HttpServletRequest request;
+    @Mock
+    private HttpServletResponse response;
+    @Mock
+    private RedirectStrategy redirectStrategy;
+    @Mock
+    private AuthenticationException exception;
 
     private OAuth2LoginFailureHandler handler;
 

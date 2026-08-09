@@ -43,7 +43,9 @@ import java.util.UUID;
 @Transactional
 public class SecretCrushServiceImpl implements SecretCrushService {
 
-    /** Max simultaneously-active crushes one user may hold (anti-spam cap). */
+    /**
+     * Max simultaneously-active crushes one user may hold (anti-spam cap).
+     */
     private static final int MAX_ACTIVE_CRUSHES = 20;
 
     private final SecretCrushRepository secretCrushRepository;
@@ -181,7 +183,9 @@ public class SecretCrushServiceImpl implements SecretCrushService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_404"));
     }
 
-    /** Response for a confirmed match — includes partner card + compatibility. */
+    /**
+     * Response for a confirmed match — includes partner card + compatibility.
+     */
     private SecretCrushMatchResponse matchedResponse(User self, User partner) {
         return entry(partner, true, safeScore(self, partner));
     }

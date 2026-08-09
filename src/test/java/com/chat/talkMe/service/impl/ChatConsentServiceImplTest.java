@@ -58,13 +58,20 @@ class ChatConsentServiceImplTest {
 
     private static final String CHAT_UUID = UUID.randomUUID().toString();
 
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
-    @Mock private ChatExplicitConsentRepository consentRepository;
-    @Mock private MessageRepository messageRepository;
-    @Mock private MessageMapper messageMapper;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private MessageService messageService;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private ChatExplicitConsentRepository consentRepository;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private MessageMapper messageMapper;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private MessageService messageService;
 
     private ChatConsentServiceImpl service;
 
@@ -95,7 +102,9 @@ class ChatConsentServiceImplTest {
         return u;
     }
 
-    /** Wire a valid, member 1:1 chat lookup for {@code currentUser}. */
+    /**
+     * Wire a valid, member 1:1 chat lookup for {@code currentUser}.
+     */
     private void memberChat(User currentUser) {
         when(chatRepository.findByUuid(UUID.fromString(CHAT_UUID))).thenReturn(Optional.of(chat));
         when(chatMemberRepository.findByChatAndUser(chat, currentUser))

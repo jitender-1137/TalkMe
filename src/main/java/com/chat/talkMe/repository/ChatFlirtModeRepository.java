@@ -13,10 +13,14 @@ import java.util.UUID;
 @Repository
 public interface ChatFlirtModeRepository extends JpaRepository<ChatFlirtMode, Long> {
 
-    /** The single flirt-mode row for a chat (if any). */
+    /**
+     * The single flirt-mode row for a chat (if any).
+     */
     Optional<ChatFlirtMode> findByChat(Chat chat);
 
-    /** The single flirt-mode row for a chat resolved by its uuid (if any). */
+    /**
+     * The single flirt-mode row for a chat resolved by its uuid (if any).
+     */
     @Query("SELECT f FROM ChatFlirtMode f WHERE f.chat.uuid = :chatUuid")
     Optional<ChatFlirtMode> findByChatUuid(@Param("chatUuid") UUID chatUuid);
 }

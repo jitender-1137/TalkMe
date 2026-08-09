@@ -18,9 +18,13 @@ public interface FlirtModeService {
      */
     FlirtModeResponse getState(User me, String chatUuid);
 
-    /** Opt {@code me} into flirt mode on this chat (upsert), recompute active, notify both. */
+    /**
+     * Opt {@code me} into flirt mode on this chat (upsert), recompute active, notify both.
+     */
     FlirtModeResponse enable(User me, String chatUuid);
 
-    /** Opt {@code me} out of flirt mode on this chat (upsert), recompute active, notify both. */
+    /**
+     * Opt {@code me} out of flirt mode on this chat (upsert), recompute active, notify both.
+     */
     FlirtModeResponse disable(User me, String chatUuid);
 }

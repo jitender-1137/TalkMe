@@ -87,25 +87,44 @@ class ChatServiceImplTest {
     private static final String CURRENT_UUID = "22222222-2222-2222-2222-222222222222";
     private static final String OTHER_UUID = "33333333-3333-3333-3333-333333333333";
 
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
-    @Mock private MemberCountCache memberCountCache;
-    @Mock private UserSettingsCache userSettingsCache;
-    @Mock private BlockCache blockCache;
-    @Mock private UserRepository userRepository;
-    @Mock private MessageRepository messageRepository;
-    @Mock private MessageReadReceiptRepository readReceiptRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private MessageMapper messageMapper;
-    @Mock private ChatMapper chatMapper;
-    @Mock private PresenceService presenceService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private FriendRepository friendRepository;
-    @Mock private ApplicationEventPublisher applicationEventPublisher;
-    @Mock private ObjectMapper objectMapper;
-    @Mock private OutboxEventRepository outboxEventRepository;
-    @Mock private ChatKeyService chatKeyService;
-    @Mock private MessageCryptoService messageCryptoService;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private MemberCountCache memberCountCache;
+    @Mock
+    private UserSettingsCache userSettingsCache;
+    @Mock
+    private BlockCache blockCache;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private MessageReadReceiptRepository readReceiptRepository;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private MessageMapper messageMapper;
+    @Mock
+    private ChatMapper chatMapper;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private ObjectMapper objectMapper;
+    @Mock
+    private OutboxEventRepository outboxEventRepository;
+    @Mock
+    private ChatKeyService chatKeyService;
+    @Mock
+    private MessageCryptoService messageCryptoService;
 
     private ChatServiceImpl service;
 
@@ -150,7 +169,9 @@ class ChatServiceImplTest {
         return m;
     }
 
-    /** A 1:1 chat with the current user + the other user as its two members. */
+    /**
+     * A 1:1 chat with the current user + the other user as its two members.
+     */
     private Chat privateChat() {
         Chat chat = Chat.builder().chatType(ChatType.PRIVATE).build();
         chat.setId(10L);
@@ -160,7 +181,9 @@ class ChatServiceImplTest {
         return chat;
     }
 
-    /** A multi-party GROUP chat with the current user's role as given. */
+    /**
+     * A multi-party GROUP chat with the current user's role as given.
+     */
     private Chat groupChat(MemberRole selfRole) {
         Chat chat = Chat.builder().chatType(ChatType.GROUP).name("Team").build();
         chat.setId(20L);
@@ -1388,7 +1411,9 @@ class ChatServiceImplTest {
             return MessageReadReceipt.builder().user(u).status(status).build();
         }
 
-        /** A GROUP with the current user (OWNER, first) followed by the given members. */
+        /**
+         * A GROUP with the current user (OWNER, first) followed by the given members.
+         */
         private Chat ghostGroup(User... others) {
             Chat c = Chat.builder().chatType(ChatType.GROUP).name("G").build();
             c.setId(40L);

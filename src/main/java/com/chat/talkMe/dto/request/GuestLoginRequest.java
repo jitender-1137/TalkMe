@@ -23,9 +23,13 @@ public class GuestLoginRequest {
     @ValidGender
     private String gender;
 
-    /** Cloudflare Turnstile token (verified server-side). */
+    /**
+     * Cloudflare Turnstile token (verified server-side).
+     */
     private String captchaToken;
 
-    /** Honeypot — must stay empty; bots tend to fill every field. */
+    /**
+     * Honeypot — must stay empty; bots tend to fill every field.
+     */
     private String website;
 }

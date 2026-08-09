@@ -34,17 +34,36 @@ class BackgroundTaskErrorsTest {
     private Logger log;
 
     // --- locally-named exceptions whose getName() contains each policed token ---
-    static class RedisCommandTimeoutException extends RuntimeException {}
-    static class RedisConnectionException extends RuntimeException {}
-    static class RedisConnectionFailureException extends RuntimeException {}
-    static class QueryTimeoutException extends RuntimeException {}
-    static class DataAccessResourceFailureException extends RuntimeException {}
-    static class RedisSystemException extends RuntimeException {}
+    static class RedisCommandTimeoutException extends RuntimeException {
+    }
 
-    /** A throwable whose cause is itself — exercises the self-loop guard without infinite spin. */
+    static class RedisConnectionException extends RuntimeException {
+    }
+
+    static class RedisConnectionFailureException extends RuntimeException {
+    }
+
+    static class QueryTimeoutException extends RuntimeException {
+    }
+
+    static class DataAccessResourceFailureException extends RuntimeException {
+    }
+
+    static class RedisSystemException extends RuntimeException {
+    }
+
+    /**
+     * A throwable whose cause is itself — exercises the self-loop guard without infinite spin.
+     */
     static class SelfCausedException extends RuntimeException {
-        SelfCausedException() { super("loop"); }
-        @Override public synchronized Throwable getCause() { return this; }
+        SelfCausedException() {
+            super("loop");
+        }
+
+        @Override
+        public synchronized Throwable getCause() {
+            return this;
+        }
     }
 
     @Nested

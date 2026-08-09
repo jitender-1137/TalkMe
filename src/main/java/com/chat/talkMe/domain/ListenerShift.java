@@ -47,7 +47,9 @@ import java.time.Instant;
 @AllArgsConstructor
 public class ListenerShift extends BaseEntity {
 
-    /** The volunteer holding space this shift. */
+    /**
+     * The volunteer holding space this shift.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "listener_id", nullable = false)
     private User listener;
@@ -61,15 +63,21 @@ public class ListenerShift extends BaseEntity {
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
 
-    /** Set when the shift is ENDED; null while still AVAILABLE/ENGAGED. */
+    /**
+     * Set when the shift is ENDED; null while still AVAILABLE/ENGAGED.
+     */
     @Column(name = "ended_at")
     private Instant endedAt;
 
-    /** The LISTENING-mode room this shift is currently bound to; null while merely AVAILABLE. */
+    /**
+     * The LISTENING-mode room this shift is currently bound to; null while merely AVAILABLE.
+     */
     @Column(name = "room_chat_uuid", length = 64)
     private String roomChatUuid;
 
-    /** How many people this shift has helped so far — feeds the Great Listener trend. */
+    /**
+     * How many people this shift has helped so far — feeds the Great Listener trend.
+     */
     @Column(name = "people_helped", nullable = false)
     @ColumnDefault("0")
     @Builder.Default

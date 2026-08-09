@@ -8,15 +8,16 @@
 
 Sends a new message (text or media attachment) inside a chat.
 
-*   **URL:** `POST /api/v1/chats/{chatId}/messages`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/chats/{chatId}/messages`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body (Text Message)
+
 ```json
 {
   "content": "Hello, how are you?",
@@ -25,6 +26,7 @@ Sends a new message (text or media attachment) inside a chat.
 ```
 
 ### Request Body (Reply/Quote Message)
+
 ```json
 {
   "content": "I am doing well, thank you!",
@@ -34,6 +36,7 @@ Sends a new message (text or media attachment) inside a chat.
 ```
 
 ### Request Body (Media Attachment Message)
+
 ```json
 {
   "content": "Check out this document",
@@ -46,6 +49,7 @@ Sends a new message (text or media attachment) inside a chat.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -72,13 +76,14 @@ Sends a new message (text or media attachment) inside a chat.
 
 Loads chat history messages.
 
-*   **URL:** `GET /api/v1/chats/{chatId}/messages`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `page` (number, optional, default: 0)
-    *   `size` (number, optional, default: 50)
+* **URL:** `GET /api/v1/chats/{chatId}/messages`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `page` (number, optional, default: 0)
+    * `size` (number, optional, default: 50)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -115,14 +120,15 @@ Loads chat history messages.
 
 Deletes a message from the conversation thread history.
 
-*   **URL:** `DELETE /api/v1/chats/{chatId}/messages/{messageId}`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/chats/{chatId}/messages/{messageId}`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -138,16 +144,17 @@ Deletes a message from the conversation thread history.
 
 Reacts to a specific message using a WhatsApp-style emoji.
 
-*   **URL:** `POST /api/v1/chats/{chatId}/messages/{messageId}/react`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `emoji` (string, required): The emoji reaction string, e.g. `👍`, `❤️`.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/chats/{chatId}/messages/{messageId}/react`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `emoji` (string, required): The emoji reaction string, e.g. `👍`, `❤️`.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -163,16 +170,17 @@ Reacts to a specific message using a WhatsApp-style emoji.
 
 Removes a reaction from a message.
 
-*   **URL:** `DELETE /api/v1/chats/{chatId}/messages/{messageId}/react`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `emoji` (string, required): The emoji reaction to remove.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/chats/{chatId}/messages/{messageId}/react`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `emoji` (string, required): The emoji reaction to remove.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

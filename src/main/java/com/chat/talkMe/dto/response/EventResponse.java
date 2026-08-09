@@ -38,7 +38,9 @@ public class EventResponse {
     // ── Counts + viewer state ─────────────────────────────────────────────────
     private long goingCount;
     private long interestedCount;
-    /** The viewer's RSVP status (GOING|INTERESTED|DECLINED), or null if they haven't RSVP'd. */
+    /**
+     * The viewer's RSVP status (GOING|INTERESTED|DECLINED), or null if they haven't RSVP'd.
+     */
     private String myRsvp;
     private boolean attended;
 }

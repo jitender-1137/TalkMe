@@ -35,10 +35,16 @@ public class SmartProfileCardResponse {
     private String presence;
     private String lastSeen;
     private int mutualFriendsCount;
-    /** Current daily-activity streak in days (feature #31); null when none / lapsed. Best-effort. */
+    /**
+     * Current daily-activity streak in days (feature #31); null when none / lapsed. Best-effort.
+     */
     private Integer onlineStreak;
-    /** Count of the user's public, non-deleted, non-expired posts in the last 30 days; null when zero. Best-effort. */
+    /**
+     * Count of the user's public, non-deleted, non-expired posts in the last 30 days; null when zero. Best-effort.
+     */
     private Integer recentPublicPosts;
-    /** Compatibility relative to the viewer (feature #10). */
+    /**
+     * Compatibility relative to the viewer (feature #10).
+     */
     private CompatibilityScore compatibility;
 }

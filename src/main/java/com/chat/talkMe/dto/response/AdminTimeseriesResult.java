@@ -1,11 +1,15 @@
 package com.chat.talkMe.dto.response;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-/** A single metric's time series with the resolved interval — for a per-graph query. */
+/**
+ * A single metric's time series with the resolved interval — for a per-graph query.
+ */
 @Data
 @Builder
 @NoArgsConstructor

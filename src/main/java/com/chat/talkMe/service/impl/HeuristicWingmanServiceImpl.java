@@ -31,7 +31,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
 
     // ── Static template banks ────────────────────────────────────────────────────
 
-    /** Generic openers used when we have no shared signal to lean on. */
+    /**
+     * Generic openers used when we have no shared signal to lean on.
+     */
     private static final List<String> GENERIC_ICEBREAKERS = List.of(
             "Hey! What's keeping you up tonight?",
             "If you could be anywhere right now, where would it be?",
@@ -40,21 +42,27 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
             "What's a song you have on repeat right now?",
             "Tell me something most people don't know about you.");
 
-    /** Answer-style replies for when the other person asked a question. */
+    /**
+     * Answer-style replies for when the other person asked a question.
+     */
     private static final List<String> ANSWER_STYLE = List.of(
             "Good question — let me think about that for a sec.",
             "Honestly? Probably not what you'd expect. What about you?",
             "Depends on the day — but I'd love to hear your take first.",
             "Ha, that's a fun one. Here's my honest answer...");
 
-    /** Openers for short/greeting-style incoming messages. */
+    /**
+     * Openers for short/greeting-style incoming messages.
+     */
     private static final List<String> OPENER_STYLE = List.of(
             "Hey there! How's your night going?",
             "Hi! Perfect timing — I was just about to say hello.",
             "Hey :) what are you up to right now?",
             "Hello! What brought you here tonight?");
 
-    /** Follow-up style replies to keep an ongoing thread alive. */
+    /**
+     * Follow-up style replies to keep an ongoing thread alive.
+     */
     private static final List<String> FOLLOWUP_STYLE = List.of(
             "That's really interesting — tell me more about that.",
             "Love that. What got you into it?",
@@ -94,7 +102,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
         return new ArrayList<>(out).subList(0, Math.min(max, out.size()));
     }
 
-    /** Turn a compatibility highlight ("You both love Music") into a conversational opener. */
+    /**
+     * Turn a compatibility highlight ("You both love Music") into a conversational opener.
+     */
     private static String highlightToOpener(String highlight) {
         if (highlight == null || highlight.isBlank()) return "What are you into these days?";
         String h = highlight.trim();
@@ -118,7 +128,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
         return h + " — tell me more?";
     }
 
-    /** Concrete, template-based openers built from shared interests / languages / mood. */
+    /**
+     * Concrete, template-based openers built from shared interests / languages / mood.
+     */
     private static List<String> sharedSignalOpeners(User a, User b) {
         List<String> out = new ArrayList<>();
 
@@ -177,7 +189,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
 
     // ── Rewrite my message ───────────────────────────────────────────────────────
 
-    /** Tone → (prefix, suffix) decoration templates for the heuristic rewriter. */
+    /**
+     * Tone → (prefix, suffix) decoration templates for the heuristic rewriter.
+     */
     private static final Map<String, String[]> TONE_TEMPLATES = Map.of(
             "friendly", new String[]{"Hey! ", " 😊"},
             "flirty", new String[]{"", " 😉"},
@@ -218,7 +232,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
         return new ArrayList<>(out).subList(0, Math.min(max, out.size()));
     }
 
-    /** Strip a leading greeting and trailing filler so tone templates read cleanly. */
+    /**
+     * Strip a leading greeting and trailing filler so tone templates read cleanly.
+     */
     private static String normalizeCore(String text) {
         String t = text.trim();
         // Collapse runs of whitespace.

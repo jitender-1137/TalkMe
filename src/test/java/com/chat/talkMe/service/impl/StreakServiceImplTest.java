@@ -49,9 +49,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("StreakServiceImpl (unit)")
 class StreakServiceImplTest {
 
-    @Mock private DailyStreakRepository streakRepository;
-    @Mock private ReputationRecorder reputationRecorder;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private DailyStreakRepository streakRepository;
+    @Mock
+    private ReputationRecorder reputationRecorder;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private StreakServiceImpl service;
 

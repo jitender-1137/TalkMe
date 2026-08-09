@@ -27,7 +27,9 @@ public enum MilestoneType {
         this.label = label;
     }
 
-    /** Human-readable label surfaced on the timeline. */
+    /**
+     * Human-readable label surfaced on the timeline.
+     */
     public String getLabel() {
         return label;
     }

@@ -10,15 +10,23 @@ import com.chat.talkMe.dto.response.BucketListResponse;
  */
 public interface BucketListService {
 
-    /** The full list for a chat, auto-creating the list row on first use. */
+    /**
+     * The full list for a chat, auto-creating the list row on first use.
+     */
     BucketListResponse getList(User user, String chatId);
 
-    /** Append a new (open) entry to the list. */
+    /**
+     * Append a new (open) entry to the list.
+     */
     BucketListResponse addItem(User user, String chatId, String text);
 
-    /** Flip an entry's completed flag, stamping/clearing who checked it off and when. */
+    /**
+     * Flip an entry's completed flag, stamping/clearing who checked it off and when.
+     */
     BucketListResponse toggleItem(User user, String chatId, String itemUuid);
 
-    /** Remove an entry from the list. */
+    /**
+     * Remove an entry from the list.
+     */
     BucketListResponse removeItem(User user, String chatId, String itemUuid);
 }

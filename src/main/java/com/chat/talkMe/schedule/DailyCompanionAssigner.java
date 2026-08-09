@@ -22,13 +22,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DailyCompanionAssigner {
 
-    /** How many recent real accounts to curate companions for per run. */
+    /**
+     * How many recent real accounts to curate companions for per run.
+     */
     private static final int ELIGIBLE_BATCH = 500;
 
     private final UserRepository userRepository;
     private final DailyCompanionService dailyCompanionService;
 
-    /** Daily at 00:05 server time. */
+    /**
+     * Daily at 00:05 server time.
+     */
     @Scheduled(cron = "0 5 0 * * *")
     public void assignDaily() {
         try {

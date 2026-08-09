@@ -34,12 +34,12 @@ public class MediaAssetService {
      * are derived from the actual stored key (not the raw client params), so the record
      * always agrees with the folder the file landed in.
      *
-     * @param reference the stored reference returned by the storage backend
-     * @param owner     the authenticated uploader (may be null for anonymous flows)
-     * @param uploadType the upload {@code type} param (image / video / …)
+     * @param reference        the stored reference returned by the storage backend
+     * @param owner            the authenticated uploader (may be null for anonymous flows)
+     * @param uploadType       the upload {@code type} param (image / video / …)
      * @param originalFileName client-reported file name
-     * @param contentType MIME type
-     * @param fileSize  stored size in bytes
+     * @param contentType      MIME type
+     * @param fileSize         stored size in bytes
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(String reference, User owner, String uploadType,
@@ -75,7 +75,9 @@ public class MediaAssetService {
         }
     }
 
-    /** Top-level folder of an object key (mirrors AdminServiceImpl.categoryOf). */
+    /**
+     * Top-level folder of an object key (mirrors AdminServiceImpl.categoryOf).
+     */
     private static String categoryOf(String key) {
         int slash = key.indexOf('/');
         String top = slash > 0 ? key.substring(0, slash) : key;
@@ -85,7 +87,9 @@ public class MediaAssetService {
         };
     }
 
-    /** The nth {@code /}-separated segment of a key, or null. */
+    /**
+     * The nth {@code /}-separated segment of a key, or null.
+     */
     private static String segment(String key, int index) {
         String[] parts = key.split("/");
         return index >= 0 && index < parts.length ? parts[index] : null;

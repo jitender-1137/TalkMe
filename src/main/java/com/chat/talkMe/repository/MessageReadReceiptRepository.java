@@ -27,7 +27,7 @@ public interface MessageReadReceiptRepository extends JpaRepository<MessageReadR
      */
     @Modifying(clearAutomatically = true)
     @Query("UPDATE MessageReadReceipt r SET r.status = 'READ', r.readAt = :readAt " +
-           "WHERE r.message.chat = :chat AND r.user.id = :userId AND r.status <> 'READ'")
+            "WHERE r.message.chat = :chat AND r.user.id = :userId AND r.status <> 'READ'")
     int bulkMarkAsRead(Chat chat, Long userId, Instant readAt);
 
     /**
@@ -35,26 +35,26 @@ public interface MessageReadReceiptRepository extends JpaRepository<MessageReadR
      * that has no receipt yet for this user. Race-safe: ON CONFLICT DO NOTHING on the
      * uk_read_receipt_message_user unique constraint means a concurrent insert is
      * silently skipped instead of throwing. Returns the number of rows actually inserted.
-     *
+     * <p>
      * Use status='READ' with readAt=deliveredAt=now for the read flow, or
      * status='DELIVERED' with readAt=null, deliveredAt=now for the delivery flow.
      */
     @Modifying(clearAutomatically = true)
     @Query(value = """
-        INSERT INTO message_read_receipts
-            (uuid, created_at, updated_at, is_deleted, version,
-             message_id, user_id, status, read_at, delivered_at)
-        SELECT gen_random_uuid(), :now, :now, false, 0,
-               m.id, :userId, :status, :readAt, :deliveredAt
-        FROM messages m
-        WHERE m.chat_id = :chatId
-          AND m.sender_id <> :userId
-          AND m.is_deleted = false
-          AND NOT EXISTS (
-              SELECT 1 FROM message_read_receipts r
-              WHERE r.message_id = m.id AND r.user_id = :userId)
-        ON CONFLICT (message_id, user_id) DO NOTHING
-        """, nativeQuery = true)
+            INSERT INTO message_read_receipts
+                (uuid, created_at, updated_at, is_deleted, version,
+                 message_id, user_id, status, read_at, delivered_at)
+            SELECT gen_random_uuid(), :now, :now, false, 0,
+                   m.id, :userId, :status, :readAt, :deliveredAt
+            FROM messages m
+            WHERE m.chat_id = :chatId
+              AND m.sender_id <> :userId
+              AND m.is_deleted = false
+              AND NOT EXISTS (
+                  SELECT 1 FROM message_read_receipts r
+                  WHERE r.message_id = m.id AND r.user_id = :userId)
+            ON CONFLICT (message_id, user_id) DO NOTHING
+            """, nativeQuery = true)
     int insertMissingReceipts(Long chatId, Long userId, String status, Instant readAt, Instant deliveredAt, Instant now);
 
     /**
@@ -63,6 +63,6 @@ public interface MessageReadReceiptRepository extends JpaRepository<MessageReadR
      */
     @Modifying(clearAutomatically = true)
     @Query("UPDATE MessageReadReceipt r SET r.status = 'DELIVERED', r.deliveredAt = :deliveredAt " +
-           "WHERE r.message.chat = :chat AND r.user.id = :userId AND r.status = 'SENT'")
+            "WHERE r.message.chat = :chat AND r.user.id = :userId AND r.status = 'SENT'")
     int bulkMarkAsDelivered(Chat chat, Long userId, Instant deliveredAt);
 }

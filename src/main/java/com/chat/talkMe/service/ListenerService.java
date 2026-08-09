@@ -3,6 +3,7 @@ package com.chat.talkMe.service;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.ListenerShiftResponse;
 import com.chat.talkMe.enums.ListenerReason;
+
 import java.util.List;
 
 /**
@@ -15,10 +16,14 @@ import java.util.List;
  */
 public interface ListenerService {
 
-    /** Put the current user on duty (idempotent): create or re-arm an AVAILABLE shift. */
+    /**
+     * Put the current user on duty (idempotent): create or re-arm an AVAILABLE shift.
+     */
     ListenerShiftResponse goAvailable(User user);
 
-    /** Take the current user off duty (idempotent). An ENGAGED shift is credited before ending. */
+    /**
+     * Take the current user off duty (idempotent). An ENGAGED shift is credited before ending.
+     */
     void endShift(User user);
 
     /**
@@ -35,6 +40,8 @@ public interface ListenerService {
      */
     ListenerShiftResponse completeShift(User listener);
 
-    /** The current live queue of AVAILABLE listeners. */
+    /**
+     * The current live queue of AVAILABLE listeners.
+     */
     List<ListenerShiftResponse> listAvailable();
 }

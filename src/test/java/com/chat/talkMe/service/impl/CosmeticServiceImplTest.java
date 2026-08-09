@@ -49,9 +49,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("CosmeticServiceImpl (unit)")
 class CosmeticServiceImplTest {
 
-    @Mock private UnlockableCosmeticRepository catalogRepo;
-    @Mock private UserCosmeticRepository userCosmeticRepo;
-    @Mock private UserReputationRepository reputationRepo;
+    @Mock
+    private UnlockableCosmeticRepository catalogRepo;
+    @Mock
+    private UserCosmeticRepository userCosmeticRepo;
+    @Mock
+    private UserReputationRepository reputationRepo;
 
     private CosmeticServiceImpl service;
     private User user;

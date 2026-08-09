@@ -2,32 +2,53 @@ package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.config.RabbitConfig;
 import com.chat.talkMe.crypto.MessageCryptoService;
-import com.chat.talkMe.domain.*;
+import com.chat.talkMe.domain.Chat;
+import com.chat.talkMe.domain.ChatExplicitConsent;
+import com.chat.talkMe.domain.ChatMember;
+import com.chat.talkMe.domain.Message;
+import com.chat.talkMe.domain.MessageAttachment;
+import com.chat.talkMe.domain.MessageReaction;
+import com.chat.talkMe.domain.MessageReadReceipt;
+import com.chat.talkMe.domain.MessageStar;
+import com.chat.talkMe.domain.OutboxEvent;
+import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserSetting;
+import com.chat.talkMe.dto.request.ReactToMessageRequest;
+import com.chat.talkMe.dto.request.SendMessageRequest;
+import com.chat.talkMe.dto.response.MessagePageResponse;
+import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.enums.ChatType;
+import com.chat.talkMe.enums.ConsentStatus;
+import com.chat.talkMe.enums.MemberRole;
+import com.chat.talkMe.enums.MessageType;
 import com.chat.talkMe.enums.MessagingPrivacy;
 import com.chat.talkMe.enums.ModerationStatus;
 import com.chat.talkMe.event.MessageSentEvent;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ContentModerationException;
-import com.chat.talkMe.dto.request.SendMessageRequest;
-import com.chat.talkMe.dto.response.MessageResponse;
-import com.chat.talkMe.enums.ChatType;
-import com.chat.talkMe.enums.ConsentStatus;
-import com.chat.talkMe.enums.MemberRole;
-import com.chat.talkMe.dto.response.MessagePageResponse;
-import com.chat.talkMe.enums.MessageType;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.exception.TooManyRequestsException;
-import com.chat.talkMe.dto.request.ReactToMessageRequest;
 import com.chat.talkMe.mapper.MessageMapper;
 import com.chat.talkMe.moderation.ContentModerationService;
-import com.chat.talkMe.repository.*;
+import com.chat.talkMe.repository.BlockUserRepository;
+import com.chat.talkMe.repository.ChatExplicitConsentRepository;
+import com.chat.talkMe.repository.ChatMemberRepository;
+import com.chat.talkMe.repository.ChatRepository;
+import com.chat.talkMe.repository.FriendRepository;
+import com.chat.talkMe.repository.MessageAttachmentRepository;
+import com.chat.talkMe.repository.MessageReactionRepository;
+import com.chat.talkMe.repository.MessageReadReceiptRepository;
+import com.chat.talkMe.repository.MessageRepository;
+import com.chat.talkMe.repository.MessageStarRepository;
+import com.chat.talkMe.repository.OutboxEventRepository;
+import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.GroupAuthzService;
 import com.chat.talkMe.service.MessageService;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.storage.MediaStorage;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -48,6 +69,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -104,7 +126,7 @@ public class MessageServiceImpl implements MessageService {
                 boolean isChannel = chat.getChatType() == ChatType.CHANNEL;
                 throw new ForbiddenException(
                         isChannel ? "Only admins can post in this channel"
-                                  : "You can't send messages here right now",
+                                : "You can't send messages here right now",
                         isChannel ? "TM_294" : "TM_295");
             }
             int slow = chat.getSettings() != null ? chat.getSettings().getSlowModeSeconds() : 0;
@@ -215,14 +237,14 @@ public class MessageServiceImpl implements MessageService {
                 }
                 // Group allows explicit content: allow (fall through, stays CLEAN).
             } else {
-            ConsentStatus consent = consentRepository.findByChat(chat)
-                    .map(ChatExplicitConsent::getStatus)
-                    .orElse(ConsentStatus.NONE);
-            // 1:1 explicit text requires the normal mutual-consent handshake.
-            if (consent != ConsentStatus.GRANTED) {
-                // Saved but withheld from the recipient until consent is granted.
-                moderationStatus = ModerationStatus.BLOCKED_PENDING_CONSENT;
-            }
+                ConsentStatus consent = consentRepository.findByChat(chat)
+                        .map(ChatExplicitConsent::getStatus)
+                        .orElse(ConsentStatus.NONE);
+                // 1:1 explicit text requires the normal mutual-consent handshake.
+                if (consent != ConsentStatus.GRANTED) {
+                    // Saved but withheld from the recipient until consent is granted.
+                    moderationStatus = ModerationStatus.BLOCKED_PENDING_CONSENT;
+                }
             }
         }
 
@@ -515,7 +537,9 @@ public class MessageServiceImpl implements MessageService {
         }).collect(Collectors.toList());
     }
 
-    /** Flag {@code starred} on a page of responses for the current user (one query). */
+    /**
+     * Flag {@code starred} on a page of responses for the current user (one query).
+     */
     private void applyStarredFlags(List<Message> rows, List<MessageResponse> responses, User user) {
         if (rows.isEmpty()) return;
         List<Long> ids = rows.stream().map(Message::getId).collect(Collectors.toList());
@@ -609,7 +633,9 @@ public class MessageServiceImpl implements MessageService {
         return r;
     }
 
-    /** Distinct receipt users (other than the viewer) who are in Ghost mode. */
+    /**
+     * Distinct receipt users (other than the viewer) who are in Ghost mode.
+     */
     private Set<Long> ghostReceiptUserIds(Collection<Message> rows, User viewer) {
         Map<Long, User> users = new HashMap<>();
         for (Message m : rows) {
@@ -623,7 +649,9 @@ public class MessageServiceImpl implements MessageService {
         return presenceService.getGhostUserIds(users.values());
     }
 
-    /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
+    /**
+     * Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT).
+     */
     private String resolveStatusExcludingGhosts(Message m, Set<Long> ghostIds) {
         if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
         boolean delivered = false;
@@ -686,7 +714,9 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
-    /** Notifies chat subscribers that a message was deleted for everyone (tombstone). */
+    /**
+     * Notifies chat subscribers that a message was deleted for everyone (tombstone).
+     */
     private void broadcastMessageDeleted(String chatUuid, String messageUuid) {
         try {
             Map<String, Object> payload = new HashMap<>();
@@ -751,7 +781,9 @@ public class MessageServiceImpl implements MessageService {
         return reaped;
     }
 
-    /** Load a message and verify the caller is a member of the chat it belongs to. */
+    /**
+     * Load a message and verify the caller is a member of the chat it belongs to.
+     */
     @Override
     @Transactional
     public MessageResponse editMessage(String chatUuid, String messageUuid, String content, User currentUser) {
@@ -817,7 +849,9 @@ public class MessageServiceImpl implements MessageService {
         return message;
     }
 
-    /** Destroy the media forever: delete files from disk, drop attachment rows, flag expired, broadcast. */
+    /**
+     * Destroy the media forever: delete files from disk, drop attachment rows, flag expired, broadcast.
+     */
     private void expireSelfDestruct(Message message) {
         if (message.isSelfDestructExpired()) return; // idempotent
         // Attachment fileUrl/thumbnailUrl are stored ENCRYPTED at rest — decrypt to the

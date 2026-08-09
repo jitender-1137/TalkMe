@@ -38,23 +38,36 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FlirtModeServiceImpl implements FlirtModeService {
 
-    /** Max attempts for the optimistic-lock retry when both participants toggle at once. */
+    /**
+     * Max attempts for the optimistic-lock retry when both participants toggle at once.
+     */
     private static final int MAX_TOGGLE_ATTEMPTS = 3;
 
     private final ChatRepository chatRepository;
     private final ChatFlirtModeRepository flirtModeRepository;
     private final SimpMessagingTemplate messagingTemplate;
-    /** Self-proxy so the lazy row-create + the mutation transaction run through the proxy. */
+    /**
+     * Self-proxy so the lazy row-create + the mutation transaction run through the proxy.
+     */
     private final ObjectProvider<FlirtModeServiceImpl> self;
 
-    /** Resolved, membership-verified context for a flirt-mode operation on a PRIVATE chat. */
-    private record Ctx(Chat chat, long meId, User other, long lowUserId, long highUserId) {}
+    /**
+     * Resolved, membership-verified context for a flirt-mode operation on a PRIVATE chat.
+     */
+    private record Ctx(Chat chat, long meId, User other, long lowUserId, long highUserId) {
+    }
 
-    /** A single after-commit WS delivery: the target username + their viewer-relative state. */
-    private record Push(String username, FlirtModeResponse payload) {}
+    /**
+     * A single after-commit WS delivery: the target username + their viewer-relative state.
+     */
+    private record Push(String username, FlirtModeResponse payload) {
+    }
 
-    /** Result of a committed consent mutation: the caller's response + both after-commit pushes. */
-    private record ConsentResult(FlirtModeResponse response, Push mePush, Push otherPush) {}
+    /**
+     * Result of a committed consent mutation: the caller's response + both after-commit pushes.
+     */
+    private record ConsentResult(FlirtModeResponse response, Push mePush, Push otherPush) {
+    }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
@@ -125,7 +138,7 @@ public class FlirtModeServiceImpl implements FlirtModeService {
         Push mePush = new Push(me.getUsername(), mine);
         Push otherPush = ctx.other() != null
                 ? new Push(ctx.other().getUsername(),
-                           responseFor(chatUuid, ctx.other().getId(), ctx.lowUserId(), row))
+                responseFor(chatUuid, ctx.other().getId(), ctx.lowUserId(), row))
                 : null;
         return new ConsentResult(mine, mePush, otherPush);
     }
@@ -148,7 +161,9 @@ public class FlirtModeServiceImpl implements FlirtModeService {
         }
     }
 
-    /** Insert a fresh flirt-mode row in an isolated transaction (see getOrCreateRow). */
+    /**
+     * Insert a fresh flirt-mode row in an isolated transaction (see getOrCreateRow).
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ChatFlirtMode createRowInNewTx(Long chatId, Long lowUserId, Long highUserId) {
         Chat ref = chatRepository.getReferenceById(chatId);
@@ -207,12 +222,16 @@ public class FlirtModeServiceImpl implements FlirtModeService {
         return new Ctx(chat, meId, other, lowUserId, highUserId);
     }
 
-    /** Build a viewer-relative response for the given context/row (null row → all-false). */
+    /**
+     * Build a viewer-relative response for the given context/row (null row → all-false).
+     */
     private FlirtModeResponse toResponse(String chatUuid, Ctx ctx, ChatFlirtMode row) {
         return responseFor(chatUuid, ctx.meId(), ctx.lowUserId(), row);
     }
 
-    /** Build a response relative to {@code viewerId}, given the low-id participant and the row. */
+    /**
+     * Build a response relative to {@code viewerId}, given the low-id participant and the row.
+     */
     private FlirtModeResponse responseFor(String chatUuid, long viewerId, long lowUserId, ChatFlirtMode row) {
         boolean lowEnabled = row != null && row.isEnabledByLow();
         boolean highEnabled = row != null && row.isEnabledByHigh();
@@ -229,7 +248,9 @@ public class FlirtModeServiceImpl implements FlirtModeService {
                 .build();
     }
 
-    /** Deliver a pre-computed after-commit push to one participant (best-effort, fail-open). */
+    /**
+     * Deliver a pre-computed after-commit push to one participant (best-effort, fail-open).
+     */
     private void pushRaw(Push push, String chatUuid) {
         if (push == null || push.username() == null) return;
         try {

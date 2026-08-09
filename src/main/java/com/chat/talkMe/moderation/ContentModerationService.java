@@ -11,7 +11,9 @@ import java.nio.file.Path;
  */
 public interface ContentModerationService {
 
-    /** Classify free text (English + Hindi/Hinglish) as vulgar/abusive/sexual. */
+    /**
+     * Classify free text (English + Hindi/Hinglish) as vulgar/abusive/sexual.
+     */
     ModerationResult moderateText(String content);
 
     /**
@@ -28,6 +30,8 @@ public interface ContentModerationService {
      */
     ModerationResult moderateUpload(MultipartFile file);
 
-    /** Whether moderation is enabled at all (config-gated kill switch). */
+    /**
+     * Whether moderation is enabled at all (config-gated kill switch).
+     */
     boolean isEnabled();
 }

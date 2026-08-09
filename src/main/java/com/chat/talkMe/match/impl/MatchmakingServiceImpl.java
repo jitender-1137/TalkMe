@@ -2,24 +2,24 @@ package com.chat.talkMe.match.impl;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.MatchStartRequest;
-import com.chat.talkMe.dto.response.MatchSessionResponse;
 import com.chat.talkMe.dto.response.AnonymousPartnerResponse;
+import com.chat.talkMe.dto.response.MatchSessionResponse;
 import com.chat.talkMe.enums.ConversationEnergy;
 import com.chat.talkMe.enums.GenderPreference;
 import com.chat.talkMe.enums.MatchMode;
 import com.chat.talkMe.enums.Mood;
-import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.match.AliasGenerator;
 import com.chat.talkMe.match.MatchPreferenceService;
 import com.chat.talkMe.match.MatchPreferenceSnapshot;
+import com.chat.talkMe.match.MatchServerEvent;
 import com.chat.talkMe.match.MatchSession;
 import com.chat.talkMe.match.MatchTimerService;
-import com.chat.talkMe.match.MatchServerEvent;
 import com.chat.talkMe.match.MatchmakingService;
 import com.chat.talkMe.match.OnlineCountPublisher;
-import com.chat.talkMe.match.SessionService;
 import com.chat.talkMe.match.SessionCleanupService;
+import com.chat.talkMe.match.SessionService;
 import com.chat.talkMe.match.WaitingQueueService;
+import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.CompatibilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,9 +53,13 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final MatchTimerService matchTimerService;
 
     private static final String ACTIVE_USERS_KEY = "matchmaking:active_users";
-    /** How many waiting users to scan when ranking a preference match. */
+    /**
+     * How many waiting users to scan when ranking a preference match.
+     */
     private static final int SCAN_CAP = 50;
-    /** After this long in the queue, a candidate's SOFT filters (age/country) are relaxed. */
+    /**
+     * After this long in the queue, a candidate's SOFT filters (age/country) are relaxed.
+     */
     private static final long RELAX_AFTER_MS = 25_000L;
 
     @Override
@@ -233,24 +237,30 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         if (a.isVerifiedOnly() && !b.isOwnVerified()) return false;
         if (b.isVerifiedOnly() && !a.isOwnVerified()) return false;
         // Required language (hard, both ways)
-        if (hasText(a.getLanguageFilter()) && !containsIgnoreCase(b.getOwnLanguages(), a.getLanguageFilter())) return false;
-        if (hasText(b.getLanguageFilter()) && !containsIgnoreCase(a.getOwnLanguages(), b.getLanguageFilter())) return false;
+        if (hasText(a.getLanguageFilter()) && !containsIgnoreCase(b.getOwnLanguages(), a.getLanguageFilter()))
+            return false;
+        if (hasText(b.getLanguageFilter()) && !containsIgnoreCase(a.getOwnLanguages(), b.getLanguageFilter()))
+            return false;
         // Mood-compatible-only (hard, both ways when requested)
         if ((a.isMoodCompatibleOnly() || b.isMoodCompatibleOnly())
                 && !moodCompatible(a.getMood(), b.getMood())) return false;
         // Soft filters (age + country) — each party's own dropped once THEY have waited.
         if (!relaxA) {
             if (!ageOk(a, b.getOwnAge())) return false;
-            if (hasText(a.getCountryFilter()) && !equalsIgnoreCase(a.getCountryFilter(), b.getOwnCountry())) return false;
+            if (hasText(a.getCountryFilter()) && !equalsIgnoreCase(a.getCountryFilter(), b.getOwnCountry()))
+                return false;
         }
         if (!relaxB) {
             if (!ageOk(b, a.getOwnAge())) return false;
-            if (hasText(b.getCountryFilter()) && !equalsIgnoreCase(b.getCountryFilter(), a.getOwnCountry())) return false;
+            if (hasText(b.getCountryFilter()) && !equalsIgnoreCase(b.getCountryFilter(), a.getOwnCountry()))
+                return false;
         }
         return true;
     }
 
-    /** Mood affinity for the moodCompatibleOnly hard filter: same mood or same cluster. */
+    /**
+     * Mood affinity for the moodCompatibleOnly hard filter: same mood or same cluster.
+     */
     private static boolean moodCompatible(String a, String b) {
         if (a == null || b == null) return false;              // can't verify → not compatible
         if (a.equalsIgnoreCase(b)) return true;
@@ -294,13 +304,15 @@ public class MatchmakingServiceImpl implements MatchmakingService {
                     me.setMood(Mood.valueOf(filters.getMood().trim().toUpperCase()));
                     me.setMoodUpdatedAt(Instant.now());
                     dirty = true;
-                } catch (IllegalArgumentException ignored) { }
+                } catch (IllegalArgumentException ignored) {
+                }
             }
             if (hasText(filters.getEnergy())) {
                 try {
                     me.setConversationEnergy(ConversationEnergy.valueOf(filters.getEnergy().trim().toUpperCase()));
                     dirty = true;
-                } catch (IllegalArgumentException ignored) { }
+                } catch (IllegalArgumentException ignored) {
+                }
             }
         }
         if (dirty) userRepository.save(me);
@@ -384,7 +396,9 @@ public class MatchmakingServiceImpl implements MatchmakingService {
                 .build();
     }
 
-    /** Clamp the timed-session duration to the allowed {5, 10, 15} minutes (default 10). */
+    /**
+     * Clamp the timed-session duration to the allowed {5, 10, 15} minutes (default 10).
+     */
     private static int normalizeDuration(Integer minutes) {
         if (minutes == null) return 10;
         if (minutes <= 5) return 5;
@@ -392,7 +406,9 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         return 10;
     }
 
-    private static boolean hasText(String s) { return s != null && !s.isBlank(); }
+    private static boolean hasText(String s) {
+        return s != null && !s.isBlank();
+    }
 
     private static boolean equalsIgnoreCase(String a, String b) {
         return a != null && b != null && a.equalsIgnoreCase(b);

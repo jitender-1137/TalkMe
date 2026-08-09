@@ -53,12 +53,18 @@ class UnreadDigestServiceTest {
     private static final long USER_ID = 7L;
     private static final long CHAT_ID = 99L;
 
-    @Mock private MessageRepository messageRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private EmailService emailService;
-    @Mock private MessageCryptoService messageCryptoService;
-    @Captor private ArgumentCaptor<List<EmailUnreadPreview>> previewsCaptor;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private EmailService emailService;
+    @Mock
+    private MessageCryptoService messageCryptoService;
+    @Captor
+    private ArgumentCaptor<List<EmailUnreadPreview>> previewsCaptor;
 
     private UnreadDigestService service;
 
@@ -92,7 +98,9 @@ class UnreadDigestServiceTest {
         return m;
     }
 
-    /** Wires the full eligible-user happy path with a single unread from {@code Bob}. */
+    /**
+     * Wires the full eligible-user happy path with a single unread from {@code Bob}.
+     */
     private User wireEligibleUser(Long watermark, long newestId) {
         User u = user(USER_ID, "jane@example.com", "Jane", watermark);
         User bob = User.builder().name("Bob").build();

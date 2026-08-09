@@ -16,9 +16,13 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "security.captcha")
 public class CaptchaProperties {
 
-    /** Master switch — when false, CAPTCHA checks are skipped. */
+    /**
+     * Master switch — when false, CAPTCHA checks are skipped.
+     */
     private boolean enabled = true;
 
-    /** Cloudflare Turnstile secret key. */
+    /**
+     * Cloudflare Turnstile secret key.
+     */
     private String secretKey;
 }

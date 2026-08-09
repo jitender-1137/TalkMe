@@ -36,8 +36,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("OutboxPublisherJob (unit)")
 class OutboxPublisherJobTest {
 
-    @Mock private OutboxEventRepository outboxRepo;
-    @Mock private OutboxDispatcher dispatcher;
+    @Mock
+    private OutboxEventRepository outboxRepo;
+    @Mock
+    private OutboxDispatcher dispatcher;
 
     private OutboxPublisherJob job;
 

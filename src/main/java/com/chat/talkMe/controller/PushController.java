@@ -17,7 +17,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
@@ -33,7 +40,9 @@ public class PushController {
     private final JwtTokenProvider jwtTokenProvider;
     private final ChatService chatService;
 
-    /** VAPID public key the browser needs to create a push subscription. */
+    /**
+     * VAPID public key the browser needs to create a push subscription.
+     */
     @GetMapping("/vapid-public-key")
     public ResponseEntity<ResponseDto<Map<String, String>>> getVapidPublicKey() {
         return ResponseEntity.ok(SuccessResponseDto.success(
@@ -54,7 +63,9 @@ public class PushController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Push subscription removed", "TM_281"));
     }
 
-    /** Report how the user is accessing the app (BROWSER / PWA / IOS_HOME). */
+    /**
+     * Report how the user is accessing the app (BROWSER / PWA / IOS_HOME).
+     */
     @PutMapping("/installation")
     public ResponseEntity<ResponseDto<Void>> updateInstallation(
             @Valid @RequestBody UpdateInstallationRequest request,
@@ -65,7 +76,9 @@ public class PushController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Installation type updated", "TM_282"));
     }
 
-    /** Authoritative unread total (recomputed) — used on load and after reconnect/offline. */
+    /**
+     * Authoritative unread total (recomputed) — used on load and after reconnect/offline.
+     */
     @GetMapping("/unread-count")
     public ResponseEntity<ResponseDto<Map<String, Integer>>> getUnreadCount(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -79,7 +92,7 @@ public class PushController {
      * backgrounder and the WebSocket is closed). Marks the chat delivered for the
      * recipient and broadcasts a DELIVERED receipt to the sender — the WhatsApp
      * "double tick" without the recipient having to reopen the app.
-     *
+     * <p>
      * Public (no Bearer auth): the signed, short-lived delivery token in the body
      * IS the authorization — it only grants "mark this one chat delivered for this
      * one user". Best-effort: always returns 200 so the SW never retries noisily.

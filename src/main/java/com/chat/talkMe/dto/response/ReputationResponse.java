@@ -26,7 +26,9 @@ public class ReputationResponse {
     private int pointsForNextLevel;
     private double progressPercent;
 
-    /** ISO date the user joined (from account creation), for a "member since" chip. */
+    /**
+     * ISO date the user joined (from account creation), for a "member since" chip.
+     */
     private String memberSince;
 
     // Equipped-cosmetic placeholders (populated by the cosmetics feature later).

@@ -36,7 +36,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,18 +69,27 @@ class WebPushServiceImplTest {
         }
     }
 
-    /** A real, curve-valid P-256 public point (base64url) — the webpush lib decodes it. */
+    /**
+     * A real, curve-valid P-256 public point (base64url) — the webpush lib decodes it.
+     */
     private static final String VALID_P256DH = generateP256dh();
     private static final String VALID_AUTH =
             Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes(16));
-    /** Public IP literal → passes the SSRF guard with no DNS lookup. */
+    /**
+     * Public IP literal → passes the SSRF guard with no DNS lookup.
+     */
     private static final String SAFE_ENDPOINT = "https://93.184.216.34/push/abc";
 
-    @Mock private PushSubscriptionRepository subscriptionRepository;
-    @Mock private PushService pushService;
-    @Mock private WebPushProperties properties;
-    @Mock private CircuitBreakerRegistry circuitBreakerRegistry;
-    @Mock private CircuitBreaker circuitBreaker;
+    @Mock
+    private PushSubscriptionRepository subscriptionRepository;
+    @Mock
+    private PushService pushService;
+    @Mock
+    private WebPushProperties properties;
+    @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+    @Mock
+    private CircuitBreaker circuitBreaker;
 
     private WebPushServiceImpl service;
 
@@ -321,7 +329,9 @@ class WebPushServiceImplTest {
         }
     }
 
-    /** Wire up an enabled, single-subscription send whose HTTP status is {@code resp}. */
+    /**
+     * Wire up an enabled, single-subscription send whose HTTP status is {@code resp}.
+     */
     private void arrangeSend(PushSubscription sub, HttpResponse resp) throws Exception {
         when(properties.isEnabled()).thenReturn(true);
         when(subscriptionRepository.findByUser_Id(5L)).thenReturn(List.of(sub));
@@ -337,7 +347,9 @@ class WebPushServiceImplTest {
         return b;
     }
 
-    /** Generate a valid secp256r1 public key encoded as an uncompressed base64url point. */
+    /**
+     * Generate a valid secp256r1 public key encoded as an uncompressed base64url point.
+     */
     private static String generateP256dh() {
         try {
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");

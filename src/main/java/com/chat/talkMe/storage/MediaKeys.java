@@ -14,9 +14,12 @@ import java.nio.charset.StandardCharsets;
  */
 public final class MediaKeys {
 
-    private MediaKeys() {}
+    private MediaKeys() {
+    }
 
-    /** The absolute path a reference points at (decoding {@code ?path=} if present), or null. */
+    /**
+     * The absolute path a reference points at (decoding {@code ?path=} if present), or null.
+     */
     public static String absolutePath(String reference) {
         if (reference == null || reference.isBlank()) return null;
         int idx = reference.indexOf("path=");
@@ -31,7 +34,9 @@ public final class MediaKeys {
         return p.startsWith("/") ? p : null;
     }
 
-    /** The object key (path under {@code mediaRoot}) for a reference, or null if unsafe/unknown. */
+    /**
+     * The object key (path under {@code mediaRoot}) for a reference, or null if unsafe/unknown.
+     */
     public static String key(String reference, String mediaRoot) {
         String abs = absolutePath(reference);
         if (abs == null) return null;
@@ -42,13 +47,17 @@ public final class MediaKeys {
         return isSafeKey(key) ? key : null;
     }
 
-    /** A safe object key is relative and never traverses upward. */
+    /**
+     * A safe object key is relative and never traverses upward.
+     */
     public static boolean isSafeKey(String key) {
         if (key == null || key.isBlank()) return false;
         return !key.startsWith("/") && !key.contains("..") && !key.contains("\\");
     }
 
-    /** Best-effort MIME guess from a file name/key extension (null if unknown). */
+    /**
+     * Best-effort MIME guess from a file name/key extension (null if unknown).
+     */
     public static String contentTypeGuess(String keyOrName) {
         if (keyOrName == null) return null;
         int dot = keyOrName.lastIndexOf('.');

@@ -32,7 +32,9 @@ public class BadgeController {
 
     private final BadgeService badgeService;
 
-    /** All badges for a user (earned + in-progress endorsement counts). */
+    /**
+     * All badges for a user (earned + in-progress endorsement counts).
+     */
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('BADGES')")
     public ResponseEntity<ResponseDto<List<BadgeResponse>>> listBadges(
@@ -41,7 +43,9 @@ public class BadgeController {
         return ResponseEntity.ok(SuccessResponseDto.success(badges));
     }
 
-    /** Endorse a peer for a trait; returns the resulting badge state. */
+    /**
+     * Endorse a peer for a trait; returns the resulting badge state.
+     */
     @PostMapping("/endorse")
     @PreAuthorize("@featureGuard.check('BADGES')")
     public ResponseEntity<ResponseDto<BadgeResponse>> endorse(

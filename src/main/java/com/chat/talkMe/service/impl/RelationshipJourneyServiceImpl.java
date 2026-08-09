@@ -40,7 +40,9 @@ import java.util.UUID;
 @Transactional
 public class RelationshipJourneyServiceImpl implements RelationshipJourneyService {
 
-    /** Dedupe refs per milestone source (part of the unique key with type). */
+    /**
+     * Dedupe refs per milestone source (part of the unique key with type).
+     */
     private static final String REF_FRIENDSHIP = "friendship";
     private static final String REF_CHAT = "chat";   // message + photo milestones
     private static final String REF_GAME = "game";   // games milestone
@@ -160,16 +162,27 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
         // so one failing query never drops the friendship milestones already written above.
         Chat chat = resolveSharedChat(low, high);
         if (chat != null) {
-            try { materializeMessageMilestones(low, high, chat); }
-            catch (Exception e) { log.debug("[Journey] msg milestones {}/{}: {}", low, high, e.getMessage()); }
-            try { materializePhotoMilestones(low, high, chat); }
-            catch (Exception e) { log.debug("[Journey] photo milestones {}/{}: {}", low, high, e.getMessage()); }
-            try { materializeGameMilestones(low, high, chat); }
-            catch (Exception e) { log.debug("[Journey] game milestones {}/{}: {}", low, high, e.getMessage()); }
+            try {
+                materializeMessageMilestones(low, high, chat);
+            } catch (Exception e) {
+                log.debug("[Journey] msg milestones {}/{}: {}", low, high, e.getMessage());
+            }
+            try {
+                materializePhotoMilestones(low, high, chat);
+            } catch (Exception e) {
+                log.debug("[Journey] photo milestones {}/{}: {}", low, high, e.getMessage());
+            }
+            try {
+                materializeGameMilestones(low, high, chat);
+            } catch (Exception e) {
+                log.debug("[Journey] game milestones {}/{}: {}", low, high, e.getMessage());
+            }
         }
     }
 
-    /** The earliest non-deleted PRIVATE/STRANGER chat the pair share (stable first-message anchor). */
+    /**
+     * The earliest non-deleted PRIVATE/STRANGER chat the pair share (stable first-message anchor).
+     */
     private Chat resolveSharedChat(long low, long high) {
         return chatRepository.findPrivateChatBetweenUsers(low, high).stream()
                 .filter(c -> !c.isDeleted())

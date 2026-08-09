@@ -1,7 +1,10 @@
 package com.chat.talkMe.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.bind.annotation.RestController;
@@ -10,10 +13,6 @@ import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -67,9 +66,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     private static final class CachingSpaResourceResolver extends PathResourceResolver {
 
-        /** key (resource URL) -> fully-read, in-memory copy. Bounded by the static bundle size. */
+        /**
+         * key (resource URL) -> fully-read, in-memory copy. Bounded by the static bundle size.
+         */
         private final ConcurrentHashMap<String, Resource> cache = new ConcurrentHashMap<>();
-        /** Serializes the (rare) cold reads so two threads never inflate from the jar at once. */
+        /**
+         * Serializes the (rare) cold reads so two threads never inflate from the jar at once.
+         */
         private final Object inflateLock = new Object();
 
         @Override
@@ -103,7 +106,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
             return null;
         }
 
-        /** Return an in-memory copy of {@code original}, reading it from the jar at most once. */
+        /**
+         * Return an in-memory copy of {@code original}, reading it from the jar at most once.
+         */
         private Resource cached(Resource original) throws IOException {
             if (original == null) {
                 return null;
@@ -170,7 +175,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         return (resource.exists() && resource.isReadable()) ? resource : null;
     }
 
-    /** True if the last path segment contains a dot (i.e. looks like a file, not a route). */
+    /**
+     * True if the last path segment contains a dot (i.e. looks like a file, not a route).
+     */
     private static boolean lastSegmentHasExtension(String path) {
         int lastSlash = path.lastIndexOf('/');
         String lastSegment = (lastSlash >= 0) ? path.substring(lastSlash + 1) : path;

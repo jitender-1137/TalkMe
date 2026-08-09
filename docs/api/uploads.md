@@ -8,19 +8,22 @@
 
 Uploads a multipart file (e.g. image, video, audio, document) to the backend storage service.
 
-*   **URL:** `POST /api/v1/uploads`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
-*   **Headers:**
-    *   `Content-Type: multipart/form-data`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/uploads`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **Headers:**
+    * `Content-Type: multipart/form-data`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Multipart Form Data
-*   `file` (File, required): The binary payload of the file to upload.
-*   `type` (string, required): The target location/intent category of the file, e.g. `AVATAR`, `CHAT_MEDIA`, `POST_MEDIA`, `STORY_MEDIA`.
+
+* `file` (File, required): The binary payload of the file to upload.
+* `type` (string, required): The target location/intent category of the file, e.g. `AVATAR`, `CHAT_MEDIA`, `POST_MEDIA`,
+  `STORY_MEDIA`.
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

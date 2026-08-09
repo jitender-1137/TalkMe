@@ -12,6 +12,8 @@ import java.util.UUID;
 @Repository
 public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findByUserAndIsDeletedFalse(User user);
+
     Optional<Session> findByUuid(UUID uuid);
+
     void deleteByUser(User user);
 }

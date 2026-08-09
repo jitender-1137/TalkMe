@@ -108,7 +108,9 @@ class ChatConsentControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A plausible consent snapshot for the given status, with the derived flags wired sensibly. */
+    /**
+     * A plausible consent snapshot for the given status, with the derived flags wired sensibly.
+     */
     private static ConsentStateResponse state(String status) {
         return ConsentStateResponse.builder()
                 .chatId(CHAT)

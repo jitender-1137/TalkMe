@@ -27,8 +27,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("MessageBroadcastListener (unit)")
 class MessageBroadcastListenerTest {
 
-    @Mock private EventPublisher eventPublisher;
-    @Mock private MessageDeliveryService deliveryService;
+    @Mock
+    private EventPublisher eventPublisher;
+    @Mock
+    private MessageDeliveryService deliveryService;
 
     private MessageBroadcastListener listener;
 

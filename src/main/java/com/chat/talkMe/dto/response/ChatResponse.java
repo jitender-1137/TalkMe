@@ -1,11 +1,12 @@
 package com.chat.talkMe.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @Builder
@@ -30,6 +31,8 @@ public class ChatResponse {
     @JsonProperty("hasBlockedMe")
     private boolean hasBlockedMe;
 
-    /** Present only for multi-party chats (GROUP/CHANNEL/ROOM); null for 1:1. */
+    /**
+     * Present only for multi-party chats (GROUP/CHANNEL/ROOM); null for 1:1.
+     */
     private GroupInfoResponse group;
 }

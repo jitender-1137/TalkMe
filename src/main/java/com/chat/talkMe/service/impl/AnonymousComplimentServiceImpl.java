@@ -42,10 +42,14 @@ import java.util.UUID;
 @Transactional
 public class AnonymousComplimentServiceImpl implements AnonymousComplimentService {
 
-    /** Max compliments one user may send per rolling 24h (anti-spam cap). */
+    /**
+     * Max compliments one user may send per rolling 24h (anti-spam cap).
+     */
     private static final int DAILY_CAP = 10;
 
-    /** WS destination (client subscribes to {@code /user/queue/compliments}). */
+    /**
+     * WS destination (client subscribes to {@code /user/queue/compliments}).
+     */
     private static final String QUEUE = "/queue/compliments";
 
     private final AnonymousComplimentRepository complimentRepository;

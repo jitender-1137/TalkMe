@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Schema heal for the expanded profile model (Late-Night Social, cornerstone C2).
- *
+ * <p>
  * Hibernate froze a CHECK constraint on every {@code @Enumerated(STRING)} column
  * (including {@code @ElementCollection} value columns) at table-creation time, and
  * {@code ddl-auto: update} never widens them. So the moment the {@code Interest} enum
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * night_owl_mode enum columns receive a value outside the originally-created set,
  * inserts fail against the stale constraint. Drop them — the application enforces valid
  * enum values. {@code DROP CONSTRAINT IF EXISTS} is idempotent and safe if a name differs.
- *
+ * <p>
  * The single highest-risk item is {@code user_interests_interest_check}: without dropping
  * it, ALL interest writes fail once the enum is expanded.
  */

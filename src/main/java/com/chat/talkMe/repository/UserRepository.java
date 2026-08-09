@@ -1,8 +1,6 @@
 package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.User;
-import java.time.Instant;
-import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -20,12 +20,18 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByUsername(String username);
+
     // Batch lookup for fan-out (avoids N+1 when notifying all chat recipients).
     List<User> findByUsernameIn(Collection<String> usernames);
+
     Optional<User> findByEmail(String email);
+
     Optional<User> findByGoogleId(String googleId);
+
     Optional<User> findByUuid(UUID uuid);
+
     boolean existsByUsername(String username);
+
     boolean existsByEmail(String email);
 
     // ── Case-insensitive lookups ─────────────────────────────────────────────
@@ -33,54 +39,82 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     // too, for login. These repair already-stored mixed-case rows without a data
     // migration and prevent duplicate accounts differing only by letter case.
     Optional<User> findByUsernameIgnoreCase(String username);
+
     Optional<User> findByEmailIgnoreCase(String email);
+
     boolean existsByEmailIgnoreCase(String email);
+
     boolean existsByUsernameIgnoreCase(String username);
 
     // ── Referrals (attribution only — no reward payout) ──────────────────────
     // Count excludes soft-deleted joiners so the headline matches the listed rows.
     long countByReferredByAndIsDeletedFalse(User referredBy);
+
     List<User> findByReferredByAndIsDeletedFalseOrderByCreatedAtDesc(
             User referredBy, Pageable pageable);
 
     // ── Admin dashboard counters ─────────────────────────────────────────────
     long countByIsVerifiedTrue();
+
     long countByIsGuestTrue();
 
-    /** Recently-joined real accounts (Night Owl Lobby "recently joined", feature #2). */
+    /**
+     * Recently-joined real accounts (Night Owl Lobby "recently joined", feature #2).
+     */
     List<User> findByIsGuestFalseAndBannedFalseAndIsDeletedFalseOrderByCreatedAtDesc(
             Pageable pageable);
+
     long countByCreatedAtAfter(Instant since);
-    /** Signup timestamps since a cutoff — bucketed by day in the service for charts. */
+
+    /**
+     * Signup timestamps since a cutoff — bucketed by day in the service for charts.
+     */
     @Query("SELECT u.createdAt FROM User u WHERE u.createdAt >= :since")
     List<Instant> findSignupTimesSince(@Param("since") Instant since);
+
     long countByBannedTrue();
-    /** Soft-deleted (is_deleted = true) vs active account counts for the dashboard. */
+
+    /**
+     * Soft-deleted (is_deleted = true) vs active account counts for the dashboard.
+     */
     long countByIsDeletedTrue();
+
     long countByIsDeletedFalse();
-    /** One-time correction: guests must never be verified. Returns rows fixed. */
+
+    /**
+     * One-time correction: guests must never be verified. Returns rows fixed.
+     */
     @Modifying
     @Query("UPDATE User u SET u.isVerified = false WHERE u.isGuest = true AND u.isVerified = true")
     int unverifyAllGuests();
-    /** Users seen since a cutoff — "active" counts for the analytics dashboard. */
+
+    /**
+     * Users seen since a cutoff — "active" counts for the analytics dashboard.
+     */
     long countByPresenceLastSeenAtAfter(Instant since);
-    /** Accounts soft-deleted and awaiting purge (grace window), newest request first. */
+
+    /**
+     * Accounts soft-deleted and awaiting purge (grace window), newest request first.
+     */
     List<User> findByIsDeletedTrueAndDeletionRequestedAtIsNotNullOrderByDeletionRequestedAtDesc();
+
     @Query("SELECT u.gender, COUNT(u) FROM User u WHERE u.isGuest = false GROUP BY u.gender")
     List<Object[]> countGroupedByGender();
+
     @Query("SELECT u.country, COUNT(u) FROM User u WHERE u.isGuest = false AND u.country IS NOT NULL GROUP BY u.country ORDER BY COUNT(u) DESC")
     List<Object[]> countGroupedByCountry();
+
     // Paginated search over name/username/email for the admin user list.
     Page<User>
-        findByUsernameContainingIgnoreCaseOrNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+    findByUsernameContainingIgnoreCaseOrNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
             String username, String name, String email, Pageable pageable);
 
     @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u " +
-           "WHERE up.status = 'ONLINE' " +
-           "AND up.invisibleModeEnabled = false " +
-           "AND up.ghostModeEnabled = false " +
-           "AND u.id <> :currentUserId " +
-           "AND u.isDeleted = false")
+            "WHERE up.status = 'ONLINE' " +
+            "AND up.invisibleModeEnabled = false " +
+            "AND up.ghostModeEnabled = false " +
+            "AND u.id <> :currentUserId " +
+            "AND u.isDeleted = false")
     List<User> findAllOnlineUsersExcludeSelf(@Param("currentUserId") Long currentUserId);
 
     @Query("SELECT u FROM User u WHERE u.username IN :usernames AND (:currentUserId IS NULL OR u.id <> :currentUserId) AND u.isDeleted = false")
@@ -100,7 +134,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("SELECT u.totalUnreadCount FROM User u WHERE u.id = :id")
     Integer getTotalUnreadCount(@Param("id") Long id);
 
-    /** Soft-deleted accounts whose recovery window has elapsed — due for permanent purge. */
+    /**
+     * Soft-deleted accounts whose recovery window has elapsed — due for permanent purge.
+     */
     @Query("SELECT u FROM User u WHERE u.isDeleted = true AND u.deletionRequestedAt IS NOT NULL AND u.deletionRequestedAt < :cutoff")
     List<User> findAccountsDueForPurge(@Param("cutoff") Instant cutoff);
 }

@@ -18,7 +18,6 @@ import com.chat.talkMe.service.FriendService;
 import com.chat.talkMe.service.PostService;
 import com.chat.talkMe.service.UserService;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,9 +26,20 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -53,13 +63,15 @@ public class UserController {
     public ResponseEntity<ResponseDto<UserResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         UserResponse response = userService.updateProfile(request, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Profile updated successfully", "TM_060"));
     }
 
-    /** Change the current user's username (unique; taken names — including accounts
-     *  pending deletion — are rejected, while fully-purged names are free). */
+    /**
+     * Change the current user's username (unique; taken names — including accounts
+     * pending deletion — are rejected, while fully-purged names are free).
+     */
     @PatchMapping("/me/username")
     public ResponseEntity<ResponseDto<UserResponse>> changeUsername(
             @Valid @RequestBody ChangeUsernameRequest request,
@@ -68,7 +80,9 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Username updated", "TM_060"));
     }
 
-    /** Live availability check for the username field. */
+    /**
+     * Live availability check for the username field.
+     */
     @GetMapping("/me/username-available")
     public ResponseEntity<ResponseDto<Map<String, Boolean>>> usernameAvailable(
             @RequestParam("username") String username,
@@ -77,7 +91,9 @@ public class UserController {
         return ResponseEntity.ok(SuccessResponseDto.success(Map.of("available", available)));
     }
 
-    /** Fast, param-based mood update (feature #4) — e.g. PUT /users/me/mood?value=FLIRT. */
+    /**
+     * Fast, param-based mood update (feature #4) — e.g. PUT /users/me/mood?value=FLIRT.
+     */
     @PutMapping("/me/mood")
     public ResponseEntity<ResponseDto<UserResponse>> updateMood(
             @RequestParam("value") String value,
@@ -90,7 +106,7 @@ public class UserController {
     public ResponseEntity<ResponseDto<Map<String, String>>> uploadAvatar(
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         Map<String, String> response = userService.uploadAvatar(file, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Avatar uploaded successfully", "TM_USER_001"));
     }
@@ -140,7 +156,9 @@ public class UserController {
                 userService.getPublicProfileByUsername(username)));
     }
 
-    /** Smart Profile Card (feature #20) — late-night attributes + compatibility hint. */
+    /**
+     * Smart Profile Card (feature #20) — late-night attributes + compatibility hint.
+     */
     @GetMapping("/{userId}/card")
     @PreAuthorize("@featureGuard.check('SMART_PROFILE_CARD')")
     public ResponseEntity<ResponseDto<SmartProfileCardResponse>> getSmartProfileCard(
@@ -165,7 +183,7 @@ public class UserController {
     public ResponseEntity<ResponseDto<Void>> blockUser(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         friendService.blockUser(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "User blocked", "TM_067"));
     }
@@ -174,7 +192,7 @@ public class UserController {
     public ResponseEntity<ResponseDto<Void>> unblockUser(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         friendService.unblockUser(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "User unblocked", "TM_068"));
     }
@@ -182,7 +200,7 @@ public class UserController {
     @GetMapping("/blocked")
     public ResponseEntity<ResponseDto<PaginatedResponse<BlockedUserResponse>>> getBlockedUsers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         PaginatedResponse<BlockedUserResponse> response = userService.getBlockedUsers(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
@@ -192,7 +210,7 @@ public class UserController {
             @PathVariable("userId") String userId,
             @RequestBody Map<String, String> payload,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         String reason = payload.getOrDefault("reason", "other");
         String description = payload.get("description");
 
@@ -205,7 +223,7 @@ public class UserController {
             @PathVariable("userId") String userId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         Page<PostResponse> response = postService.getProfileFeed(userId, pageable, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
@@ -214,7 +232,7 @@ public class UserController {
     public ResponseEntity<ResponseDto<UserResponse>> getUserProfile(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         UserResponse response = userService.getUserById(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
@@ -223,7 +241,7 @@ public class UserController {
     public ResponseEntity<ResponseDto<MutualFriendsResponse>> getMutualFriends(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+
         MutualFriendsResponse response = userService.getMutualFriends(userId, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }

@@ -12,10 +12,14 @@ import java.util.List;
 @Repository
 public interface WeeklyMatchPickRepository extends JpaRepository<WeeklyMatchPick, Long> {
 
-    /** The current-week curated picks for a user, best match first. */
+    /**
+     * The current-week curated picks for a user, best match first.
+     */
     List<WeeklyMatchPick> findByUserAndWeekStartOrderByRankAsc(User user, LocalDate weekStart);
 
-    /** Prune rows for weeks older than the given Monday. */
+    /**
+     * Prune rows for weeks older than the given Monday.
+     */
     @Modifying
     void deleteByWeekStartBefore(LocalDate weekStart);
 }

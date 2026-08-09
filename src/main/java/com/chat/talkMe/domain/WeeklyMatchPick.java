@@ -34,25 +34,35 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class WeeklyMatchPick extends BaseEntity {
 
-    /** The user this curated pick belongs to. */
+    /**
+     * The user this curated pick belongs to.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** The suggested candidate. */
+    /**
+     * The suggested candidate.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "picked_user_id", nullable = false)
     private User pickedUser;
 
-    /** Compatibility overall score (0–100) at generation time. */
+    /**
+     * Compatibility overall score (0–100) at generation time.
+     */
     @Column(name = "score", nullable = false)
     private int score;
 
-    /** Monday of the ISO week these picks were generated for. */
+    /**
+     * Monday of the ISO week these picks were generated for.
+     */
     @Column(name = "week_start", nullable = false)
     private LocalDate weekStart;
 
-    /** 1-based rank within the week's picks (1 = most compatible). */
+    /**
+     * 1-based rank within the week's picks (1 = most compatible).
+     */
     @Column(name = "rank", nullable = false)
     private int rank;
 }

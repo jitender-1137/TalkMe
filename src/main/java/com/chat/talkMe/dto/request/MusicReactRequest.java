@@ -14,6 +14,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class MusicReactRequest {
 
-    /** The reaction emoji (short). */
+    /**
+     * The reaction emoji (short).
+     */
     private String emoji;
 }

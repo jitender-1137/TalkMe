@@ -8,18 +8,19 @@
 
 Retrieves recommended discovery profiles based on interests, verified status, online visibility, and search terms.
 
-*   **URL:** `GET /api/v1/discover`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `q` (string, optional): Keyword query (searches username, name, email).
-    *   `interests` (string, optional): Comma-separated list of interests to filter by (e.g. `GAMING,TRAVEL`).
-    *   `distance` (double, optional): Custom geographical radius search (in km).
-    *   `verified` (boolean, optional): `true` to filter by verified badges.
-    *   `isOnline` (boolean, optional): `true` to filter by online status.
-    *   `cursor` (string, optional): Next page cursor index.
-    *   `limit` (number, optional, default: 20): Size of page to return.
+* **URL:** `GET /api/v1/discover`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `q` (string, optional): Keyword query (searches username, name, email).
+    * `interests` (string, optional): Comma-separated list of interests to filter by (e.g. `GAMING,TRAVEL`).
+    * `distance` (double, optional): Custom geographical radius search (in km).
+    * `verified` (boolean, optional): `true` to filter by verified badges.
+    * `isOnline` (boolean, optional): `true` to filter by online status.
+    * `cursor` (string, optional): Next page cursor index.
+    * `limit` (number, optional, default: 20): Size of page to return.
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -63,14 +64,15 @@ Retrieves recommended discovery profiles based on interests, verified status, on
 
 Saves a like action on a discovery user profile.
 
-*   **URL:** `POST /api/v1/discover/{userId}/like`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/discover/{userId}/like`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -86,14 +88,15 @@ Saves a like action on a discovery user profile.
 
 Removes a like action from a discovery user profile.
 
-*   **URL:** `DELETE /api/v1/discover/{userId}/like`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/discover/{userId}/like`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

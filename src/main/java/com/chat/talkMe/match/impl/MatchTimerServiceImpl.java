@@ -26,7 +26,9 @@ public class MatchTimerServiceImpl implements MatchTimerService {
     private static final String PROMPT_ZSET = "match:chem-prompts";
     private static final String IDX_PREFIX = "match:chem-idx:";
 
-    /** Rotating intro prompts for Chemistry Timer (#14). Same prompt goes to both peers. */
+    /**
+     * Rotating intro prompts for Chemistry Timer (#14). Same prompt goes to both peers.
+     */
     private static final String[] PROMPTS = {
             "What's keeping you up tonight?",
             "Two truths and a lie — go.",

@@ -21,11 +21,15 @@ public class BadgeResponse {
     private String type;
     private String label;
 
-    /** ISO-8601 instant the badge was awarded; null while still below the award threshold. */
+    /**
+     * ISO-8601 instant the badge was awarded; null while still below the award threshold.
+     */
     private String awardedAt;
 
     private int endorsementCount;
 
-    /** True once endorsements have crossed the award threshold. */
+    /**
+     * True once endorsements have crossed the award threshold.
+     */
     private boolean earned;
 }

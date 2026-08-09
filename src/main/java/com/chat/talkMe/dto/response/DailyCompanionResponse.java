@@ -20,7 +20,9 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class DailyCompanionResponse {
 
-    /** Null when there is no pairing for the requested day. */
+    /**
+     * Null when there is no pairing for the requested day.
+     */
     private String pairingUuid;
     private LocalDate pairDate;
     private String status;

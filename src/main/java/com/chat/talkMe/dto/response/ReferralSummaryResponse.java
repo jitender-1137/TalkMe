@@ -16,10 +16,16 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReferralSummaryResponse {
-    /** The current user's username — the client builds the invite link "/@{username}" from it. */
+    /**
+     * The current user's username — the client builds the invite link "/@{username}" from it.
+     */
     private String username;
-    /** Total people who joined via this user's link. */
+    /**
+     * Total people who joined via this user's link.
+     */
     private long referralCount;
-    /** Most-recent joiners (capped). */
+    /**
+     * Most-recent joiners (capped).
+     */
     private List<ReferredUserResponse> referrals;
 }

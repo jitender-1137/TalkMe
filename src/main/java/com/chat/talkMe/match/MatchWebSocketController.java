@@ -1,13 +1,14 @@
 package com.chat.talkMe.match;
 
+import com.chat.talkMe.dto.request.MatchStartRequest;
+import com.chat.talkMe.enums.RevealChannel;
+import com.chat.talkMe.match.impl.MatchMessageBufferService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
-import com.chat.talkMe.dto.request.MatchStartRequest;
-import com.chat.talkMe.enums.RevealChannel;
-import com.chat.talkMe.match.impl.MatchMessageBufferService;
+
 import java.security.Principal;
 import java.util.Map;
 
@@ -142,8 +143,7 @@ public class MatchWebSocketController {
             case "END" -> matchmakingService.handleExit(name);
             case "REMATCH" -> matchmakingService.handleNewChat(name);
             // Exchanging profiles / adding a friend is a consent-gated PROFILE reveal.
-            case "EXCHANGE_PROFILES", "ADD_FRIEND" ->
-                    revealService.requestReveal(name, RevealChannel.PROFILE);
+            case "EXCHANGE_PROFILES", "ADD_FRIEND" -> revealService.requestReveal(name, RevealChannel.PROFILE);
             case "CONTINUE" -> matchTimerService.continueRequest(name);
             default -> { /* ignore unknown */ }
         }

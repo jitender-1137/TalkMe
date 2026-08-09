@@ -24,7 +24,9 @@ public class AdminAttachmentView {
     private String senderName;
     private String senderAvatar;
 
-    /** Chat members other than the sender — who received/can see the file. */
+    /**
+     * Chat members other than the sender — who received/can see the file.
+     */
     private List<SharedUser> sharedWith;
 
     private String type;          // message type (IMAGE / VIDEO / AUDIO / DOCUMENT / ...)

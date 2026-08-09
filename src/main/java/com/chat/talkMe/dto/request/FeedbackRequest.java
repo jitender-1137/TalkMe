@@ -28,7 +28,9 @@ public class FeedbackRequest {
     @Size(max = 4000, message = "Comment is too long")
     private String comment;
 
-    /** FeedbackType name: LOGOUT, ACCOUNT_DELETION, LEAVE_GROUP, LEAVE_ROOM, MANUAL, OTHER. */
+    /**
+     * FeedbackType name: LOGOUT, ACCOUNT_DELETION, LEAVE_GROUP, LEAVE_ROOM, MANUAL, OTHER.
+     */
     private String type;
 
     @Size(max = 160, message = "Context is too long")

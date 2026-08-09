@@ -8,16 +8,17 @@
 
 Updates the user's manual presence status (e.g. `ONLINE`, `OFFLINE`, `AWAY`, `IDLE`, `INVISIBLE`).
 
-*   **URL:** `PUT /api/v1/presence/status`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
-*   **Query Parameters:**
-    *   `status` (string, required): Allowed values are `ONLINE`, `OFFLINE`, `AWAY`, `IDLE`, `INVISIBLE`.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/presence/status`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **Query Parameters:**
+    * `status` (string, required): Allowed values are `ONLINE`, `OFFLINE`, `AWAY`, `IDLE`, `INVISIBLE`.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -31,18 +32,20 @@ Updates the user's manual presence status (e.g. `ONLINE`, `OFFLINE`, `AWAY`, `ID
 
 ## 2. Toggle Ghost Mode
 
-Enables or disables Ghost Mode. When Ghost Mode is enabled, the user's presence status appears offline or restricted to other users, hiding their last-seen timestamp.
+Enables or disables Ghost Mode. When Ghost Mode is enabled, the user's presence status appears offline or restricted to
+other users, hiding their last-seen timestamp.
 
-*   **URL:** `PUT /api/v1/presence/ghost`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Query Parameters:**
-    *   `enabled` (boolean, required): `true` to enable ghost mode, `false` to disable.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/presence/ghost`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Query Parameters:**
+    * `enabled` (boolean, required): `true` to enable ghost mode, `false` to disable.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -58,16 +61,17 @@ Enables or disables Ghost Mode. When Ghost Mode is enabled, the user's presence 
 
 Enables or disables Invisible Mode. When Invisible Mode is enabled, the user always appears offline to other users.
 
-*   **URL:** `PUT /api/v1/presence/invisible`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Query Parameters:**
-    *   `enabled` (boolean, required): `true` to enable invisible mode, `false` to disable.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/presence/invisible`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Query Parameters:**
+    * `enabled` (boolean, required): `true` to enable invisible mode, `false` to disable.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -81,16 +85,18 @@ Enables or disables Invisible Mode. When Invisible Mode is enabled, the user alw
 
 ## 4. Reset Presence Settings
 
-Resets all presence status settings (status, ghost mode, invisible mode) back to their default values (e.g. `ONLINE`, modes disabled).
+Resets all presence status settings (status, ghost mode, invisible mode) back to their default values (e.g. `ONLINE`,
+modes disabled).
 
-*   **URL:** `DELETE /api/v1/presence/reset`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/presence/reset`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -104,12 +110,15 @@ Resets all presence status settings (status, ghost mode, invisible mode) back to
 
 ## 5. Get Presence Status
 
-Retrieves the presence status of a specific user. Privacy settings (like ghost mode and invisible mode) are automatically handled; retrieving your own presence shows configuration states, whereas retrieving someone else's presence hides those flags and may hide their last-seen timestamp.
+Retrieves the presence status of a specific user. Privacy settings (like ghost mode and invisible mode) are
+automatically handled; retrieving your own presence shows configuration states, whereas retrieving someone else's
+presence hides those flags and may hide their last-seen timestamp.
 
-*   **URL:** `GET /api/v1/presence/{username}`
-*   **Authentication Required:** Yes (Role: `USER` or `GUEST`)
+* **URL:** `GET /api/v1/presence/{username}`
+* **Authentication Required:** Yes (Role: `USER` or `GUEST`)
 
 ### Success Response (`200 OK` - Retrieving Own Presence)
+
 ```json
 {
   "success": true,
@@ -126,6 +135,7 @@ Retrieves the presence status of a specific user. Privacy settings (like ghost m
 ```
 
 ### Success Response (`200 OK` - Retrieving Other User's Presence)
+
 ```json
 {
   "success": true,

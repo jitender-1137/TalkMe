@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
  * Static-accessible message resolver backed by Spring's MessageSource.
  * Provides a centralized way to resolve messages from messages.properties
  * without requiring Spring bean injection at the call site.
- *
+ * <p>
  * Usage: MessageResolver.get("TM_210") → "Post created successfully."
  */
 @Component
@@ -33,7 +33,7 @@ public class MessageResolver {
     /**
      * Resolve message by code with argument substitution.
      * e.g. messages.properties: TM_064=User {0} not found.
-     *      MessageResolver.get("TM_064", "johndoe") → "User johndoe not found."
+     * MessageResolver.get("TM_064", "johndoe") → "User johndoe not found."
      */
     public static String get(String code, Object... args) {
         if (messageSource == null) {

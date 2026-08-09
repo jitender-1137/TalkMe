@@ -32,7 +32,9 @@ public class SecretCrushController {
 
     private final SecretCrushService secretCrushService;
 
-    /** Crush on a user; returns a match (with partner + compatibility) iff it's mutual. */
+    /**
+     * Crush on a user; returns a match (with partner + compatibility) iff it's mutual.
+     */
     @PostMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
     public ResponseEntity<ResponseDto<SecretCrushMatchResponse>> addCrush(
@@ -42,7 +44,9 @@ public class SecretCrushController {
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
-    /** Withdraw the caller's crush on a user. */
+    /**
+     * Withdraw the caller's crush on a user.
+     */
     @DeleteMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
     public ResponseEntity<ResponseDto<Void>> withdrawCrush(
@@ -52,7 +56,9 @@ public class SecretCrushController {
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Crush withdrawn", "TM_000"));
     }
 
-    /** The caller's OWN outgoing crushes plus their matches. */
+    /**
+     * The caller's OWN outgoing crushes plus their matches.
+     */
     @GetMapping("/mine")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
     public ResponseEntity<ResponseDto<List<SecretCrushMatchResponse>>> listMine(

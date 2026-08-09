@@ -119,7 +119,9 @@ class FlirtModeControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A viewer-relative flirt-mode state DTO. */
+    /**
+     * A viewer-relative flirt-mode state DTO.
+     */
     private static FlirtModeResponse state(boolean myEnabled, boolean otherEnabled, boolean active) {
         return FlirtModeResponse.builder()
                 .chatUuid(CHAT_ID)

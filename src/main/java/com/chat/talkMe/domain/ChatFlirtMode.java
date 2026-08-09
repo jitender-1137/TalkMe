@@ -42,38 +42,52 @@ import org.hibernate.annotations.ColumnDefault;
 @AllArgsConstructor
 public class ChatFlirtMode extends BaseEntity {
 
-    /** The owning 1:1 chat. Unique — at most one flirt-mode row per chat. */
+    /**
+     * The owning 1:1 chat. Unique — at most one flirt-mode row per chat.
+     */
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "chat_id", nullable = false, unique = true)
     private Chat chat;
 
-    /** {@code User.id} of the participant with the smaller id (maps to {@link #enabledByLow}). */
+    /**
+     * {@code User.id} of the participant with the smaller id (maps to {@link #enabledByLow}).
+     */
     @Column(name = "low_user_id", nullable = false)
     private Long lowUserId;
 
-    /** {@code User.id} of the participant with the larger id (maps to {@link #enabledByHigh}). */
+    /**
+     * {@code User.id} of the participant with the larger id (maps to {@link #enabledByHigh}).
+     */
     @Column(name = "high_user_id", nullable = false)
     private Long highUserId;
 
-    /** Whether the lower-id participant has opted into flirt mode. */
+    /**
+     * Whether the lower-id participant has opted into flirt mode.
+     */
     @Column(name = "enabled_by_low", nullable = false)
     @ColumnDefault("false")
     @Builder.Default
     private boolean enabledByLow = false;
 
-    /** Whether the higher-id participant has opted into flirt mode. */
+    /**
+     * Whether the higher-id participant has opted into flirt mode.
+     */
     @Column(name = "enabled_by_high", nullable = false)
     @ColumnDefault("false")
     @Builder.Default
     private boolean enabledByHigh = false;
 
-    /** Derived: true only when BOTH participants have opted in. Kept in sync on every mutation. */
+    /**
+     * Derived: true only when BOTH participants have opted in. Kept in sync on every mutation.
+     */
     @Column(name = "active", nullable = false)
     @ColumnDefault("false")
     @Builder.Default
     private boolean active = false;
 
-    /** Recompute {@link #active} from the two consent flags. Call after any consent change. */
+    /**
+     * Recompute {@link #active} from the two consent flags. Call after any consent change.
+     */
     public void recomputeActive() {
         this.active = this.enabledByLow && this.enabledByHigh;
     }

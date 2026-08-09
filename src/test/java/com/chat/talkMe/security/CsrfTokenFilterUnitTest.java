@@ -65,7 +65,9 @@ class CsrfTokenFilterUnitTest {
         req.setCookies(new Cookie(name, value));
     }
 
-    /** Invoke the (package-visible, protected) filter method directly. */
+    /**
+     * Invoke the (package-visible, protected) filter method directly.
+     */
     private MockHttpServletResponse invoke(MockHttpServletRequest req) throws Exception {
         MockHttpServletResponse res = new MockHttpServletResponse();
         filter.doFilterInternal(req, res, chain);

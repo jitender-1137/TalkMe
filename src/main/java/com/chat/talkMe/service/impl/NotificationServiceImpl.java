@@ -8,9 +8,6 @@ import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.NotificationRepository;
 import com.chat.talkMe.repository.UserFollowRepository;
 import com.chat.talkMe.service.NotificationService;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +16,9 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -84,9 +84,9 @@ public class NotificationServiceImpl implements NotificationService {
 
         try {
             messagingTemplate.convertAndSendToUser(
-                user.getUsername(),
-                "/queue/notifications",
-                mapToResponse(saved)
+                    user.getUsername(),
+                    "/queue/notifications",
+                    mapToResponse(saved)
             );
         } catch (Exception e) {
             log.error("Failed to broadcast notification via WebSocket", e);

@@ -14,7 +14,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -35,12 +34,16 @@ import static org.mockito.Mockito.when;
 class MessageCryptoServiceTest {
 
     private static final long CHAT_ID = 42L;
-    /** Fixed AES-256 key so encrypt→decrypt is deterministic across the two calls. */
+    /**
+     * Fixed AES-256 key so encrypt→decrypt is deterministic across the two calls.
+     */
     private static final SecretKey KEY =
             new SecretKeySpec("0123456789abcdef0123456789abcdef".getBytes(), "AES");
 
-    @Mock private ChatKeyService chatKeyService;
-    @Mock private MasterKeyService masterKeyService;
+    @Mock
+    private ChatKeyService chatKeyService;
+    @Mock
+    private MasterKeyService masterKeyService;
 
     private MessageCryptoService service;
 

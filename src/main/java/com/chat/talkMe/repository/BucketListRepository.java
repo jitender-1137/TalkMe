@@ -9,6 +9,8 @@ import java.util.Optional;
 @Repository
 public interface BucketListRepository extends JpaRepository<BucketList, Long> {
 
-    /** The single bucket list for a chat, if it has been created yet. */
+    /**
+     * The single bucket list for a chat, if it has been created yet.
+     */
     Optional<BucketList> findByChatUuid(String chatUuid);
 }

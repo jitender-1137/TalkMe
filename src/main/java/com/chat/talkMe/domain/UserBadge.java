@@ -1,8 +1,20 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.BadgeType;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
@@ -32,11 +44,15 @@ public class UserBadge extends BaseEntity {
     @Column(name = "badge_type", nullable = false, length = 40)
     private BadgeType badgeType;
 
-    /** Stamped when the badge is first awarded (endorsements cross the threshold). */
+    /**
+     * Stamped when the badge is first awarded (endorsements cross the threshold).
+     */
     @Column(name = "awarded_at")
     private Instant awardedAt;
 
-    /** Number of distinct peers who have endorsed this user for this badge. */
+    /**
+     * Number of distinct peers who have endorsed this user for this badge.
+     */
     @Column(name = "endorsement_count", nullable = false)
     @ColumnDefault("0")
     private int endorsementCount;

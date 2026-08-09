@@ -19,7 +19,6 @@ import com.chat.talkMe.repository.ListenerShiftRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.GroupService;
 import com.chat.talkMe.service.ReputationRecorder;
-import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +32,7 @@ import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,14 +64,22 @@ class ListenerServiceImplTest {
 
     private static final String AVAILABLE_SET = "listeners:available";
 
-    @Mock private ListenerShiftRepository shiftRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private GroupService groupService;
-    @Mock private ReputationRecorder reputationRecorder;
-    @Mock private StringRedisTemplate redis;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ListenerShiftRepository shiftRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private GroupService groupService;
+    @Mock
+    private ReputationRecorder reputationRecorder;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private ListenerServiceImpl service;
 

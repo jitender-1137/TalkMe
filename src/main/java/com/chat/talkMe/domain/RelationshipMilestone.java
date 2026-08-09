@@ -50,11 +50,15 @@ import java.time.Instant;
 @AllArgsConstructor
 public class RelationshipMilestone extends BaseEntity {
 
-    /** Lower of the two user ids in the relationship (normalized {@code userAId < userBId}). */
+    /**
+     * Lower of the two user ids in the relationship (normalized {@code userAId < userBId}).
+     */
     @Column(name = "user_a_id", nullable = false)
     private Long userAId;
 
-    /** Higher of the two user ids in the relationship (normalized {@code userAId < userBId}). */
+    /**
+     * Higher of the two user ids in the relationship (normalized {@code userAId < userBId}).
+     */
     @Column(name = "user_b_id", nullable = false)
     private Long userBId;
 
@@ -64,15 +68,21 @@ public class RelationshipMilestone extends BaseEntity {
     @Builder.Default
     private MilestoneType type = MilestoneType.BECAME_FRIENDS;
 
-    /** When the milestone was achieved (source of the timeline ordering). */
+    /**
+     * When the milestone was achieved (source of the timeline ordering).
+     */
     @Column(name = "achieved_at", nullable = false)
     private Instant achievedAt;
 
-    /** Optional human-readable detail (e.g. a count or the friendship day). */
+    /**
+     * Optional human-readable detail (e.g. a count or the friendship day).
+     */
     @Column(name = "detail", length = 255)
     private String detail;
 
-    /** Stable dedupe key for the source of this milestone; part of the unique constraint. */
+    /**
+     * Stable dedupe key for the source of this milestone; part of the unique constraint.
+     */
     @Column(name = "ref", length = 100)
     private String ref;
 }

@@ -134,7 +134,9 @@ class WingmanControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** Wire the happy-path relationship gates: other exists, no blocks either way, and friends. */
+    /**
+     * Wire the happy-path relationship gates: other exists, no blocks either way, and friends.
+     */
     private void wireFriendship() {
         when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(other));
         when(blockUserRepository.existsByUserAndBlocked(eq(testUser), eq(other))).thenReturn(false);

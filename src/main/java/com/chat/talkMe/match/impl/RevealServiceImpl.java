@@ -34,7 +34,9 @@ public class RevealServiceImpl implements RevealService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    /** When true, a PHOTO reveal is blocked until VOICE is mutually revealed (feature #15). */
+    /**
+     * When true, a PHOTO reveal is blocked until VOICE is mutually revealed (feature #15).
+     */
     @Value("${match.voice-before-photo.enabled:false}")
     private boolean voiceBeforePhoto;
 
@@ -102,7 +104,9 @@ public class RevealServiceImpl implements RevealService {
         }
     }
 
-    /** Voice-before-photo gate: a PHOTO reveal needs VOICE mutually revealed first (if enabled). */
+    /**
+     * Voice-before-photo gate: a PHOTO reveal needs VOICE mutually revealed first (if enabled).
+     */
     private boolean photoAllowed(MatchSession session, RevealChannel channel) {
         return !(voiceBeforePhoto && channel == RevealChannel.PHOTO
                 && !session.getRevealExchanged().contains(RevealChannel.VOICE));

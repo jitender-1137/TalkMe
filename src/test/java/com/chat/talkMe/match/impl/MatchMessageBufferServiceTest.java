@@ -40,10 +40,14 @@ class MatchMessageBufferServiceTest {
     private static final String KEY = "match:msgbuffer:" + USER;
     private static final String QUEUE = "/queue/match";
 
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ObjectMapper objectMapper;
-    @Mock private ListOperations<String, String> listOps;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ObjectMapper objectMapper;
+    @Mock
+    private ListOperations<String, String> listOps;
 
     private MatchMessageBufferService service;
 

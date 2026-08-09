@@ -11,7 +11,6 @@ import com.chat.talkMe.dto.response.PublicProfileResponse;
 import com.chat.talkMe.dto.response.SmartProfileCardResponse;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.exception.BadRequestException;
-import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.GlobalExceptionHandler;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.exception.UnauthorizedException;
@@ -91,10 +90,14 @@ class UserControllerUnitTest {
     private static final String VE = "VE_101";
     private static final String ERR500 = "TM_002";
 
-    @Mock private UserService userService;
-    @Mock private FriendService friendService;
-    @Mock private PostService postService;
-    @Mock private AuthService authService;
+    @Mock
+    private UserService userService;
+    @Mock
+    private FriendService friendService;
+    @Mock
+    private PostService postService;
+    @Mock
+    private AuthService authService;
 
     private MockMvc mockMvc;
     private User testUser;

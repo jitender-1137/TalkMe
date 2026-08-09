@@ -11,16 +11,26 @@ import lombok.Data;
 @Data
 @Builder
 public class OAuthUserInfo {
-    /** Provider subject id — Google's "sub" claim. */
+    /**
+     * Provider subject id — Google's "sub" claim.
+     */
     private String providerId;
     private String email;
     private boolean emailVerified;
-    /** Display name (Google "name"). */
+    /**
+     * Display name (Google "name").
+     */
     private String name;
-    /** Profile image URL (Google "picture"). */
+    /**
+     * Profile image URL (Google "picture").
+     */
     private String picture;
-    /** Best-effort — null unless the birthday scope was granted. */
+    /**
+     * Best-effort — null unless the birthday scope was granted.
+     */
     private Integer age;
-    /** Best-effort — null unless the gender scope was granted. */
+    /**
+     * Best-effort — null unless the gender scope was granted.
+     */
     private String gender;
 }

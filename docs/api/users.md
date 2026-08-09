@@ -8,10 +8,11 @@
 
 Retrieves the authenticated user's full profile details.
 
-*   **URL:** `GET /api/v1/users/me`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/users/me`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -48,15 +49,16 @@ Retrieves the authenticated user's full profile details.
 
 Modifies the authenticated user's profile details. Mapped to both `PATCH` and `PUT`.
 
-*   **URL:** `PATCH /api/v1/users/me` | `PUT /api/v1/users/me`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PATCH /api/v1/users/me` | `PUT /api/v1/users/me`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "name": "Johnathan Doe",
@@ -70,6 +72,7 @@ Modifies the authenticated user's profile details. Mapped to both `PATCH` and `P
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -106,20 +109,22 @@ Modifies the authenticated user's profile details. Mapped to both `PATCH` and `P
 
 Uploads a new avatar photo.
 
-*   **URL:** `POST /api/v1/users/me/avatar`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: multipart/form-data`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/users/me/avatar`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: multipart/form-data`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```text
 file: <image binary>  (jpg/png/webp/heic, max 5 MB)
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -137,14 +142,15 @@ file: <image binary>  (jpg/png/webp/heic, max 5 MB)
 
 Deletes the user's avatar.
 
-*   **URL:** `DELETE /api/v1/users/me/avatar`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/users/me/avatar`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -160,10 +166,11 @@ Deletes the user's avatar.
 
 Gets public details of another user by UUID.
 
-*   **URL:** `GET /api/v1/users/{userId}`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/users/{userId}`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -200,14 +207,15 @@ Gets public details of another user by UUID.
 
 Searches the directory by matching name, username, or email.
 
-*   **URL:** `GET /api/v1/users/search`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `q` (string, required): Query string (min 2 chars).
-    *   `limit` (number, optional, default: 20)
-    *   `cursor` (string, optional): Page index value for next elements fetch.
+* **URL:** `GET /api/v1/users/search`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `q` (string, required): Query string (min 2 chars).
+    * `limit` (number, optional, default: 20)
+    * `cursor` (string, optional): Page index value for next elements fetch.
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -254,14 +262,15 @@ Searches the directory by matching name, username, or email.
 
 Blocks a user.
 
-*   **URL:** `POST /api/v1/users/{userId}/block`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/users/{userId}/block`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -277,14 +286,15 @@ Blocks a user.
 
 Removes a block on a user.
 
-*   **URL:** `DELETE /api/v1/users/{userId}/block`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/users/{userId}/block`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -300,10 +310,11 @@ Removes a block on a user.
 
 Fetches a list of blocked users.
 
-*   **URL:** `GET /api/v1/users/blocked`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/users/blocked`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -334,15 +345,16 @@ Fetches a list of blocked users.
 
 Reports a user for abusive behavior.
 
-*   **URL:** `POST /api/v1/users/{userId}/report`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/users/{userId}/report`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "reason": "harassment",
@@ -351,6 +363,7 @@ Reports a user for abusive behavior.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -366,13 +379,14 @@ Reports a user for abusive behavior.
 
 Gets public feed posts created by target user.
 
-*   **URL:** `GET /api/v1/users/{userId}/posts`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `page` (number, optional, default: 0)
-    *   `size` (number, optional, default: 20)
+* **URL:** `GET /api/v1/users/{userId}/posts`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `page` (number, optional, default: 0)
+    * `size` (number, optional, default: 20)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -406,10 +420,11 @@ Gets public feed posts created by target user.
 
 Fetches public profile card. Identical structure to UserResponse.
 
-*   **URL:** `GET /api/v1/users/{userId}/profile`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/users/{userId}/profile`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -446,10 +461,11 @@ Fetches public profile card. Identical structure to UserResponse.
 
 Retrieves the list and count of mutual friends between current user and target user.
 
-*   **URL:** `GET /api/v1/users/{userId}/mutual-friends`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/users/{userId}/mutual-friends`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

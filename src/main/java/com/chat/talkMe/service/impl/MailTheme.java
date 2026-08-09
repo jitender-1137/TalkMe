@@ -15,55 +15,81 @@ import java.util.Arrays;
 @Component
 public class MailTheme {
 
-    /** Buttons + solid header fallback (deep emerald). */
+    /**
+     * Buttons + solid header fallback (deep emerald).
+     */
     @Value("${app.mail.theme.primary:#047857}")
     private String primary;
 
-    /** Header gradient start (deep emerald). */
+    /**
+     * Header gradient start (deep emerald).
+     */
     @Value("${app.mail.theme.header-from:#064e3b}")
     private String headerFrom;
 
-    /** Header gradient end (teal). */
+    /**
+     * Header gradient end (teal).
+     */
     @Value("${app.mail.theme.header-to:#0f766e}")
     private String headerTo;
 
-    /** Links, checkmarks, chips (calm teal). */
+    /**
+     * Links, checkmarks, chips (calm teal).
+     */
     @Value("${app.mail.theme.accent:#0f766e}")
     private String accent;
 
-    /** Headings / strong text. */
+    /**
+     * Headings / strong text.
+     */
     @Value("${app.mail.theme.ink:#0f172a}")
     private String ink;
 
-    /** Body copy. */
+    /**
+     * Body copy.
+     */
     @Value("${app.mail.theme.body:#334155}")
     private String body;
 
-    /** Secondary / muted copy. */
+    /**
+     * Secondary / muted copy.
+     */
     @Value("${app.mail.theme.muted:#64748b}")
     private String muted;
 
-    /** Page background behind the card. */
+    /**
+     * Page background behind the card.
+     */
     @Value("${app.mail.theme.page-bg:#eef2f6}")
     private String pageBg;
 
-    /** Card + divider borders. */
+    /**
+     * Card + divider borders.
+     */
     @Value("${app.mail.theme.card-border:#e6ebf1}")
     private String cardBorder;
 
-    /** Footer background. */
+    /**
+     * Footer background.
+     */
     @Value("${app.mail.theme.footer-bg:#f8fafc}")
     private String footerBg;
 
-    /** Footer text. */
+    /**
+     * Footer text.
+     */
     @Value("${app.mail.theme.footer-text:#94a3b8}")
     private String footerText;
 
-    /** Font stack for the whole email. */
+    /**
+     * Font stack for the whole email.
+     */
     @Value("${app.mail.theme.font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}")
     private String font;
 
-    /** Palette for initial-circle avatars when no photo URL is available (comma-separated hex). */
+    /**
+     * Palette for initial-circle avatars when no photo URL is available (comma-separated hex).
+     */
     @Value("${app.mail.theme.avatar-colors:#6366f1,#0ea5e9,#0d9488,#f59e0b,#e11d48,#8b5cf6,#db2777,#0f766e}")
     private String avatarColorsCsv;
 
@@ -115,7 +141,9 @@ public class MailTheme {
         return font;
     }
 
-    /** Pick a stable avatar colour for a name. */
+    /**
+     * Pick a stable avatar colour for a name.
+     */
     public String avatarColor(String seed) {
         String[] colors = avatarColors();
         int idx = Math.floorMod(seed == null ? 0 : seed.hashCode(), colors.length);

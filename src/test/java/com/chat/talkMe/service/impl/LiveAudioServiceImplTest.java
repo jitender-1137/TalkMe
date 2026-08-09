@@ -51,8 +51,10 @@ class LiveAudioServiceImplTest {
     private static final String CHAT_ID = "33333333-3333-3333-3333-333333333333";
     private static final UUID CHAT_UUID = UUID.fromString(CHAT_ID);
 
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
     private LiveAudioProperties props;
     private LiveAudioServiceImpl service;

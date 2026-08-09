@@ -1,11 +1,15 @@
 package com.chat.talkMe.dto.response;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.List;
 
-/** A feed post as seen by an admin — author, content, media and engagement counts. */
+/**
+ * A feed post as seen by an admin — author, content, media and engagement counts.
+ */
 @Data
 @Builder
 public class AdminPostView {

@@ -52,7 +52,9 @@ public class EventRsvp extends BaseEntity {
     @Builder.Default
     private RsvpStatus status = RsvpStatus.GOING;
 
-    /** True once the user joined the live room; used to grant reputation exactly once. */
+    /**
+     * True once the user joined the live room; used to grant reputation exactly once.
+     */
     @Column(name = "attended", nullable = false)
     @ColumnDefault("false")
     @Builder.Default

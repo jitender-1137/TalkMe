@@ -53,10 +53,14 @@ class FollowServiceImplTest {
     private static final String TARGET_UUID = "11111111-1111-1111-1111-111111111111";
     private static final String CURRENT_UUID = "22222222-2222-2222-2222-222222222222";
 
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private NotificationService notificationService;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private NotificationService notificationService;
 
     private FollowServiceImpl service;
 

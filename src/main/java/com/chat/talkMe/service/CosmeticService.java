@@ -17,10 +17,14 @@ import java.util.List;
  */
 public interface CosmeticService {
 
-    /** Full catalog with owned/locked/equipped flags resolved for the given user. */
+    /**
+     * Full catalog with owned/locked/equipped flags resolved for the given user.
+     */
     List<CosmeticResponse> catalog(User user);
 
-    /** Only the cosmetics the user owns, with equipped flags. */
+    /**
+     * Only the cosmetics the user owns, with equipped flags.
+     */
     List<CosmeticResponse> myCosmetics(User user);
 
     /**
@@ -29,6 +33,8 @@ public interface CosmeticService {
      */
     List<CosmeticResponse> equip(User user, String code);
 
-    /** Unequip whatever the user currently has equipped in the given slot (no-op if none). */
+    /**
+     * Unequip whatever the user currently has equipped in the given slot (no-op if none).
+     */
     List<CosmeticResponse> unequip(User user, CosmeticType slot);
 }

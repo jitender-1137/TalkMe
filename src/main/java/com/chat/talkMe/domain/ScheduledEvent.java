@@ -34,7 +34,9 @@ import java.time.Instant;
 @AllArgsConstructor
 public class ScheduledEvent extends BaseEntity {
 
-    /** The user who scheduled the event — the only party allowed to cancel it. */
+    /**
+     * The user who scheduled the event — the only party allowed to cancel it.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "host_id", nullable = false)
     private User host;
@@ -45,15 +47,21 @@ public class ScheduledEvent extends BaseEntity {
     @Column(name = "description", length = 2000)
     private String description;
 
-    /** When the event begins; the orchestrator spins up the room at/after this instant. */
+    /**
+     * When the event begins; the orchestrator spins up the room at/after this instant.
+     */
     @Column(name = "start_at", nullable = false)
     private Instant startAt;
 
-    /** Optional close time; when set and elapsed, the orchestrator flips LIVE → ENDED. */
+    /**
+     * Optional close time; when set and elapsed, the orchestrator flips LIVE → ENDED.
+     */
     @Column(name = "end_at")
     private Instant endAt;
 
-    /** Free-form discovery/theme label (e.g. "music", "late-night talk"). */
+    /**
+     * Free-form discovery/theme label (e.g. "music", "late-night talk").
+     */
     @Column(name = "category", length = 60)
     private String category;
 
@@ -63,17 +71,23 @@ public class ScheduledEvent extends BaseEntity {
     @Builder.Default
     private EventStatus status = EventStatus.SCHEDULED;
 
-    /** Uuid of the ROOM chat spun up for this event; null until it goes LIVE. */
+    /**
+     * Uuid of the ROOM chat spun up for this event; null until it goes LIVE.
+     */
     @Column(name = "room_chat_uuid", length = 40)
     private String roomChatUuid;
 
-    /** Seat cap for GOING RSVPs; 0 = unlimited. */
+    /**
+     * Seat cap for GOING RSVPs; 0 = unlimited.
+     */
     @Column(name = "max_attendees", nullable = false)
     @ColumnDefault("0")
     @Builder.Default
     private int maxAttendees = 0;
 
-    /** Guards against re-notifying RSVPs when the room is spun up. */
+    /**
+     * Guards against re-notifying RSVPs when the room is spun up.
+     */
     @Column(name = "reminder_sent", nullable = false)
     @ColumnDefault("false")
     @Builder.Default

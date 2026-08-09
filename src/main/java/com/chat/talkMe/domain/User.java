@@ -1,36 +1,37 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import java.time.Instant;
-import java.util.HashMap;
-import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
+import com.chat.talkMe.enums.ConversationEnergy;
+import com.chat.talkMe.enums.InstallationType;
+import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.Language;
 import com.chat.talkMe.enums.LookingForTag;
 import com.chat.talkMe.enums.Mood;
 import com.chat.talkMe.enums.PersonalityTrait;
 import jakarta.persistence.CollectionTable;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.MapKeyEnumerated;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.JoinTable;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Formula;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import com.chat.talkMe.enums.ConversationEnergy;
-import com.chat.talkMe.enums.InstallationType;
-import com.chat.talkMe.enums.Interest;
+
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -175,7 +176,9 @@ public class User extends BaseEntity {
     // All nullable objects (never primitives) so "not set" is distinguishable — the
     // matching/compatibility engines treat null as "no preference".
 
-    /** Current mood / intent (feature #4), updatable any time. */
+    /**
+     * Current mood / intent (feature #4), updatable any time.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "mood", length = 30)
     private Mood mood;
@@ -183,12 +186,16 @@ public class User extends BaseEntity {
     @Column(name = "mood_updated_at")
     private Instant moodUpdatedAt;
 
-    /** Conversation vibe (feature #5). */
+    /**
+     * Conversation vibe (feature #5).
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "conversation_energy", length = 20)
     private ConversationEnergy conversationEnergy;
 
-    /** Languages spoken (feature #3 filter + compatibility). */
+    /**
+     * Languages spoken (feature #3 filter + compatibility).
+     */
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_languages", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "language")
@@ -196,7 +203,9 @@ public class User extends BaseEntity {
     @Builder.Default
     private Set<Language> languages = new HashSet<>();
 
-    /** What the user is looking for (feature #29). */
+    /**
+     * What the user is looking for (feature #29).
+     */
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_looking_for", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "tag")
@@ -204,7 +213,9 @@ public class User extends BaseEntity {
     @Builder.Default
     private Set<LookingForTag> lookingFor = new HashSet<>();
 
-    /** Compact personality trait scores (0–100) for cosine compatibility. Lazy — off the hot path. */
+    /**
+     * Compact personality trait scores (0–100) for cosine compatibility. Lazy — off the hot path.
+     */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_personality", joinColumns = @JoinColumn(name = "user_id"))
     @MapKeyColumn(name = "trait")
@@ -213,14 +224,18 @@ public class User extends BaseEntity {
     @Builder.Default
     private Map<PersonalityTrait, Integer> personality = new HashMap<>();
 
-    /** Async voice introduction (feature #16) — 15–30s clip stored via MediaStorage. */
+    /**
+     * Async voice introduction (feature #16) — 15–30s clip stored via MediaStorage.
+     */
     @Column(name = "voice_intro_url", length = 512)
     private String voiceIntroUrl;
 
     @Column(name = "voice_intro_duration_ms")
     private Integer voiceIntroDurationMs;
 
-    /** Cached profile-completion percentage (0–100), recomputed on profile writes. Feeds gamification. */
+    /**
+     * Cached profile-completion percentage (0–100), recomputed on profile writes. Feeds gamification.
+     */
     @Column(name = "profile_completion", nullable = false)
     @ColumnDefault("0")
     @Builder.Default
@@ -228,9 +243,9 @@ public class User extends BaseEntity {
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
@@ -250,13 +265,17 @@ public class User extends BaseEntity {
     @Formula("(SELECT p.last_seen_at FROM user_presences p WHERE p.user_id = id)")
     private Instant presenceLastSeenAt;
 
-    /** How the user most recently accessed the app — drives push vs WS-only delivery. */
+    /**
+     * How the user most recently accessed the app — drives push vs WS-only delivery.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "installation_type", length = 20)
     @Builder.Default
     private InstallationType installationType = InstallationType.BROWSER;
 
-    /** Server-driven total unread message count, used for the app badge. */
+    /**
+     * Server-driven total unread message count, used for the app badge.
+     */
     @Column(name = "total_unread_count", nullable = false, columnDefinition = "integer default 0")
     @Builder.Default
     private int totalUnreadCount = 0;

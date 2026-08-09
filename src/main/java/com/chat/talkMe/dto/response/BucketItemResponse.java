@@ -8,14 +8,18 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
-/** Client-facing view of one entry in a shared bucket list (feature #18). */
+/**
+ * Client-facing view of one entry in a shared bucket list (feature #18).
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class BucketItemResponse {
 
-    /** The item's uuid (as String); used by the toggle/remove routes. */
+    /**
+     * The item's uuid (as String); used by the toggle/remove routes.
+     */
     private String id;
     private String text;
     private boolean completed;

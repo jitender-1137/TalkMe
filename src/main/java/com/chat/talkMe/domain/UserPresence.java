@@ -1,7 +1,18 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 
 @Entity
@@ -36,7 +47,9 @@ public class UserPresence extends BaseEntity {
     @Builder.Default
     private boolean invisibleModeEnabled = false;
 
-    /** When true, other users never see this user's "last seen" timestamp. */
+    /**
+     * When true, other users never see this user's "last seen" timestamp.
+     */
     @Column(name = "hide_last_seen_enabled", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean hideLastSeenEnabled = false;

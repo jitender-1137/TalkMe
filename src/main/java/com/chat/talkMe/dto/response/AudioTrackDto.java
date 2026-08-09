@@ -6,7 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Soundtrack payload — used both in create requests and in responses. */
+/**
+ * Soundtrack payload — used both in create requests and in responses.
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,7 +21,9 @@ public class AudioTrackDto {
     private Integer audioStartSec;
     private Integer audioClipSeconds;
 
-    /** Response mapping: returns null when no track is attached. */
+    /**
+     * Response mapping: returns null when no track is attached.
+     */
     public static AudioTrackDto from(AudioTrack a) {
         if (a == null || !a.isPresent()) {
             return null;
@@ -34,7 +38,9 @@ public class AudioTrackDto {
                 .build();
     }
 
-    /** Request mapping: returns null when this payload carries no usable track. */
+    /**
+     * Request mapping: returns null when this payload carries no usable track.
+     */
     public AudioTrack toEntity() {
         if (audioUrl == null || audioUrl.isBlank()) {
             return null;

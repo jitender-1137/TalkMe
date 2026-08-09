@@ -36,7 +36,9 @@ public class ReputationCache {
         return KEY_PREFIX + userId;
     }
 
-    /** Return the cached snapshot, else compute via {@code supplier}, cache it, and return it. */
+    /**
+     * Return the cached snapshot, else compute via {@code supplier}, cache it, and return it.
+     */
     public ReputationResponse getOrCompute(Long userId, Supplier<ReputationResponse> supplier) {
         if (userId == null) {
             return supplier.get();
@@ -59,7 +61,9 @@ public class ReputationCache {
         return fresh;
     }
 
-    /** Invalidate after a recompute/prestige. Best-effort. */
+    /**
+     * Invalidate after a recompute/prestige. Best-effort.
+     */
     public void evict(Long userId) {
         if (userId == null) return;
         try {

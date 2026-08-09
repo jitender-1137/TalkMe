@@ -19,7 +19,9 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
 
     void deleteByEndpoint(String endpoint);
 
-    /** Remove every push subscription for a user (used on the single-device login sweep). */
+    /**
+     * Remove every push subscription for a user (used on the single-device login sweep).
+     */
     @Modifying
     @Query("DELETE FROM PushSubscription p WHERE p.user.id = :userId")
     int deleteByUserId(@Param("userId") Long userId);

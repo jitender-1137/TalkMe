@@ -8,15 +8,16 @@
 
 Creates a new post with text content and optional media attachments.
 
-*   **URL:** `POST /api/v1/posts`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/posts`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "content": "Just had an amazing day exploring the city! Check out this view. #travel #adventure",
@@ -30,6 +31,7 @@ Creates a new post with text content and optional media attachments.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -74,14 +76,15 @@ Creates a new post with text content and optional media attachments.
 
 Retrieves a paginated list of posts for the user's home feed.
 
-*   **URL:** `GET /api/v1/posts/feed`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Query Parameters:**
-    *   `page` (number, optional, default: 0)
-    *   `size` (number, optional, default: 20)
-    *   `sort` (string, optional, default: `createdAt,desc`)
+* **URL:** `GET /api/v1/posts/feed`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Query Parameters:**
+    * `page` (number, optional, default: 0)
+    * `size` (number, optional, default: 20)
+    * `sort` (string, optional, default: `createdAt,desc`)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -144,14 +147,15 @@ Retrieves a paginated list of posts for the user's home feed.
 
 Retrieves a paginated list of posts created by a specific user.
 
-*   **URL:** `GET /api/v1/posts/user/{userUuid}`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Query Parameters:**
-    *   `page` (number, optional, default: 0)
-    *   `size` (number, optional, default: 20)
-    *   `sort` (string, optional, default: `createdAt,desc`)
+* **URL:** `GET /api/v1/posts/user/{userUuid}`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Query Parameters:**
+    * `page` (number, optional, default: 0)
+    * `size` (number, optional, default: 20)
+    * `sort` (string, optional, default: `createdAt,desc`)
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -206,14 +210,15 @@ Retrieves a paginated list of posts created by a specific user.
 
 Deletes a post owned by the current authenticated user.
 
-*   **URL:** `DELETE /api/v1/posts/{id}`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/posts/{id}`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -229,14 +234,15 @@ Deletes a post owned by the current authenticated user.
 
 Likes a specific post.
 
-*   **URL:** `POST /api/v1/posts/{id}/like`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/posts/{id}/like`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -252,14 +258,15 @@ Likes a specific post.
 
 Removes a like from a post.
 
-*   **URL:** `DELETE /api/v1/posts/{id}/like`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/posts/{id}/like`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -275,15 +282,16 @@ Removes a like from a post.
 
 Adds a comment (or reply) to a post.
 
-*   **URL:** `POST /api/v1/posts/{id}/comments`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/posts/{id}/comments`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "content": "This is a comment.",
@@ -292,6 +300,7 @@ Adds a comment (or reply) to a post.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -313,14 +322,15 @@ Adds a comment (or reply) to a post.
 
 Deletes a comment from a post.
 
-*   **URL:** `DELETE /api/v1/posts/{id}/comments/{commentId}`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/posts/{id}/comments/{commentId}`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -336,14 +346,15 @@ Deletes a comment from a post.
 
 Bookmarks a post for the user.
 
-*   **URL:** `POST /api/v1/posts/{id}/bookmark`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/posts/{id}/bookmark`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -359,14 +370,15 @@ Bookmarks a post for the user.
 
 Removes a bookmark from a post.
 
-*   **URL:** `DELETE /api/v1/posts/{id}/bookmark`
-*   **Authentication Required:** Yes (Role: `USER`)
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/posts/{id}/bookmark`
+* **Authentication Required:** Yes (Role: `USER`)
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

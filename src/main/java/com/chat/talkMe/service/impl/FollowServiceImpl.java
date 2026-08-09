@@ -51,17 +51,17 @@ public class FollowServiceImpl implements FollowService {
                 .following(targetUser)
                 .status("ACCEPTED") // Will update for private accounts later
                 .build();
-        
+
         userFollowRepository.save(follow);
-        
+
         notificationService.createNotification(
-            targetUser,
-            "New follower",
-            currentUser.getName() + " started following you.",
-            "FOLLOW",
-            currentUser.getUuid().toString(),
-            currentUser,
-            null
+                targetUser,
+                "New follower",
+                currentUser.getName() + " started following you.",
+                "FOLLOW",
+                currentUser.getUuid().toString(),
+                currentUser,
+                null
         );
     }
 
@@ -71,7 +71,7 @@ public class FollowServiceImpl implements FollowService {
         User targetUser = getUser(targetUserUuid);
         UserFollow follow = userFollowRepository.findByFollowerAndFollowingAndIsDeletedFalse(currentUser, targetUser)
                 .orElseThrow(() -> new BadRequestException("You are not following this user", "TM_252"));
-        
+
         follow.setDeleted(true);
         userFollowRepository.save(follow);
     }
@@ -82,7 +82,7 @@ public class FollowServiceImpl implements FollowService {
         User follower = getUser(followerUuid);
         UserFollow follow = userFollowRepository.findByFollowerAndFollowingAndIsDeletedFalse(follower, currentUser)
                 .orElseThrow(() -> new BadRequestException("This user is not following you", "TM_253"));
-        
+
         follow.setDeleted(true);
         userFollowRepository.save(follow);
     }

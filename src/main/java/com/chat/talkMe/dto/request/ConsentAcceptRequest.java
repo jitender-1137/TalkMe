@@ -10,6 +10,8 @@ public class ConsentAcceptRequest {
     @NotNull
     private ConsentType type;
 
-    /** The version the client is accepting. When null/stale, the server uses the current required version. */
+    /**
+     * The version the client is accepting. When null/stale, the server uses the current required version.
+     */
     private String version;
 }

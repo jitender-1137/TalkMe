@@ -5,7 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** A searchable music track (from the free iTunes Search preview catalog). */
+/**
+ * A searchable music track (from the free iTunes Search preview catalog).
+ */
 @Data
 @Builder
 @NoArgsConstructor

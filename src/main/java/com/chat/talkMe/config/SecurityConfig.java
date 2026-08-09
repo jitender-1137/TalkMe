@@ -7,7 +7,6 @@ import com.chat.talkMe.security.RateLimitingFilter;
 import com.chat.talkMe.security.oauth.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.chat.talkMe.security.oauth.OAuth2LoginFailureHandler;
 import com.chat.talkMe.security.oauth.OAuth2LoginSuccessHandler;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -29,6 +28,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -135,7 +136,7 @@ public class SecurityConfig {
                     // rest require authentication. authenticated() — not hasRole("ADMIN") — because
                     // no user is ever granted ROLE_ADMIN, so admin-only would lock out everyone.
                     auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/actuator/**").authenticated();
+                            .requestMatchers("/actuator/**").authenticated();
 
                     // Swagger / OpenAPI docs. In prod: locked down (not public). In dev/local:
                     // reachable. The root-path UI (/swagger-ui.html + static assets) and the
@@ -151,16 +152,16 @@ public class SecurityConfig {
                     }
 
                     auth.requestMatchers(unSecured()).permitAll()
-                        // Admin API — SUPER_ADMIN only (defense-in-depth; the controller
-                        // also carries @PreAuthorize). ONLY the /api/v1-prefixed API path:
-                        // @RestControllers are served under /api/v1 (WebMvcConfig), so the
-                        // AdminController is /api/v1/admin/**. The bare /admin (and /admin/user,
-                        // /admin/audit, …) is the STATIC frontend page — it must fall through
-                        // to permitAll below and be served as admin.html by the SPA resource
-                        // handler, so it is deliberately NOT matched here.
-                        .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
-                        .requestMatchers("/api/**").authenticated() // Require auth for API endpoints
-                        .anyRequest().permitAll(); // Allow static SPA resources and frontend routes
+                            // Admin API — SUPER_ADMIN only (defense-in-depth; the controller
+                            // also carries @PreAuthorize). ONLY the /api/v1-prefixed API path:
+                            // @RestControllers are served under /api/v1 (WebMvcConfig), so the
+                            // AdminController is /api/v1/admin/**. The bare /admin (and /admin/user,
+                            // /admin/audit, …) is the STATIC frontend page — it must fall through
+                            // to permitAll below and be served as admin.html by the SPA resource
+                            // handler, so it is deliberately NOT matched here.
+                            .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
+                            .requestMatchers("/api/**").authenticated() // Require auth for API endpoints
+                            .anyRequest().permitAll(); // Allow static SPA resources and frontend routes
                 });
 
         // Google social login (authorization-code flow). Enabled only when a Google

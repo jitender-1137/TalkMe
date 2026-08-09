@@ -9,11 +9,6 @@ import com.chat.talkMe.dto.response.TranslateResponse;
 import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.service.impl.TranslationServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +20,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import javax.net.ssl.SSLSession;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
@@ -33,6 +29,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,7 +40,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -322,7 +321,9 @@ class TranslationServiceImplTest {
             return new TranslateBatchRequest(items, target, source);
         }
 
-        /** Replicates the impl's cache key so a specific item can be stubbed as a hit/miss. */
+        /**
+         * Replicates the impl's cache key so a specific item can be stubbed as a hit/miss.
+         */
         private String key(String target, String text) throws Exception {
             MessageDigest d = MessageDigest.getInstance("SHA-256");
             byte[] h = d.digest(text.getBytes(StandardCharsets.UTF_8));
@@ -483,18 +484,51 @@ class TranslationServiceImplTest {
             // stub interrupts the outer one (UnfinishedStubbingException). Production only
             // reads statusCode() and body().
             return new HttpResponse<>() {
-                @Override public int statusCode() { return status; }
-                @Override public String body() { return body; }
-                @Override public HttpRequest request() { return null; }
-                @Override public Optional<HttpResponse<String>> previousResponse() { return Optional.empty(); }
-                @Override public HttpHeaders headers() { return HttpHeaders.of(Map.of(), (a, b) -> true); }
-                @Override public Optional<SSLSession> sslSession() { return Optional.empty(); }
-                @Override public URI uri() { return URI.create("https://test.local"); }
-                @Override public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
+                @Override
+                public int statusCode() {
+                    return status;
+                }
+
+                @Override
+                public String body() {
+                    return body;
+                }
+
+                @Override
+                public HttpRequest request() {
+                    return null;
+                }
+
+                @Override
+                public Optional<HttpResponse<String>> previousResponse() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public HttpHeaders headers() {
+                    return HttpHeaders.of(Map.of(), (a, b) -> true);
+                }
+
+                @Override
+                public Optional<SSLSession> sslSession() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public URI uri() {
+                    return URI.create("https://test.local");
+                }
+
+                @Override
+                public HttpClient.Version version() {
+                    return HttpClient.Version.HTTP_1_1;
+                }
             };
         }
 
-        /** Cache miss for the single-translate path (cap is enforced, arms the TTL). */
+        /**
+         * Cache miss for the single-translate path (cap is enforced, arms the TTL).
+         */
         private void singleMiss() {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null);

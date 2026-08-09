@@ -41,7 +41,9 @@ public class AdminMediaOwnershipResponse {
     private String granularity;        // "hour" | "day"
     private List<AdminTimeseriesPoint> uploadsSeries;
 
-    /** A labelled count + byte total (context or media-type breakdown row). */
+    /**
+     * A labelled count + byte total (context or media-type breakdown row).
+     */
     @Data
     @Builder
     @NoArgsConstructor
@@ -52,7 +54,9 @@ public class AdminMediaOwnershipResponse {
         private long bytes;
     }
 
-    /** A user ranked by how much media they've uploaded. */
+    /**
+     * A user ranked by how much media they've uploaded.
+     */
     @Data
     @Builder
     @NoArgsConstructor
@@ -67,7 +71,9 @@ public class AdminMediaOwnershipResponse {
         private long strangerCount; // how many were anonymous stranger uploads
     }
 
-    /** One recent upload with its owner + context, for the activity feed. */
+    /**
+     * One recent upload with its owner + context, for the activity feed.
+     */
     @Data
     @Builder
     @NoArgsConstructor

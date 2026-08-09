@@ -10,7 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -26,14 +30,18 @@ public class CityController {
 
     private final CityService cityService;
 
-    /** The city map: every district with its live count + curated room count. */
+    /**
+     * The city map: every district with its live count + curated room count.
+     */
     @GetMapping
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
     public ResponseEntity<ResponseDto<List<CityDistrictResponse>>> districts() {
         return ResponseEntity.ok(SuccessResponseDto.success(cityService.listDistricts()));
     }
 
-    /** One district: card + curated rooms + live roster. */
+    /**
+     * One district: card + curated rooms + live roster.
+     */
     @GetMapping("/{slug}")
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
     public ResponseEntity<ResponseDto<CityDistrictDetailResponse>> district(
@@ -43,7 +51,9 @@ public class CityController {
                 cityService.getDistrict(slug, userDetails.getUser())));
     }
 
-    /** Announce presence in a district (joins the Redis presence set, broadcasts a join). */
+    /**
+     * Announce presence in a district (joins the Redis presence set, broadcasts a join).
+     */
     @PostMapping("/{slug}/enter")
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
     public ResponseEntity<ResponseDto<CityDistrictDetailResponse>> enter(

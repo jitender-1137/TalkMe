@@ -6,8 +6,25 @@ import com.chat.talkMe.enums.CityLocation;
 import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.JoinPolicy;
 import com.chat.talkMe.enums.RoomMode;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.util.ArrayList;
@@ -48,7 +65,9 @@ public class Chat extends BaseEntity {
     @Column(name = "description", length = 1024)
     private String description;
 
-    /** Group avatar image URL. */
+    /**
+     * Group avatar image URL.
+     */
     @Column(name = "image_url", length = 512)
     private String imageUrl;
 
@@ -92,13 +111,17 @@ public class Chat extends BaseEntity {
     @Builder.Default
     private boolean allowNonFriends = false;
 
-    /** Max members (MVP cap). */
+    /**
+     * Max members (MVP cap).
+     */
     @ColumnDefault("256")
     @Column(name = "member_limit", nullable = false)
     @Builder.Default
     private int memberLimit = 256;
 
-    /** Denormalized owner id for cheap authz; the OWNER-role member is source of truth. */
+    /**
+     * Denormalized owner id for cheap authz; the OWNER-role member is source of truth.
+     */
     @Column(name = "owner_id")
     private Long ownerId;
 
@@ -106,11 +129,15 @@ public class Chat extends BaseEntity {
     @Builder.Default
     private ChatSettings settings = ChatSettings.builder().build();
 
-    /** Free-form category label for room discovery. */
+    /**
+     * Free-form category label for room discovery.
+     */
     @Column(name = "category", length = 64)
     private String category;
 
-    /** Interest tags for room/group discovery (mirrors user_interests). */
+    /**
+     * Interest tags for room/group discovery (mirrors user_interests).
+     */
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "chat_tags",
             joinColumns = @JoinColumn(name = "chat_id"),
@@ -120,25 +147,33 @@ public class Chat extends BaseEntity {
     @Builder.Default
     private Set<Interest> tags = new HashSet<>();
 
-    /** Editorially-curated room surfaced on the Trending/Night rail (feature #23). */
+    /**
+     * Editorially-curated room surfaced on the Trending/Night rail (feature #23).
+     */
     @Column(name = "room_curated", nullable = false)
     @ColumnDefault("false")
     @Builder.Default
     private boolean roomCurated = false;
 
-    /** Which Virtual Night City district this ROOM belongs to, if any (feature #25). */
+    /**
+     * Which Virtual Night City district this ROOM belongs to, if any (feature #25).
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "city_location", length = 32)
     private CityLocation cityLocation;
 
-    /** Behavioural mode of a ROOM (features #26/#27). STANDARD for every ordinary room. */
+    /**
+     * Behavioural mode of a ROOM (features #26/#27). STANDARD for every ordinary room.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "room_mode", length = 20, nullable = false)
     @ColumnDefault("'STANDARD'")
     @Builder.Default
     private RoomMode roomMode = RoomMode.STANDARD;
 
-    /** True for GROUP/CHANNEL/ROOM. Convenience delegate to chatType. */
+    /**
+     * True for GROUP/CHANNEL/ROOM. Convenience delegate to chatType.
+     */
     @Transient
     public boolean isMultiParty() {
         return chatType != null && chatType.isMultiParty();

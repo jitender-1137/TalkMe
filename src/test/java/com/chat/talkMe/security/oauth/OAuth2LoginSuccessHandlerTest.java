@@ -48,13 +48,19 @@ import static org.mockito.Mockito.when;
 @DisplayName("OAuth2LoginSuccessHandler (unit)")
 class OAuth2LoginSuccessHandlerTest {
 
-    @Mock private AuthService authService;
-    @Mock private GoogleProfileService googleProfileService;
-    @Mock private ObjectProvider<OAuth2AuthorizedClientService> authorizedClientServiceProvider;
+    @Mock
+    private AuthService authService;
+    @Mock
+    private GoogleProfileService googleProfileService;
+    @Mock
+    private ObjectProvider<OAuth2AuthorizedClientService> authorizedClientServiceProvider;
 
-    @Mock private HttpServletRequest request;
-    @Mock private HttpServletResponse response;
-    @Mock private RedirectStrategy redirectStrategy;
+    @Mock
+    private HttpServletRequest request;
+    @Mock
+    private HttpServletResponse response;
+    @Mock
+    private RedirectStrategy redirectStrategy;
 
     private OAuth2LoginSuccessHandler handler;
 
@@ -68,7 +74,9 @@ class OAuth2LoginSuccessHandlerTest {
         handler.setRedirectStrategy(redirectStrategy);
     }
 
-    /** OAuth2User with the standard OIDC attributes; individual tests override as needed. */
+    /**
+     * OAuth2User with the standard OIDC attributes; individual tests override as needed.
+     */
     private OAuth2User principalWithName(String name) {
         OAuth2User p = Mockito.mock(OAuth2User.class);
         lenient().when(p.getAttribute("sub")).thenReturn("google-sub-1");

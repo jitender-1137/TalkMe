@@ -36,8 +36,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("MediaAssetService (unit)")
 class MediaAssetServiceTest {
 
-    @Mock private MediaAssetRepository repository;
-    @Mock private StorageProperties storageProperties;
+    @Mock
+    private MediaAssetRepository repository;
+    @Mock
+    private StorageProperties storageProperties;
 
     private MediaAssetService service;
 

@@ -6,15 +6,23 @@ package com.chat.talkMe.match;
  * the client countdown is purely cosmetic and can never unlock post-timer actions.
  */
 public interface MatchTimerService {
-    /** Arm the session's countdown (reads mode from the session; also kicks off Chemistry prompts). */
+    /**
+     * Arm the session's countdown (reads mode from the session; also kicks off Chemistry prompts).
+     */
     void arm(String sessionId, int seconds);
 
-    /** Clear all timers/prompts for a session (on cleanup or mutual continue). */
+    /**
+     * Clear all timers/prompts for a session (on cleanup or mutual continue).
+     */
     void cancel(String sessionId);
 
-    /** Record a user's "continue" choice; when both agree, the session becomes untimed. */
+    /**
+     * Record a user's "continue" choice; when both agree, the session becomes untimed.
+     */
     void continueRequest(String username);
 
-    /** Fire any due time-ups + rotate Chemistry prompts. Called by the reaper. */
+    /**
+     * Fire any due time-ups + rotate Chemistry prompts. Called by the reaper.
+     */
     void reapDue();
 }

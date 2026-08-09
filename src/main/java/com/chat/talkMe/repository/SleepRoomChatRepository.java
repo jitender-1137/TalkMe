@@ -20,7 +20,9 @@ import java.util.List;
 @Repository
 public interface SleepRoomChatRepository extends JpaRepository<Chat, Long> {
 
-    /** Active (non-deleted) rooms in a given behavioural mode, most-recently-active first. */
+    /**
+     * Active (non-deleted) rooms in a given behavioural mode, most-recently-active first.
+     */
     @Query("SELECT c FROM Chat c WHERE c.roomMode = :mode AND c.isDeleted = false ORDER BY c.updatedAt DESC")
     List<Chat> findActiveByRoomMode(@Param("mode") RoomMode mode);
 }

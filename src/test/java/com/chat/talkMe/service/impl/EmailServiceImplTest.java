@@ -66,15 +66,24 @@ class EmailServiceImplTest {
     private static final String RESEND_HOST = "api.resend.com";
     private static final String BREVO_HOST = "api.brevo.com";
 
-    @Mock private ObjectProvider<StringRedisTemplate> redisProvider;
-    @Mock private ObjectProvider<JavaMailSender> mailSenderProvider;
-    @Mock private EmailTemplates templates;
-    @Mock private UserRepository userRepository;
-    @Mock private DisposableEmailDomains disposableDomains;
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private JavaMailSender mailSender;
-    @Mock private HttpClient http;
+    @Mock
+    private ObjectProvider<StringRedisTemplate> redisProvider;
+    @Mock
+    private ObjectProvider<JavaMailSender> mailSenderProvider;
+    @Mock
+    private EmailTemplates templates;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private DisposableEmailDomains disposableDomains;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private JavaMailSender mailSender;
+    @Mock
+    private HttpClient http;
 
     private EmailServiceImpl service;
 
@@ -119,7 +128,9 @@ class EmailServiceImplTest {
         return resp;
     }
 
-    /** Route each send by the request host so provider order is asserted, not assumed. */
+    /**
+     * Route each send by the request host so provider order is asserted, not assumed.
+     */
     @SuppressWarnings("unchecked")
     private void stubByHost(int resendStatus, int brevoStatus) throws Exception {
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenAnswer(inv -> {

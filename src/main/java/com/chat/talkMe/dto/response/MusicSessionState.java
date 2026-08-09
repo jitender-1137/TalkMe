@@ -23,28 +23,42 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class MusicSessionState {
 
-    /** Opaque track identifier (e.g. the iTunes trackId), if the client supplied one. */
+    /**
+     * Opaque track identifier (e.g. the iTunes trackId), if the client supplied one.
+     */
     private String trackId;
 
-    /** Playable audio/preview URL the peers stream from. */
+    /**
+     * Playable audio/preview URL the peers stream from.
+     */
     private String url;
 
     private String title;
     private String artist;
     private String artworkUrl;
 
-    /** Playhead position (seconds) at the moment {@link #updatedAtEpochMs} was stamped. */
+    /**
+     * Playhead position (seconds) at the moment {@link #updatedAtEpochMs} was stamped.
+     */
     private double positionSec;
 
-    /** Whether playback is currently running (vs paused). */
+    /**
+     * Whether playback is currently running (vs paused).
+     */
     private boolean playing;
 
-    /** Epoch millis when the playback state last changed (the anchor for drift). */
+    /**
+     * Epoch millis when the playback state last changed (the anchor for drift).
+     */
     private long updatedAtEpochMs;
 
-    /** Username of whoever last mutated the session (the acting "host" for that event). */
+    /**
+     * Username of whoever last mutated the session (the acting "host" for that event).
+     */
     private String hostUsername;
 
-    /** Server clock at read/broadcast time, so the client can compute drift. */
+    /**
+     * Server clock at read/broadcast time, so the client can compute drift.
+     */
     private long serverTimeEpochMs;
 }

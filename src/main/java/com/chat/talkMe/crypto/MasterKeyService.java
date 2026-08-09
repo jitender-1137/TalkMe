@@ -48,12 +48,16 @@ public class MasterKeyService {
         }
     }
 
-    /** True only when a valid master key is configured. */
+    /**
+     * True only when a valid master key is configured.
+     */
     public boolean isConfigured() {
         return masterKey != null;
     }
 
-    /** Encrypt a raw data-key with the master key → base64(iv‖ciphertext‖tag). */
+    /**
+     * Encrypt a raw data-key with the master key → base64(iv‖ciphertext‖tag).
+     */
     public String wrap(byte[] dataKey) {
         try {
             byte[] iv = new byte[IV_LEN];
@@ -68,7 +72,9 @@ public class MasterKeyService {
         }
     }
 
-    /** Reverse of {@link #wrap} — returns the raw data-key bytes. */
+    /**
+     * Reverse of {@link #wrap} — returns the raw data-key bytes.
+     */
     public byte[] unwrap(String wrapped) {
         try {
             byte[] all = Base64.getDecoder().decode(wrapped);

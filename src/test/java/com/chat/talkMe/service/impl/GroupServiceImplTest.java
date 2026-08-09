@@ -89,22 +89,38 @@ class GroupServiceImplTest {
     private static final String CHAT_UUID_STR = CHAT_UUID.toString();
     private static final String TARGET_UUID_STR = TARGET_UUID.toString();
 
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private GroupAuthzService authz;
-    @Mock private ChatService chatService;
-    @Mock private MessageService messageService;
-    @Mock private PresenceService presenceService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private FriendRepository friendRepository;
-    @Mock private AuditLogRepository auditLogRepository;
-    @Mock private NotificationService notificationService;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private GroupInviteRepository groupInviteRepository;
-    @Mock private MemberCountCache memberCountCache;
-    @Mock private UserSettingsCache userSettingsCache;
-    @Mock private ObjectProvider<EventService> eventServiceProvider;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private GroupAuthzService authz;
+    @Mock
+    private ChatService chatService;
+    @Mock
+    private MessageService messageService;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private AuditLogRepository auditLogRepository;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private GroupInviteRepository groupInviteRepository;
+    @Mock
+    private MemberCountCache memberCountCache;
+    @Mock
+    private UserSettingsCache userSettingsCache;
+    @Mock
+    private ObjectProvider<EventService> eventServiceProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -151,7 +167,9 @@ class GroupServiceImplTest {
         return m;
     }
 
-    /** Stub loadGroup() to resolve to the given chat. */
+    /**
+     * Stub loadGroup() to resolve to the given chat.
+     */
     private void stubLoad(Chat chat) {
         when(chatRepository.findByUuidWithMembers(CHAT_UUID)).thenReturn(Optional.of(chat));
     }

@@ -73,17 +73,28 @@ class MatchmakingServiceImplTest {
     private static final String ME = "alice";
     private static final String PEER = "bob";
 
-    @Mock private WaitingQueueService waitingQueueService;
-    @Mock private SessionService sessionService;
-    @Mock private SessionCleanupService sessionCleanupService;
-    @Mock private UserRepository userRepository;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private OnlineCountPublisher onlineCountPublisher;
-    @Mock private MatchPreferenceService matchPreferenceService;
-    @Mock private CompatibilityService compatibilityService;
-    @Mock private MatchTimerService matchTimerService;
+    @Mock
+    private WaitingQueueService waitingQueueService;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private SessionCleanupService sessionCleanupService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private OnlineCountPublisher onlineCountPublisher;
+    @Mock
+    private MatchPreferenceService matchPreferenceService;
+    @Mock
+    private CompatibilityService compatibilityService;
+    @Mock
+    private MatchTimerService matchTimerService;
 
     private MatchmakingServiceImpl service;
 
@@ -112,7 +123,9 @@ class MatchmakingServiceImplTest {
         return u;
     }
 
-    /** Stub the Redis active-users set (used by every non-early-return path). */
+    /**
+     * Stub the Redis active-users set (used by every non-early-return path).
+     */
     private void stubActiveSet() {
         when(redisTemplate.opsForSet()).thenReturn(setOps);
     }
@@ -239,7 +252,9 @@ class MatchmakingServiceImplTest {
             return f;
         }
 
-        /** Stub a complete, successful preference pairing of ME with PEER. */
+        /**
+         * Stub a complete, successful preference pairing of ME with PEER.
+         */
         private void stubSuccessfulPairing() {
             when(sessionService.getSessionByUser(ME)).thenReturn(Optional.empty());
             when(userRepository.findByUsername(ME)).thenReturn(Optional.of(me));
@@ -656,9 +671,11 @@ class MatchmakingServiceImplTest {
     @DisplayName("selectBestMatch — candidate ranking / legacy / claim branches")
     class SelectBestMatch {
 
-        /** Legacy (expired-snapshot) candidate is pairable only for a blind QUICK seeker;
-         *  reached directly since a QUICK no-filter seeker never routes through this method
-         *  via startMatching. Covers the cs==null + hasNoFilters()&&QUICK true branch. */
+        /**
+         * Legacy (expired-snapshot) candidate is pairable only for a blind QUICK seeker;
+         * reached directly since a QUICK no-filter seeker never routes through this method
+         * via startMatching. Covers the cs==null + hasNoFilters()&&QUICK true branch.
+         */
         @Test
         @DisplayName("legacy candidate (null snapshot) + blind QUICK seeker → claimed with score 0")
         void legacyCandidatePairedForBlindQuickSeeker() {
@@ -1024,7 +1041,9 @@ class MatchmakingServiceImplTest {
     @DisplayName("mutuallyEligible — hard/soft filter matrix (both directions)")
     class MutuallyEligible {
 
-        /** Fully-permissive base snapshot: ANY gender, no verified/lang/mood/age/country. */
+        /**
+         * Fully-permissive base snapshot: ANY gender, no verified/lang/mood/age/country.
+         */
         private static MatchPreferenceSnapshot.MatchPreferenceSnapshotBuilder b() {
             return MatchPreferenceSnapshot.builder()
                     .genderPref(GenderPreference.ANY)

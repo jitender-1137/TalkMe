@@ -16,6 +16,7 @@ import java.util.UUID;
 public interface StoryRepository extends JpaRepository<Story, Long> {
     @Query("SELECT s.createdAt FROM Story s WHERE s.createdAt >= :since")
     List<Instant> findTimesSince(@Param("since") Instant since);
+
     Optional<Story> findByUuid(UUID uuid);
 
     @Query("SELECT s FROM Story s WHERE s.expiresAt > :now AND s.isDeleted = false ORDER BY s.createdAt DESC")
@@ -24,8 +25,10 @@ public interface StoryRepository extends JpaRepository<Story, Long> {
     @Query("SELECT s FROM Story s WHERE s.user = :user AND s.expiresAt > :now AND s.isDeleted = false ORDER BY s.createdAt DESC")
     List<Story> findActiveStoriesByUser(User user, Instant now);
 
-    /** Every non-deleted story by a user, newest first — including EXPIRED ones.
-     *  Powers the owner's "My Stories" archive in the profile tab. */
+    /**
+     * Every non-deleted story by a user, newest first — including EXPIRED ones.
+     * Powers the owner's "My Stories" archive in the profile tab.
+     */
     @Query("SELECT s FROM Story s WHERE s.user = :user AND s.isDeleted = false ORDER BY s.createdAt DESC")
     List<Story> findAllByUser(User user);
 }

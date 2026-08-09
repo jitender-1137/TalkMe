@@ -1,9 +1,20 @@
 package com.chat.talkMe.service.impl;
 
-import com.chat.talkMe.domain.*;
+import com.chat.talkMe.domain.BaseEntity;
+import com.chat.talkMe.domain.Poll;
+import com.chat.talkMe.domain.PollOption;
+import com.chat.talkMe.domain.PollVote;
+import com.chat.talkMe.domain.Post;
+import com.chat.talkMe.domain.PostBookmark;
+import com.chat.talkMe.domain.PostComment;
+import com.chat.talkMe.domain.PostCommentLike;
+import com.chat.talkMe.domain.PostLike;
+import com.chat.talkMe.domain.PostMedia;
+import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserSetting;
+import com.chat.talkMe.dto.request.PollRequest;
 import com.chat.talkMe.dto.request.PostCommentRequest;
 import com.chat.talkMe.dto.request.PostMediaRequest;
-import com.chat.talkMe.dto.request.PollRequest;
 import com.chat.talkMe.dto.request.PostRequest;
 import com.chat.talkMe.dto.response.AudioTrackDto;
 import com.chat.talkMe.dto.response.AuthUserResponse;
@@ -21,7 +32,18 @@ import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
 import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.moderation.ModerationResult;
-import com.chat.talkMe.repository.*;
+import com.chat.talkMe.repository.PollOptionRepository;
+import com.chat.talkMe.repository.PollRepository;
+import com.chat.talkMe.repository.PollVoteRepository;
+import com.chat.talkMe.repository.PostBookmarkRepository;
+import com.chat.talkMe.repository.PostCommentLikeRepository;
+import com.chat.talkMe.repository.PostCommentRepository;
+import com.chat.talkMe.repository.PostLikeRepository;
+import com.chat.talkMe.repository.PostMediaRepository;
+import com.chat.talkMe.repository.PostRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
+import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.FeatureAccessService;
 import com.chat.talkMe.service.NotificationService;
 import com.chat.talkMe.storage.MediaStorage;
@@ -75,24 +97,42 @@ import static org.mockito.Mockito.when;
 @DisplayName("PostServiceImpl (unit)")
 class PostServiceImplTest {
 
-    @Mock private PostRepository postRepository;
-    @Mock private PostMediaRepository postMediaRepository;
-    @Mock private PostLikeRepository postLikeRepository;
-    @Mock private PostCommentRepository postCommentRepository;
-    @Mock private PostCommentLikeRepository postCommentLikeRepository;
-    @Mock private PostBookmarkRepository postBookmarkRepository;
-    @Mock private PollRepository pollRepository;
-    @Mock private PollOptionRepository pollOptionRepository;
-    @Mock private PollVoteRepository pollVoteRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private NotificationService notificationService;
-    @Mock private ContentModerationService moderationService;
-    @Mock private PhotoMusicMuxer photoMusicMuxer;
-    @Mock private MediaStorage mediaStorage;
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private FeatureAccessService featureAccessService;
+    @Mock
+    private PostRepository postRepository;
+    @Mock
+    private PostMediaRepository postMediaRepository;
+    @Mock
+    private PostLikeRepository postLikeRepository;
+    @Mock
+    private PostCommentRepository postCommentRepository;
+    @Mock
+    private PostCommentLikeRepository postCommentLikeRepository;
+    @Mock
+    private PostBookmarkRepository postBookmarkRepository;
+    @Mock
+    private PollRepository pollRepository;
+    @Mock
+    private PollOptionRepository pollOptionRepository;
+    @Mock
+    private PollVoteRepository pollVoteRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private PhotoMusicMuxer photoMusicMuxer;
+    @Mock
+    private MediaStorage mediaStorage;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private FeatureAccessService featureAccessService;
 
     private PostServiceImpl service;
 
@@ -1498,7 +1538,9 @@ class PostServiceImplTest {
 
     // ═══════════════════ branch-coverage backfill (negative / edge paths) ═══════════════════
 
-    /** Build a PostMedia and attach it to a post (for firstThumb / mapToPostResponse paths). */
+    /**
+     * Build a PostMedia and attach it to a post (for firstThumb / mapToPostResponse paths).
+     */
     private PostMedia media(Post post, String mediaUrl, String mediaType, String coverImageUrl) {
         PostMedia m = PostMedia.builder()
                 .post(post).mediaUrl(mediaUrl).mediaType(mediaType).coverImageUrl(coverImageUrl)

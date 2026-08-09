@@ -53,13 +53,19 @@ import static org.mockito.Mockito.when;
 @DisplayName("WebSocketChannelInterceptor (unit)")
 class WebSocketChannelInterceptorUnitTest {
 
-    @Mock private JwtTokenProvider tokenProvider;
-    @Mock private CustomUserDetailsService userDetailsService;
-    @Mock private ChatRepository chatRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private StringRedisTemplate redisTemplate;
+    @Mock
+    private JwtTokenProvider tokenProvider;
+    @Mock
+    private CustomUserDetailsService userDetailsService;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private StringRedisTemplate redisTemplate;
 
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private WebSocketChannelInterceptor interceptor;
     private final MessageChannel channel = mock(MessageChannel.class);
@@ -81,13 +87,17 @@ class WebSocketChannelInterceptorUnitTest {
         return u;
     }
 
-    /** An authenticated STOMP principal in the exact shape the interceptor's authz reads. */
+    /**
+     * An authenticated STOMP principal in the exact shape the interceptor's authz reads.
+     */
     private UsernamePasswordAuthenticationToken authFor(User u) {
         CustomUserDetails cud = new CustomUserDetails(u);
         return new UsernamePasswordAuthenticationToken(cud, null, cud.getAuthorities());
     }
 
-    /** Build a mutable STOMP message so the interceptor can read and mutate the same accessor. */
+    /**
+     * Build a mutable STOMP message so the interceptor can read and mutate the same accessor.
+     */
     private Message<byte[]> message(StompHeaderAccessor accessor, byte[] payload) {
         accessor.setLeaveMutable(true);
         accessor.setSessionId("sess-1");
@@ -98,14 +108,18 @@ class WebSocketChannelInterceptorUnitTest {
         return message(accessor, new byte[0]);
     }
 
-    /** Build a STOMP message with an arbitrary (non-byte[]) payload type. */
+    /**
+     * Build a STOMP message with an arbitrary (non-byte[]) payload type.
+     */
     private Message<?> messageWith(StompHeaderAccessor accessor, Object payload) {
         accessor.setLeaveMutable(true);
         accessor.setSessionId("sess-1");
         return MessageBuilder.createMessage(payload, accessor.getMessageHeaders());
     }
 
-    /** Stub the Redis fixed-window counter to return the given count. */
+    /**
+     * Stub the Redis fixed-window counter to return the given count.
+     */
     private void stubRedisCount(long count) {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.increment(anyString())).thenReturn(count);

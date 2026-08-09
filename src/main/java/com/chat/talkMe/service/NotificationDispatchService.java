@@ -24,6 +24,8 @@ public interface NotificationDispatchService {
      */
     void onEphemeralMessage(Long recipientUserId, String title, String body, String url);
 
-    /** Recompute the authoritative unread total from the DB, store + broadcast it. */
+    /**
+     * Recompute the authoritative unread total from the DB, store + broadcast it.
+     */
     int recomputeUnread(User user);
 }

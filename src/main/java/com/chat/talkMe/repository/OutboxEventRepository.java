@@ -20,7 +20,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
      * scan never blocks the fast path.
      */
     @Query("SELECT o.id FROM OutboxEvent o " +
-           "WHERE o.status = 'PENDING' AND o.createdAt < :cutoff ORDER BY o.createdAt ASC")
+            "WHERE o.status = 'PENDING' AND o.createdAt < :cutoff ORDER BY o.createdAt ASC")
     List<Long> findPendingIds(@Param("cutoff") Instant cutoff, Pageable pageable);
 
     /**
@@ -29,16 +29,20 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
      * node is skipped (returns empty) rather than waited on.
      */
     @Query(value = "SELECT * FROM outbox_event WHERE id = :id AND status = 'PENDING' " +
-                   "FOR UPDATE SKIP LOCKED", nativeQuery = true)
+            "FOR UPDATE SKIP LOCKED", nativeQuery = true)
     Optional<OutboxEvent> lockPendingById(@Param("id") Long id);
 
-    /** Marks the row for an event delivered. Idempotent — safe to call repeatedly. */
+    /**
+     * Marks the row for an event delivered. Idempotent — safe to call repeatedly.
+     */
     @Modifying
     @Query("UPDATE OutboxEvent o SET o.status = 'PUBLISHED', o.publishedAt = :now " +
-           "WHERE o.eventKey = :eventKey AND o.status = 'PENDING'")
+            "WHERE o.eventKey = :eventKey AND o.status = 'PENDING'")
     int markPublished(@Param("eventKey") String eventKey, @Param("now") Instant now);
 
-    /** Housekeeping: drop delivered rows older than the cutoff so the table stays small. */
+    /**
+     * Housekeeping: drop delivered rows older than the cutoff so the table stays small.
+     */
     @Modifying
     @Transactional
     @Query("DELETE FROM OutboxEvent o WHERE o.status = 'PUBLISHED' AND o.publishedAt < :cutoff")

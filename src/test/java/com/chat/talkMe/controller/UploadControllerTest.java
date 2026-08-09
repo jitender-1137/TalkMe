@@ -31,8 +31,11 @@ import java.util.Set;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -105,11 +108,11 @@ public class UploadControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/uploads")
-                .file(file)
-                .param("type", "image")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .file(file)
+                        .param("type", "image")
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("File uploaded successfully"))
@@ -132,10 +135,10 @@ public class UploadControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/uploads")
-                .file(file)
-                .param("type", "document")
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .file(file)
+                        .param("type", "document")
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -151,11 +154,11 @@ public class UploadControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/uploads")
-                .file(file)
-                .param("type", "document")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "wrong-token-value"))
+                        .file(file)
+                        .param("type", "document")
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "wrong-token-value"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.messageCode").value("CSRF_TOKEN_INVALID"));
     }
@@ -165,10 +168,10 @@ public class UploadControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/uploads")
-                .param("type", "document")
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .param("type", "document")
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_002"));
@@ -186,10 +189,10 @@ public class UploadControllerTest {
         Cookie csrfCookie = new Cookie("csrf_token", "test-token-value");
 
         mockMvc.perform(multipart("/api/v1/uploads")
-                .file(file)
-                .with(user(testUserDetails()))
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .file(file)
+                        .with(user(testUserDetails()))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.messageCode").value("TM_002"));
@@ -205,7 +208,7 @@ public class UploadControllerTest {
         Files.writeString(tempTestFilePath, "Media file test contents.");
 
         mockMvc.perform(get("/api/v1/uploads/media")
-                .param("path", tempTestFilePath.toString()))
+                        .param("path", tempTestFilePath.toString()))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Media file test contents."));
     }
@@ -213,7 +216,7 @@ public class UploadControllerTest {
     @Test
     void testGetMediaNotFound() throws Exception {
         mockMvc.perform(get("/api/v1/uploads/media")
-                .param("path", "test-uploads/non-existent-file.txt"))
+                        .param("path", "test-uploads/non-existent-file.txt"))
                 .andExpect(status().isNotFound());
     }
 }

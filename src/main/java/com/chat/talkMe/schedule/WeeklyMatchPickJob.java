@@ -28,7 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WeeklyMatchPickJob {
 
-    /** Upper bound on how many users get picks each run — keeps the batch cost bounded. */
+    /**
+     * Upper bound on how many users get picks each run — keeps the batch cost bounded.
+     */
     private static final int MAX_ELIGIBLE_USERS = 1000;
 
     private final WeeklyMatchPickService weeklyMatchPickService;

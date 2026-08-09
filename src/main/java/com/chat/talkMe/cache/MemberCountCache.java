@@ -11,13 +11,13 @@ import java.time.Duration;
 
 /**
  * Redis-backed cache of a chat's ACTIVE member count.
- *
+ * <p>
  * The count is read on every chat-detail load and for every item in the
  * channels/rooms discover lists (via {@code buildGroupInfo}) — a COUNT(*) per chat
  * that added up to real DB load. We cache it in Redis and bust it on any membership
  * change (join / leave / add / remove / invite-accept). A short TTL is a safety net
  * so a missed bust self-heals instead of showing a wrong count forever.
- *
+ * <p>
  * NOTE: only the DISPLAY count is cached. Hard checks (member-limit enforcement)
  * must still read the live DB count.
  */
@@ -36,7 +36,9 @@ public class MemberCountCache {
         return KEY_PREFIX + chatUuid;
     }
 
-    /** Cached active-member count for a chat; computes + caches on a miss. */
+    /**
+     * Cached active-member count for a chat; computes + caches on a miss.
+     */
     public int get(Chat chat) {
         if (chat == null || chat.getUuid() == null) {
             return chat == null ? 0 : (int) chatMemberRepository.countActiveMembers(chat);
@@ -60,7 +62,9 @@ public class MemberCountCache {
         return count;
     }
 
-    /** Invalidate the cached count after a membership change. Best-effort. */
+    /**
+     * Invalidate the cached count after a membership change. Best-effort.
+     */
     public void evict(String chatUuid) {
         if (chatUuid == null) return;
         try {

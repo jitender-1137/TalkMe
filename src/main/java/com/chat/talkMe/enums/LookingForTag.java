@@ -1,6 +1,8 @@
 package com.chat.talkMe.enums;
 
-/** What a user is looking for (feature #29, multi-select). Shown on the profile card. */
+/**
+ * What a user is looking for (feature #29, multi-select). Shown on the profile card.
+ */
 public enum LookingForTag {
     FRIENDS,
     DATING,

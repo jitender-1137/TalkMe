@@ -55,18 +55,29 @@ import static org.mockito.Mockito.when;
 @DisplayName("WebSocketController (unit)")
 class WebSocketControllerUnitTest {
 
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private UserService userService;
-    @Mock private UserRepository userRepository;
-    @Mock private PresenceService presenceService;
-    @Mock private NotificationDispatchService notificationDispatchService;
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private UserService userService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private NotificationDispatchService notificationDispatchService;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private ZSetOperations<String, String> zSetOps;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private ZSetOperations<String, String> zSetOps;
 
     private WebSocketController controller;
     private User testUser;
@@ -87,13 +98,17 @@ class WebSocketControllerUnitTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** An authenticated principal carrying our CustomUserDetails (the shape the controller checks). */
+    /**
+     * An authenticated principal carrying our CustomUserDetails (the shape the controller checks).
+     */
     private UsernamePasswordAuthenticationToken authPrincipal() {
         CustomUserDetails cud = new CustomUserDetails(testUser);
         return new UsernamePasswordAuthenticationToken(cud, null, cud.getAuthorities());
     }
 
-    /** A plain principal (name only) — NOT a UsernamePasswordAuthenticationToken/CustomUserDetails. */
+    /**
+     * A plain principal (name only) — NOT a UsernamePasswordAuthenticationToken/CustomUserDetails.
+     */
     private Principal plainPrincipal(String name) {
         return () -> name;
     }

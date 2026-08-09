@@ -7,11 +7,12 @@ import com.chat.talkMe.dto.response.MessageAttachmentResponse;
 import com.chat.talkMe.dto.response.MessageReactionResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.dto.response.ParentMessageResponse;
-import java.util.Collections;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+
+import java.util.Collections;
 
 @Mapper(componentModel = "spring")
 public interface MessageMapper {

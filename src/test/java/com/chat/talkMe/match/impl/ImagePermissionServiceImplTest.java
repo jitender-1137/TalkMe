@@ -43,8 +43,10 @@ class ImagePermissionServiceImplTest {
     private static final String USER_B = "bob";
     private static final String QUEUE = "/queue/match";
 
-    @Mock private SessionService sessionService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private ImagePermissionServiceImpl service;
 

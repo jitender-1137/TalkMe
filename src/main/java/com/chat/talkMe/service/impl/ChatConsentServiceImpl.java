@@ -5,10 +5,8 @@ import com.chat.talkMe.domain.ChatExplicitConsent;
 import com.chat.talkMe.domain.Message;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.ConsentStateResponse;
-import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.ConsentStatus;
-import com.chat.talkMe.enums.ModerationStatus;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.MessageMapper;
@@ -29,14 +27,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatConsentServiceImpl implements ChatConsentService {
 
-    /** After this many consecutive declines no further request is allowed (either side). */
+    /**
+     * After this many consecutive declines no further request is allowed (either side).
+     */
     private static final int MAX_DECLINES = 3;
 
     private final ChatRepository chatRepository;

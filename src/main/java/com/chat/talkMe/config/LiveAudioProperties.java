@@ -19,22 +19,34 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.live-audio")
 public class LiveAudioProperties {
 
-    /** Master on/off for the token seam (independent of the per-user feature flag). */
+    /**
+     * Master on/off for the token seam (independent of the per-user feature flag).
+     */
     private boolean enabled = false;
 
-    /** LiveKit API key ({@code iss} of the minted JWT). */
+    /**
+     * LiveKit API key ({@code iss} of the minted JWT).
+     */
     private String apiKey = "";
 
-    /** LiveKit API secret (HMAC-SHA256 signing key for the JWT). */
+    /**
+     * LiveKit API secret (HMAC-SHA256 signing key for the JWT).
+     */
     private String apiSecret = "";
 
-    /** Public LiveKit ws(s):// URL the client connects to; returned alongside the token. */
+    /**
+     * Public LiveKit ws(s):// URL the client connects to; returned alongside the token.
+     */
     private String wsUrl = "";
 
-    /** Minted-token lifetime in seconds. */
+    /**
+     * Minted-token lifetime in seconds.
+     */
     private long tokenTtlSeconds = 3600;
 
-    /** True only when the seam is switched on AND fully configured. */
+    /**
+     * True only when the seam is switched on AND fully configured.
+     */
     public boolean isReady() {
         return enabled
                 && apiKey != null && !apiKey.isBlank()

@@ -29,7 +29,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,14 +67,21 @@ class PresenceServiceImplTest {
     private static final String AWAY_DEADLINE_ZSET = "presence:away-deadlines";
     private static final String USERNAME = "alice";
 
-    @Mock private UserPresenceRepository userPresenceRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SimpMessagingTemplate simpMessagingTemplate;
-    @Mock private PresenceServiceHelper presenceServiceHelper;
+    @Mock
+    private UserPresenceRepository userPresenceRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SimpMessagingTemplate simpMessagingTemplate;
+    @Mock
+    private PresenceServiceHelper presenceServiceHelper;
 
-    @Mock private HashOperations<String, Object, Object> hashOps;
-    @Mock private ZSetOperations<String, String> zSetOps;
+    @Mock
+    private HashOperations<String, Object, Object> hashOps;
+    @Mock
+    private ZSetOperations<String, String> zSetOps;
 
     private PresenceServiceImpl service;
 
@@ -121,14 +127,18 @@ class PresenceServiceImplTest {
         return up;
     }
 
-    /** Make {@code readFlags(user)} take the Redis hot path with all flags false. */
+    /**
+     * Make {@code readFlags(user)} take the Redis hot path with all flags false.
+     */
     private void stubFlagsAllFalse(String username) {
         lenient().when(hashOps.entries(KEY_PREFIX + username))
                 .thenReturn(hash("ghostModeEnabled", "false",
                         "invisibleModeEnabled", "false", "hideLastSeenEnabled", "false"));
     }
 
-    /** Capture the single broadcast notification, if any. */
+    /**
+     * Capture the single broadcast notification, if any.
+     */
     private PresenceNotification captureBroadcast(String username) {
         ArgumentCaptor<PresenceNotification> cap = ArgumentCaptor.forClass(PresenceNotification.class);
         verify(simpMessagingTemplate).convertAndSend(eq("/topic/presence/" + username), cap.capture());

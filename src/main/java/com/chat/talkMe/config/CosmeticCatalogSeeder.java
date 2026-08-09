@@ -28,7 +28,9 @@ public class CosmeticCatalogSeeder implements ApplicationRunner {
 
     private final UnlockableCosmeticRepository catalogRepo;
 
-    /** {code, type, name, rarity, unlockType, threshold, assetRef, seasonal}. */
+    /**
+     * {code, type, name, rarity, unlockType, threshold, assetRef, seasonal}.
+     */
     private static final List<Object[]> SEED = List.of(
             // --- LEVEL unlocks (threshold = min level) ---
             new Object[]{"frame_starter", CosmeticType.FRAME, "Starter Frame", CosmeticRarity.COMMON, CosmeticUnlockType.LEVEL, 1, "frame/starter", false},

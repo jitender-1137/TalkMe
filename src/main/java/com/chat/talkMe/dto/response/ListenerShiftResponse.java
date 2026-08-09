@@ -20,19 +20,27 @@ import java.time.Instant;
 @AllArgsConstructor
 public class ListenerShiftResponse {
 
-    /** Shift uuid. */
+    /**
+     * Shift uuid.
+     */
     private String id;
 
-    /** Listener identity (the volunteer). */
+    /**
+     * Listener identity (the volunteer).
+     */
     private String listenerId;
     private String listenerName;
     private String listenerUsername;
     private String listenerAvatar;
 
-    /** AVAILABLE | ENGAGED | ENDED. */
+    /**
+     * AVAILABLE | ENGAGED | ENDED.
+     */
     private String status;
 
-    /** Uuid of the LISTENING-mode room this shift is bound to (null while merely available). */
+    /**
+     * Uuid of the LISTENING-mode room this shift is bound to (null while merely available).
+     */
     private String roomChatUuid;
 
     private int peopleHelped;

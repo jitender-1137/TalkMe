@@ -1,8 +1,19 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.InstallationType;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * A W3C Push API subscription belonging to a user's installed PWA instance.
@@ -22,15 +33,21 @@ public class PushSubscription extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** Push service endpoint URL (unique per subscription). */
+    /**
+     * Push service endpoint URL (unique per subscription).
+     */
     @Column(name = "endpoint", nullable = false, unique = true, length = 1024)
     private String endpoint;
 
-    /** Client public key (base64url). */
+    /**
+     * Client public key (base64url).
+     */
     @Column(name = "p256dh", nullable = false, length = 255)
     private String p256dh;
 
-    /** Auth secret (base64url). */
+    /**
+     * Auth secret (base64url).
+     */
     @Column(name = "auth_key", nullable = false, length = 255)
     private String auth;
 

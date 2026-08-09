@@ -7,7 +7,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Body for POST /chats/{chatId}/bucket-list/items (feature #18). */
+/**
+ * Body for POST /chats/{chatId}/bucket-list/items (feature #18).
+ */
 @Data
 @Builder
 @NoArgsConstructor

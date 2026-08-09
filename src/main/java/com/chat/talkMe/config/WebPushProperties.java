@@ -15,7 +15,9 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "webpush")
 public class WebPushProperties {
 
-    /** Master switch — when false, no Web Push is sent (WebSocket-only). */
+    /**
+     * Master switch — when false, no Web Push is sent (WebSocket-only).
+     */
     private boolean enabled = true;
 
     private final Vapid vapid = new Vapid();
@@ -25,7 +27,9 @@ public class WebPushProperties {
     public static class Vapid {
         private String publicKey;
         private String privateKey;
-        /** Contact URI, e.g. "mailto:admin@talkme.app". */
+        /**
+         * Contact URI, e.g. "mailto:admin@talkme.app".
+         */
         private String subject;
     }
 }

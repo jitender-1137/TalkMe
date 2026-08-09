@@ -1,21 +1,19 @@
 package com.chat.talkMe.security;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageChannel;
 import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.FriendRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,6 +21,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -56,10 +56,10 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-        
+
         if (accessor != null) {
             StompCommand command = accessor.getCommand();
-            
+
             if (StompCommand.CONNECT.equals(command)) {
                 // Authenticate the STOMP session. A missing/invalid/expired token now
                 // REJECTS the CONNECT (previously it fell through and established an
@@ -130,7 +130,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                     String[] parts = destination.split("/");
                     if (parts.length >= 4) {
                         String chatUuid = parts[3];
-                        
+
                         Object payloadObj = message.getPayload();
                         String payloadStr = "";
                         if (payloadObj instanceof byte[]) {
@@ -138,7 +138,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                         } else if (payloadObj instanceof String) {
                             payloadStr = (String) payloadObj;
                         }
-                        
+
                         if (payloadStr.contains("\"event\":\"call_") || payloadStr.contains("\"event\": \"call_")) {
                             Object principal = accessor.getUser();
                             if (principal instanceof UsernamePasswordAuthenticationToken) {
@@ -146,7 +146,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                                 if (authToken.getPrincipal() instanceof UserDetails) {
                                     UserDetails userDetails = (UserDetails) authToken.getPrincipal();
                                     String currentUsername = userDetails.getUsername();
-                                    
+
                                     try {
                                         Optional<Chat> chatOpt = chatRepository.findByUuidWithMembers(UUID.fromString(chatUuid));
                                         if (chatOpt.isPresent()) {
@@ -161,7 +161,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                                                         recipient = member.getUser();
                                                     }
                                                 }
-                                                
+
                                                 if (sender != null && recipient != null) {
                                                     boolean isFriend = friendRepository.findByUserAndFriend(sender, recipient).isPresent();
                                                     if (!isFriend) {
@@ -187,7 +187,9 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
-    /** Returns the authenticated username on the STOMP session, or rejects the frame. */
+    /**
+     * Returns the authenticated username on the STOMP session, or rejects the frame.
+     */
     private String requireUsername(StompHeaderAccessor accessor) {
         String username = usernameOrNull(accessor);
         if (username == null) {
@@ -196,7 +198,9 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
         return username;
     }
 
-    /** Authenticated username on the STOMP session, or null if none. */
+    /**
+     * Authenticated username on the STOMP session, or null if none.
+     */
     private String usernameOrNull(StompHeaderAccessor accessor) {
         Object principal = accessor.getUser();
         if (principal instanceof UsernamePasswordAuthenticationToken authToken
@@ -206,7 +210,9 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
         return null;
     }
 
-    /** Redis fixed-window counter; fail-open if Redis is unavailable. */
+    /**
+     * Redis fixed-window counter; fail-open if Redis is unavailable.
+     */
     private boolean allowSend(String username) {
         return withinLimit("ws:ratelimit:send:" + username, SEND_LIMIT, SEND_WINDOW_SECONDS);
     }

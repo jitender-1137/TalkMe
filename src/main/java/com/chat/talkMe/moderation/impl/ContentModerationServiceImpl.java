@@ -29,13 +29,13 @@ import java.util.regex.Pattern;
  * Pure-Java text moderation: curated multilingual word-lists + a normalization
  * pipeline (lowercasing, Unicode NFKC, leetspeak folding, repeated-char collapse,
  * de-spacing) so common evasions ("f u c k", "fuuuck", "f.u.c.k", "fμck") are caught.
- *
+ * <p>
  * Matching strategy (kept conservative to limit false positives):
- *  - tokenize the normalized text and exact-match tokens against the word-list;
- *  - additionally scan a "compact" (all-separators-removed) form for word-list
- *    entries of length >= 5 only, to catch spaced/punctuated evasions without
- *    tripping on short substrings (the "Scunthorpe" problem).
- *
+ * - tokenize the normalized text and exact-match tokens against the word-list;
+ * - additionally scan a "compact" (all-separators-removed) form for word-list
+ * entries of length >= 5 only, to catch spaced/punctuated evasions without
+ * tripping on short substrings (the "Scunthorpe" problem).
+ * <p>
  * Media moderation is delegated to the NSFW client (wired in a later phase); until
  * then it returns CLEAN.
  */
@@ -122,7 +122,10 @@ public class ContentModerationServiceImpl implements ContentModerationService {
                     if (run.length() >= RUN_MIN_LEN) {
                         String joined = run.toString();
                         for (String w : runScanWords) {
-                            if (joined.contains(w)) { matched.add(w); break; }
+                            if (joined.contains(w)) {
+                                matched.add(w);
+                                break;
+                            }
                         }
                     }
                     if (!matched.isEmpty()) break;
@@ -197,7 +200,9 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         }
     }
 
-    /** lowercase → NFKC → leetspeak fold → collapse 3+ repeats to one. */
+    /**
+     * lowercase → NFKC → leetspeak fold → collapse 3+ repeats to one.
+     */
     private String normalize(String input) {
         String s = Normalizer.normalize(input.toLowerCase(), Normalizer.Form.NFKC);
         StringBuilder sb = new StringBuilder(s.length());
@@ -209,15 +214,24 @@ public class ContentModerationServiceImpl implements ContentModerationService {
 
     private char deLeet(char c) {
         switch (c) {
-            case '@': return 'a';
-            case '4': return 'a';
-            case '0': return 'o';
-            case '1': return 'i';
-            case '3': return 'e';
-            case '5': return 's';
-            case '$': return 's';
-            case '7': return 't';
-            default: return c;
+            case '@':
+                return 'a';
+            case '4':
+                return 'a';
+            case '0':
+                return 'o';
+            case '1':
+                return 'i';
+            case '3':
+                return 'e';
+            case '5':
+                return 's';
+            case '$':
+                return 's';
+            case '7':
+                return 't';
+            default:
+                return c;
         }
     }
 }

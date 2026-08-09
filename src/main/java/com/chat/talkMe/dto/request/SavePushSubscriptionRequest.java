@@ -26,6 +26,8 @@ public class SavePushSubscriptionRequest {
     @NotBlank(message = "auth key is required")
     private String auth;
 
-    /** Optional — PWA or IOS_HOME. Defaults to PWA when omitted. */
+    /**
+     * Optional — PWA or IOS_HOME. Defaults to PWA when omitted.
+     */
     private InstallationType installationType;
 }

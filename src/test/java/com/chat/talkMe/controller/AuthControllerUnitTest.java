@@ -149,7 +149,9 @@ class AuthControllerUnitTest {
     //  Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-    /** Populate the SecurityContext so @AuthenticationPrincipal resolves to our test user. */
+    /**
+     * Populate the SecurityContext so @AuthenticationPrincipal resolves to our test user.
+     */
     private void authenticateAsTestUser() {
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -192,7 +194,7 @@ class AuthControllerUnitTest {
     }
 
     private static String signupPayload(String name, String username, String email,
-                                         String password, Integer age, String gender) {
+                                        String password, Integer age, String gender) {
         return """
                 {
                   "name": %s,
@@ -210,7 +212,9 @@ class AuthControllerUnitTest {
         return signupPayload("New User", "newuser", "newuser@example.com", "password1", 25, "male");
     }
 
-    /** JSON-quote a value, or emit literal null. */
+    /**
+     * JSON-quote a value, or emit literal null.
+     */
     private static String q(String s) {
         return s == null ? "null" : "\"" + s.replace("\"", "\\\"") + "\"";
     }

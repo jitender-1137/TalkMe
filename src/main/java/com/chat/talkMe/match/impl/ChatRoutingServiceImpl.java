@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,9 +23,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ChatRoutingServiceImpl implements ChatRoutingService {
 
-    /** Same Redis set the presence listener maintains: non-empty ⇒ a live socket. */
+    /**
+     * Same Redis set the presence listener maintains: non-empty ⇒ a live socket.
+     */
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
-    /** Deep link the match notification opens. */
+    /**
+     * Deep link the match notification opens.
+     */
     private static final String MATCH_DEEP_LINK = "/#match/quick";
 
     private final SessionService sessionService;
@@ -56,7 +61,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .event("MESSAGE_RECEIVED")
                 .payload(Map.of(
                         "id", UUID.randomUUID().toString(),
-                        "content", content,                        "timestamp", System.currentTimeMillis()
+                        "content", content, "timestamp", System.currentTimeMillis()
                 ))
                 .build();
 
@@ -76,7 +81,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .event("GIF_RECEIVED")
                 .payload(Map.of(
                         "id", UUID.randomUUID().toString(),
-                        "media", media,                        "timestamp", System.currentTimeMillis()
+                        "media", media, "timestamp", System.currentTimeMillis()
                 ))
                 .build();
 
@@ -100,7 +105,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .event("IMAGE_RECEIVED")
                 .payload(Map.of(
                         "id", UUID.randomUUID().toString(),
-                        "media", media,                        "timestamp", System.currentTimeMillis()
+                        "media", media, "timestamp", System.currentTimeMillis()
                 ))
                 .build();
 

@@ -59,7 +59,9 @@ public class DtoWarmup {
         log.info("[DtoWarmup] eager-loaded {} DTO classes (incl. nested builders)", loaded);
     }
 
-    /** Load a class and recursively force-load its nested classes (Lombok builders, etc.). */
+    /**
+     * Load a class and recursively force-load its nested classes (Lombok builders, etc.).
+     */
     private int load(String className, ClassLoader cl) throws ClassNotFoundException {
         Class<?> c = Class.forName(className, true, cl);
         int n = 1;

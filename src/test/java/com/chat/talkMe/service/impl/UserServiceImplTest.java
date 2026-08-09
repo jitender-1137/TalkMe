@@ -98,24 +98,42 @@ class UserServiceImplTest {
     private static final UUID VIEWER_UUID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final Instant NOW = Instant.parse("2026-07-30T10:15:30Z");
 
-    @Mock private UserRepository userRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private BlockUserRepository blockUserRepository;
-    @Mock private MatchReportRepository matchReportRepository;
-    @Mock private PresenceService presenceService;
-    @Mock private StorageService storageService;
-    @Mock private UserMapper userMapper;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private PostRepository postRepository;
-    @Mock private ContentModerationService moderationService;
-    @Mock private NotificationService notificationService;
-    @Mock private ReputationRecorder reputationRecorder;
-    @Mock private ReputationService reputationService;
-    @Mock private CompatibilityService compatibilityService;
-    @Mock private StreakService streakService;
-    @Mock private SetOperations<String, String> setOps;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private BlockUserRepository blockUserRepository;
+    @Mock
+    private MatchReportRepository matchReportRepository;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private StorageService storageService;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private PostRepository postRepository;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private ReputationRecorder reputationRecorder;
+    @Mock
+    private ReputationService reputationService;
+    @Mock
+    private CompatibilityService compatibilityService;
+    @Mock
+    private StreakService streakService;
+    @Mock
+    private SetOperations<String, String> setOps;
 
     private UserServiceImpl service;
 
@@ -167,7 +185,9 @@ class UserServiceImplTest {
         return user(2L, TARGET_UUID, "Target");
     }
 
-    /** A fully-populated user whose {@link com.chat.talkMe.util.ProfileCompletion} score is 100. */
+    /**
+     * A fully-populated user whose {@link com.chat.talkMe.util.ProfileCompletion} score is 100.
+     */
     private User fullyCompletedUser(long id, UUID uuid) {
         User u = user(id, uuid, "Complete");
         u.setProfileImage("https://cdn/a.png");
@@ -450,7 +470,8 @@ class UserServiceImplTest {
     @DisplayName("uploadAvatar")
     class UploadAvatar {
 
-        @Mock private MultipartFile file;
+        @Mock
+        private MultipartFile file;
 
         @Test
         @DisplayName("clean new photo → stores, saves, notifies friends and returns url")

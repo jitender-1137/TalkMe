@@ -10,6 +10,8 @@ import com.chat.talkMe.dto.response.CompatibilityScore;
  */
 public interface CompatibilityService {
 
-    /** Full weighted score between two users. */
+    /**
+     * Full weighted score between two users.
+     */
     CompatibilityScore score(User a, User b);
 }

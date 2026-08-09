@@ -14,15 +14,21 @@ import java.util.Optional;
 @Repository
 public interface DailyCompanionRepository extends JpaRepository<DailyCompanion, Long> {
 
-    /** The user's pairing for a given day (unique). */
+    /**
+     * The user's pairing for a given day (unique).
+     */
     Optional<DailyCompanion> findByUserAndPairDate(User user, LocalDate pairDate);
 
     boolean existsByUserAndPairDate(User user, LocalDate pairDate);
 
-    /** All the user's pairings in a given status (e.g. their current ACTIVE companion). */
+    /**
+     * All the user's pairings in a given status (e.g. their current ACTIVE companion).
+     */
     List<DailyCompanion> findByUserAndStatus(User user, CompanionStatus status);
 
-    /** Reaper feed: ACTIVE pairings whose 24h window has elapsed. */
+    /**
+     * Reaper feed: ACTIVE pairings whose 24h window has elapsed.
+     */
     List<DailyCompanion> findByStatusAndExpiresAtBefore(CompanionStatus status, Instant cutoff);
 
     /**

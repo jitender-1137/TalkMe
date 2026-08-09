@@ -4,23 +4,29 @@ import com.chat.talkMe.dto.EmailUnreadPreview;
 
 import java.util.List;
 
-/** Transactional email delivery (welcome, verification, password reset, digests, support, etc.). */
+/**
+ * Transactional email delivery (welcome, verification, password reset, digests, support, etc.).
+ */
 public interface EmailService {
 
     /**
      * Send a password-reset email containing a one-time reset link.
      *
-     * @param toEmail        recipient address
-     * @param recipientName  display name for the greeting
-     * @param resetLink      fully-qualified reset URL (token embedded)
-     * @param expiryMinutes  how long the link stays valid (shown to the user)
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param resetLink     fully-qualified reset URL (token embedded)
+     * @param expiryMinutes how long the link stays valid (shown to the user)
      */
     void sendPasswordResetEmail(String toEmail, String recipientName, String resetLink, long expiryMinutes);
 
-    /** Onboarding welcome, sent once after signup. {@code openLink} deep-links into the app. */
+    /**
+     * Onboarding welcome, sent once after signup. {@code openLink} deep-links into the app.
+     */
     void sendWelcomeEmail(String toEmail, String recipientName, String openLink);
 
-    /** Email-address verification with a confirm link. */
+    /**
+     * Email-address verification with a confirm link.
+     */
     void sendVerificationEmail(String toEmail, String recipientName, String verifyLink, long expiryMinutes);
 
     /**
@@ -33,7 +39,9 @@ public interface EmailService {
     void sendUnreadMessagesEmail(String toEmail, String recipientName,
                                  List<EmailUnreadPreview> previews, int totalUnread, String openLink);
 
-    /** Security confirmation sent after a successful password change. */
+    /**
+     * Security confirmation sent after a successful password change.
+     */
     void sendPasswordChangedEmail(String toEmail, String recipientName);
 
     /**
@@ -45,7 +53,9 @@ public interface EmailService {
     void sendLoginAlertEmail(String toEmail, String recipientName, String device,
                              String location, String ip, String when, String secureLink);
 
-    /** Acknowledgement that a support request was received. */
+    /**
+     * Acknowledgement that a support request was received.
+     */
     void sendSupportReceivedEmail(String toEmail, String recipientName, String ticketId, String subjectLine);
 
     /**

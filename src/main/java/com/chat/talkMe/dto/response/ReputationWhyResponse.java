@@ -28,11 +28,17 @@ public class ReputationWhyResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Contributor {
-        /** Human-readable contributor name, e.g. "Lasting friendships". */
+        /**
+         * Human-readable contributor name, e.g. "Lasting friendships".
+         */
         private String contributorLabel;
-        /** Coarse bucket: "LOW" | "MED" | "HIGH". No numbers. */
+        /**
+         * Coarse bucket: "LOW" | "MED" | "HIGH". No numbers.
+         */
         private String magnitude;
-        /** Direction hint: "UP" | "FLAT" | "DOWN". */
+        /**
+         * Direction hint: "UP" | "FLAT" | "DOWN".
+         */
         private String trend;
     }
 }

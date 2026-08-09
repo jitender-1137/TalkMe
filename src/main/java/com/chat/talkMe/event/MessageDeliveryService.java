@@ -64,7 +64,9 @@ public class MessageDeliveryService implements OutboxDeliveryHandler {
         deliverIdempotent(event, row.getEventKey());
     }
 
-    /** Broadcast + cache, guarded by the Redis dedup key so it runs at most once. */
+    /**
+     * Broadcast + cache, guarded by the Redis dedup key so it runs at most once.
+     */
     private void deliverIdempotent(MessageSentEvent event, String messageId) {
         if (messageId == null) {
             broadcaster.broadcast(event); // no id to dedup on — best-effort single send

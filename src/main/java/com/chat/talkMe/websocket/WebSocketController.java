@@ -10,7 +10,6 @@ import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.NotificationDispatchService;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.service.UserService;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -27,6 +26,7 @@ import java.security.Principal;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Controller

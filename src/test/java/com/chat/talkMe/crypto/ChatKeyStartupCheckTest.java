@@ -39,9 +39,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("ChatKeyStartupCheck (unit)")
 class ChatKeyStartupCheckTest {
 
-    @Mock private ChatKeyRepository chatKeyRepository;
-    @Mock private MasterKeyService masterKeyService;
-    @Mock private MessageCryptoService messageCryptoService;
+    @Mock
+    private ChatKeyRepository chatKeyRepository;
+    @Mock
+    private MasterKeyService masterKeyService;
+    @Mock
+    private MessageCryptoService messageCryptoService;
 
     private final ApplicationArguments args = mock(ApplicationArguments.class);
 

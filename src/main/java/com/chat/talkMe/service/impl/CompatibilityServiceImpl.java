@@ -14,7 +14,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Deterministic, weighted compatibility scoring. Every factor returns 0..1; the overall
@@ -27,7 +33,9 @@ public class CompatibilityServiceImpl implements CompatibilityService {
 
     private final CompatibilityProperties weights;
 
-    /** Interests that read as "hobbies / creative / music" for the secondary overlap factor. */
+    /**
+     * Interests that read as "hobbies / creative / music" for the secondary overlap factor.
+     */
     private static final EnumSet<Interest> CREATIVE = EnumSet.of(
             Interest.MUSIC, Interest.ART, Interest.DANCE, Interest.PHOTOGRAPHY, Interest.WRITING,
             Interest.FILMMAKING, Interest.COOKING, Interest.GAMING, Interest.BOARD_GAMES, Interest.COMEDY);
@@ -228,7 +236,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
     private static String explain(int overall, List<String> highlights) {
         String lead = overall >= 75 ? "Strong match. "
                 : overall >= 50 ? "Good match. "
-                : "Some things in common. ";
+                  : "Some things in common. ";
         if (highlights.isEmpty()) return lead.trim();
         return lead + humanJoin(highlights.subList(0, Math.min(3, highlights.size()))) + ".";
     }

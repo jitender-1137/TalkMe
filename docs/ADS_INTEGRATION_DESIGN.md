@@ -39,10 +39,10 @@ The app has adult-adjacent surfaces (Night Owl, Flirt Lobby, stranger matching),
 mainstream AdSense may reject or limit the account, and it is slow to approve. Two
 networks are supported and can run at the same time on different surfaces:
 
-| Provider   | Use it for | Notes |
-|------------|-----------|-------|
+| Provider   | Use it for             | Notes                                                                                                                                                                           |
+|------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `adsterra` | **Fastest cash / now** | Approves in 24–48h, accepts social/dating content, net-15 payout. Use **Native Banner only** (no popunder/social-bar). One zone = one container, so cap its surface at `MAX=1`. |
-| `adsense`  | **Best RPM long-term** | Apply in parallel; point units only at the clean surfaces (feed/explore). Highest quality ads if approved. |
+| `adsense`  | **Best RPM long-term** | Apply in parallel; point units only at the clean surfaces (feed/explore). Highest quality ads if approved.                                                                      |
 
 The recommended rollout: **Adsterra on the feed now → apply to AdSense in parallel → put
 AdSense on feed/explore and keep Adsterra on reels once approved** — all by flipping
@@ -58,7 +58,7 @@ Add one enum key — the whole gate is one line:
 
 ```java
 // FeatureKey.java
-ADS (null, false, false, null, true),   // defaultEntitled=true → everyone when globally on
+ADS(null,false,false,null,true),   // defaultEntitled=true → everyone when globally on
 ```
 
 Master switch in `application.yml` (env-overridable, **no deploy** — matches the
@@ -130,7 +130,7 @@ makes the ad-domain allowance **additive and configurable**:
 
 ```yaml
 ads:
-  csp-domains: []   # e.g. [https://pagead2.googlesyndication.com, https://*.adsterra.com]
+  csp-domains: [ ]   # e.g. [https://pagead2.googlesyndication.com, https://*.adsterra.com]
 ```
 
 `SecurityConfig` appends `ads.csp-domains` to `script-src`, `frame-src`, `img-src`,
@@ -159,10 +159,11 @@ GET /ads/config ─► useAdsConfig() ────┘     (config fetched only w
 ### 4.2 `<AdSlot>` — the single rendering primitive
 
 ```tsx
-<AdSlot placement="feed" index={i} />
+<AdSlot placement="feed" index={i}/>
 ```
 
 Responsibilities:
+
 - Renders the correct **variant** per surface (in-feed card, masonry tile, full-screen
   reel/story slide) using the app's design tokens, with a `Sponsored` label + optional
   AdChoices link.
@@ -197,12 +198,12 @@ optimistic like/save, and infinite-scroll math are untouched. Ad nodes carry no
 
 ### 4.4 Placement map
 
-| Surface | File | Injection | Default cadence |
-|---------|------|-----------|-----------------|
-| **News feed** | `main-feed.tsx` | in-feed card between posts | every 6 posts |
-| **Explore** | `explore-discover.tsx` | sponsored masonry tile | every 12 tiles |
-| **Reels** | `reels-viewer.tsx` | full-screen sponsored reel slide | every 8 reels |
-| **Stories** | `story-viewer.tsx` | sponsored story between users | **config-ready, injection deferred** |
+| Surface       | File                   | Injection                        | Default cadence                      |
+|---------------|------------------------|----------------------------------|--------------------------------------|
+| **News feed** | `main-feed.tsx`        | in-feed card between posts       | every 6 posts                        |
+| **Explore**   | `explore-discover.tsx` | sponsored masonry tile           | every 12 tiles                       |
+| **Reels**     | `reels-viewer.tsx`     | full-screen sponsored reel slide | every 8 reels                        |
+| **Stories**   | `story-viewer.tsx`     | sponsored story between users    | **config-ready, injection deferred** |
 
 > **Stories note.** The `stories` placement exists end-to-end in config (default
 > **off**) and `<AdSlot>` supports its full-screen variant, but the render-side

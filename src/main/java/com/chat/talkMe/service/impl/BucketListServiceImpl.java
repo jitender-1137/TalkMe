@@ -37,10 +37,14 @@ public class BucketListServiceImpl implements BucketListService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
-    /** Self-proxy so the lazy list-create runs in its OWN transaction (see getOrCreateList). */
+    /**
+     * Self-proxy so the lazy list-create runs in its OWN transaction (see getOrCreateList).
+     */
     private final ObjectProvider<BucketListServiceImpl> self;
 
-    /** IDOR guard: the caller must be a member of the chat the list belongs to. */
+    /**
+     * IDOR guard: the caller must be a member of the chat the list belongs to.
+     */
     private void requireChatMember(User user, String chatId) {
         boolean member;
         try {
@@ -133,7 +137,9 @@ public class BucketListServiceImpl implements BucketListService {
         }
     }
 
-    /** Insert a fresh list row in an isolated transaction (see getOrCreateList). */
+    /**
+     * Insert a fresh list row in an isolated transaction (see getOrCreateList).
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public BucketList createListInNewTx(String chatUuid) {
         return bucketListRepository.save(BucketList.builder().chatUuid(chatUuid).build());
@@ -155,7 +161,9 @@ public class BucketListServiceImpl implements BucketListService {
         return BucketListResponse.from(list.getChatUuid(), items);
     }
 
-    /** Build the fresh full list and fan it out live to the owning chat (fail-open). */
+    /**
+     * Build the fresh full list and fan it out live to the owning chat (fail-open).
+     */
     private BucketListResponse broadcastAndBuild(String chatId, BucketList list) {
         BucketListResponse response = buildResponse(list);
         try {

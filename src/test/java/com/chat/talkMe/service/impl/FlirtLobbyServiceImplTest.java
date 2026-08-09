@@ -43,10 +43,14 @@ class FlirtLobbyServiceImplTest {
 
     private static final String KEY = "flirt-lobby:users";
 
-    @Mock private PresenceService presenceService;
-    @Mock private UserRepository userRepository;
-    @Mock private StringRedisTemplate redis;
-    @Mock private SetOperations<String, String> setOps;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private SetOperations<String, String> setOps;
 
     private FlirtLobbyServiceImpl service;
 

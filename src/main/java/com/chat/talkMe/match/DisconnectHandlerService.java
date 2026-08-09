@@ -2,7 +2,9 @@ package com.chat.talkMe.match;
 
 public interface DisconnectHandlerService {
 
-    /** Immediate teardown: dequeue, destroy any active session, notify the peer. */
+    /**
+     * Immediate teardown: dequeue, destroy any active session, notify the peer.
+     */
     void handleDisconnect(String username);
 
     /**

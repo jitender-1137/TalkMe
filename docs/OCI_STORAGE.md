@@ -42,15 +42,15 @@ objects and streams media back through `GET /uploads/media`.
 
 ## Environment variables (prod)
 
-| Var | Default | Notes |
-|---|---|---|
-| `STORAGE_PROVIDER` | `oci` | Set `local` to fall back to the VM disk. |
-| `FILE_BASE_DIR` | `/media` | Shared media root (`storage.media-root`) — OCI keys + instance disk. |
-| `OCI_NAMESPACE` | *(auto-resolved)* | Object Storage namespace; auto-detected at startup if blank. |
-| `OCI_REGION` | `ap-mumbai-1` | Must match the config file region. |
-| `OCI_BUCKET` | `neochathub-media` | |
-| `OCI_CONFIG_FILE` | `~/.oci/config` | API-key config file path. |
-| `OCI_CONFIG_PROFILE` | `DEFAULT` | Profile section in the config file. |
+| Var                  | Default            | Notes                                                                |
+|----------------------|--------------------|----------------------------------------------------------------------|
+| `STORAGE_PROVIDER`   | `oci`              | Set `local` to fall back to the VM disk.                             |
+| `FILE_BASE_DIR`      | `/media`           | Shared media root (`storage.media-root`) — OCI keys + instance disk. |
+| `OCI_NAMESPACE`      | *(auto-resolved)*  | Object Storage namespace; auto-detected at startup if blank.         |
+| `OCI_REGION`         | `ap-mumbai-1`      | Must match the config file region.                                   |
+| `OCI_BUCKET`         | `neochathub-media` |                                                                      |
+| `OCI_CONFIG_FILE`    | `~/.oci/config`    | API-key config file path.                                            |
+| `OCI_CONFIG_PROFILE` | `DEFAULT`          | Profile section in the config file.                                  |
 
 Note: existing files under an old media root on a running prod VM are **not**
 migrated — new uploads go to OCI going forward.

@@ -65,7 +65,9 @@ class UploadValidatorTest {
         return b;
     }
 
-    /** A MultipartFile whose getInputStream() returns a new stream over {@code bytes} each call. */
+    /**
+     * A MultipartFile whose getInputStream() returns a new stream over {@code bytes} each call.
+     */
     private static MultipartFile fileOf(byte[] bytes) {
         MultipartFile f = mock(MultipartFile.class);
         try {

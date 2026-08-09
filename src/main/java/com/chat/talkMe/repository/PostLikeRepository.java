@@ -13,8 +13,13 @@ import java.util.Optional;
 @Repository
 public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     Optional<PostLike> findByPostAndUser(Post post, User user);
+
     boolean existsByPostAndUser(Post post, User user);
-    /** Page of likes for a post — used to list who liked it. */
+
+    /**
+     * Page of likes for a post — used to list who liked it.
+     */
     Page<PostLike> findByPost(Post post, Pageable pageable);
+
     long countByPost(Post post);
 }

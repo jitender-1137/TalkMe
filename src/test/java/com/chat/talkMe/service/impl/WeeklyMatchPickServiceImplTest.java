@@ -44,10 +44,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("WeeklyMatchPickServiceImpl (unit)")
 class WeeklyMatchPickServiceImplTest {
 
-    @Mock private WeeklyMatchPickRepository weeklyMatchPickRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private CompatibilityService compatibilityService;
-    @Mock private BlockUserRepository blockUserRepository;
+    @Mock
+    private WeeklyMatchPickRepository weeklyMatchPickRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private CompatibilityService compatibilityService;
+    @Mock
+    private BlockUserRepository blockUserRepository;
 
     private WeeklyMatchPickServiceImpl service;
 

@@ -86,13 +86,17 @@ class RateLimitingFilterUnitTest {
     //  Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-    /** Put the filter into "production" mode so rate limiting actually runs. */
+    /**
+     * Put the filter into "production" mode so rate limiting actually runs.
+     */
     private void enableRateLimiting() {
         when(env.acceptsProfiles(any(Profiles.class))).thenReturn(false);
         when(env.getActiveProfiles()).thenReturn(new String[]{"prod"});
     }
 
-    /** Stub the counter so the next increment on any key returns {@code count}. */
+    /**
+     * Stub the counter so the next increment on any key returns {@code count}.
+     */
     private void stubIncrement(long count) {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.increment(anyString())).thenReturn(count);

@@ -15,13 +15,19 @@ import java.util.Set;
  */
 public interface FeatureAccessService {
 
-    /** True when the user may use the feature right now (cache-backed). */
+    /**
+     * True when the user may use the feature right now (cache-backed).
+     */
     boolean hasAccess(User user, FeatureKey key);
 
-    /** All feature keys the user may use. */
+    /**
+     * All feature keys the user may use.
+     */
     Set<FeatureKey> effectiveKeys(User user);
 
-    /** Wire names of all accessible features — the payload for AuthUserResponse.features / GET /features. */
+    /**
+     * Wire names of all accessible features — the payload for AuthUserResponse.features / GET /features.
+     */
     Set<String> effectiveWireNames(User user);
 
     /**
@@ -31,10 +37,14 @@ public interface FeatureAccessService {
      */
     void setSelfPreference(User user, FeatureKey key, boolean enabled);
 
-    /** Admin/cohort upsert of a grant for another user. */
+    /**
+     * Admin/cohort upsert of a grant for another user.
+     */
     void grant(User target, FeatureKey key, GrantDecision decision, GrantScope scope,
                String cohort, Instant expiresAt, String note);
 
-    /** Remove all grants (any scope) for a feature on a user. */
+    /**
+     * Remove all grants (any scope) for a feature on a user.
+     */
     void revoke(User target, FeatureKey key);
 }

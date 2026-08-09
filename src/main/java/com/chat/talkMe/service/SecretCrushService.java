@@ -20,9 +20,13 @@ public interface SecretCrushService {
      */
     SecretCrushMatchResponse addCrush(User crusher, String targetUuid);
 
-    /** Withdraw the caller's crush on {@code targetUuid} (no-op if none/already withdrawn). */
+    /**
+     * Withdraw the caller's crush on {@code targetUuid} (no-op if none/already withdrawn).
+     */
     void withdrawCrush(User crusher, String targetUuid);
 
-    /** The caller's OWN outgoing crushes plus their matches. Never anyone else's crushes. */
+    /**
+     * The caller's OWN outgoing crushes plus their matches. Never anyone else's crushes.
+     */
     List<SecretCrushMatchResponse> listMine(User user);
 }

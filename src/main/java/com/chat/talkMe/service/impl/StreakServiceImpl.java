@@ -42,9 +42,13 @@ import java.util.Set;
 @Transactional
 public class StreakServiceImpl implements StreakService {
 
-    /** Consecutive-day counts that award a cosmetic reputation milestone when first reached. */
+    /**
+     * Consecutive-day counts that award a cosmetic reputation milestone when first reached.
+     */
     private static final Set<Integer> MILESTONES = Set.of(7, 30, 100, 365);
-    /** Cap on banked freeze tokens (each absorbs one missed day). */
+    /**
+     * Cap on banked freeze tokens (each absorbs one missed day).
+     */
     private static final int MAX_FREEZE_TOKENS = 3;
 
     private final DailyStreakRepository streakRepository;

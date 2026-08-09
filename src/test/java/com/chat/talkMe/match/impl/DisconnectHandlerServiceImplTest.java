@@ -24,9 +24,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -50,14 +50,22 @@ class DisconnectHandlerServiceImplTest {
     private static final String ACTIVE_USERS = "matchmaking:active_users";
     private static final String SESSIONS_PREFIX = "presence:sessions:";
 
-    @Mock private WaitingQueueService waitingQueueService;
-    @Mock private SessionService sessionService;
-    @Mock private SessionCleanupService sessionCleanupService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private OnlineCountPublisher onlineCountPublisher;
-    @Mock private ZSetOperations<String, String> zSetOps;
-    @Mock private SetOperations<String, String> setOps;
+    @Mock
+    private WaitingQueueService waitingQueueService;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private SessionCleanupService sessionCleanupService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private OnlineCountPublisher onlineCountPublisher;
+    @Mock
+    private ZSetOperations<String, String> zSetOps;
+    @Mock
+    private SetOperations<String, String> setOps;
 
     private DisconnectHandlerServiceImpl service;
 

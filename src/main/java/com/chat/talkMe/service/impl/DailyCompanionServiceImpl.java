@@ -6,7 +6,6 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.CompatibilityScore;
 import com.chat.talkMe.dto.response.DailyCompanionResponse;
 import com.chat.talkMe.enums.CompanionStatus;
-import com.chat.talkMe.enums.ReputationEventType;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.DailyCompanionRepository;
@@ -34,11 +33,17 @@ import java.util.Set;
 @Transactional
 public class DailyCompanionServiceImpl implements DailyCompanionService {
 
-    /** Candidate pool size drawn from the most-recent real accounts. */
+    /**
+     * Candidate pool size drawn from the most-recent real accounts.
+     */
     private static final int CANDIDATE_POOL = 100;
-    /** How many days back to avoid re-pairing the same companion. */
+    /**
+     * How many days back to avoid re-pairing the same companion.
+     */
     private static final int RECENT_PAIRING_WINDOW = 14;
-    /** Decision window before a pairing expires. */
+    /**
+     * Decision window before a pairing expires.
+     */
     private static final Duration COMPANION_TTL = Duration.ofHours(24);
 
     private final DailyCompanionRepository dailyCompanionRepository;
@@ -76,7 +81,7 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
                 // via FriendService is a deliberate follow-up; no reputation is awarded here
                 // to avoid a one-tap FRIEND_LASTING farming vector — the nightly job that
                 // verifies mutual+lasting friendships is the source of that reward.)
-                pairing.setStatus(CompanionStatus.CONVERTED_FRIENDS);
+                    pairing.setStatus(CompanionStatus.CONVERTED_FRIENDS);
             // CONTINUE keeps chatting past the window — extend expiry so the reaper won't EXPIRE it.
             case "CONTINUE" -> {
                 pairing.setStatus(CompanionStatus.ACTIVE);

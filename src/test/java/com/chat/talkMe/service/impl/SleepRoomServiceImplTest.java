@@ -43,9 +43,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("SleepRoomServiceImpl (unit)")
 class SleepRoomServiceImplTest {
 
-    @Mock private GroupService groupService;
-    @Mock private ChatRepository chatRepository;
-    @Mock private SleepRoomChatRepository sleepRoomChatRepository;
+    @Mock
+    private GroupService groupService;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private SleepRoomChatRepository sleepRoomChatRepository;
 
     private SleepRoomServiceImpl service;
 

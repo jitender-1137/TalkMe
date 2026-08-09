@@ -61,12 +61,18 @@ class CityServiceImplTest {
     private static final String KEY = "city:presence:neon-district";
     private static final String TOPIC = "/topic/city/neon-district";
 
-    @Mock private ChatRepository chatRepository;
-    @Mock private MemberCountCache memberCountCache;
-    @Mock private PresenceService presenceService;
-    @Mock private StringRedisTemplate redis;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private MemberCountCache memberCountCache;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private CityServiceImpl service;
     private User alice;

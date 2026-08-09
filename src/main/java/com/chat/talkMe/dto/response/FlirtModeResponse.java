@@ -16,15 +16,23 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FlirtModeResponse {
 
-    /** UUID (as String) of the chat this state belongs to. */
+    /**
+     * UUID (as String) of the chat this state belongs to.
+     */
     private String chatUuid;
 
-    /** Whether the requesting/receiving user has opted into flirt mode. */
+    /**
+     * Whether the requesting/receiving user has opted into flirt mode.
+     */
     private boolean myEnabled;
 
-    /** Whether the OTHER participant has opted into flirt mode. */
+    /**
+     * Whether the OTHER participant has opted into flirt mode.
+     */
     private boolean otherEnabled;
 
-    /** True only when both participants have opted in (== myEnabled && otherEnabled). */
+    /**
+     * True only when both participants have opted in (== myEnabled && otherEnabled).
+     */
     private boolean active;
 }

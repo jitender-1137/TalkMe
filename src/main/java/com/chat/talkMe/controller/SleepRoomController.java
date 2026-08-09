@@ -28,7 +28,9 @@ public class SleepRoomController {
 
     private final SleepRoomService sleepRoomService;
 
-    /** Create a sleep companion room (optional {@code name}). */
+    /**
+     * Create a sleep companion room (optional {@code name}).
+     */
     @PostMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
     public ResponseEntity<ResponseDto<SleepRoomResponse>> create(
@@ -38,7 +40,9 @@ public class SleepRoomController {
         return ResponseEntity.ok(SuccessResponseDto.success(room, "Sleep room created", "TM_994"));
     }
 
-    /** List active sleep companion rooms. */
+    /**
+     * List active sleep companion rooms.
+     */
     @GetMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
     public ResponseEntity<ResponseDto<List<SleepRoomResponse>>> list(

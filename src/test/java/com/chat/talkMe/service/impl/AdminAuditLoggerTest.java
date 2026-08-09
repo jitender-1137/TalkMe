@@ -24,7 +24,8 @@ import static org.mockito.Mockito.verify;
 @DisplayName("AdminAuditLogger (unit)")
 class AdminAuditLoggerTest {
 
-    @Mock private AdminAuditLogRepository auditRepository;
+    @Mock
+    private AdminAuditLogRepository auditRepository;
 
     private AdminAuditLogger logger;
 

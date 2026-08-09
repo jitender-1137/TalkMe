@@ -19,15 +19,21 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TranslateRequest {
 
-    /** Plaintext to translate. */
+    /**
+     * Plaintext to translate.
+     */
     @NotBlank
     @Size(max = 5000)
     private String text;
 
-    /** Target language code (e.g. "es", "fr", "hi"). */
+    /**
+     * Target language code (e.g. "es", "fr", "hi").
+     */
     @NotBlank
     private String target;
 
-    /** Source language code; optional — null/blank means auto-detect. */
+    /**
+     * Source language code; optional — null/blank means auto-detect.
+     */
     private String source;
 }

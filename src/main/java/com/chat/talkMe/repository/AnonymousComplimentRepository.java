@@ -28,12 +28,18 @@ public interface AnonymousComplimentRepository extends JpaRepository<AnonymousCo
      */
     Optional<AnonymousCompliment> findByUuid(UUID uuid);
 
-    /** The recipient's inbox (newest first). Sender identity is stripped in the mapper unless REVEALED. */
+    /**
+     * The recipient's inbox (newest first). Sender identity is stripped in the mapper unless REVEALED.
+     */
     List<AnonymousCompliment> findByRecipientAndIsDeletedFalseOrderByCreatedAtDesc(User recipient);
 
-    /** The caller's OWN outgoing compliments (newest first) — recipient is not secret. */
+    /**
+     * The caller's OWN outgoing compliments (newest first) — recipient is not secret.
+     */
     List<AnonymousCompliment> findBySenderAndIsDeletedFalseOrderByCreatedAtDesc(User sender);
 
-    /** How many compliments a sender has sent since a cutoff — powers the daily cap. */
+    /**
+     * How many compliments a sender has sent since a cutoff — powers the daily cap.
+     */
     long countBySenderAndCreatedAtAfter(User sender, Instant since);
 }

@@ -25,10 +25,10 @@ public class DeviceServiceImpl implements DeviceService {
     @Transactional
     public void registerDevice(RegisterDeviceRequest request, User currentUser) {
         log.debug("Registering device token for user: {}", currentUser.getUsername());
-        
+
         // Remove or update if token already exists
         Optional<Device> existingDevice = deviceRepository.findByDeviceToken(request.getDeviceToken());
-        
+
         if (existingDevice.isPresent()) {
             Device device = existingDevice.get();
             device.setUser(currentUser);
@@ -54,7 +54,7 @@ public class DeviceServiceImpl implements DeviceService {
         log.debug("Unregistering device token for user: {}", currentUser.getUsername());
         Device device = deviceRepository.findByDeviceToken(deviceToken)
                 .orElseThrow(() -> new NotFoundException("Device token not found", "TM_002"));
-        
+
         if (device.getUser().getId().equals(currentUser.getId())) {
             deviceRepository.delete(device);
             log.info("Successfully unregistered device token: {}", deviceToken);

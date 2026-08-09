@@ -4,7 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** One day's bucket for the dashboard charts (e.g. signups per day). */
+/**
+ * One day's bucket for the dashboard charts (e.g. signups per day).
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

@@ -22,7 +22,8 @@ import static org.mockito.Mockito.verify;
 @DisplayName("StatusBroadcastListener (unit)")
 class StatusBroadcastListenerTest {
 
-    @Mock private StatusDeliveryService statusDeliveryService;
+    @Mock
+    private StatusDeliveryService statusDeliveryService;
 
     private StatusBroadcastListener listener;
 

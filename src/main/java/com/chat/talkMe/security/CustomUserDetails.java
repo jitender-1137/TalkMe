@@ -12,20 +12,21 @@ import java.util.List;
 
 @Getter
 public class CustomUserDetails implements UserDetails {
+    private static final long serialVersionUID = 1L;
 
     private final User user;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public CustomUserDetails(User user) {
         this.user = user;
-        
+
         List<SimpleGrantedAuthority> auths = new ArrayList<>();
         // Add roles as ROLE_...
         user.getRoles().forEach(role -> {
             auths.add(new SimpleGrantedAuthority(role.getName()));
             // Add corresponding permissions as raw authorities
-            role.getPermissions().forEach(permission -> 
-                auths.add(new SimpleGrantedAuthority(permission.getName()))
+            role.getPermissions().forEach(permission ->
+                    auths.add(new SimpleGrantedAuthority(permission.getName()))
             );
         });
         this.authorities = auths;

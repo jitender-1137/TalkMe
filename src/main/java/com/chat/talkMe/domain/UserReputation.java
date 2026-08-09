@@ -1,8 +1,20 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.StarRank;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
@@ -32,7 +44,9 @@ public class UserReputation extends BaseEntity {
     @JoinColumn(name = "user_id", unique = true)
     private User user;
 
-    /** Points accumulated in the current prestige cycle. Reset to 0 on prestige. */
+    /**
+     * Points accumulated in the current prestige cycle. Reset to 0 on prestige.
+     */
     @Column(name = "lifetime_points", nullable = false)
     @ColumnDefault("0")
     private long lifetimePoints;
@@ -62,15 +76,21 @@ public class UserReputation extends BaseEntity {
     @ColumnDefault("0")
     private double progressPercent;
 
-    /** JSON array of {label, magnitude} — the contributor breakdown, labels only, no weights. */
+    /**
+     * JSON array of {label, magnitude} — the contributor breakdown, labels only, no weights.
+     */
     @Column(name = "top_contributors_json", columnDefinition = "TEXT")
     private String topContributorsJson;
 
-    /** JSON of durable lifetime counters that survive prestige. */
+    /**
+     * JSON of durable lifetime counters that survive prestige.
+     */
     @Column(name = "lifetime_stats_json", columnDefinition = "TEXT")
     private String lifetimeStatsJson;
 
-    /** Points earned across ALL prestige cycles; never reset. */
+    /**
+     * Points earned across ALL prestige cycles; never reset.
+     */
     @Column(name = "all_time_points", nullable = false)
     @ColumnDefault("0")
     private long allTimePoints;
@@ -78,7 +98,9 @@ public class UserReputation extends BaseEntity {
     @Column(name = "last_computed_at")
     private Instant lastComputedAt;
 
-    /** Highest ledger id already folded into this snapshot (incremental recompute cursor). */
+    /**
+     * Highest ledger id already folded into this snapshot (incremental recompute cursor).
+     */
     @Column(name = "last_ledger_id_applied", nullable = false)
     @ColumnDefault("0")
     private long lastLedgerIdApplied;

@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -39,10 +38,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("ReputationAggregationJob (unit)")
 class ReputationAggregationJobTest {
 
-    @Mock private UserReputationRepository reputationRepository;
-    @Mock private ReputationEventRepository ledgerRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private ReputationService reputationService;
+    @Mock
+    private UserReputationRepository reputationRepository;
+    @Mock
+    private ReputationEventRepository ledgerRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ReputationService reputationService;
 
     private ReputationAggregationJob job;
 

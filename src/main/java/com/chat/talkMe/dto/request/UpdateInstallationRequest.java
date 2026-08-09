@@ -7,7 +7,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Reports how the user is currently accessing the app (BROWSER / PWA / IOS_HOME). */
+/**
+ * Reports how the user is currently accessing the app (BROWSER / PWA / IOS_HOME).
+ */
 @Data
 @Builder
 @NoArgsConstructor

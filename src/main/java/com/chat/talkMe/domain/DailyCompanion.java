@@ -42,17 +42,23 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class DailyCompanion extends BaseEntity {
 
-    /** The user this pairing belongs to (the one who sees this companion). */
+    /**
+     * The user this pairing belongs to (the one who sees this companion).
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** The curated companion presented to {@link #user}. */
+    /**
+     * The curated companion presented to {@link #user}.
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "companion_id", nullable = false)
     private User companion;
 
-    /** The day this pairing is for (server-local date). One per user per day. */
+    /**
+     * The day this pairing is for (server-local date). One per user per day.
+     */
     @Column(name = "pair_date", nullable = false)
     private LocalDate pairDate;
 
@@ -62,11 +68,15 @@ public class DailyCompanion extends BaseEntity {
     @Builder.Default
     private CompanionStatus status = CompanionStatus.ACTIVE;
 
-    /** When the 24h decision window closes; the reaper expires ACTIVE rows past this. */
+    /**
+     * When the 24h decision window closes; the reaper expires ACTIVE rows past this.
+     */
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    /** Cached compatibility score (0–100) at assignment time, for display without re-scoring. */
+    /**
+     * Cached compatibility score (0–100) at assignment time, for display without re-scoring.
+     */
     @Column(name = "compatibility_score")
     private Integer compatibilityScore;
 }

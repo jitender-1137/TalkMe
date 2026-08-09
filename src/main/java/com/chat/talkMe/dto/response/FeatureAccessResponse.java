@@ -7,7 +7,9 @@ import lombok.NoArgsConstructor;
 
 import java.util.Set;
 
-/** The set of feature wire-names the authenticated user may use. */
+/**
+ * The set of feature wire-names the authenticated user may use.
+ */
 @Data
 @Builder
 @NoArgsConstructor

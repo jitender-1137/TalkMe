@@ -1,8 +1,9 @@
 package com.chat.talkMe.service.impl;
 
-import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.BlockUser;
 import com.chat.talkMe.domain.MatchReport;
+import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserSetting;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.CompatibilityScore;
@@ -12,7 +13,6 @@ import com.chat.talkMe.dto.response.PublicProfileResponse;
 import com.chat.talkMe.dto.response.ReputationResponse;
 import com.chat.talkMe.dto.response.SmartProfileCardResponse;
 import com.chat.talkMe.dto.response.UserResponse;
-import com.chat.talkMe.domain.UserSetting;
 import com.chat.talkMe.enums.MessagingPrivacy;
 import com.chat.talkMe.enums.Mood;
 import com.chat.talkMe.enums.PresenceStatus;
@@ -26,20 +26,20 @@ import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
+import com.chat.talkMe.repository.PostRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.CompatibilityService;
 import com.chat.talkMe.service.NotificationService;
-import com.chat.talkMe.repository.UserFollowRepository;
-import com.chat.talkMe.repository.PostRepository;
-import com.chat.talkMe.service.StreakService;
-import com.chat.talkMe.service.UserService;
-import com.chat.talkMe.util.ProfileCompletion;
-import jakarta.persistence.criteria.Predicate;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.service.ReputationRecorder;
 import com.chat.talkMe.service.ReputationService;
 import com.chat.talkMe.service.StorageService;
+import com.chat.talkMe.service.StreakService;
+import com.chat.talkMe.service.UserService;
+import com.chat.talkMe.util.ProfileCompletion;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,6 +47,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -61,7 +62,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Slf4j
 @Service
@@ -203,7 +203,9 @@ public class UserServiceImpl implements UserService {
         return response;
     }
 
-    /** Empty/blank → null (so a cleared dropdown clears the column). */
+    /**
+     * Empty/blank → null (so a cleared dropdown clears the column).
+     */
     private static String blankToNull(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
     }

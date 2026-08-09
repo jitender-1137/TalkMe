@@ -36,8 +36,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("RelationshipJourneyJob (unit)")
 class RelationshipJourneyJobTest {
 
-    @Mock private FriendRepository friendRepository;
-    @Mock private RelationshipJourneyService relationshipJourneyService;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private RelationshipJourneyService relationshipJourneyService;
 
     private RelationshipJourneyJob job;
 

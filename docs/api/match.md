@@ -8,15 +8,16 @@
 
 Enters the matchmaking queue. If a partner matches your filters, a session is returned immediately.
 
-*   **URL:** `POST /api/v1/match/queue`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/match/queue`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body (Optional filters)
+
 ```json
 {
   "interests": ["GAMING", "TRAVEL"],
@@ -27,6 +28,7 @@ Enters the matchmaking queue. If a partner matches your filters, a session is re
 ```
 
 ### Success Response (`200 OK` - Match Found)
+
 ```json
 {
   "success": true,
@@ -55,6 +57,7 @@ Enters the matchmaking queue. If a partner matches your filters, a session is re
 ```
 
 ### Success Response (`200 OK` - Entered Queue)
+
 ```json
 {
   "success": true,
@@ -70,14 +73,15 @@ Enters the matchmaking queue. If a partner matches your filters, a session is re
 
 Exits the matchmaking queue, canceling any pending searches.
 
-*   **URL:** `DELETE /api/v1/match/queue`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/match/queue`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -93,10 +97,11 @@ Exits the matchmaking queue, canceling any pending searches.
 
 Retrieves active stranger session details if one is already active.
 
-*   **URL:** `GET /api/v1/match/session`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/match/session`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -130,14 +135,15 @@ Retrieves active stranger session details if one is already active.
 
 Skips the current stranger chat partner and enters the queue to look for a new one.
 
-*   **URL:** `POST /api/v1/match/skip`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/match/skip`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK` - Match Found)
+
 ```json
 {
   "success": true,
@@ -171,14 +177,15 @@ Skips the current stranger chat partner and enters the queue to look for a new o
 
 Closes and terminates the current stranger session.
 
-*   **URL:** `POST /api/v1/match/end`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/match/end`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -194,15 +201,16 @@ Closes and terminates the current stranger session.
 
 Reports the stranger partner for behavior issues.
 
-*   **URL:** `POST /api/v1/match/report`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/match/report`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body
+
 ```json
 {
   "reason": "Harassment",
@@ -211,6 +219,7 @@ Reports the stranger partner for behavior issues.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -219,4 +228,5 @@ Reports the stranger partner for behavior issues.
   "timestamp": "2026-06-03T00:33:00Z"
 }
 ```
+
 }

@@ -65,10 +65,14 @@ class WebSocketPresenceListenerTest {
     private static final String SESSION_ID = "sess-1";
     private static final Duration SESSION_TTL = Duration.ofDays(1);
 
-    @Mock private PresenceService presenceService;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private DisconnectHandlerService disconnectHandlerService;
-    @Mock private SetOperations<String, String> setOps;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private DisconnectHandlerService disconnectHandlerService;
+    @Mock
+    private SetOperations<String, String> setOps;
 
     private WebSocketPresenceListener listener;
     private User testUser;
@@ -92,7 +96,9 @@ class WebSocketPresenceListenerTest {
         return new UsernamePasswordAuthenticationToken(cud, null, cud.getAuthorities());
     }
 
-    /** A UPAT whose principal is NOT a CustomUserDetails → extractUser returns null. */
+    /**
+     * A UPAT whose principal is NOT a CustomUserDetails → extractUser returns null.
+     */
     private UsernamePasswordAuthenticationToken nonUserDetailsPrincipal() {
         return new UsernamePasswordAuthenticationToken("just-a-string", null);
     }
@@ -101,7 +107,9 @@ class WebSocketPresenceListenerTest {
         return () -> USERNAME;
     }
 
-    /** A STOMP message carrying (or not) a session id, as {@code StompHeaderAccessor.wrap} reads it. */
+    /**
+     * A STOMP message carrying (or not) a session id, as {@code StompHeaderAccessor.wrap} reads it.
+     */
     private Message<byte[]> stompMessage(StompCommand command, String sessionId) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
         if (sessionId != null) {

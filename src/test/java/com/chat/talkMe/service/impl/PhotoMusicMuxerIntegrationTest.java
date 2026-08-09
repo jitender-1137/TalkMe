@@ -151,7 +151,9 @@ class PhotoMusicMuxerIntegrationTest {
         }
     }
 
-    /** Run a command, drain stderr, fail the assumption if it can't complete. */
+    /**
+     * Run a command, drain stderr, fail the assumption if it can't complete.
+     */
     private static String run(List<String> cmd, int timeoutSec) throws Exception {
         Process p = new ProcessBuilder(cmd).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
         StringBuilder err = new StringBuilder();
@@ -171,7 +173,9 @@ class PhotoMusicMuxerIntegrationTest {
         return err.toString();
     }
 
-    /** `ffmpeg -i <file>` prints media info (Duration + codecs) to stderr. */
+    /**
+     * `ffmpeg -i <file>` prints media info (Duration + codecs) to stderr.
+     */
     private String probe(Path file) throws Exception {
         return run(List.of(ffmpeg, "-hide_banner", "-i", file.toString()), 20);
     }

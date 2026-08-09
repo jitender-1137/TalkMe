@@ -1,7 +1,16 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
@@ -32,11 +41,15 @@ public class BucketListItem extends BaseEntity {
     @Builder.Default
     private boolean completed = false;
 
-    /** User who last checked the item off; null while the item is open. */
+    /**
+     * User who last checked the item off; null while the item is open.
+     */
     @Column(name = "completed_by_user_id")
     private Long completedByUserId;
 
-    /** When the item was last checked off; null while the item is open. */
+    /**
+     * When the item was last checked off; null while the item is open.
+     */
     @Column(name = "completed_at")
     private Instant completedAt;
 

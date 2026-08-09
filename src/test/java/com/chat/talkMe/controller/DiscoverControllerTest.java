@@ -4,12 +4,12 @@ import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserPresence;
 import com.chat.talkMe.repository.RoleRepository;
-import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.UserPresenceRepository;
+import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.CustomUserDetails;
 import jakarta.servlet.http.Cookie;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -103,7 +103,7 @@ public class DiscoverControllerTest {
     @Test
     void testGetDiscoverSorting() throws Exception {
         Role userRole = roleRepository.findByName("ROLE_USER").orElseThrow();
-        
+
         User onlineUser = User.builder()
                 .username("onlineuser")
                 .email("onlineuser@example.com")
@@ -137,16 +137,16 @@ public class DiscoverControllerTest {
 
         // 1. Like profile
         mockMvc.perform(post("/api/v1/discover/" + likedUserUuid + "/like")
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("User profile liked"));
 
         // 2. Unlike profile
         mockMvc.perform(delete("/api/v1/discover/" + likedUserUuid + "/like")
-                .cookie(csrfCookie)
-                .header("X-CSRF-Token", "test-token-value"))
+                        .cookie(csrfCookie)
+                        .header("X-CSRF-Token", "test-token-value"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("User profile unliked"));

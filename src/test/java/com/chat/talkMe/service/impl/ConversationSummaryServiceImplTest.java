@@ -95,7 +95,9 @@ class ConversationSummaryServiceImplTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** A live 1:1 chat matching CHAT_UUID (not deleted). Chat's @Builder omits BaseEntity fields. */
+    /**
+     * A live 1:1 chat matching CHAT_UUID (not deleted). Chat's @Builder omits BaseEntity fields.
+     */
     private static Chat privateChat() {
         Chat chat = Chat.builder().chatType(ChatType.PRIVATE).name(null).build();
         chat.setDeleted(false);
@@ -106,7 +108,9 @@ class ConversationSummaryServiceImplTest {
         return ChatMember.builder().chat(chat).user(user).build();
     }
 
-    /** An active membership row for {@code user} (never left, not banned). */
+    /**
+     * An active membership row for {@code user} (never left, not banned).
+     */
     private static ChatMember activeMember(Chat chat, User user) {
         return ChatMember.builder().chat(chat).user(user).leftAt(null).isBanned(false).build();
     }
@@ -239,7 +243,9 @@ class ConversationSummaryServiceImplTest {
     @DisplayName("happy path")
     class HappyPath {
 
-        /** Stubs a fully-populated live 1:1 with the given counts, then returns the built chat. */
+        /**
+         * Stubs a fully-populated live 1:1 with the given counts, then returns the built chat.
+         */
         private Chat stubLivePairChat(long total, long myCount, long theirCount,
                                       long photos, long activeDays, Instant firstAt) {
             Chat chat = privateChat();
@@ -380,7 +386,9 @@ class ConversationSummaryServiceImplTest {
             return u;
         }
 
-        /** Stub a live 1:1 pair on the given (non-field) users with explicit counts. */
+        /**
+         * Stub a live 1:1 pair on the given (non-field) users with explicit counts.
+         */
         private Chat stubPair(Chat chat, User meU, User otherU, long total, long my, long their,
                               long photos, long activeDays, Instant firstAt) {
             when(chatRepository.findByUuid(any(UUID.class))).thenReturn(Optional.of(chat));

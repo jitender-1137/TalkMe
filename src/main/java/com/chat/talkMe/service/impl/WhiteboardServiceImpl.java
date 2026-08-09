@@ -178,7 +178,9 @@ public class WhiteboardServiceImpl implements WhiteboardService {
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_103"));
     }
 
-    /** Atomically allocate the next per-chat sequence number. Fail-open to a time-based fallback. */
+    /**
+     * Atomically allocate the next per-chat sequence number. Fail-open to a time-based fallback.
+     */
     private long nextSeq(String chatUuid) {
         try {
             String seqKey = seqKey(chatUuid);
@@ -193,7 +195,9 @@ public class WhiteboardServiceImpl implements WhiteboardService {
         return Instant.now().toEpochMilli();
     }
 
-    /** Append the op JSON to the capped op-log and refresh its TTL. Fail-open. */
+    /**
+     * Append the op JSON to the capped op-log and refresh its TTL. Fail-open.
+     */
     private void pushOp(String chatUuid, WhiteboardOp op) {
         try {
             String opsKey = opsKey(chatUuid);
@@ -206,7 +210,9 @@ public class WhiteboardServiceImpl implements WhiteboardService {
         }
     }
 
-    /** Re-broadcast an op on the existing chat topic. Fail-open. */
+    /**
+     * Re-broadcast an op on the existing chat topic. Fail-open.
+     */
     private void broadcast(String chatUuid, String event, WhiteboardOp payload) {
         try {
             messagingTemplate.convertAndSend(

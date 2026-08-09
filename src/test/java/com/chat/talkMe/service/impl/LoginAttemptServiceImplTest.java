@@ -40,8 +40,10 @@ class LoginAttemptServiceImplTest {
     private static final String IP_KEY = "login:fail:ip:203.0.113.9";
     private static final long WINDOW_SECONDS = 15 * 60;
 
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private LoginAttemptServiceImpl service;
 

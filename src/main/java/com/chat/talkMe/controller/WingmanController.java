@@ -15,7 +15,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.UUID;
@@ -75,7 +81,9 @@ public class WingmanController {
         return ResponseEntity.ok(SuccessResponseDto.success(suggestions));
     }
 
-    /** Reply suggestions given the other person's last message. */
+    /**
+     * Reply suggestions given the other person's last message.
+     */
     @PostMapping("/suggest")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
     public ResponseEntity<ResponseDto<List<String>>> suggest(
@@ -113,11 +121,15 @@ public class WingmanController {
         return Math.min(max, HARD_CAP);
     }
 
-    /** Request body for {@link #suggest}. {@code max} is optional (defaults to 5). */
+    /**
+     * Request body for {@link #suggest}. {@code max} is optional (defaults to 5).
+     */
     public record SuggestRequest(String lastMessage, Integer max) {
     }
 
-    /** Request body for {@link #rewrite}. {@code tone} and {@code max} are optional. */
+    /**
+     * Request body for {@link #rewrite}. {@code tone} and {@code max} are optional.
+     */
     public record RewriteRequest(String draft, String tone, Integer max) {
     }
 }

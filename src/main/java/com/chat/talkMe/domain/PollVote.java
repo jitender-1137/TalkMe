@@ -1,7 +1,16 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * A single user's vote for one {@link PollOption}. A user may hold at most one
@@ -10,8 +19,8 @@ import lombok.*;
  */
 @Entity
 @Table(
-    name = "poll_votes",
-    uniqueConstraints = @UniqueConstraint(name = "uk_poll_vote_user", columnNames = {"poll_id", "user_id"})
+        name = "poll_votes",
+        uniqueConstraints = @UniqueConstraint(name = "uk_poll_vote_user", columnNames = {"poll_id", "user_id"})
 )
 @Getter
 @Setter

@@ -1,7 +1,17 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDate;
@@ -29,21 +39,29 @@ public class DailyStreak extends BaseEntity {
     @JoinColumn(name = "user_id", unique = true)
     private User user;
 
-    /** Consecutive-day count in the current run. Reset to 1 on a broken streak. */
+    /**
+     * Consecutive-day count in the current run. Reset to 1 on a broken streak.
+     */
     @Column(name = "current_streak", nullable = false)
     @ColumnDefault("0")
     private int currentStreak;
 
-    /** Best run ever achieved; never decreases. */
+    /**
+     * Best run ever achieved; never decreases.
+     */
     @Column(name = "longest_streak", nullable = false)
     @ColumnDefault("0")
     private int longestStreak;
 
-    /** Day (UTC) of the most recent check-in, or null before the first check-in. */
+    /**
+     * Day (UTC) of the most recent check-in, or null before the first check-in.
+     */
     @Column(name = "last_check_in_day")
     private LocalDate lastCheckInDay;
 
-    /** Freeze tokens that absorb a single missed day so the streak survives a one-day gap. */
+    /**
+     * Freeze tokens that absorb a single missed day so the streak survives a one-day gap.
+     */
     @Column(name = "freeze_tokens", nullable = false)
     @ColumnDefault("0")
     private int freezeTokens;

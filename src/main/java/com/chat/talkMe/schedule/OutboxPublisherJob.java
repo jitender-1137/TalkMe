@@ -1,5 +1,6 @@
 package com.chat.talkMe.schedule;
 
+import com.chat.talkMe.event.MessageDeliveryService;
 import com.chat.talkMe.event.OutboxDispatcher;
 import com.chat.talkMe.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,17 +31,25 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OutboxPublisherJob {
 
-    /** Don't touch a row until the fast path has had time to deliver it. */
+    /**
+     * Don't touch a row until the fast path has had time to deliver it.
+     */
     private static final Duration GRACE = Duration.ofSeconds(15);
-    /** Max rows per tick — bounds work during a recovery surge. */
+    /**
+     * Max rows per tick — bounds work during a recovery surge.
+     */
     private static final int BATCH = 200;
-    /** Delivered rows older than this are purged to keep the table small. */
+    /**
+     * Delivered rows older than this are purged to keep the table small.
+     */
     private static final Duration RETENTION = Duration.ofDays(2);
 
     private final OutboxEventRepository outboxRepo;
     private final OutboxDispatcher dispatcher;
 
-    /** Re-drive anything the fast path missed. Runs a few seconds after each completes. */
+    /**
+     * Re-drive anything the fast path missed. Runs a few seconds after each completes.
+     */
     @Scheduled(fixedDelayString = "${app.outbox.poll-ms:5000}")
     public void redrivePending() {
         try {
@@ -66,7 +75,9 @@ public class OutboxPublisherJob {
         }
     }
 
-    /** Housekeeping: drop long-delivered rows daily. */
+    /**
+     * Housekeeping: drop long-delivered rows daily.
+     */
     @Scheduled(cron = "${app.outbox.cleanup-cron:0 30 3 * * *}")
     public void purgeOldPublished() {
         try {

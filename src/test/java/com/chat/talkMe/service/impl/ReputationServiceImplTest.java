@@ -69,13 +69,20 @@ class ReputationServiceImplTest {
     private static final Instant CREATED = Instant.parse("2020-01-15T00:00:00Z");
     private static final String MEMBER_SINCE = CREATED.atZone(ZoneOffset.UTC).toLocalDate().toString();
 
-    @Mock private UserReputationRepository reputationRepository;
-    @Mock private ReputationEventRepository ledgerRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private ReputationCache reputationCache;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ObjectProvider<ReputationService> selfProvider;
-    @Mock private ReputationService selfService;
+    @Mock
+    private UserReputationRepository reputationRepository;
+    @Mock
+    private ReputationEventRepository ledgerRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ReputationCache reputationCache;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ObjectProvider<ReputationService> selfProvider;
+    @Mock
+    private ReputationService selfService;
 
     private final ReputationCurveProperties curve = new ReputationCurveProperties();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -83,7 +90,9 @@ class ReputationServiceImplTest {
     private ReputationServiceImpl service;
     private User user;
 
-    /** points_for_next_level for a brand-new level-1 snapshot, derived from the real curve. */
+    /**
+     * points_for_next_level for a brand-new level-1 snapshot, derived from the real curve.
+     */
     private int initialNextSpan() {
         return (int) (curve.totalXpForLevel(2) - curve.totalXpForLevel(1));
     }
@@ -114,7 +123,9 @@ class ReputationServiceImplTest {
         return r;
     }
 
-    /** Make {@code reputationCache.getOrCompute} transparently invoke the supplier. */
+    /**
+     * Make {@code reputationCache.getOrCompute} transparently invoke the supplier.
+     */
     @SuppressWarnings("unchecked")
     private void runCacheSupplier() {
         when(reputationCache.getOrCompute(anyLong(), any())).thenAnswer(inv ->

@@ -58,7 +58,9 @@ public class DisposableEmailDomains {
         log.info("[Mail] disposable-email blocklist loaded: {} domains", domains.size());
     }
 
-    /** True if the address's domain (or a parent domain) is a known disposable provider. */
+    /**
+     * True if the address's domain (or a parent domain) is a known disposable provider.
+     */
     public boolean isDisposable(String email) {
         if (email == null) {
             return false;

@@ -19,7 +19,9 @@ public enum RoomMode {
     SLEEP_COMPANION,
     LISTENING;
 
-    /** Modes whose messages must never be persisted/recorded. */
+    /**
+     * Modes whose messages must never be persisted/recorded.
+     */
     public boolean isEphemeral() {
         return this == SLEEP_COMPANION || this == LISTENING;
     }

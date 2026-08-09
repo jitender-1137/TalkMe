@@ -24,14 +24,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("SendMessageRequest JSON deserialization (absent/null primitive leniency)")
 class SendMessageRequestJsonTest {
 
-    /** Mirrors the running app: applies the same JsonMapper customizer Spring MVC uses. */
+    /**
+     * Mirrors the running app: applies the same JsonMapper customizer Spring MVC uses.
+     */
     private ObjectMapper lenient() {
         JsonMapper.Builder builder = JsonMapper.builder();
         new JacksonConfig().primitiveNullLeniencyCustomizer().customize(builder);
         return builder.build();
     }
 
-    /** The un-customized Jackson-3 default (strict on absent/null primitives). */
+    /**
+     * The un-customized Jackson-3 default (strict on absent/null primitives).
+     */
     private ObjectMapper strict() {
         return JsonMapper.builder()
                 .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true)
@@ -65,7 +69,7 @@ class SendMessageRequestJsonTest {
         // The exact body a plain text send produces — no allowDownload / forwarded keys.
         SendMessageRequest req = lenient().readValue(
                 """
-                {"content":"just text","messageType":"TEXT","clientId":"abc"}""",
+                        {"content":"just text","messageType":"TEXT","clientId":"abc"}""",
                 SendMessageRequest.class);
 
         assertThat(req.getContent()).isEqualTo("just text");
@@ -77,7 +81,7 @@ class SendMessageRequestJsonTest {
     void explicitNullPrimitives_defaultFalse_noThrow() {
         SendMessageRequest req = lenient().readValue(
                 """
-                {"content":"x","allowDownload":null,"forwarded":null}""",
+                        {"content":"x","allowDownload":null,"forwarded":null}""",
                 SendMessageRequest.class);
 
         assertThat(req.isAllowDownload()).isFalse();
@@ -98,7 +102,7 @@ class SendMessageRequestJsonTest {
     void absentNullableWrappers_stayNull() {
         SendMessageRequest req = lenient().readValue(
                 """
-                {"content":"x"}""", SendMessageRequest.class);
+                        {"content":"x"}""", SendMessageRequest.class);
 
         // Wrapper types legitimately stay null when absent — only PRIMITIVES were affected.
         assertThat(req.getSelfDestructSeconds()).isNull();
@@ -113,7 +117,7 @@ class SendMessageRequestJsonTest {
     void strictDefault_reproducesTheBug_onAnAbsentPrimitive() {
         assertThatThrownBy(() -> strict().readValue(
                 """
-                {"content":"just text","messageType":"TEXT"}""",
+                        {"content":"just text","messageType":"TEXT"}""",
                 SendMessageRequest.class))
                 .isInstanceOf(MismatchedInputException.class)
                 .hasMessageContaining("boolean");

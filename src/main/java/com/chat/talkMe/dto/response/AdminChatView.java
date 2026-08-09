@@ -5,7 +5,9 @@ import lombok.Data;
 
 import java.util.List;
 
-/** A chat as seen by an admin — id, kind, members, activity. */
+/**
+ * A chat as seen by an admin — id, kind, members, activity.
+ */
 @Data
 @Builder
 public class AdminChatView {

@@ -2,15 +2,23 @@ package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.GameState;
 import com.chat.talkMe.enums.GameType;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
  * A single conversation-game session (feature #13) bound to one private chat.
  * The engine is server-authoritative but client-driven over REST: the client
  * calls /start, /{uuid}/next and /{uuid}/end and re-reads state via /active.
- *
+ * <p>
  * Prompts themselves are not persisted — they come from the static in-code
  * {@code GamePromptBank}. Only the cursor ({@link #currentRound}) and the
  * resolved prompt id ({@link #currentPromptId}) are stored.
@@ -34,7 +42,9 @@ public class GameSession extends BaseEntity {
     @Builder.Default
     private GameState state = GameState.LOBBY;
 
-    /** UUID (as String) of the chat this game runs in. */
+    /**
+     * UUID (as String) of the chat this game runs in.
+     */
     @Column(name = "chat_id", nullable = false, length = 64)
     private String chatId;
 
@@ -43,7 +53,9 @@ public class GameSession extends BaseEntity {
     @Builder.Default
     private int currentRound = 0;
 
-    /** Identifier of the currently-served prompt (game type + index into the bank). */
+    /**
+     * Identifier of the currently-served prompt (game type + index into the bank).
+     */
     @Column(name = "current_prompt_id", length = 64)
     private String currentPromptId;
 }

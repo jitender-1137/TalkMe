@@ -11,6 +11,8 @@ import java.util.Optional;
 @Repository
 public interface GroupInviteRepository extends JpaRepository<GroupInvite, Long> {
     Optional<GroupInvite> findByChatAndInvitee(Chat chat, User invitee);
+
     Optional<GroupInvite> findByChatAndInviteeAndStatus(Chat chat, User invitee, String status);
+
     boolean existsByChatAndInviteeAndStatus(Chat chat, User invitee, String status);
 }

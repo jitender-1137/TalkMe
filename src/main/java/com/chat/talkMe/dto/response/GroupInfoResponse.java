@@ -16,7 +16,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GroupInfoResponse {
-    /** "group" | "channel" | "room" (lower-cased chatType). */
+    /**
+     * "group" | "channel" | "room" (lower-cased chatType).
+     */
     private String subtype;
     private String visibility;      // PRIVATE | PUBLIC
     private String joinPolicy;      // OPEN | REQUEST | INVITE_ONLY

@@ -10,9 +10,13 @@ import java.util.List;
 @Repository
 public interface RelationshipMilestoneRepository extends JpaRepository<RelationshipMilestone, Long> {
 
-    /** The full timeline for a normalized pair, oldest milestone first. */
+    /**
+     * The full timeline for a normalized pair, oldest milestone first.
+     */
     List<RelationshipMilestone> findByUserAIdAndUserBIdOrderByAchievedAtAsc(Long userAId, Long userBId);
 
-    /** Idempotency guard: has this exact milestone (pair + type + source ref) already been recorded? */
+    /**
+     * Idempotency guard: has this exact milestone (pair + type + source ref) already been recorded?
+     */
     boolean existsByUserAIdAndUserBIdAndTypeAndRef(Long userAId, Long userBId, MilestoneType type, String ref);
 }

@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Night Owl Lobby (feature #2). Gated by the NIGHT_OWL entitlement. */
+/**
+ * Night Owl Lobby (feature #2). Gated by the NIGHT_OWL entitlement.
+ */
 @RestController
 @RequestMapping("/night-owl")
 @RequiredArgsConstructor
@@ -33,7 +35,9 @@ public class NightOwlController {
                 nightOwlService.getDashboard(userDetails.getUser())));
     }
 
-    /** Trending / curated interest rooms rail (feature #23). */
+    /**
+     * Trending / curated interest rooms rail (feature #23).
+     */
     @GetMapping("/trending-rooms")
     @PreAuthorize("@featureGuard.check('INTEREST_ROOMS')")
     public ResponseEntity<ResponseDto<List<TrendingRoomCard>>> trendingRooms(

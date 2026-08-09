@@ -3,23 +3,23 @@ package com.chat.talkMe.exception;
 import com.chat.talkMe.dto.response.ResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
-import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.apache.catalina.connector.ClientAbortException;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -171,7 +171,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
-    /** True if anywhere in the cause chain is a client-side disconnect (dead socket). */
+    /**
+     * True if anywhere in the cause chain is a client-side disconnect (dead socket).
+     */
     private boolean isClientAbort(Throwable ex) {
         Throwable t = ex;
         for (int hops = 0; t != null && hops < 12; t = t.getCause(), hops++) {

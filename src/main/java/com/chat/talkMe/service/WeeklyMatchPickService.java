@@ -14,16 +14,24 @@ import java.util.List;
  */
 public interface WeeklyMatchPickService {
 
-    /** Current week's persisted picks for the user (empty if none generated yet). */
+    /**
+     * Current week's persisted picks for the user (empty if none generated yet).
+     */
     List<WeeklyMatchPickResponse> getCurrent(User user);
 
-    /** (Re)generate and persist the top picks for the current week for a single user. */
+    /**
+     * (Re)generate and persist the top picks for the current week for a single user.
+     */
     void generateFor(User user);
 
-    /** Delete picks from weeks before {@code weekStart} (runs in a transaction). */
+    /**
+     * Delete picks from weeks before {@code weekStart} (runs in a transaction).
+     */
     void pruneOlderThan(LocalDate weekStart);
 
-    /** Most recent Monday — the canonical week key for all picks. */
+    /**
+     * Most recent Monday — the canonical week key for all picks.
+     */
     static LocalDate weekStart() {
         return LocalDate.now().with(DayOfWeek.MONDAY);
     }

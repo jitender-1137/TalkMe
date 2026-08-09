@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 
 /**
  * Log-hygiene helper for scheduled background reapers (presence, lobby, match).
- *
+ * <p>
  * A transient Redis/DB blip — e.g. a laptop waking from sleep with stale pooled
  * connections, or a brief network hiccup — should not dump a full stack trace on
  * every reaper tick (which fires as often as every 1s). Those failures self-heal
@@ -13,9 +13,12 @@ import org.slf4j.Logger;
  */
 public final class BackgroundTaskErrors {
 
-    private BackgroundTaskErrors() {}
+    private BackgroundTaskErrors() {
+    }
 
-    /** True when the throwable (or any cause) is a transient infra connectivity/timeout blip. */
+    /**
+     * True when the throwable (or any cause) is a transient infra connectivity/timeout blip.
+     */
     public static boolean isTransientInfra(Throwable t) {
         for (Throwable c = t; c != null; c = c.getCause()) {
             String name = c.getClass().getName();

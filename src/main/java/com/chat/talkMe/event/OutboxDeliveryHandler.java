@@ -13,9 +13,13 @@ import com.chat.talkMe.domain.OutboxEvent;
  */
 public interface OutboxDeliveryHandler {
 
-    /** The {@link OutboxEvent#getEventType()} value this handler is responsible for. */
+    /**
+     * The {@link OutboxEvent#getEventType()} value this handler is responsible for.
+     */
     String eventType();
 
-    /** Re-deliver the event carried by this row. May throw to signal a retryable failure. */
+    /**
+     * Re-deliver the event carried by this row. May throw to signal a retryable failure.
+     */
     void broadcast(OutboxEvent row) throws Exception;
 }

@@ -15,15 +15,23 @@ import java.util.List;
  */
 public interface WhiteboardService {
 
-    /** Replay the current op-log (in seq order) for the chat. */
+    /**
+     * Replay the current op-log (in seq order) for the chat.
+     */
     List<WhiteboardOp> getBoard(User me, String chatUuid);
 
-    /** Append a stroke op, broadcast it live, and return the server-stamped op. */
+    /**
+     * Append a stroke op, broadcast it live, and return the server-stamped op.
+     */
     WhiteboardOp addStroke(User me, WhiteboardStrokeRequest req);
 
-    /** Wipe the board: drop the stored op-log, push a clear marker, broadcast it. */
+    /**
+     * Wipe the board: drop the stored op-log, push a clear marker, broadcast it.
+     */
     void clear(User me, String chatUuid);
 
-    /** Append an undo op (clients remove the author's last stroke), broadcast it, return the op. */
+    /**
+     * Append an undo op (clients remove the author's last stroke), broadcast it, return the op.
+     */
     WhiteboardOp undo(User me, String chatUuid);
 }

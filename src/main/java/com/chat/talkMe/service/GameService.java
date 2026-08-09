@@ -11,15 +11,23 @@ import com.chat.talkMe.enums.GameType;
  */
 public interface GameService {
 
-    /** Start a new game in a chat → IN_PROGRESS with the first prompt. */
+    /**
+     * Start a new game in a chat → IN_PROGRESS with the first prompt.
+     */
     GameSessionResponse start(User user, String chatId, GameType gameType);
 
-    /** Advance to the next round/prompt; ENDs the session once the bank is exhausted. */
+    /**
+     * Advance to the next round/prompt; ENDs the session once the bank is exhausted.
+     */
     GameSessionResponse next(User user, String gameSessionUuid);
 
-    /** End the session (ENDED). */
+    /**
+     * End the session (ENDED).
+     */
     GameSessionResponse end(User user, String gameSessionUuid);
 
-    /** The current non-ended session for a chat, or null when none is active. */
+    /**
+     * The current non-ended session for a chat, or null when none is active.
+     */
     GameSessionResponse active(User user, String chatId);
 }

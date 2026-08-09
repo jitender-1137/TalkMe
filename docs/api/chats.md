@@ -8,15 +8,16 @@
 
 Creates a new 1-to-1 private chat or a group chat.
 
-*   **URL:** `POST /api/v1/chats`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `Content-Type: application/json`
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `POST /api/v1/chats`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `Content-Type: application/json`
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Request Body (1-to-1 Private Chat)
+
 ```json
 {
   "recipientId": "f8a42b10-671c-43fe-a5fe-e8a6eb4862b2"
@@ -24,6 +25,7 @@ Creates a new 1-to-1 private chat or a group chat.
 ```
 
 ### Request Body (Group Chat)
+
 ```json
 {
   "name": "Project Devs",
@@ -35,6 +37,7 @@ Creates a new 1-to-1 private chat or a group chat.
 ```
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -71,10 +74,11 @@ Creates a new 1-to-1 private chat or a group chat.
 
 Retrieves all active chats for the authenticated user, ordered by pinned status and last message time.
 
-*   **URL:** `GET /api/v1/chats`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/chats`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -123,10 +127,11 @@ Retrieves all active chats for the authenticated user, ordered by pinned status 
 
 Fetches metadata for a specific chat conversation.
 
-*   **URL:** `GET /api/v1/chats/{id}`
-*   **Authentication Required:** Yes
+* **URL:** `GET /api/v1/chats/{id}`
+* **Authentication Required:** Yes
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -163,16 +168,17 @@ Fetches metadata for a specific chat conversation.
 
 Archives or unarchives a conversation thread.
 
-*   **URL:** `PUT /api/v1/chats/{id}/archive`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `archive` (boolean, required): `true` to archive, `false` to unarchive.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/chats/{id}/archive`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `archive` (boolean, required): `true` to archive, `false` to unarchive.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -188,16 +194,17 @@ Archives or unarchives a conversation thread.
 
 Mutes or unmutes notification alerts for a conversation.
 
-*   **URL:** `PUT /api/v1/chats/{id}/mute`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `mute` (boolean, required): `true` to mute, `false` to unmute.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/chats/{id}/mute`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `mute` (boolean, required): `true` to mute, `false` to unmute.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -213,16 +220,17 @@ Mutes or unmutes notification alerts for a conversation.
 
 Pins or unpins a conversation.
 
-*   **URL:** `PUT /api/v1/chats/{id}/pin`
-*   **Authentication Required:** Yes
-*   **Query Parameters:**
-    *   `pin` (boolean, required): `true` to pin, `false` to unpin.
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/chats/{id}/pin`
+* **Authentication Required:** Yes
+* **Query Parameters:**
+    * `pin` (boolean, required): `true` to pin, `false` to unpin.
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -238,14 +246,15 @@ Pins or unpins a conversation.
 
 Deletes all message history within a chat thread.
 
-*   **URL:** `DELETE /api/v1/chats/{id}/clear`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/chats/{id}/clear`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -261,14 +270,15 @@ Deletes all message history within a chat thread.
 
 Removes a chat thread and exits the membership.
 
-*   **URL:** `DELETE /api/v1/chats/{id}`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `DELETE /api/v1/chats/{id}`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,
@@ -284,14 +294,15 @@ Removes a chat thread and exits the membership.
 
 Marks all unread messages inside a conversation as read.
 
-*   **URL:** `PUT /api/v1/chats/{id}/read`
-*   **Authentication Required:** Yes
-*   **Headers:**
-    *   `X-CSRF-Token: <token>`
-*   **Cookies:**
-    *   `csrf_token=<token>`
+* **URL:** `PUT /api/v1/chats/{id}/read`
+* **Authentication Required:** Yes
+* **Headers:**
+    * `X-CSRF-Token: <token>`
+* **Cookies:**
+    * `csrf_token=<token>`
 
 ### Success Response (`200 OK`)
+
 ```json
 {
   "success": true,

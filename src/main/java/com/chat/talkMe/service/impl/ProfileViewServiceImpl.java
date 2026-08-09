@@ -34,7 +34,9 @@ public class ProfileViewServiceImpl implements ProfileViewService {
     private final UserMapper userMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
-    /** Cap on the "who viewed me" list returned to the client. */
+    /**
+     * Cap on the "who viewed me" list returned to the client.
+     */
     private static final int MAX_VIEWERS = 100;
 
     @Override

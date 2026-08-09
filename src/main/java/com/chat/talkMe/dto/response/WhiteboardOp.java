@@ -23,27 +23,43 @@ import java.util.List;
 @AllArgsConstructor
 public class WhiteboardOp {
 
-    /** Per-chat monotonically increasing sequence number, stamped by the server. */
+    /**
+     * Per-chat monotonically increasing sequence number, stamped by the server.
+     */
     private long seq;
 
-    /** "stroke" | "clear" | "undo". */
+    /**
+     * "stroke" | "clear" | "undo".
+     */
     private String type;
 
-    /** UUID of the user who authored this op. */
+    /**
+     * UUID of the user who authored this op.
+     */
     private String authorUuid;
 
-    /** CSS colour (stroke ops only). */
+    /**
+     * CSS colour (stroke ops only).
+     */
     private String color;
 
-    /** Stroke width in normalized units (stroke ops only). */
+    /**
+     * Stroke width in normalized units (stroke ops only).
+     */
     private double size;
 
-    /** Drawing tool (stroke ops only). */
+    /**
+     * Drawing tool (stroke ops only).
+     */
     private String tool;
 
-    /** Normalized 0..1 [x, y] point pairs (stroke ops only; null for clear/undo). */
+    /**
+     * Normalized 0..1 [x, y] point pairs (stroke ops only; null for clear/undo).
+     */
     private List<double[]> points;
 
-    /** Server timestamp in epoch millis. */
+    /**
+     * Server timestamp in epoch millis.
+     */
     private long ts;
 }

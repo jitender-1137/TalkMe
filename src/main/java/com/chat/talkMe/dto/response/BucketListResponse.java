@@ -8,14 +8,18 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/** The full shared bucket list for a chat (feature #18). Also the WS broadcast payload. */
+/**
+ * The full shared bucket list for a chat (feature #18). Also the WS broadcast payload.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class BucketListResponse {
 
-    /** UUID (as String) of the owning chat. */
+    /**
+     * UUID (as String) of the owning chat.
+     */
     private String chatId;
     private List<BucketItemResponse> items;
 

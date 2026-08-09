@@ -32,9 +32,12 @@ import static org.mockito.Mockito.when;
 @DisplayName("OnlineCountPublisher (unit)")
 class OnlineCountPublisherTest {
 
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SetOperations<String, String> setOps;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SetOperations<String, String> setOps;
 
     private OnlineCountPublisher publisher;
 

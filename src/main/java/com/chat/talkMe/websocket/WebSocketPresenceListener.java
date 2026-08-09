@@ -2,9 +2,9 @@ package com.chat.talkMe.websocket;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.PresenceStatus;
+import com.chat.talkMe.match.DisconnectHandlerService;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.PresenceService;
-import com.chat.talkMe.match.DisconnectHandlerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -88,7 +88,7 @@ public class WebSocketPresenceListener {
         if (sessionId != null) {
             String sessionsKey = SESSIONS_KEY_PREFIX + username;
             redisTemplate.opsForSet().remove(sessionsKey, sessionId);
-            
+
             Long size = redisTemplate.opsForSet().size(sessionsKey);
             if (size != null && size > 0) {
                 isLastSession = false;

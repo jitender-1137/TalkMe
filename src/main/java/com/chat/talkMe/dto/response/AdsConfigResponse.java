@@ -20,7 +20,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AdsConfigResponse {
-    /** Master on/off — equal to the global {@code ads} feature kill-switch state. */
+    /**
+     * Master on/off — equal to the global {@code ads} feature kill-switch state.
+     */
     private boolean enabled;
     private String provider;
     private String label;

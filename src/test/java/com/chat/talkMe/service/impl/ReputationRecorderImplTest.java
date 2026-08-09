@@ -31,7 +31,8 @@ import static org.mockito.Mockito.verify;
 @DisplayName("ReputationRecorderImpl (unit)")
 class ReputationRecorderImplTest {
 
-    @Mock private ApplicationEventPublisher publisher;
+    @Mock
+    private ApplicationEventPublisher publisher;
 
     private ReputationRecorderImpl recorder;
 

@@ -7,7 +7,9 @@ import lombok.Data;
 
 import java.time.Instant;
 
-/** Admin request to grant/deny a feature for a specific user. */
+/**
+ * Admin request to grant/deny a feature for a specific user.
+ */
 @Data
 public class FeatureGrantRequest {
 

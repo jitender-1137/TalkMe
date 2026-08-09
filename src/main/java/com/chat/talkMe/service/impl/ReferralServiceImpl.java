@@ -16,7 +16,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReferralServiceImpl implements ReferralService {
 
-    /** Cap the returned joiner list; the count is always exact. */
+    /**
+     * Cap the returned joiner list; the count is always exact.
+     */
     private static final int MAX_LISTED = 50;
 
     private final UserRepository userRepository;

@@ -1,6 +1,8 @@
 package com.chat.talkMe.enums;
 
-/** Who a user wants to be matched with (adds COUPLE beyond the base genders). */
+/**
+ * Who a user wants to be matched with (adds COUPLE beyond the base genders).
+ */
 public enum GenderPreference {
     ANY,
     MALE,

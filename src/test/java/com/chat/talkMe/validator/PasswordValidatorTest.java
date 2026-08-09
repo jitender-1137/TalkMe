@@ -31,7 +31,9 @@ class PasswordValidatorTest {
         return sb.toString();
     }
 
-    /** Builds a length-n password that always contains a letter and a digit. */
+    /**
+     * Builds a length-n password that always contains a letter and a digit.
+     */
     private static String validOfLength(int n) {
         StringBuilder sb = new StringBuilder();
         sb.append('a').append('1');

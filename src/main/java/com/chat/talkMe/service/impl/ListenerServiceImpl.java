@@ -22,8 +22,8 @@ import com.chat.talkMe.service.ListenerService;
 import com.chat.talkMe.service.ReputationRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +47,9 @@ import java.util.UUID;
 public class ListenerServiceImpl implements ListenerService {
 
     private static final String AVAILABLE_SET = "listeners:available";
-    /** People helped within a shift before the shift trends its owner toward Great Listener. */
+    /**
+     * People helped within a shift before the shift trends its owner toward Great Listener.
+     */
     private static final int GREAT_LISTENER_THRESHOLD = 3;
 
     private final ListenerShiftRepository shiftRepository;
@@ -191,7 +193,9 @@ public class ListenerServiceImpl implements ListenerService {
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    /** Credit one helped person and, at the threshold, trend the listener toward Great Listener. */
+    /**
+     * Credit one helped person and, at the threshold, trend the listener toward Great Listener.
+     */
     private void creditHelp(ListenerShift shift) {
         shift.setPeopleHelped(shift.getPeopleHelped() + 1);
         if (shift.getPeopleHelped() >= GREAT_LISTENER_THRESHOLD) {

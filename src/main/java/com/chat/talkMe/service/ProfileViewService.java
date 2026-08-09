@@ -9,15 +9,23 @@ import java.util.List;
 
 public interface ProfileViewService {
 
-    /** Record that {@code viewer} opened {@code viewedUuid}'s profile/photo. Self-views are ignored. */
+    /**
+     * Record that {@code viewer} opened {@code viewedUuid}'s profile/photo. Self-views are ignored.
+     */
     void recordView(User viewer, String viewedUuid, ProfileViewType type);
 
-    /** Most-recent viewers of {@code currentUser}'s profile. */
+    /**
+     * Most-recent viewers of {@code currentUser}'s profile.
+     */
     List<ProfileViewResponse> getViewers(User currentUser);
 
-    /** Total + unseen viewer counts for the badge. */
+    /**
+     * Total + unseen viewer counts for the badge.
+     */
     ProfileViewCountResponse getCounts(User currentUser);
 
-    /** Clear the "new viewers" badge for {@code currentUser}. */
+    /**
+     * Clear the "new viewers" badge for {@code currentUser}.
+     */
     void markAllSeen(User currentUser);
 }

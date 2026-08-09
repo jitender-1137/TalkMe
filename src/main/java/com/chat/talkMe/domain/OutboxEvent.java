@@ -1,7 +1,18 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 
@@ -49,11 +60,15 @@ public class OutboxEvent {
     @Column(name = "event_key", nullable = false, length = 64)
     private String eventKey;
 
-    /** Event type, routes to the matching delivery handler (e.g. {@code message.send}). */
+    /**
+     * Event type, routes to the matching delivery handler (e.g. {@code message.send}).
+     */
     @Column(name = "event_type", nullable = false, length = 64)
     private String eventType;
 
-    /** JSON-serialized {@code MessageSentEvent} — the full payload to re-deliver. */
+    /**
+     * JSON-serialized {@code MessageSentEvent} — the full payload to re-deliver.
+     */
     @Column(name = "payload", columnDefinition = "TEXT", nullable = false)
     private String payload;
 

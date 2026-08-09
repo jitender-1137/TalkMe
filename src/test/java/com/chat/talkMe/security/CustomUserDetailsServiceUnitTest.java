@@ -30,8 +30,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("CustomUserDetailsService (unit)")
 class CustomUserDetailsServiceUnitTest {
 
-    @Mock private UserRepository userRepository;
-    @InjectMocks private CustomUserDetailsService service;
+    @Mock
+    private UserRepository userRepository;
+    @InjectMocks
+    private CustomUserDetailsService service;
 
     private static User user(String username) {
         return User.builder().username(username).email(username + "@e.com").name("N")

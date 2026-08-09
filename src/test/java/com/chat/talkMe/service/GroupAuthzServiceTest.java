@@ -34,7 +34,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("GroupAuthzService (unit)")
 class GroupAuthzServiceTest {
 
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
     private GroupAuthzService service;
 

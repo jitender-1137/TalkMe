@@ -1,12 +1,12 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.dto.EmailUnreadPreview;
-import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Year;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Builds branded, email-client-safe HTML for every NeoChatHub transactional email.
@@ -25,7 +25,9 @@ import java.util.List;
 @Component
 public class EmailTemplates {
 
-    /** How many unread rows to show before collapsing into a "+N more" line. */
+    /**
+     * How many unread rows to show before collapsing into a "+N more" line.
+     */
     private static final int MAX_UNREAD_ROWS = 5;
 
     private final MailTheme theme;
@@ -51,7 +53,9 @@ public class EmailTemplates {
     @Value("${app.mail.logo-url:}")
     private String logoUrlOverride;
 
-    /** Resolves the effective email-logo URL: the override, or the backend endpoint. */
+    /**
+     * Resolves the effective email-logo URL: the override, or the backend endpoint.
+     */
     private String logoUrl() {
         if (logoUrlOverride != null && !logoUrlOverride.isBlank()) {
             return logoUrlOverride.trim();
@@ -66,35 +70,41 @@ public class EmailTemplates {
 
     // ── Public templates ───────────────────────────────────────────────────────
 
-    /** Sent once, after the email is verified. */
+    /**
+     * Sent once, after the email is verified.
+     */
     public String welcome(String name, String openLink) {
         String content = h1("Welcome to " + esc(brandName) + ", " + greetName(name) + "! 🎉")
                 + p("Your account is verified and ready. " + esc(brandName) + " is where you meet new "
-                    + "people, spark real conversations, and stay connected — one chat at a time.")
+                + "people, spark real conversations, and stay connected — one chat at a time.")
                 + p("Here's how to get the most out of it:")
                 + featureList(List.of(
-                        "Complete your profile so people know who they're talking to",
-                        "Jump into a random match or browse and message someone new",
-                        "Turn on notifications so you never miss a reply"))
+                "Complete your profile so people know who they're talking to",
+                "Jump into a random match or browse and message someone new",
+                "Turn on notifications so you never miss a reply"))
                 + button("Open " + esc(brandName), openLink)
                 + signoff("Glad to have you here.");
         return layout("Welcome to " + brandName + " — let's get you started.", content);
     }
 
-    /** Email-address verification with a confirm link. Sent first, at signup. */
+    /**
+     * Email-address verification with a confirm link. Sent first, at signup.
+     */
     public String verifyEmail(String name, String verifyLink, long expiryMinutes) {
         String content = h1("Verify your email")
                 + p("Hi " + greetName(name) + ",")
                 + p("Welcome to " + esc(brandName) + "! Confirm this is your email address to activate "
-                    + "your account. This link expires in " + expiryMinutes + " minutes.")
+                + "your account. This link expires in " + expiryMinutes + " minutes.")
                 + button("Verify email", verifyLink)
                 + fallbackLink(verifyLink)
                 + p(mutedText("If you didn't create a " + esc(brandName)
-                    + " account, you can safely ignore this email."));
+                + " account, you can safely ignore this email."));
         return layout("Confirm your email to activate your " + brandName + " account.", content);
     }
 
-    /** LinkedIn-style unread-messages digest. */
+    /**
+     * LinkedIn-style unread-messages digest.
+     */
     public String unreadMessages(String name, List<EmailUnreadPreview> previews,
                                  int totalUnread, String openLink) {
         String heading = totalUnread == 1
@@ -110,46 +120,50 @@ public class EmailTemplates {
         String content = h1(heading)
                 + p("Here's what you missed on " + esc(brandName) + ":")
                 + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
-                    + "style=\"margin:10px 0 6px;border:1px solid " + theme.cardBorder()
-                    + ";border-radius:14px;background:#fbfcfe;\">"
-                    + "<tr><td style=\"padding:2px 18px;\">"
-                    + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">" + rows + "</table>"
-                    + "</td></tr></table>"
+                + "style=\"margin:10px 0 6px;border:1px solid " + theme.cardBorder()
+                + ";border-radius:14px;background:#fbfcfe;\">"
+                + "<tr><td style=\"padding:2px 18px;\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">" + rows + "</table>"
+                + "</td></tr></table>"
                 + (remaining > 0
-                        ? p(mutedText("+ " + remaining + " more "
-                            + (remaining == 1 ? "conversation" : "conversations") + " waiting for you."))
-                        : "")
+                ? p(mutedText("+ " + remaining + " more "
+                              + (remaining == 1 ? "conversation" : "conversations") + " waiting for you."))
+                : "")
                 + button("Open " + esc(brandName), openLink)
                 + p(mutedText("You're receiving this because you have unread messages. "
-                    + "You can turn these off in Settings → Notifications."));
+                + "You can turn these off in Settings → Notifications."));
         String preheader = totalUnread == 1
                 ? "You have a new message on " + brandName
                 : "You have " + totalUnread + " new messages on " + brandName;
         return layout(preheader, content);
     }
 
-    /** Password-reset link. */
+    /**
+     * Password-reset link.
+     */
     public String passwordReset(String name, String resetLink, long expiryMinutes) {
         String content = h1("Reset your password")
                 + p("Hi " + greetName(name) + ",")
                 + p("We received a request to reset your " + esc(brandName)
-                    + " password. Choose a new one using the button below. "
-                    + "This link expires in " + expiryMinutes + " minutes.")
+                + " password. Choose a new one using the button below. "
+                + "This link expires in " + expiryMinutes + " minutes.")
                 + button("Reset password", resetLink)
                 + fallbackLink(resetLink)
                 + p(mutedText("If you didn't request this, you can safely ignore this email — "
-                    + "your password won't change."));
+                + "your password won't change."));
         return layout("Reset your " + brandName + " password.", content);
     }
 
-    /** Security notice after a successful password change. */
+    /**
+     * Security notice after a successful password change.
+     */
     public String passwordChanged(String name) {
         String content = h1("Your password was changed")
                 + p("Hi " + greetName(name) + ",")
                 + p("This is a confirmation that your " + esc(brandName)
-                    + " password was just changed. If this was you, no action is needed.")
+                + " password was just changed. If this was you, no action is needed.")
                 + p("If you <b>didn't</b> make this change, your account may be compromised — "
-                    + "please contact us immediately.")
+                + "please contact us immediately.")
                 + button("Contact support", "mailto:" + supportEmail)
                 + signoff("Keeping your account safe,");
         return layout("Your " + brandName + " password was changed.", content);
@@ -175,28 +189,30 @@ public class EmailTemplates {
                         + "<div style=\"font-family:" + theme.font() + ";font-size:16px;font-weight:700;color:"
                         + theme.ink() + ";line-height:1.4;\">" + deviceLine + "</div>"
                         + (when == null || when.isBlank() ? "" :
-                            "<div style=\"font-family:" + theme.font() + ";font-size:13px;color:" + theme.muted()
-                            + ";margin-top:6px;\">" + esc(when) + "</div>")
+                        "<div style=\"font-family:" + theme.font() + ";font-size:13px;color:" + theme.muted()
+                        + ";margin-top:6px;\">" + esc(when) + "</div>")
                         + (ip == null || ip.isBlank() ? "" :
-                            "<div style=\"font-family:" + theme.font() + ";font-size:12px;color:" + theme.muted()
-                            + ";margin-top:2px;\">IP&nbsp;" + esc(ip) + "</div>")
+                        "<div style=\"font-family:" + theme.font() + ";font-size:12px;color:" + theme.muted()
+                        + ";margin-top:2px;\">IP&nbsp;" + esc(ip) + "</div>")
                         + "</td></tr></table>";
 
         String content = h1("We noticed a new login, " + greetName(name))
                 + p("We noticed a login to your " + esc(brandName)
-                    + " account from a device you don't usually use.")
+                + " account from a device you don't usually use.")
                 + card
                 + p("<b>If this was you</b>, you're all set — no action is needed and you can safely ignore "
-                    + "this email.")
+                + "this email.")
                 + p("<b>If this wasn't you</b>, someone else may have your password. Secure your account now: "
-                    + "we'll sign you out on every device so you can set a new password.")
+                + "we'll sign you out on every device so you can set a new password.")
                 + button("Secure my account", secureLink)
                 + p(mutedText("You're receiving this because new-login alerts are on for your account. "
-                    + "You can turn them off in Settings &rarr; Notifications."));
+                + "You can turn them off in Settings &rarr; Notifications."));
         return layout("We noticed a new login to your " + brandName + " account.", content);
     }
 
-    /** Acknowledgement that a support request was received. */
+    /**
+     * Acknowledgement that a support request was received.
+     */
     public String supportReceived(String name, String ticketId, String subjectLine) {
         String ref = ticketId == null || ticketId.isBlank() ? "" :
                 p(mutedText("Reference: <b style=\"color:" + theme.ink() + ";\">#" + esc(ticketId) + "</b>"));
@@ -205,8 +221,8 @@ public class EmailTemplates {
         String content = h1("We've got your message")
                 + p("Hi " + greetName(name) + ",")
                 + p("Thanks for reaching out to " + esc(brandName)
-                    + " support. Our team has received your request and will get back to you as soon "
-                    + "as possible — usually within 24–48 hours.")
+                + " support. Our team has received your request and will get back to you as soon "
+                + "as possible — usually within 24–48 hours.")
                 + subj
                 + ref
                 + p("There's no need to reply to this email; we'll follow up at this address.")
@@ -317,16 +333,16 @@ public class EmailTemplates {
                 "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:4px 0 8px;\">");
         for (String item : items) {
             sb.append("<tr>")
-              .append("<td valign=\"top\" style=\"width:30px;padding:2px 12px 12px 0;\">")
-              .append("<table role=\"presentation\" width=\"20\" height=\"20\" cellpadding=\"0\" cellspacing=\"0\" "
-                      + "style=\"width:20px;height:20px;border-radius:7px;background:rgba(15,118,110,0.10);\">"
-                      + "<tr><td align=\"center\" valign=\"middle\" style=\"height:20px;color:" + theme.accent()
-                      + ";font-size:12px;font-weight:700;\">&#10003;</td></tr></table>")
-              .append("</td>")
-              .append("<td valign=\"middle\" style=\"color:").append(theme.body())
-              .append(";font-size:15px;line-height:1.5;padding-bottom:12px;\">")
-              .append(esc(item)).append("</td>")
-              .append("</tr>");
+                    .append("<td valign=\"top\" style=\"width:30px;padding:2px 12px 12px 0;\">")
+                    .append("<table role=\"presentation\" width=\"20\" height=\"20\" cellpadding=\"0\" cellspacing=\"0\" "
+                            + "style=\"width:20px;height:20px;border-radius:7px;background:rgba(15,118,110,0.10);\">"
+                            + "<tr><td align=\"center\" valign=\"middle\" style=\"height:20px;color:" + theme.accent()
+                            + ";font-size:12px;font-weight:700;\">&#10003;</td></tr></table>")
+                    .append("</td>")
+                    .append("<td valign=\"middle\" style=\"color:").append(theme.body())
+                    .append(";font-size:15px;line-height:1.5;padding-bottom:12px;\">")
+                    .append(esc(item)).append("</td>")
+                    .append("</tr>");
         }
         return sb.append("</table>").toString();
     }
@@ -397,7 +413,9 @@ public class EmailTemplates {
         return s.length() <= max ? s : s.substring(0, max - 1).stripTrailing() + "…";
     }
 
-    /** HTML-escape text content. */
+    /**
+     * HTML-escape text content.
+     */
     private static String esc(String s) {
         if (s == null) {
             return "";
@@ -409,7 +427,9 @@ public class EmailTemplates {
                 .replace("'", "&#39;");
     }
 
-    /** Escape a URL for safe use in an href attribute. */
+    /**
+     * Escape a URL for safe use in an href attribute.
+     */
     private static String attr(String s) {
         if (s == null) {
             return "";

@@ -4,7 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** A single {label → count} bucket for breakdown charts/tables. */
+/**
+ * A single {label → count} bucket for breakdown charts/tables.
+ */
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

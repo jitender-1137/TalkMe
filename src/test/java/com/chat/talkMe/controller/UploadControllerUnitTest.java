@@ -13,9 +13,6 @@ import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.MediaAssetService;
 import com.chat.talkMe.service.StorageService;
 import com.chat.talkMe.storage.MediaStorage;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +33,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -139,7 +140,9 @@ class UploadControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A 64-byte buffer beginning with the real 8-byte PNG signature — passes UploadValidator for type=image. */
+    /**
+     * A 64-byte buffer beginning with the real 8-byte PNG signature — passes UploadValidator for type=image.
+     */
     private static byte[] pngBytes() {
         byte[] full = new byte[64];
         byte[] sig = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};

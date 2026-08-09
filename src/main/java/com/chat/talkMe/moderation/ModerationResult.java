@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * Outcome of a content-moderation check. {@code explicit == true} means the content
  * is vulgar/abusive/sexual (text) or NSFW (media) and must be gated.
- *
+ * <p>
  * NOTE: {@code matchedTerms} is for server-side telemetry/debugging ONLY — it must
  * never be logged at INFO or returned to another user (it would leak the explicit terms).
  */
@@ -18,7 +18,7 @@ import java.util.List;
 @AllArgsConstructor
 public class ModerationResult {
 
-    public enum Category { CLEAN, PROFANITY, ABUSE, SEXUAL, NSFW_IMAGE, NSFW_VIDEO }
+    public enum Category {CLEAN, PROFANITY, ABUSE, SEXUAL, NSFW_IMAGE, NSFW_VIDEO}
 
     private final boolean explicit;
     private final Category category;

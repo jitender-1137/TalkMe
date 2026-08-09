@@ -42,7 +42,9 @@ import java.util.stream.Collectors;
 public class CityServiceImpl implements CityService {
 
     private static final String KEY_PREFIX = "city:presence:";
-    /** Safety expiry so an abandoned district set can't linger forever; refreshed on enter. */
+    /**
+     * Safety expiry so an abandoned district set can't linger forever; refreshed on enter.
+     */
     private static final Duration PRESENCE_TTL = Duration.ofHours(12);
 
     private final ChatRepository chatRepository;
@@ -184,7 +186,9 @@ public class CityServiceImpl implements CityService {
         }
     }
 
-    /** Set members currently online (sorted); prunes stale offline entries best-effort. */
+    /**
+     * Set members currently online (sorted); prunes stale offline entries best-effort.
+     */
     private List<String> liveRoster(String slug, Set<String> online) {
         Set<String> members = members(slug);
         List<String> live = members.stream().filter(online::contains).sorted().collect(Collectors.toList());

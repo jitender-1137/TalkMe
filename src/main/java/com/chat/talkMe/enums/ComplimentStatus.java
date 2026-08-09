@@ -8,12 +8,20 @@ package com.chat.talkMe.enums;
  * recipient's reveal request. No other state exposes the sender.
  */
 public enum ComplimentStatus {
-    /** Delivered anonymously; recipient sees the message but not the sender. */
+    /**
+     * Delivered anonymously; recipient sees the message but not the sender.
+     */
     SENT,
-    /** Recipient has asked to know who sent it; awaiting the sender's decision. */
+    /**
+     * Recipient has asked to know who sent it; awaiting the sender's decision.
+     */
     REVEAL_REQUESTED,
-    /** Sender accepted the reveal; sender identity is now visible to the recipient. */
+    /**
+     * Sender accepted the reveal; sender identity is now visible to the recipient.
+     */
     REVEALED,
-    /** Sender declined the reveal; the compliment stays anonymous forever. */
+    /**
+     * Sender declined the reveal; the compliment stays anonymous forever.
+     */
     DECLINED
 }

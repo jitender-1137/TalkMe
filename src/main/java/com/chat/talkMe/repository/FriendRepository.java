@@ -20,11 +20,15 @@ public interface FriendRepository extends JpaRepository<Friend, Long> {
     // ── Admin analytics: friend hierarchy ─────────────────────────────────────
     long countByUserAndIsDeletedFalse(User user);
 
-    /** [userId, friendCount] for every user with ≥1 friend link — for distribution. */
+    /**
+     * [userId, friendCount] for every user with ≥1 friend link — for distribution.
+     */
     @Query("SELECT f.user.id, COUNT(f) FROM Friend f WHERE f.isDeleted = false GROUP BY f.user.id")
     List<Object[]> countFriendsPerUser();
 
-    /** [User, friendCount] most-connected first — the top of the social graph. */
+    /**
+     * [User, friendCount] most-connected first — the top of the social graph.
+     */
     @Query("SELECT f.user, COUNT(f) FROM Friend f WHERE f.isDeleted = false GROUP BY f.user ORDER BY COUNT(f) DESC")
     List<Object[]> topConnectors(Pageable pageable);
 }

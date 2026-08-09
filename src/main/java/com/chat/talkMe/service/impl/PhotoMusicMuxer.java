@@ -4,13 +4,11 @@ import com.chat.talkMe.storage.MediaKeys;
 import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.storage.StorageProperties;
 import com.chat.talkMe.util.SsrfGuard;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +18,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Merges a still photo + a trimmed music clip into an autoplaying MP4 — the way
@@ -201,7 +201,9 @@ public class PhotoMusicMuxer {
         }
     }
 
-    /** Last ~500 chars of captured stderr — enough to see the real ffmpeg error. */
+    /**
+     * Last ~500 chars of captured stderr — enough to see the real ffmpeg error.
+     */
     private static String tail(StringBuilder sb) {
         String s = sb.toString().strip();
         if (s.isEmpty()) return "(no stderr captured)";

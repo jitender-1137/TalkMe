@@ -12,16 +12,24 @@ import com.chat.talkMe.dto.response.ReputationWhyResponse;
  */
 public interface ReputationService {
 
-    /** Cosmetic snapshot for the caller; lazily creates a BRONZE/level-1 record on first read. */
+    /**
+     * Cosmetic snapshot for the caller; lazily creates a BRONZE/level-1 record on first read.
+     */
     ReputationResponse getMine(User user);
 
-    /** Cosmetic snapshot for any user by uuid (for profile viewing). */
+    /**
+     * Cosmetic snapshot for any user by uuid (for profile viewing).
+     */
     ReputationResponse getFor(String userUuid);
 
-    /** Opaque contributor explainer (labels + coarse magnitude only, no weights). */
+    /**
+     * Opaque contributor explainer (labels + coarse magnitude only, no weights).
+     */
     ReputationWhyResponse why(User user);
 
-    /** Prestige reset (requires level &gt;= 100). Preserves all-time totals + lifetime stats. */
+    /**
+     * Prestige reset (requires level &gt;= 100). Preserves all-time totals + lifetime stats.
+     */
     ReputationResponse prestige(User user);
 
     /**

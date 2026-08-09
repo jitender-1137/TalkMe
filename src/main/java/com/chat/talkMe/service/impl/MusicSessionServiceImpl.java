@@ -8,14 +8,13 @@ import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.service.MusicSessionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -47,7 +46,9 @@ public class MusicSessionServiceImpl implements MusicSessionService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
 
-    /** IDOR guard: the caller must be a member of the chat the session runs in. */
+    /**
+     * IDOR guard: the caller must be a member of the chat the session runs in.
+     */
     private void requireChatMember(User user, String chatId) {
         boolean member;
         try {

@@ -21,15 +21,23 @@ import java.util.Optional;
 @Repository
 public interface SecretCrushRepository extends JpaRepository<SecretCrush, Long> {
 
-    /** The (at most one) crush row for a given directed pair, any status. */
+    /**
+     * The (at most one) crush row for a given directed pair, any status.
+     */
     Optional<SecretCrush> findByCrusherAndTarget(User crusher, User target);
 
-    /** Directed pair lookup narrowed to a status — used for the reciprocity check. */
+    /**
+     * Directed pair lookup narrowed to a status — used for the reciprocity check.
+     */
     Optional<SecretCrush> findByCrusherAndTargetAndStatus(User crusher, User target, SecretCrushStatus status);
 
-    /** How many crushes THIS user currently holds in a given status (rate-limit / cap). */
+    /**
+     * How many crushes THIS user currently holds in a given status (rate-limit / cap).
+     */
     long countByCrusherAndStatus(User crusher, SecretCrushStatus status);
 
-    /** THIS user's own outgoing crushes in a given status. Only ever the caller's own rows. */
+    /**
+     * THIS user's own outgoing crushes in a given status. Only ever the caller's own rows.
+     */
     List<SecretCrush> findByCrusherAndStatus(User crusher, SecretCrushStatus status);
 }

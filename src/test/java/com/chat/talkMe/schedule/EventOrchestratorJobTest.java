@@ -24,7 +24,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("EventOrchestratorJob (unit)")
 class EventOrchestratorJobTest {
 
-    @Mock private EventService eventService;
+    @Mock
+    private EventService eventService;
 
     private EventOrchestratorJob job;
 

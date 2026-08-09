@@ -19,6 +19,8 @@ public interface DiscoverService {
             String country,
             User currentUser
     );
+
     void likeProfile(String userId, User currentUser);
+
     void unlikeProfile(String userId, User currentUser);
 }

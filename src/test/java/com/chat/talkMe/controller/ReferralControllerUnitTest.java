@@ -36,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("ReferralController (unit)")
 class ReferralControllerUnitTest {
 
-    @Mock private ReferralService referralService;
+    @Mock
+    private ReferralService referralService;
 
     private MockMvc mockMvc;
     private User testUser;

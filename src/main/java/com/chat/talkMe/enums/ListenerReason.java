@@ -23,12 +23,16 @@ public enum ListenerReason {
         this.label = label;
     }
 
-    /** Human-friendly label used in the support room's title. */
+    /**
+     * Human-friendly label used in the support room's title.
+     */
     public String getLabel() {
         return label;
     }
 
-    /** Case-insensitive lookup; returns {@link #NEED_TO_TALK} for null/unknown input. */
+    /**
+     * Case-insensitive lookup; returns {@link #NEED_TO_TALK} for null/unknown input.
+     */
     public static ListenerReason fromWireOrDefault(String wire) {
         if (wire == null || wire.isBlank()) return NEED_TO_TALK;
         try {

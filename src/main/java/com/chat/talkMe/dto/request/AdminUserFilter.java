@@ -2,7 +2,9 @@ package com.chat.talkMe.dto.request;
 
 import lombok.Data;
 
-/** SuperAdmin user-list filters. All fields optional; null = no constraint. */
+/**
+ * SuperAdmin user-list filters. All fields optional; null = no constraint.
+ */
 @Data
 public class AdminUserFilter {
     private String query;          // free text over username / name / email

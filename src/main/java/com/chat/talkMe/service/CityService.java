@@ -18,18 +18,28 @@ import java.util.List;
  */
 public interface CityService {
 
-    /** All districts as cards, each with live presence count + curated room count. */
+    /**
+     * All districts as cards, each with live presence count + curated room count.
+     */
     List<CityDistrictResponse> listDistricts();
 
-    /** One district's detail: card + curated rooms + live roster. */
+    /**
+     * One district's detail: card + curated rooms + live roster.
+     */
     CityDistrictDetailResponse getDistrict(String slug, User user);
 
-    /** Add the user to the district's presence set, broadcast a join, return detail. */
+    /**
+     * Add the user to the district's presence set, broadcast a join, return detail.
+     */
     CityDistrictDetailResponse enterDistrict(User user, String slug);
 
-    /** Remove the user from the district's presence set, broadcast a leave, return detail. */
+    /**
+     * Remove the user from the district's presence set, broadcast a leave, return detail.
+     */
     void leaveDistrict(User user, String slug);
 
-    /** Curated ROOM chats seeded into the district. */
+    /**
+     * Curated ROOM chats seeded into the district.
+     */
     List<ChatResponse> getRooms(String slug, User user);
 }

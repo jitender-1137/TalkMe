@@ -29,7 +29,9 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
     private final StringRedisTemplate redisTemplate;
     private final OnlineCountPublisher onlineCountPublisher;
 
-    /** Deadline ZSET of users whose match teardown is on hold pending reconnect. */
+    /**
+     * Deadline ZSET of users whose match teardown is on hold pending reconnect.
+     */
     private static final String MATCH_DISCONNECT_ZSET = "match:disconnect-deadlines";
     /**
      * Deadline ZSET of dropped users whose peer has NOT yet been told "reconnecting…".
@@ -38,7 +40,9 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
      */
     private static final String MATCH_RECONNECTING_NOTIFY_ZSET = "match:reconnecting-notify-deadlines";
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
-    /** How long a matched/searching user may be gone before the match is torn down. */
+    /**
+     * How long a matched/searching user may be gone before the match is torn down.
+     */
     private static final Duration MATCH_DISCONNECT_GRACE = Duration.ofSeconds(45);
     /**
      * Grace before the peer is told "reconnecting…". A minimize/foreground toggle or
@@ -62,7 +66,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         // 2. Destroy active session & 3. Notify stranger
         sessionService.getSessionByUser(username).ifPresent(session -> {
             String stranger = session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
-            
+
             // Destroy active session
             sessionService.destroySession(session.getId());
 
@@ -191,7 +195,9 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         return reaped;
     }
 
-    /** Send an anonymous match lifecycle event (only the session id) to a peer. */
+    /**
+     * Send an anonymous match lifecycle event (only the session id) to a peer.
+     */
     private void notifyStranger(String stranger, String event, String sessionId) {
         MatchServerEvent evt = MatchServerEvent.builder()
                 .event(event)

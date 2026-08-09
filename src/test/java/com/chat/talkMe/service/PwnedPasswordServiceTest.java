@@ -46,7 +46,8 @@ class PwnedPasswordServiceTest {
     private static final String PREFIX = "5BAA6";
     private static final String SUFFIX = "1E4C9B93F3F0682250B6CF8331B7EE68FD8";
 
-    @Mock private HttpClient http;
+    @Mock
+    private HttpClient http;
 
     private PwnedPasswordService service;
 

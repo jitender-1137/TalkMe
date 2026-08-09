@@ -1,21 +1,27 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.cache.BlockCache;
-import com.chat.talkMe.domain.*;
+import com.chat.talkMe.domain.BlockUser;
+import com.chat.talkMe.domain.Friend;
+import com.chat.talkMe.domain.FriendRequest;
+import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.FriendRequestResponse;
 import com.chat.talkMe.enums.FriendRequestStatus;
-import com.chat.talkMe.exception.*;
+import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ConflictException;
+import com.chat.talkMe.exception.ForbiddenException;
+import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.mapper.FriendRequestMapper;
 import com.chat.talkMe.mapper.UserMapper;
-import com.chat.talkMe.repository.*;
+import com.chat.talkMe.repository.BlockUserRepository;
+import com.chat.talkMe.repository.FriendRepository;
+import com.chat.talkMe.repository.FriendRequestRepository;
+import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.FriendService;
 import com.chat.talkMe.service.PresenceService;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.Collections;
-import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +30,11 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,10 +59,14 @@ public class FriendServiceImpl implements FriendService {
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
 
-    /** Max NEW friend requests one user may originate per day (anti-spam). */
+    /**
+     * Max NEW friend requests one user may originate per day (anti-spam).
+     */
     private static final int FRIEND_REQUEST_DAILY_CAP = 50;
 
-    /** Redis daily counter; throws 429 past the cap. Fail-open on Redis errors. */
+    /**
+     * Redis daily counter; throws 429 past the cap. Fail-open on Redis errors.
+     */
     private void enforceFriendRequestQuota(User sender) {
         try {
             String key = "friendreq:" + sender.getId() + ":" + LocalDate.now();
@@ -91,8 +106,8 @@ public class FriendServiceImpl implements FriendService {
         }
 
         // Check blocks
-        if (blockUserRepository.existsByUserAndBlocked(receiver, currentUser) || 
-            blockUserRepository.existsByUserAndBlocked(currentUser, receiver)) {
+        if (blockUserRepository.existsByUserAndBlocked(receiver, currentUser) ||
+                blockUserRepository.existsByUserAndBlocked(currentUser, receiver)) {
             throw new ForbiddenException("Friend request blocked", "TM_103");
         }
 
@@ -230,7 +245,7 @@ public class FriendServiceImpl implements FriendService {
         Set<Long> friendsOnlyIds = friends.isEmpty()
                 ? Collections.emptySet()
                 : userSettingRepository.findFriendsOnlyUserIds(
-                        friends.stream().map(User::getId).collect(Collectors.toList()));
+                friends.stream().map(User::getId).collect(Collectors.toList()));
         return friends.stream()
                 .map(friend -> {
                     AuthUserResponse response = userMapper.toAuthUserResponse(friend);

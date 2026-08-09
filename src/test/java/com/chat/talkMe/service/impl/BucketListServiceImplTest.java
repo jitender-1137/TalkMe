@@ -13,7 +13,6 @@ import com.chat.talkMe.repository.BucketListItemRepository;
 import com.chat.talkMe.repository.BucketListRepository;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
-import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,6 +25,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,15 +55,24 @@ import static org.mockito.Mockito.when;
 @DisplayName("BucketListServiceImpl (unit)")
 class BucketListServiceImplTest {
 
-    @Mock private BucketListRepository bucketListRepository;
-    @Mock private BucketListItemRepository bucketListItemRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ObjectProvider<BucketListServiceImpl> self;
-    @Mock private BucketListServiceImpl selfProxy;
-    @Mock private Chat chat;
-    @Mock private ChatMember member;
+    @Mock
+    private BucketListRepository bucketListRepository;
+    @Mock
+    private BucketListItemRepository bucketListItemRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ObjectProvider<BucketListServiceImpl> self;
+    @Mock
+    private BucketListServiceImpl selfProxy;
+    @Mock
+    private Chat chat;
+    @Mock
+    private ChatMember member;
 
     private BucketListServiceImpl service;
 
@@ -80,7 +89,9 @@ class BucketListServiceImplTest {
         user.setId(7L);
     }
 
-    /** Stub the IDOR guard so the caller passes as a member of the chat. */
+    /**
+     * Stub the IDOR guard so the caller passes as a member of the chat.
+     */
     private void asMember() {
         when(chatRepository.findByUuid(CHAT_UUID)).thenReturn(Optional.of(chat));
         when(chatMemberRepository.findByChatAndUser(chat, user)).thenReturn(Optional.of(member));

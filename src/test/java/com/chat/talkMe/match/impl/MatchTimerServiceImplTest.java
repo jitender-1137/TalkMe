@@ -50,11 +50,16 @@ class MatchTimerServiceImplTest {
     private static final String IDX_PREFIX = "match:chem-idx:";
     private static final long INTERVAL = 45000L;
 
-    @Mock private SessionService sessionService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redis;
-    @Mock private ZSetOperations<String, String> zSetOps;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ZSetOperations<String, String> zSetOps;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private MatchTimerServiceImpl service;
 

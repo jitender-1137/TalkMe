@@ -30,19 +30,29 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "ads")
 public class AdsProperties {
 
-    /** Ad network the client should render. One of: adsense | adsterra. */
+    /**
+     * Ad network the client should render. One of: adsense | adsterra.
+     */
     private String provider = "";
 
-    /** Label stamped on every ad so it is always clearly disclosed. */
+    /**
+     * Label stamped on every ad so it is always clearly disclosed.
+     */
     private String label = "";
 
-    /** Optional "why this ad?" / ad-privacy link shown on each slot. */
+    /**
+     * Optional "why this ad?" / ad-privacy link shown on each slot.
+     */
     private String adChoicesUrl = "";
 
-    /** AdSense publisher id ({@code ca-pub-XXXX}); account-wide. Empty until configured. */
+    /**
+     * AdSense publisher id ({@code ca-pub-XXXX}); account-wide. Empty until configured.
+     */
     private String clientId = "";
 
-    /** Global network loader script URL (adsterra zone script). Empty until configured. */
+    /**
+     * Global network loader script URL (adsterra zone script). Empty until configured.
+     */
     private String scriptUrl = "";
 
     /**
@@ -57,7 +67,9 @@ public class AdsProperties {
      */
     private String socialBarScriptUrl = "";
 
-    /** Hard ceiling on ads shown to a user in one session, across every surface. */
+    /**
+     * Hard ceiling on ads shown to a user in one session, across every surface.
+     */
     private int frequencyCapPerSession = 30;
 
     /**
@@ -67,7 +79,9 @@ public class AdsProperties {
      */
     private List<String> cspDomains = new ArrayList<>();
 
-    /** Per-surface controls, keyed by surface: feed | explore | reels | stories. */
+    /**
+     * Per-surface controls, keyed by surface: feed | explore | reels | stories.
+     */
     private Map<String, Placement> placements = defaultPlacements();
 
     private static Map<String, Placement> defaultPlacements() {
@@ -80,15 +94,23 @@ public class AdsProperties {
         return m;
     }
 
-    /** Per-surface knobs. */
+    /**
+     * Per-surface knobs.
+     */
     @Getter
     @Setter
     public static class Placement {
-        /** Whether ads show on this surface at all. */
+        /**
+         * Whether ads show on this surface at all.
+         */
         private boolean enabled = true;
-        /** Insert an ad after every N organic items. */
+        /**
+         * Insert an ad after every N organic items.
+         */
         private int everyN = 8;
-        /** Max ads for this surface per session. */
+        /**
+         * Max ads for this surface per session.
+         */
         private int maxPerSession = 12;
         /**
          * Network id for this surface: AdSense slot id, Adsterra Native-Banner container
@@ -113,12 +135,17 @@ public class AdsProperties {
          * for AdSense.
          */
         private String format = "native";
-        /** Banner width in px (Adsterra banner format only; e.g. 300, 336, 728, 320). */
+        /**
+         * Banner width in px (Adsterra banner format only; e.g. 300, 336, 728, 320).
+         */
         private int width = 0;
-        /** Banner height in px (Adsterra banner format only; e.g. 250, 280, 90, 50, 100). */
+        /**
+         * Banner height in px (Adsterra banner format only; e.g. 250, 280, 90, 50, 100).
+         */
         private int height = 0;
 
-        public Placement() {}
+        public Placement() {
+        }
 
         public Placement(boolean enabled, int everyN, int maxPerSession, String unitId) {
             this.enabled = enabled;

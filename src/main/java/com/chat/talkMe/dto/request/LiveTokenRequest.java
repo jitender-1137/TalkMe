@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Request a LiveKit token for the given chat's live-audio room (Phase 6). */
+/**
+ * Request a LiveKit token for the given chat's live-audio room (Phase 6).
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

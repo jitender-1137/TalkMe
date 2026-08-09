@@ -5,7 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Echo of a submitted feedback entry returned to its author. */
+/**
+ * Echo of a submitted feedback entry returned to its author.
+ */
 @Data
 @Builder
 @NoArgsConstructor

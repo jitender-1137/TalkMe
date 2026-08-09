@@ -108,27 +108,48 @@ import static org.mockito.Mockito.when;
 @DisplayName("AuthServiceImpl (unit)")
 class AuthServiceImplTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private RoleRepository roleRepository;
-    @Mock private PermissionRepository permissionRepository;
-    @Mock private RefreshTokenRepository refreshTokenRepository;
-    @Mock private SessionRepository sessionRepository;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private JwtTokenProvider tokenProvider;
-    @Mock private UserMapper userMapper;
-    @Mock private SessionMapper sessionMapper;
-    @Mock private CountryDetectionService countryDetectionService;
-    @Mock private LoginAttemptService loginAttemptService;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private PwnedPasswordService pwnedPasswordService;
-    @Mock private EmailService emailService;
-    @Mock private WebPushService webPushService;
-    @Mock private ContentModerationService moderationService;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private FeatureAccessService featureAccessService;
-    @Mock private FeatureAccessCache featureAccessCache;
-    @Mock private ReputationRecorder reputationRecorder;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private RoleRepository roleRepository;
+    @Mock
+    private PermissionRepository permissionRepository;
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+    @Mock
+    private SessionRepository sessionRepository;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    @Mock
+    private JwtTokenProvider tokenProvider;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private SessionMapper sessionMapper;
+    @Mock
+    private CountryDetectionService countryDetectionService;
+    @Mock
+    private LoginAttemptService loginAttemptService;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private PwnedPasswordService pwnedPasswordService;
+    @Mock
+    private EmailService emailService;
+    @Mock
+    private WebPushService webPushService;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private FeatureAccessService featureAccessService;
+    @Mock
+    private FeatureAccessCache featureAccessCache;
+    @Mock
+    private ReputationRecorder reputationRecorder;
 
     private AuthServiceImpl service;
 
@@ -188,13 +209,17 @@ class AuthServiceImplTest {
                 .city("Pune").region("Maharashtra").build();
     }
 
-    /** Detection carrying only a country (no city/region), for the country-backfill edge branches. */
+    /**
+     * Detection carrying only a country (no city/region), for the country-backfill edge branches.
+     */
     private CountryDetectionResult detectionOnly(String country) {
         return CountryDetectionResult.builder()
                 .country(country).source("GeoIP").clientIp("1.2.3.4").build();
     }
 
-    /** Stub the tail of {@code generateLoginResponse} shared by every login-producing path. */
+    /**
+     * Stub the tail of {@code generateLoginResponse} shared by every login-producing path.
+     */
     private void stubLoginPipeline() {
         when(tokenProvider.generateToken(anyString(), anyBoolean())).thenReturn("access-jwt");
         when(userMapper.toAuthUserResponse(any(User.class))).thenReturn(new AuthUserResponse());
@@ -1918,7 +1943,9 @@ class AuthServiceImplTest {
     @DisplayName("oauthLogin (branch backfill)")
     class OauthBranches {
 
-        /** Existing account, pre-populated so no field is dirty unless the test says so. */
+        /**
+         * Existing account, pre-populated so no field is dirty unless the test says so.
+         */
         private User cleanExisting() {
             User u = activeUser();
             u.setGoogleId("g-sub-1");

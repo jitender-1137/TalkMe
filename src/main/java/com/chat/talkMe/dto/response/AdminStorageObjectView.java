@@ -79,7 +79,9 @@ public class AdminStorageObjectView {
 
     private boolean deleted;       // owning message soft-deleted
 
-    /** A chat participant the attachment was shared with (a receiver). */
+    /**
+     * A chat participant the attachment was shared with (a receiver).
+     */
     @Data
     @Builder
     public static class SharedUser {

@@ -51,12 +51,18 @@ import static org.mockito.Mockito.when;
 @DisplayName("DailyCompanionServiceImpl (unit)")
 class DailyCompanionServiceImplTest {
 
-    @Mock private DailyCompanionRepository dailyCompanionRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private BlockUserRepository blockUserRepository;
-    @Mock private CompatibilityService compatibilityService;
-    @Mock private NotificationService notificationService;
-    @Mock private ReputationRecorder reputationRecorder;
+    @Mock
+    private DailyCompanionRepository dailyCompanionRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private BlockUserRepository blockUserRepository;
+    @Mock
+    private CompatibilityService compatibilityService;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private ReputationRecorder reputationRecorder;
 
     private DailyCompanionServiceImpl service;
 

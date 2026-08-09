@@ -23,6 +23,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MessageSentEvent implements Serializable {
+    private static final long serialVersionUID = 1L;
     private String chatUuid;
     private MessageResponse message;
     private Long senderUserId;

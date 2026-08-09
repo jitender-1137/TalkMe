@@ -5,11 +5,16 @@ import java.util.Optional;
 
 public interface WaitingQueueService {
     void enqueue(String username);
+
     void dequeue(String username);
+
     Optional<String> pollNext(String excludeUsername);
+
     boolean isInQueue(String username);
 
-    /** Oldest-first snapshot of up to {@code max} waiting usernames, excluding {@code exclude}. */
+    /**
+     * Oldest-first snapshot of up to {@code max} waiting usernames, excluding {@code exclude}.
+     */
     List<String> peekCandidates(int max, String exclude);
 
     /**

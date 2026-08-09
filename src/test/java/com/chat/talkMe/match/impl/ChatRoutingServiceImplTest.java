@@ -10,7 +10,6 @@ import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.moderation.ModerationResult;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.NotificationDispatchService;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,6 +22,7 @@ import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -32,7 +32,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,15 +53,24 @@ class ChatRoutingServiceImplTest {
     private static final String SENDER = "alice";
     private static final String PEER = "bob";
 
-    @Mock private SessionService sessionService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private ContentModerationService moderationService;
-    @Mock private MatchConsentService matchConsentService;
-    @Mock private UserRepository userRepository;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private MatchMessageBufferService matchMessageBuffer;
-    @Mock private NotificationDispatchService notificationDispatchService;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ContentModerationService moderationService;
+    @Mock
+    private MatchConsentService matchConsentService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private MatchMessageBufferService matchMessageBuffer;
+    @Mock
+    private NotificationDispatchService notificationDispatchService;
 
     private ChatRoutingServiceImpl service;
 
@@ -80,13 +88,17 @@ class ChatRoutingServiceImplTest {
                 .build();
     }
 
-    /** Make the recipient look ONLINE (a live socket in the presence set). */
+    /**
+     * Make the recipient look ONLINE (a live socket in the presence set).
+     */
     private void recipientOnline() {
         when(redisTemplate.opsForSet()).thenReturn(setOps);
         when(setOps.size(anyString())).thenReturn(1L);
     }
 
-    /** Make the recipient look OFFLINE (no live socket). */
+    /**
+     * Make the recipient look OFFLINE (no live socket).
+     */
     private void recipientOffline() {
         when(redisTemplate.opsForSet()).thenReturn(setOps);
         when(setOps.size(anyString())).thenReturn(0L);

@@ -24,10 +24,14 @@ public class ComplimentResponse {
 
     private String uuid;
     private String message;
-    /** {@link com.chat.talkMe.enums.ComplimentStatus} name. */
+    /**
+     * {@link com.chat.talkMe.enums.ComplimentStatus} name.
+     */
     private String status;
     private String createdAt;
-    /** True in the sender's own "sent" listing; false in the recipient's inbox. */
+    /**
+     * True in the sender's own "sent" listing; false in the recipient's inbox.
+     */
     private boolean fromMe;
 
     // ── Sender identity — ONLY non-null when status == REVEALED ──────────────────

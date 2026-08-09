@@ -1,7 +1,14 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * An immutable record of a privileged SuperAdmin action (viewing decrypted messages,
@@ -19,26 +26,36 @@ import lombok.*;
 @AllArgsConstructor
 public class AdminAuditLog extends BaseEntity {
 
-    /** UUID of the acting admin (nullable if resolved only by username). */
+    /**
+     * UUID of the acting admin (nullable if resolved only by username).
+     */
     @Column(name = "admin_id", length = 64)
     private String adminId;
 
     @Column(name = "admin_username", nullable = false, length = 100)
     private String adminUsername;
 
-    /** Machine action code, e.g. VIEW_MESSAGES, BAN_USER, GRANT_ROLE. */
+    /**
+     * Machine action code, e.g. VIEW_MESSAGES, BAN_USER, GRANT_ROLE.
+     */
     @Column(name = "action", nullable = false, length = 64)
     private String action;
 
-    /** What kind of thing was acted on: USER / CHAT. */
+    /**
+     * What kind of thing was acted on: USER / CHAT.
+     */
     @Column(name = "target_type", length = 32)
     private String targetType;
 
-    /** UUID of the target (user/chat). */
+    /**
+     * UUID of the target (user/chat).
+     */
     @Column(name = "target_id", length = 64)
     private String targetId;
 
-    /** Free-text detail (old→new value, reason, count, …). */
+    /**
+     * Free-text detail (old→new value, reason, count, …).
+     */
     @Column(name = "detail", columnDefinition = "TEXT")
     private String detail;
 }

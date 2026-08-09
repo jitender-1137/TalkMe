@@ -8,23 +8,39 @@ package com.chat.talkMe.enums;
  * real-time relays and are never persisted as chat attachments).
  */
 public enum MediaContext {
-    /** Anonymous matched-stranger chat. Identity is hidden from the peer BY DESIGN — */
-    /** the storage path carries no owner, so the upload record is the ONLY owner link. */
+    /**
+     * Anonymous matched-stranger chat. Identity is hidden from the peer BY DESIGN —
+     * the storage path carries no owner, so the upload record is the ONLY owner link.
+     */
     STRANGER,
-    /** Ephemeral lobby DM. Owner is also encoded in the {@code lobby/<uuid>/} path. */
+    /**
+     * Ephemeral lobby DM. Owner is also encoded in the {@code lobby/<uuid>/} path.
+     */
     LOBBY,
-    /** Persisted 1:1 / group / room conversation (also has a MessageAttachment row). */
+    /**
+     * Persisted 1:1 / group / room conversation (also has a MessageAttachment row).
+     */
     CONVERSATION,
-    /** Profile photo. */
+    /**
+     * Profile photo.
+     */
     PROFILE,
-    /** Feed post media. */
+    /**
+     * Feed post media.
+     */
     POST,
-    /** Story media. */
+    /**
+     * Story media.
+     */
     STORY,
-    /** Anything uncategorised ({@code others/}). */
+    /**
+     * Anything uncategorised ({@code others/}).
+     */
     OTHER;
 
-    /** Map a top-level storage folder (from {@code categoryOf}) to a context. */
+    /**
+     * Map a top-level storage folder (from {@code categoryOf}) to a context.
+     */
     public static MediaContext fromCategory(String category) {
         if (category == null) return OTHER;
         return switch (category.toLowerCase()) {
@@ -38,7 +54,9 @@ public enum MediaContext {
         };
     }
 
-    /** True when the uploader's identity is hidden from the chat peer (anonymous). */
+    /**
+     * True when the uploader's identity is hidden from the chat peer (anonymous).
+     */
     public boolean isAnonymousToPeer() {
         return this == STRANGER;
     }

@@ -57,10 +57,14 @@ class ProfileViewServiceImplTest {
 
     private static final String VIEWED_UUID = "33333333-3333-3333-3333-333333333333";
 
-    @Mock private ProfileViewRepository profileViewRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private UserMapper userMapper;
-    @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private ProfileViewRepository profileViewRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     private ProfileViewServiceImpl service;
 

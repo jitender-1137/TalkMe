@@ -35,7 +35,8 @@ class DeviceServiceImplTest {
 
     private static final String TOKEN = "fcm-token-abc";
 
-    @Mock private DeviceRepository deviceRepository;
+    @Mock
+    private DeviceRepository deviceRepository;
 
     private DeviceServiceImpl service;
 

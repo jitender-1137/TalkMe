@@ -52,10 +52,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("BadgeServiceImpl (unit)")
 class BadgeServiceImplTest {
 
-    @Mock private UserBadgeRepository userBadgeRepository;
-    @Mock private BadgeEndorsementRepository badgeEndorsementRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private ReputationRecorder reputationRecorder;
+    @Mock
+    private UserBadgeRepository userBadgeRepository;
+    @Mock
+    private BadgeEndorsementRepository badgeEndorsementRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ReputationRecorder reputationRecorder;
 
     private BadgeServiceImpl service;
 

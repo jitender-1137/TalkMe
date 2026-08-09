@@ -13,6 +13,7 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+
 import java.time.Instant;
 import java.util.Optional;
 
@@ -32,7 +33,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("PresenceServiceHelper (unit)")
 class PresenceServiceHelperTest {
 
-    @Mock private UserPresenceRepository userPresenceRepository;
+    @Mock
+    private UserPresenceRepository userPresenceRepository;
 
     private PresenceServiceHelper helper;
 

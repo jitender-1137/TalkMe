@@ -15,15 +15,15 @@ import java.util.stream.Collectors;
 
 /**
  * Redis cache of the set of user-ids each user has blocked.
- *
+ * <p>
  * Block checks are a hot N+1: the chat-list build calls {@code existsByUserAndBlocked}
  * TWICE for every 1:1 conversation (did I block them / did they block me), and message
  * send / profile view do the same. Blocks change rarely, so caching each user's blocked
- * set (loaded once, then reused for every direction) removes those repeated SELECTs.
- *
+ * set (loaded once, then reused for every direction) removes those repeated Selects.
+ * <p>
  * Correctness: the blocker's set is evicted immediately on block/unblock; a short TTL is
  * a backstop for any path that mutates blocks without going through the cache.
- *
+ * <p>
  * Value format: comma-joined blocked user-ids, or "" for "blocks nobody" (distinct from
  * a null cache miss, so an empty set is cached too).
  */
@@ -42,7 +42,9 @@ public class BlockCache {
         return KEY_PREFIX + userId;
     }
 
-    /** True when {@code blocker} has blocked {@code blockedUserId}. */
+    /**
+     * True when {@code blocker} has blocked {@code blockedUserId}.
+     */
     public boolean hasBlocked(User blocker, Long blockedUserId) {
         if (blocker == null || blockedUserId == null) return false;
         return blockedIds(blocker).contains(blockedUserId);
@@ -71,7 +73,9 @@ public class BlockCache {
         return ids;
     }
 
-    /** Invalidate a user's blocked set after they block/unblock someone. Best-effort. */
+    /**
+     * Invalidate a user's blocked set after they block/unblock someone. Best-effort.
+     */
     public void evict(Long userId) {
         if (userId == null) return;
         try {

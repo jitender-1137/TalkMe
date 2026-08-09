@@ -5,25 +5,36 @@ import com.chat.talkMe.cache.MemberCountCache;
 import com.chat.talkMe.cache.UserSettingsCache;
 import com.chat.talkMe.crypto.ChatKeyService;
 import com.chat.talkMe.crypto.MessageCryptoService;
-import com.chat.talkMe.domain.*;
+import com.chat.talkMe.domain.Chat;
+import com.chat.talkMe.domain.ChatMember;
+import com.chat.talkMe.domain.ChatSettings;
+import com.chat.talkMe.domain.Message;
+import com.chat.talkMe.domain.OutboxEvent;
+import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.CreateChatRequest;
+import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.ChatKeyResponse;
 import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.GroupInfoResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.event.StatusUpdateEvent;
 import com.chat.talkMe.exception.ForbiddenException;
-import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.ChatMapper;
 import com.chat.talkMe.mapper.MessageMapper;
 import com.chat.talkMe.mapper.UserMapper;
-import com.chat.talkMe.repository.*;
+import com.chat.talkMe.repository.ChatMemberRepository;
+import com.chat.talkMe.repository.ChatRepository;
+import com.chat.talkMe.repository.FriendRepository;
+import com.chat.talkMe.repository.MessageReadReceiptRepository;
+import com.chat.talkMe.repository.MessageRepository;
+import com.chat.talkMe.repository.OutboxEventRepository;
+import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.ChatService;
 import com.chat.talkMe.service.PresenceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.chat.talkMe.dto.response.AuthUserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,7 +44,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -206,7 +223,7 @@ public class ChatServiceImpl implements ChatService {
     public List<ChatResponse> getChats(User currentUser) {
         User managedUser = ensureManagedUser(currentUser);
         List<Chat> chats = chatRepository.findChatsByUser(managedUser);
-        
+
         Map<Long, ChatResponse> privateChatMap = new HashMap<>();
         List<ChatResponse> uniqueChats = new ArrayList<>();
 
@@ -226,7 +243,7 @@ public class ChatServiceImpl implements ChatService {
                         .filter(m -> !m.getUser().getId().equals(managedUser.getId()))
                         .findFirst()
                         .orElse(null);
-                
+
                 if (memberOther != null) {
                     Long otherUserId = memberOther.getUser().getId();
                     if (privateChatMap.containsKey(otherUserId)) {
@@ -338,13 +355,13 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
-        
+
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
                 .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
         member.setClearedAt(Instant.now());
         chatMemberRepository.save(member);
-        
+
         log.info("Clear chat requested for chat: {}", uuid);
     }
 
@@ -388,7 +405,7 @@ public class ChatServiceImpl implements ChatService {
             payload.put("chatId", uuid);
 
             eventWrapper.put("payload", payload);
-            
+
             // 1. Send to chat topic
             messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
 
@@ -397,9 +414,9 @@ public class ChatServiceImpl implements ChatService {
                 User memberUser = memberObj.getUser();
                 if (memberUser != null && !memberUser.getId().equals(currentUser.getId())) {
                     messagingTemplate.convertAndSendToUser(
-                        memberUser.getUsername(),
-                        "/queue/chats",
-                        eventWrapper
+                            memberUser.getUsername(),
+                            "/queue/chats",
+                            eventWrapper
                     );
                 }
             }
@@ -579,7 +596,9 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
-    /** Ids of this chat's members (other than the viewer) who are in Ghost mode. */
+    /**
+     * Ids of this chat's members (other than the viewer) who are in Ghost mode.
+     */
     private Set<Long> ghostMemberIds(Chat chat, User viewer) {
         List<User> others = chat.getMembers().stream()
                 .map(ChatMember::getUser)
@@ -588,7 +607,9 @@ public class ChatServiceImpl implements ChatService {
         return presenceService.getGhostUserIds(others);
     }
 
-    /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
+    /**
+     * Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT).
+     */
     private String resolveStatusExcludingGhosts(Message m, Set<Long> ghostIds) {
         if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
         boolean delivered = false;
@@ -609,7 +630,7 @@ public class ChatServiceImpl implements ChatService {
                 .orElse(null);
 
         ChatResponse response = chatMapper.toChatResponse(chat);
-        
+
         if (memberSelf != null) {
             response.setMuted(memberSelf.isMuted());
             response.setArchived(memberSelf.isArchived());
@@ -717,7 +738,9 @@ public class ChatServiceImpl implements ChatService {
         return response;
     }
 
-    /** Builds the group/channel/room metadata block for a multi-party chat. */
+    /**
+     * Builds the group/channel/room metadata block for a multi-party chat.
+     */
     private GroupInfoResponse buildGroupInfo(Chat chat, ChatMember memberSelf) {
         ChatSettings s = chat.getSettings() != null ? chat.getSettings() : ChatSettings.builder().build();
 

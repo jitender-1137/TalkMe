@@ -29,13 +29,17 @@ public class CreateEventRequest {
     @NotNull(message = "Event start time is required")
     private Instant startAt;
 
-    /** Optional close time; when set and elapsed the event auto-ends. */
+    /**
+     * Optional close time; when set and elapsed the event auto-ends.
+     */
     private Instant endAt;
 
     @Size(max = 60)
     private String category;
 
-    /** Seat cap for GOING RSVPs; 0/omitted = unlimited. */
+    /**
+     * Seat cap for GOING RSVPs; 0/omitted = unlimited.
+     */
     @PositiveOrZero
     private int maxAttendees;
 }

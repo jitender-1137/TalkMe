@@ -102,7 +102,9 @@ class AnonymousComplimentServiceImplTest {
                 .recipientUuid(recipientUuid).message(message).build();
     }
 
-    /** A persisted-looking compliment (from `s` to `r`) in the given status. */
+    /**
+     * A persisted-looking compliment (from `s` to `r`) in the given status.
+     */
     private static AnonymousCompliment compliment(User s, User r, ComplimentStatus status) {
         AnonymousCompliment c = AnonymousCompliment.builder()
                 .sender(s).recipient(r).message("You have the kindest smile").status(status)
@@ -112,7 +114,9 @@ class AnonymousComplimentServiceImplTest {
         return c;
     }
 
-    /** Extract the {@link ComplimentResponse} carried in the single WS push to {@code username}. */
+    /**
+     * Extract the {@link ComplimentResponse} carried in the single WS push to {@code username}.
+     */
     private ComplimentResponse capturePushPayload(String username, String expectedEvent) {
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
         verify(messagingTemplate).convertAndSendToUser(eq(username), eq(QUEUE), payload.capture());

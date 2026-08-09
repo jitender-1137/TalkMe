@@ -23,6 +23,8 @@ public class CompatibilityScore {
     private Map<String, Integer> breakdown;
     private List<String> highlights;
     private String explanation;
-    /** Coarse label for anonymous surfaces: "HIGH" | "MEDIUM" | "LOW". */
+    /**
+     * Coarse label for anonymous surfaces: "HIGH" | "MEDIUM" | "LOW".
+     */
     private String bucket;
 }

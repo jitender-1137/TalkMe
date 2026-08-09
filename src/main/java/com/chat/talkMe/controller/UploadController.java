@@ -15,12 +15,16 @@ import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.util.UploadValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,7 +38,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UploadController {
 
-    /** Per-type upload caps. The global multipart limit is the larger of these (30MB). */
+    /**
+     * Per-type upload caps. The global multipart limit is the larger of these (30MB).
+     */
     private static final long MAX_IMAGE_BYTES = 2L * 1024 * 1024;   // 2 MB
     private static final long MAX_VIDEO_BYTES = 30L * 1024 * 1024;  // 30 MB
 
@@ -45,7 +51,9 @@ public class UploadController {
     private final ContentModerationService moderationService;
     private final MediaAssetService mediaAssetService;
 
-    /** Upload categories whose images/videos must be CLEAN (publicly visible content). */
+    /**
+     * Upload categories whose images/videos must be CLEAN (publicly visible content).
+     */
     private static final Set<String> MODERATED_CONTEXTS = Set.of("profile", "post", "story");
 
     @PostMapping(consumes = "multipart/form-data")
@@ -206,9 +214,9 @@ public class UploadController {
                 String cid = safeUuid(contextId);
                 if (cid != null && userDetails != null && userDetails.getUser() != null
                         && chatRepository.findByUuid(UUID.fromString(cid))
-                            .filter(chat -> chatMemberRepository
-                                    .findByChatAndUser(chat, userDetails.getUser()).isPresent())
-                            .isPresent()) {
+                        .filter(chat -> chatMemberRepository
+                                .findByChatAndUser(chat, userDetails.getUser()).isPresent())
+                        .isPresent()) {
                     return "conversations/" + cid;
                 }
                 break;
@@ -219,7 +227,9 @@ public class UploadController {
         return "others";
     }
 
-    /** Normalized UUID string, or null if {@code value} is not a valid UUID. */
+    /**
+     * Normalized UUID string, or null if {@code value} is not a valid UUID.
+     */
     private String safeUuid(String value) {
         if (value == null || value.isBlank()) {
             return null;

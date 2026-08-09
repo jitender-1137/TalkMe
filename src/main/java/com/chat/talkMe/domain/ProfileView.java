@@ -53,7 +53,9 @@ public class ProfileView extends BaseEntity {
     @Builder.Default
     private Instant lastViewedAt = Instant.now();
 
-    /** False until the viewed user has opened their "who viewed me" list (drives the badge). */
+    /**
+     * False until the viewed user has opened their "who viewed me" list (drives the badge).
+     */
     @Column(name = "seen", nullable = false)
     @Builder.Default
     private boolean seen = false;

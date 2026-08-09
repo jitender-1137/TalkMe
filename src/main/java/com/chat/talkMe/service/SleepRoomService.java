@@ -12,9 +12,13 @@ import java.util.List;
  */
 public interface SleepRoomService {
 
-    /** Create a SLEEP_COMPANION room owned by the current user. {@code name} is optional. */
+    /**
+     * Create a SLEEP_COMPANION room owned by the current user. {@code name} is optional.
+     */
     SleepRoomResponse createSleepRoom(User user, String name);
 
-    /** List active sleep-companion rooms, most-recently-active first. */
+    /**
+     * List active sleep-companion rooms, most-recently-active first.
+     */
     List<SleepRoomResponse> listSleepRooms();
 }

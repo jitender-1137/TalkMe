@@ -45,8 +45,10 @@ class MatchPreferenceServiceImplTest {
     private static final String KEY = "matchmaking:prefs:alice";
     private static final Duration TTL = Duration.ofMinutes(15);
 
-    @Mock private StringRedisTemplate redis;
-    @Mock private ValueOperations<String, String> valueOps;
+    @Mock
+    private StringRedisTemplate redis;
+    @Mock
+    private ValueOperations<String, String> valueOps;
 
     private ObjectMapper objectMapper;
     private MatchPreferenceServiceImpl service;

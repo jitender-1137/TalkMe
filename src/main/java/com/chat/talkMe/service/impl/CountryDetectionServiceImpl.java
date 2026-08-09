@@ -149,7 +149,9 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         return request.getRemoteAddr();
     }
 
-    /** ip-api returns lat/lon as JSON numbers, which Jackson may map to Double or Integer. */
+    /**
+     * ip-api returns lat/lon as JSON numbers, which Jackson may map to Double or Integer.
+     */
     private static Double asDouble(Object v) {
         if (v instanceof Number n) {
             return n.doubleValue();
@@ -159,7 +161,7 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
 
     private String getCountryNameFromCode(String countryCode) {
         try {
-            Locale locale = new Locale("", countryCode);
+            Locale locale = Locale.of("", countryCode);
             String country = locale.getDisplayCountry(Locale.ENGLISH);
             if (country != null && !country.isBlank() && !country.equalsIgnoreCase(countryCode)) {
                 return country;

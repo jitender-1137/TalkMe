@@ -5,10 +5,14 @@ import com.chat.talkMe.dto.request.SavePushSubscriptionRequest;
 
 public interface WebPushService {
 
-    /** Create or update a push subscription for the given user. */
+    /**
+     * Create or update a push subscription for the given user.
+     */
     void saveSubscription(User user, SavePushSubscriptionRequest request);
 
-    /** Remove a subscription by endpoint (e.g. on logout / unsubscribe). */
+    /**
+     * Remove a subscription by endpoint (e.g. on logout / unsubscribe).
+     */
     void removeSubscription(String endpoint);
 
     /**

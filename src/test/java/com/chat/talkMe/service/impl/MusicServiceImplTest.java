@@ -37,7 +37,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @DisplayName("MusicServiceImpl (unit)")
 class MusicServiceImplTest {
 
-    @Mock private HttpClient httpClient;
+    @Mock
+    private HttpClient httpClient;
 
     private MusicServiceImpl service;
 

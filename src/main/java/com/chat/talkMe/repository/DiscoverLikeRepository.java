@@ -10,5 +10,6 @@ import java.util.Optional;
 @Repository
 public interface DiscoverLikeRepository extends JpaRepository<DiscoverLike, Long> {
     boolean existsByUserAndLikedUser(User user, User likedUser);
+
     Optional<DiscoverLike> findByUserAndLikedUser(User user, User likedUser);
 }

@@ -27,7 +27,8 @@ import static org.mockito.Mockito.when;
 @DisplayName("MatchDisconnectReaper (unit)")
 class MatchDisconnectReaperTest {
 
-    @Mock private DisconnectHandlerService disconnectHandlerService;
+    @Mock
+    private DisconnectHandlerService disconnectHandlerService;
 
     private MatchDisconnectReaper reaper;
 

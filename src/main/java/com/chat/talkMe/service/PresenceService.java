@@ -3,7 +3,7 @@ package com.chat.talkMe.service;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserPresence;
 import com.chat.talkMe.enums.PresenceStatus;
-import com.chat.talkMe.websocket.PresenceNotification;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
@@ -36,6 +36,7 @@ public interface PresenceService {
      * Flip every backgrounded user whose ONLINE grace window has elapsed from
      * ONLINE to IDLE (last-seen preserved), scheduling their IDLE → OFFLINE
      * deadline. Driven by a scheduled reaper.
+     *
      * @return number of users transitioned to IDLE.
      */
     int reapBackgroundedAwayUsers();
@@ -50,7 +51,9 @@ public interface PresenceService {
      */
     void markDisconnected(User user, Duration idleGrace);
 
-    /** Refresh a user's liveness timestamp (called on connect + every client heartbeat). */
+    /**
+     * Refresh a user's liveness timestamp (called on connect + every client heartbeat).
+     */
     void recordHeartbeat(User user);
 
     /**
@@ -58,6 +61,7 @@ public interface PresenceService {
      * longer than {@code timeout} (closed tab / crash / network loss, none of
      * which reliably deliver a WebSocket disconnect), they are moved to IDLE with
      * a short grace window. {@link #reapExpiredIdleUsers()} then flips them OFFLINE.
+     *
      * @return number of users transitioned.
      */
     int reapTimedOutUsers(Duration timeout);
@@ -65,11 +69,14 @@ public interface PresenceService {
     /**
      * Flip to OFFLINE every IDLE user whose scheduled offline deadline has passed.
      * Driven by a scheduled reaper.
+     *
      * @return number of users flipped OFFLINE.
      */
     int reapExpiredIdleUsers();
 
-    /** Apparent status for OTHER viewers (Invisible mode is masked to OFFLINE). Redis-first. */
+    /**
+     * Apparent status for OTHER viewers (Invisible mode is masked to OFFLINE). Redis-first.
+     */
     PresenceStatus getStatus(User user);
 
     /**
@@ -89,10 +96,14 @@ public interface PresenceService {
      */
     Set<String> getAwayUsernames();
 
-    /** The user's TRUE status, unmasked by Invisible mode — for the owner's own view. Redis-first. */
+    /**
+     * The user's TRUE status, unmasked by Invisible mode — for the owner's own view. Redis-first.
+     */
     PresenceStatus getRawStatus(User user);
 
-    /** Live last-seen timestamp, read from Redis (the DB value is only durable-on-OFFLINE). */
+    /**
+     * Live last-seen timestamp, read from Redis (the DB value is only durable-on-OFFLINE).
+     */
     Instant getLastSeen(User user);
 
     /**
@@ -105,16 +116,25 @@ public interface PresenceService {
      */
     Instant getApparentLastSeen(User user);
 
-    /** Whether the user has Ghost mode on (suppresses outbound delivered/seen receipts). */
+    /**
+     * Whether the user has Ghost mode on (suppresses outbound delivered/seen receipts).
+     */
     boolean isGhost(User user);
 
-    /** Of the given users, the ids of those in Ghost mode (batched receipt-suppression check). */
+    /**
+     * Of the given users, the ids of those in Ghost mode (batched receipt-suppression check).
+     */
     Set<Long> getGhostUserIds(Collection<User> users);
 
     void toggleGhostMode(User user, boolean enabled);
+
     void toggleInvisibleMode(User user, boolean enabled);
+
     void toggleHideLastSeen(User user, boolean enabled);
+
     void resetPresence(User user);
+
     boolean isUserOnline(User user);
+
     UserPresence getUserPresence(User user);
 }

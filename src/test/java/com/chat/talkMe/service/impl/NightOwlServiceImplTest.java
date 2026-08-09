@@ -46,10 +46,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("NightOwlServiceImpl (unit)")
 class NightOwlServiceImplTest {
 
-    @Mock private PresenceService presenceService;
-    @Mock private UserRepository userRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private ChatMemberRepository chatMemberRepository;
 
     private NightOwlServiceImpl service;
     private User current;
@@ -110,9 +114,11 @@ class NightOwlServiceImplTest {
         @DisplayName("guests and banned users are filtered out of onlineNow")
         void filtersGuestAndBanned() {
             User guest = User.builder().username("g").name("G").isGuest(true).interests(new HashSet<>()).build();
-            guest.setId(4L); guest.setUuid(UUID.randomUUID());
+            guest.setId(4L);
+            guest.setUuid(UUID.randomUUID());
             User banned = User.builder().username("bn").name("Bn").banned(true).interests(new HashSet<>()).build();
-            banned.setId(5L); banned.setUuid(UUID.randomUUID());
+            banned.setId(5L);
+            banned.setUuid(UUID.randomUUID());
             User ok = user(6L, "real");
 
             when(presenceService.getOnlineUsernames())
@@ -214,7 +220,8 @@ class NightOwlServiceImplTest {
         @DisplayName("no interests anywhere → empty trending, no NPE")
         void trendingEmpty() {
             User a = User.builder().username("alice").name("A").interests(null).build();
-            a.setId(2L); a.setUuid(UUID.randomUUID());
+            a.setId(2L);
+            a.setUuid(UUID.randomUUID());
             when(presenceService.getOnlineUsernames())
                     .thenReturn(new LinkedHashSet<>(List.of("alice")));
             when(userRepository.findByUsernameIn(anyList())).thenReturn(List.of(a));

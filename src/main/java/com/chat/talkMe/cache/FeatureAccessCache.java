@@ -21,7 +21,7 @@ import java.util.function.Supplier;
  * global {@code epoch} (a single Redis counter) lets a config/flag change invalidate
  * <em>every</em> user at once without scanning keys — a cached entry whose epoch is
  * behind the current global epoch is treated as a miss.
- *
+ * <p>
  * Fail-open: any Redis error falls back to recomputing from the DB.
  */
 @Slf4j
@@ -48,7 +48,9 @@ public class FeatureAccessCache {
         }
     }
 
-    /** Read from cache (honouring the global epoch); on any miss/error compute and store. */
+    /**
+     * Read from cache (honoring the global epoch); on any miss/error compute and store.
+     */
     public Set<String> getOrCompute(Long userId, Supplier<Set<String>> loader) {
         if (userId == null) return loader.get();
         long epoch = currentEpoch();
@@ -76,7 +78,9 @@ public class FeatureAccessCache {
         return computed;
     }
 
-    /** Invalidate one user's cached access. Best-effort. */
+    /**
+     * Invalidate one user's cached access. Best-effort.
+     */
     public void evict(Long userId) {
         if (userId == null) return;
         try {
@@ -86,7 +90,9 @@ public class FeatureAccessCache {
         }
     }
 
-    /** Invalidate every user's cached access (e.g. after a global flag change). Best-effort. */
+    /**
+     * Invalidate every user's cached access (e.g. after a global flag change). Best-effort.
+     */
     public void bumpGlobalEpoch() {
         try {
             redis.opsForValue().increment(EPOCH_KEY);

@@ -21,7 +21,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SecretCrushMatchResponse {
 
-    /** True only when both users crush each other. */
+    /**
+     * True only when both users crush each other.
+     */
     private boolean matched;
 
     // ── Partner card (the matched user, or the caller's own crush target in a list) ──
@@ -32,9 +34,13 @@ public class SecretCrushMatchResponse {
     private String partnerMood;
     private String partnerCountry;
 
-    /** Compatibility with the partner; populated on a match, may be null otherwise. */
+    /**
+     * Compatibility with the partner; populated on a match, may be null otherwise.
+     */
     private CompatibilityScore compatibility;
 
-    /** Optional chat id if a conversation was created for the match. Currently null. */
+    /**
+     * Optional chat id if a conversation was created for the match. Currently null.
+     */
     private String chatId;
 }

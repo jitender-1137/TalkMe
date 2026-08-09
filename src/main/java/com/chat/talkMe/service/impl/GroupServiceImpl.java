@@ -79,7 +79,9 @@ public class GroupServiceImpl implements GroupService {
     private final GroupInviteRepository groupInviteRepository;
     private final MemberCountCache memberCountCache;
     private final UserSettingsCache userSettingsCache;
-    /** Lazy to break the GroupService ⇄ EventService constructor cycle (Events spins up rooms via GroupService). */
+    /**
+     * Lazy to break the GroupService ⇄ EventService constructor cycle (Events spins up rooms via GroupService).
+     */
     private final ObjectProvider<EventService> eventServiceProvider;
 
     @Override
@@ -172,7 +174,8 @@ public class GroupServiceImpl implements GroupService {
 
         ChatSettings s = chat.getSettings();
         if (request.getWhoCanSend() != null) s.setWhoCanSend(SendPolicy.valueOf(request.getWhoCanSend()));
-        if (request.getWhoCanAddMembers() != null) s.setWhoCanAddMembers(MemberRole.valueOf(request.getWhoCanAddMembers()));
+        if (request.getWhoCanAddMembers() != null)
+            s.setWhoCanAddMembers(MemberRole.valueOf(request.getWhoCanAddMembers()));
         if (request.getWhoCanEditInfo() != null) s.setWhoCanEditInfo(MemberRole.valueOf(request.getWhoCanEditInfo()));
         if (request.getWhoCanPin() != null) s.setWhoCanPin(MemberRole.valueOf(request.getWhoCanPin()));
         if (request.getSlowModeSeconds() != null) s.setSlowModeSeconds(Math.max(0, request.getSlowModeSeconds()));
@@ -375,7 +378,10 @@ public class GroupServiceImpl implements GroupService {
         List<ChatType> types = new ArrayList<>();
         if ("channel".equalsIgnoreCase(type)) types.add(ChatType.CHANNEL);
         else if ("room".equalsIgnoreCase(type)) types.add(ChatType.ROOM);
-        else { types.add(ChatType.CHANNEL); types.add(ChatType.ROOM); }
+        else {
+            types.add(ChatType.CHANNEL);
+            types.add(ChatType.ROOM);
+        }
 
         // Pre-build the lowercased LIKE pattern (null = no text filter).
         String pattern = (query != null && !query.isBlank())
@@ -513,7 +519,9 @@ public class GroupServiceImpl implements GroupService {
         chat.getMembers().add(m);
     }
 
-    /** True if {@code other} is an active friend of {@code user}. */
+    /**
+     * True if {@code other} is an active friend of {@code user}.
+     */
     private boolean areFriends(User user, User other) {
         return friendRepository.findByUserAndFriend(user, other)
                 .map(f -> !f.isDeleted())
@@ -536,8 +544,10 @@ public class GroupServiceImpl implements GroupService {
         return false; // NOBODY
     }
 
-    /** Message-content sentinel carrying a group-invite payload (mirrors the shared-post
-     *  encoding; the frontend detects this prefix and renders a Join/Decline card). */
+    /**
+     * Message-content sentinel carrying a group-invite payload (mirrors the shared-post
+     * encoding; the frontend detects this prefix and renders a Join/Decline card).
+     */
     private static final String INVITE_SENTINEL = "tmginvite";
 
     /**
@@ -698,7 +708,9 @@ public class GroupServiceImpl implements GroupService {
         }
     }
 
-    /** Lenient parse for member-id lists: returns null for a malformed id (caller skips it). */
+    /**
+     * Lenient parse for member-id lists: returns null for a malformed id (caller skips it).
+     */
     private UUID tryUuid(String s) {
         if (s == null || s.isBlank() || "undefined".equals(s) || "null".equals(s)) return null;
         try {

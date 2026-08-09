@@ -15,7 +15,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class WeeklyMatchPickResponse {
-    /** Picked user's public uuid. */
+    /**
+     * Picked user's public uuid.
+     */
     private String id;
     private String name;
     private String username;
@@ -23,10 +25,16 @@ public class WeeklyMatchPickResponse {
     private String mood;
     private String country;
     private Integer age;
-    /** 1-based rank within the week (1 = most compatible). */
+    /**
+     * 1-based rank within the week (1 = most compatible).
+     */
     private int rank;
-    /** Stored overall score (0–100) at generation time. */
+    /**
+     * Stored overall score (0–100) at generation time.
+     */
     private int score;
-    /** Live, full compatibility breakdown against the requesting user. */
+    /**
+     * Live, full compatibility breakdown against the requesting user.
+     */
     private CompatibilityScore compatibility;
 }

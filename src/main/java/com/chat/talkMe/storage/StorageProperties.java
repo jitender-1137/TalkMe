@@ -17,7 +17,9 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "storage")
 public class StorageProperties {
 
-    /** Root for all media references/keys (OCI + instance disk). Defaults to /media. */
+    /**
+     * Root for all media references/keys (OCI + instance disk). Defaults to /media.
+     */
     private String mediaRoot = "/media";
 
     private final Oci oci = new Oci();
@@ -25,15 +27,25 @@ public class StorageProperties {
     @Getter
     @Setter
     public static class Oci {
-        /** Object Storage namespace (tenancy namespace). Auto-resolved at startup if blank. */
+        /**
+         * Object Storage namespace (tenancy namespace). Auto-resolved at startup if blank.
+         */
         private String namespace;
-        /** OCI region identifier, e.g. "ap-mumbai-1". */
+        /**
+         * OCI region identifier, e.g. "ap-mumbai-1".
+         */
         private String region;
-        /** The single bucket all media is stored in (shared across backend instances). */
+        /**
+         * The single bucket all media is stored in (shared across backend instances).
+         */
         private String bucket = "neochathub-media";
-        /** Path to the OCI API-key config file (supports a leading ~). */
+        /**
+         * Path to the OCI API-key config file (supports a leading ~).
+         */
         private String configFile = "~/.oci/config";
-        /** Profile section within the config file. */
+        /**
+         * Profile section within the config file.
+         */
         private String configProfile = "DEFAULT";
     }
 }

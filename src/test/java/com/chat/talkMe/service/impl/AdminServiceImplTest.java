@@ -135,36 +135,66 @@ import static org.mockito.Mockito.when;
 @DisplayName("AdminServiceImpl (unit)")
 class AdminServiceImplTest {
 
-    @Mock private UserRepository userRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private MessageRepository messageRepository;
-    @Mock private PresenceService presenceService;
-    @Mock private MessageCryptoService messageCryptoService;
-    @Mock private MessageMapper messageMapper;
-    @Mock private RoleRepository roleRepository;
-    @Mock private AdminAuditLogRepository auditRepository;
-    @Mock private AdminAuditLogger auditLogger;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private MessageAttachmentRepository attachmentRepository;
-    @Mock private PostRepository postRepository;
-    @Mock private StoryRepository storyRepository;
-    @Mock private ProfileViewRepository profileViewRepository;
-    @Mock private MatchReportRepository matchReportRepository;
-    @Mock private FeedbackRepository feedbackRepository;
-    @Mock private UserFollowRepository userFollowRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private FriendRequestRepository friendRequestRepository;
-    @Mock private MessageReactionRepository reactionRepository;
-    @Mock private PostLikeRepository postLikeRepository;
-    @Mock private PostCommentRepository postCommentRepository;
-    @Mock private UserSettingRepository userSettingRepository;
-    @Mock private UserPresenceRepository userPresenceRepository;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOps;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private MediaStorage mediaStorage;
-    @Mock private StorageProperties storageProperties;
-    @Mock private MediaAssetRepository mediaAssetRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private PresenceService presenceService;
+    @Mock
+    private MessageCryptoService messageCryptoService;
+    @Mock
+    private MessageMapper messageMapper;
+    @Mock
+    private RoleRepository roleRepository;
+    @Mock
+    private AdminAuditLogRepository auditRepository;
+    @Mock
+    private AdminAuditLogger auditLogger;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    @Mock
+    private MessageAttachmentRepository attachmentRepository;
+    @Mock
+    private PostRepository postRepository;
+    @Mock
+    private StoryRepository storyRepository;
+    @Mock
+    private ProfileViewRepository profileViewRepository;
+    @Mock
+    private MatchReportRepository matchReportRepository;
+    @Mock
+    private FeedbackRepository feedbackRepository;
+    @Mock
+    private UserFollowRepository userFollowRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private FriendRequestRepository friendRequestRepository;
+    @Mock
+    private MessageReactionRepository reactionRepository;
+    @Mock
+    private PostLikeRepository postLikeRepository;
+    @Mock
+    private PostCommentRepository postCommentRepository;
+    @Mock
+    private UserSettingRepository userSettingRepository;
+    @Mock
+    private UserPresenceRepository userPresenceRepository;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOps;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private MediaStorage mediaStorage;
+    @Mock
+    private StorageProperties storageProperties;
+    @Mock
+    private MediaAssetRepository mediaAssetRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -214,7 +244,9 @@ class AdminServiceImplTest {
         return c;
     }
 
-    /** A media_assets ownership row (for the media-analytics / user-media tests). */
+    /**
+     * A media_assets ownership row (for the media-analytics / user-media tests).
+     */
     private MediaAsset mediaAsset(
             User owner, MediaContext ctx, String key, String uploadType, long size) {
         MediaAsset a = MediaAsset.builder()
@@ -228,7 +260,9 @@ class AdminServiceImplTest {
         return a;
     }
 
-    /** A chat MessageAttachment (for the chat-media + reconcile tests). */
+    /**
+     * A chat MessageAttachment (for the chat-media + reconcile tests).
+     */
     private MessageAttachment attachment(
             Chat c, User sender, MessageType type, String mime, String fileName, String key) {
         Message m = Message.builder().chat(c).sender(sender).messageType(type).content("cap").build();
@@ -2073,7 +2107,9 @@ class AdminServiceImplTest {
             return new MediaStorage.StoredObject("/media/" + key, key, size, Instant.now(), ct);
         }
 
-        /** Build a chat with a sender member, a receiver member, and a null-user member. */
+        /**
+         * Build a chat with a sender member, a receiver member, and a null-user member.
+         */
         private Chat chatWithMembers(User sender, User receiver) {
             Chat c = chat(ChatType.PRIVATE);
             c.getMembers().add(ChatMember.builder().chat(c).user(sender).build());
@@ -2175,7 +2211,7 @@ class AdminServiceImplTest {
             assertThat(res.getCounts().getOrphan()).isEqualTo(4L);
             assertThat(res.getCounts().getLinked()).isZero();
             assertThat(res.getItems()).extracting(
-                    AdminStorageObjectView::getCategory)
+                            AdminStorageObjectView::getCategory)
                     .contains("conversations", "lobby", "strangers", "posts", "stories", "profiles", "other");
         }
     }
@@ -2237,10 +2273,12 @@ class AdminServiceImplTest {
         @DisplayName("blank name derives from members; long preview truncates; null-uuid member id null")
         void longPreviewDerivedName() {
             User owner = user("owner1");
-            User m1 = user("m1"); m1.setUuid(null); // null-uuid member → Member.id null
+            User m1 = user("m1");
+            m1.setUuid(null); // null-uuid member → Member.id null
             User m2 = user("m2");
             Chat c = Chat.builder().chatType(ChatType.GROUP).name("   ").build(); // blank → derive
-            c.setId(idSeq++); c.setUuid(UUID.randomUUID());
+            c.setId(idSeq++);
+            c.setUuid(UUID.randomUUID());
             c.setUpdatedAt(Instant.now());
             c.getMembers().add(ChatMember.builder().chat(c).user(null).build());
             c.getMembers().add(ChatMember.builder().chat(c).user(m1).build());
@@ -2322,7 +2360,8 @@ class AdminServiceImplTest {
             c.getMembers().add(ChatMember.builder().chat(c).user(receiver).build());
             Message m = Message.builder().chat(c).sender(sender).messageType(MessageType.IMAGE)
                     .content("caption").build();
-            m.setId(idSeq++); m.setUuid(UUID.randomUUID());
+            m.setId(idSeq++);
+            m.setUuid(UUID.randomUUID());
             m.setForwarded(true);
             m.setEdited(true);
             m.setModerationStatus(ModerationStatus.RELEASED);
@@ -2333,8 +2372,10 @@ class AdminServiceImplTest {
             MessageAttachment a = MessageAttachment.builder().message(m).fileName("img.jpg")
                     .fileUrl("/media/conversations/rp/img.jpg").mimeType("image/jpeg").fileSize(10L)
                     .thumbnailUrl("/media/conversations/rp/img-thumb.jpg").build();
-            a.setId(idSeq++); a.setUuid(UUID.randomUUID());
-            a.setCreatedAt(Instant.now()); a.setUpdatedAt(Instant.now());
+            a.setId(idSeq++);
+            a.setUuid(UUID.randomUUID());
+            a.setCreatedAt(Instant.now());
+            a.setUpdatedAt(Instant.now());
             when(attachmentRepository.findAll()).thenReturn(List.of(a));
             when(mediaStorage.list(null)).thenReturn(List.of(
                     obj("conversations/rp/img.jpg", 10, "image/jpeg", Instant.now())));
@@ -2386,16 +2427,19 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("linked message with a null sender includes every member; a null-uuid member yields a null id")
         void nullSenderIncludesAllMembers() {
-            User m1 = user("mm1"); m1.setUuid(null);
+            User m1 = user("mm1");
+            m1.setUuid(null);
             User m2 = user("mm2");
             Chat c = chat(ChatType.PRIVATE);
             c.getMembers().add(ChatMember.builder().chat(c).user(m1).build());
             c.getMembers().add(ChatMember.builder().chat(c).user(m2).build());
             Message m = Message.builder().chat(c).sender(null).messageType(MessageType.IMAGE).build();
-            m.setId(idSeq++); m.setUuid(UUID.randomUUID());
+            m.setId(idSeq++);
+            m.setUuid(UUID.randomUUID());
             MessageAttachment a = MessageAttachment.builder().message(m).fileName("p.jpg")
                     .fileUrl("/media/conversations/ns/p.jpg").mimeType("image/jpeg").fileSize(9L).build();
-            a.setId(idSeq++); a.setUuid(UUID.randomUUID());
+            a.setId(idSeq++);
+            a.setUuid(UUID.randomUUID());
             when(attachmentRepository.findAll()).thenReturn(List.of(a));
             when(mediaStorage.list(null)).thenReturn(List.of(
                     obj("conversations/ns/p.jpg", 9, "image/jpeg", Instant.now())));
@@ -2457,10 +2501,12 @@ class AdminServiceImplTest {
         private MessageAttachment linked(String key, MessageType type, String mime, String fileName) {
             Chat c = chat(ChatType.PRIVATE);
             Message m = Message.builder().chat(c).sender(user("kfl")).messageType(type).build();
-            m.setId(idSeq++); m.setUuid(UUID.randomUUID());
+            m.setId(idSeq++);
+            m.setUuid(UUID.randomUUID());
             MessageAttachment a = MessageAttachment.builder().message(m).fileName(fileName)
                     .fileUrl("/media/" + key).mimeType(mime).fileSize(10L).build();
-            a.setId(idSeq++); a.setUuid(UUID.randomUUID());
+            a.setId(idSeq++);
+            a.setUuid(UUID.randomUUID());
             return a;
         }
 
@@ -2606,7 +2652,8 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("null media list, null audience, author without uuid, createdAt present")
         void postEdgeBranches() {
-            User author = user("pe"); author.setUuid(null);
+            User author = user("pe");
+            author.setUuid(null);
             Post p = Post.builder().user(author).content("c").build();
             p.setId(idSeq++);
             p.setMedia(null);
@@ -2635,7 +2682,8 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("null sender → all members shared; null-uuid member, chat uuid/type null; createdAt present")
         void nullSenderAllMembers() {
-            User mem1 = user("am1"); mem1.setUuid(null);
+            User mem1 = user("am1");
+            mem1.setUuid(null);
             User mem2 = user("am2");
             Chat c = Chat.builder().chatType(null).name("Chat").build();
             c.setId(idSeq++);        // no uuid
@@ -2664,7 +2712,8 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("null members list → empty sharedWith; sender present but without uuid → null senderId")
         void nullMembersSenderNoUuid() {
-            User sender = user("as"); sender.setUuid(null);
+            User sender = user("as");
+            sender.setUuid(null);
             Chat c = chat(ChatType.PRIVATE);
             c.setMembers(null);
             Message m = Message.builder().chat(c).sender(sender).messageType(MessageType.IMAGE).build();
@@ -2720,20 +2769,26 @@ class AdminServiceImplTest {
         @DisplayName("getReport builds history (uuid/reporter/createdAt present + all-null) and sets relatedChatId")
         void getReportHistoryAndRelatedChat() {
             MatchReport r = new MatchReport();
-            r.setId(idSeq++); r.setUuid(UUID.randomUUID());
+            r.setId(idSeq++);
+            r.setUuid(UUID.randomUUID());
             r.setStatus("PENDING");
             User reporter = user("hrp");
             User reported = user("hrd");
-            r.setReporter(reporter); r.setReported(reported);
+            r.setReporter(reporter);
+            r.setReported(reported);
             when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
 
             MatchReport h1 = new MatchReport();
-            h1.setId(idSeq++); h1.setUuid(UUID.randomUUID());
-            h1.setReason("r1"); h1.setStatus("PENDING");
-            h1.setReporter(user("h1r")); h1.setCreatedAt(Instant.now());
+            h1.setId(idSeq++);
+            h1.setUuid(UUID.randomUUID());
+            h1.setReason("r1");
+            h1.setStatus("PENDING");
+            h1.setReporter(user("h1r"));
+            h1.setCreatedAt(Instant.now());
             MatchReport h2 = new MatchReport();
             h2.setId(88L);          // no uuid, reporter null, createdAt null
-            h2.setReason("r2"); h2.setStatus("PENDING");
+            h2.setReason("r2");
+            h2.setStatus("PENDING");
             when(matchReportRepository.findByReportedId(eq(reported.getId()), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(h1, h2)));
             when(chatRepository.findChatsByUser(reported)).thenReturn(List.of());
@@ -2753,10 +2808,13 @@ class AdminServiceImplTest {
         @DisplayName("evidence chat without a uuid leaves relatedChatId unset")
         void getReportEvidenceNullUuid() {
             MatchReport r = new MatchReport();
-            r.setId(idSeq++); r.setUuid(UUID.randomUUID()); r.setStatus("PENDING");
+            r.setId(idSeq++);
+            r.setUuid(UUID.randomUUID());
+            r.setStatus("PENDING");
             User reporter = user("nrp");
             User reported = user("nrd");
-            r.setReporter(reporter); r.setReported(reported);
+            r.setReporter(reporter);
+            r.setReported(reported);
             when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
             when(matchReportRepository.findByReportedId(eq(reported.getId()), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of()));
@@ -2794,10 +2852,12 @@ class AdminServiceImplTest {
             f1.setType(null);
             f1.setStatus(null);
             f1.setCreatedAt(Instant.now());
-            User u = user("fu"); u.setUuid(null);
+            User u = user("fu");
+            u.setUuid(null);
             Feedback f2 = Feedback.builder().user(u).comment("d")
                     .type(FeedbackType.MANUAL).status(FeedbackStatus.NEW).build();
-            f2.setId(idSeq++); f2.setUuid(UUID.randomUUID());
+            f2.setId(idSeq++);
+            f2.setUuid(UUID.randomUUID());
             when(feedbackRepository.findAll(any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(f1, f2)));
 
@@ -2926,10 +2986,10 @@ class AdminServiceImplTest {
             assertThat(res.getStrangerAssets()).isEqualTo(4L);
             assertThat(res.getStrangerBytes()).isEqualTo(400L);
             assertThat(res.getByContext()).extracting(
-                    AdminMediaOwnershipResponse.Bucket::getLabel)
+                            AdminMediaOwnershipResponse.Bucket::getLabel)
                     .contains("STRANGER", "CONVERSATION");
             assertThat(res.getByType()).extracting(
-                    AdminMediaOwnershipResponse.Bucket::getLabel)
+                            AdminMediaOwnershipResponse.Bucket::getLabel)
                     .contains("image", "video");
             assertThat(res.getTopUploaders()).hasSize(1);
             assertThat(res.getTopUploaders().get(0).getUsername()).isEqualTo("shutterbug");
@@ -2991,7 +3051,7 @@ class AdminServiceImplTest {
             assertThat(res.getTotal()).isEqualTo(1L);
             assertThat(res.getTotalBytes()).isEqualTo(50L);
             assertThat(res.getByContext()).extracting(
-                    AdminMediaOwnershipResponse.Bucket::getLabel)
+                            AdminMediaOwnershipResponse.Bucket::getLabel)
                     .containsExactly("STRANGER");
             verify(auditLogger).write(eq("root"), eq("VIEW_USER_MEDIA"), eq("MEDIA"),
                     eq(u.getUuid().toString()), any());

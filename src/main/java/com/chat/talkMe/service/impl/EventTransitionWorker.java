@@ -12,13 +12,13 @@ import com.chat.talkMe.repository.ScheduledEventRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.GroupService;
 import com.chat.talkMe.service.NotificationService;
-import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -81,7 +81,9 @@ public class EventTransitionWorker {
         return true;
     }
 
-    /** Flip a LIVE event whose close time has elapsed to ENDED. */
+    /**
+     * Flip a LIVE event whose close time has elapsed to ENDED.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean endEvent(Long eventId) {
         ScheduledEvent event = scheduledEventRepository.findById(eventId).orElse(null);
@@ -94,7 +96,9 @@ public class EventTransitionWorker {
         return true;
     }
 
-    /** Best-effort per-recipient fan-out to everyone who said GOING or INTERESTED. */
+    /**
+     * Best-effort per-recipient fan-out to everyone who said GOING or INTERESTED.
+     */
     private void notifyRsvps(ScheduledEvent event) {
         List<EventRsvp> rsvps = eventRsvpRepository.findByEventAndStatusIn(
                 event, List.of(RsvpStatus.GOING, RsvpStatus.INTERESTED));

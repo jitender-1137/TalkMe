@@ -20,6 +20,8 @@ public interface StreakService {
      */
     StreakResponse checkIn(User user);
 
-    /** Cosmetic streak snapshot for the caller; lazily creates a zeroed row on first read. */
+    /**
+     * Cosmetic streak snapshot for the caller; lazily creates a zeroed row on first read.
+     */
     StreakResponse getStreak(User user);
 }

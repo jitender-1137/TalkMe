@@ -1,7 +1,6 @@
 package com.chat.talkMe.storage;
 
 import com.chat.talkMe.exception.FileStorageException;
-import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
@@ -16,6 +15,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Filesystem-backed media store — the default, used in local/dev (and prod only if
@@ -117,7 +117,9 @@ public class LocalMediaStorage implements MediaStorage {
         return out;
     }
 
-    /** Resolve a reference to a path under the media root, guarding against traversal. */
+    /**
+     * Resolve a reference to a path under the media root, guarding against traversal.
+     */
     private Path resolve(String reference) {
         String abs = MediaKeys.absolutePath(reference);
         if (abs == null) return null;
@@ -125,7 +127,9 @@ public class LocalMediaStorage implements MediaStorage {
         return p.startsWith(root) ? p : null;
     }
 
-    /** A file that already lives on disk — {@link #close()} must NOT delete it. */
+    /**
+     * A file that already lives on disk — {@link #close()} must NOT delete it.
+     */
     private record InPlaceLocalFile(Path path) implements LocalFile {
         @Override
         public void close() { /* in-place file — nothing to clean up */ }

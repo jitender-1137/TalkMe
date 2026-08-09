@@ -40,12 +40,16 @@ public class MessageCryptoService {
     @Value("${app.crypto.chat-encryption.enabled:true}")
     private boolean enabled;
 
-    /** Encryption is active only when both the flag is on AND a master key exists. */
+    /**
+     * Encryption is active only when both the flag is on AND a master key exists.
+     */
     public boolean isEnabled() {
         return enabled && masterKeyService.isConfigured();
     }
 
-    /** Encrypt one field for a chat. No-op when disabled, null/empty, or already encrypted. */
+    /**
+     * Encrypt one field for a chat. No-op when disabled, null/empty, or already encrypted.
+     */
     public String encrypt(Long chatId, String plaintext) {
         if (!isEnabled() || plaintext == null || plaintext.isEmpty() || plaintext.startsWith(MARKER)) {
             return plaintext;

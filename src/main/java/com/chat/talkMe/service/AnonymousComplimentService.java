@@ -16,16 +16,24 @@ import java.util.List;
  */
 public interface AnonymousComplimentService {
 
-    /** Send an anonymous compliment; returns the sender's own view of the created row. */
+    /**
+     * Send an anonymous compliment; returns the sender's own view of the created row.
+     */
     ComplimentResponse send(User sender, SendComplimentRequest request);
 
-    /** The caller's inbox — compliments addressed to them (sender hidden unless REVEALED). */
+    /**
+     * The caller's inbox — compliments addressed to them (sender hidden unless REVEALED).
+     */
     List<ComplimentResponse> inbox(User me);
 
-    /** The caller's own outgoing compliments (fromMe=true; recipient shown, not secret). */
+    /**
+     * The caller's own outgoing compliments (fromMe=true; recipient shown, not secret).
+     */
     List<ComplimentResponse> sent(User me);
 
-    /** Recipient asks to learn who sent the compliment; notifies the sender. */
+    /**
+     * Recipient asks to learn who sent the compliment; notifies the sender.
+     */
     ComplimentResponse requestReveal(User me, String complimentUuid);
 
     /**

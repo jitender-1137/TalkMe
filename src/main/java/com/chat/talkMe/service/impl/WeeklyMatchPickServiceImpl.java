@@ -35,9 +35,13 @@ import java.util.Set;
 @Transactional
 public class WeeklyMatchPickServiceImpl implements WeeklyMatchPickService {
 
-    /** How many candidates to score each run — bounds the O(users * pool) job cost. */
+    /**
+     * How many candidates to score each run — bounds the O(users * pool) job cost.
+     */
     private static final int CANDIDATE_POOL = 200;
-    /** How many top picks to persist per user per week. */
+    /**
+     * How many top picks to persist per user per week.
+     */
     private static final int PICK_COUNT = 10;
 
     private final WeeklyMatchPickRepository weeklyMatchPickRepository;

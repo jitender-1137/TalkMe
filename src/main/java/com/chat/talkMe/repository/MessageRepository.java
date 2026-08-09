@@ -10,10 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.Instant;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
@@ -37,6 +37,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     // ── Admin dashboard counters ─────────────────────────────────────────────
     long countBySenderId(Long senderId);
+
     long countByChat(Chat chat);
 
     // ── Admin analytics ──────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     Page<Message> searchMessagesInChat(Chat chat, String query, Long userId, Instant clearedAt, Pageable pageable);
 
     Optional<Message> findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(Chat chat);
+
     Optional<Message> findFirstByChatAndIsDeletedFalseAndCreatedAtGreaterThanOrderByCreatedAtDesc(Chat chat, Instant clearedAt);
 
     // Chat-list preview capped to the viewer's visible window: after clearedAt (if the
@@ -73,17 +75,17 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Message> findMessagesToMarkRead(Chat chat, Long userId);
 
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND " +
-           "NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')")
+            "NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')")
     long countUnreadMessages(Chat chat, Long userId);
 
     @Query("SELECT COUNT(m) FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM " +
-           "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
-           "AND ( " +
-           "  (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) " +
-           "     AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
-           "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP " +
-           "     AND m.id > COALESCE((SELECT cm2.lastReadMessageId FROM ChatMember cm2 WHERE cm2.chat = m.chat AND cm2.user.id = :userId), 0)) " +
-           ")")
+            "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
+            "AND ( " +
+            "  (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) " +
+            "     AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
+            "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP " +
+            "     AND m.id > COALESCE((SELECT cm2.lastReadMessageId FROM ChatMember cm2 WHERE cm2.chat = m.chat AND cm2.user.id = :userId), 0)) " +
+            ")")
     long countTotalUnreadForUser(Long userId);
 
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (CAST(:leftAt AS timestamp) IS NULL OR m.createdAt <= :leftAt) AND (m.isBlocked = false OR m.sender.id = :userId) AND :userId NOT MEMBER OF m.deletedForUserIds AND (m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT OR m.sender.id = :userId) AND m.id > :afterSequence ORDER BY m.id ASC")
@@ -97,38 +99,53 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.id > :lastReadId AND m.sender.id <> :userId AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt)")
     long countUnreadForWatermark(Chat chat, Long userId, Long lastReadId, Instant clearedAt);
 
-    /** Highest message id in a chat (for advancing a read watermark to "all read"). */
+    /**
+     * Highest message id in a chat (for advancing a read watermark to "all read").
+     */
     @Query("SELECT COALESCE(MAX(m.id), 0) FROM Message m WHERE m.chat = :chat AND m.isDeleted = false")
     long findMaxMessageId(Chat chat);
 
     // ── Social Memory / Relationship Journey (feature #19) ───────────────────────
-    /** Total non-system, non-deleted messages in a chat (the pair's "messages exchanged"). */
+
+    /**
+     * Total non-system, non-deleted messages in a chat (the pair's "messages exchanged").
+     */
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.isDeleted = false " +
-           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+            "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
     long countVisibleByChat(@Param("chat") Chat chat);
 
-    /** Timestamp of the first visible message in a chat (null if none). */
+    /**
+     * Timestamp of the first visible message in a chat (null if none).
+     */
     @Query("SELECT MIN(m.createdAt) FROM Message m WHERE m.chat = :chat AND m.isDeleted = false " +
-           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+            "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
     Instant findFirstMessageAt(@Param("chat") Chat chat);
 
-    /** Visible message times ordered by id — pass PageRequest.of(n-1,1) to get the n-th message's time. */
+    /**
+     * Visible message times ordered by id — pass PageRequest.of(n-1,1) to get the n-th message's time.
+     */
     @Query("SELECT m.createdAt FROM Message m WHERE m.chat = :chat AND m.isDeleted = false " +
-           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM ORDER BY m.id ASC")
+            "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM ORDER BY m.id ASC")
     List<Instant> findVisibleMessageTimes(@Param("chat") Chat chat, Pageable pageable);
 
-    /** Visible messages a specific user sent in a chat (for the "who texts first" summary split). */
+    /**
+     * Visible messages a specific user sent in a chat (for the "who texts first" summary split).
+     */
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.sender.id = :senderId " +
-           "AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+            "AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
     long countVisibleByChatAndSender(@Param("chat") Chat chat,
                                      @Param("senderId") Long senderId);
 
-    /** Distinct calendar-ish activity: number of unique days that carried at least one visible message. */
+    /**
+     * Distinct calendar-ish activity: number of unique days that carried at least one visible message.
+     */
     @Query("SELECT COUNT(DISTINCT CAST(m.createdAt AS date)) FROM Message m WHERE m.chat = :chat " +
-           "AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
+            "AND m.isDeleted = false AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM")
     long countActiveDays(@Param("chat") Chat chat);
 
-    /** The currently-pinned message in a chat, if any (most recent pin wins). */
+    /**
+     * The currently-pinned message in a chat, if any (most recent pin wins).
+     */
     Optional<Message> findFirstByChatAndPinnedTrueOrderByPinnedAtDesc(Chat chat);
 
     /**
@@ -140,7 +157,9 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND (CAST(:leftAt AS timestamp) IS NULL OR m.createdAt <= :leftAt) AND (m.isBlocked = false OR m.sender.id = :userId) AND :userId NOT MEMBER OF m.deletedForUserIds AND (m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT OR m.sender.id = :userId) AND (:cursor IS NULL OR m.id < :cursor) ORDER BY m.id DESC")
     List<Message> findMessagesBeforeCursor(Chat chat, Long userId, Instant clearedAt, Instant leftAt, Long cursor, Pageable pageable);
 
-    /** Messages held pending consent in a chat (released when consent is granted). */
+    /**
+     * Messages held pending consent in a chat (released when consent is granted).
+     */
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT ORDER BY m.id ASC")
     List<Message> findHeldForConsent(Chat chat);
 
@@ -158,24 +177,26 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
      * daily job iterates.
      */
     @Query("SELECT DISTINCT cm.user.id FROM ChatMember cm, Message m " +
-           "WHERE m.chat = cm.chat AND cm.isDeleted = false AND cm.leftAt IS NULL " +
-           "AND cm.user.isGuest = false AND cm.user.isDeleted = false AND cm.user.isVerified = true AND cm.user.email IS NOT NULL " +
-           "AND m.sender.id <> cm.user.id AND m.isDeleted = false AND m.isBlocked = false " +
-           "AND cm.user.id NOT MEMBER OF m.deletedForUserIds " +
-           "AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT " +
-           "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM " +
-           "AND m.id > COALESCE(cm.user.lastUnreadDigestMessageId, 0) " +
-           "AND ( (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) " +
-           "        AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = cm.user.id AND r.status = 'READ')) " +
-           "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP " +
-           "        AND m.id > COALESCE(cm.lastReadMessageId, 0)) )")
+            "WHERE m.chat = cm.chat AND cm.isDeleted = false AND cm.leftAt IS NULL " +
+            "AND cm.user.isGuest = false AND cm.user.isDeleted = false AND cm.user.isVerified = true AND cm.user.email IS NOT NULL " +
+            "AND m.sender.id <> cm.user.id AND m.isDeleted = false AND m.isBlocked = false " +
+            "AND cm.user.id NOT MEMBER OF m.deletedForUserIds " +
+            "AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT " +
+            "AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM " +
+            "AND m.id > COALESCE(cm.user.lastUnreadDigestMessageId, 0) " +
+            "AND ( (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) " +
+            "        AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = cm.user.id AND r.status = 'READ')) " +
+            "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP " +
+            "        AND m.id > COALESCE(cm.lastReadMessageId, 0)) )")
     List<Long> findUserIdsWithNewUnread();
 
-    /** Most-recent unread messages for a user (newest first) — source of digest preview rows. */
+    /**
+     * Most-recent unread messages for a user (newest first) — source of digest preview rows.
+     */
     @Query("SELECT m FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.chat.talkMe.enums.MessageType.SYSTEM " +
-           "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
-           "AND ( (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
-           "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP AND m.id > COALESCE((SELECT cm2.lastReadMessageId FROM ChatMember cm2 WHERE cm2.chat = m.chat AND cm2.user.id = :userId), 0)) ) " +
-           "ORDER BY m.id DESC")
+            "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
+            "AND ( (m.chat.chatType IN (com.chat.talkMe.enums.ChatType.PRIVATE, com.chat.talkMe.enums.ChatType.STRANGER) AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
+            "  OR (m.chat.chatType = com.chat.talkMe.enums.ChatType.GROUP AND m.id > COALESCE((SELECT cm2.lastReadMessageId FROM ChatMember cm2 WHERE cm2.chat = m.chat AND cm2.user.id = :userId), 0)) ) " +
+            "ORDER BY m.id DESC")
     List<Message> findRecentUnreadForUser(Long userId, Pageable pageable);
 }

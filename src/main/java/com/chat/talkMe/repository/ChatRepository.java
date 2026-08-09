@@ -33,10 +33,10 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
             "WHERE (:type IS NULL OR c.chatType = :type) " +
             "AND (:includeDeleted = true OR c.isDeleted = false) " +
             "AND (:q IS NULL OR LOWER(c.name) LIKE :q OR LOWER(u.username) LIKE :q OR LOWER(u.name) LIKE :q)",
-        countQuery = "SELECT COUNT(DISTINCT c) FROM Chat c LEFT JOIN c.members m LEFT JOIN m.user u " +
-            "WHERE (:type IS NULL OR c.chatType = :type) " +
-            "AND (:includeDeleted = true OR c.isDeleted = false) " +
-            "AND (:q IS NULL OR LOWER(c.name) LIKE :q OR LOWER(u.username) LIKE :q OR LOWER(u.name) LIKE :q)")
+            countQuery = "SELECT COUNT(DISTINCT c) FROM Chat c LEFT JOIN c.members m LEFT JOIN m.user u " +
+                    "WHERE (:type IS NULL OR c.chatType = :type) " +
+                    "AND (:includeDeleted = true OR c.isDeleted = false) " +
+                    "AND (:q IS NULL OR LOWER(c.name) LIKE :q OR LOWER(u.username) LIKE :q OR LOWER(u.name) LIKE :q)")
     Page<Chat> findForAdmin(
             @Param("type") ChatType type,
             @Param("q") String q,
@@ -51,7 +51,9 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     @Query("SELECT c FROM Chat c JOIN c.members m WHERE m.user = :user AND c.isDeleted = false AND m.isDeleted = false ORDER BY c.updatedAt DESC")
     List<Chat> findChatsByUser(User user);
 
-    /** Admin: EVERY chat a user is/was a member of, including soft-deleted chats & memberships. */
+    /**
+     * Admin: EVERY chat a user is/was a member of, including soft-deleted chats & memberships.
+     */
     @Query("SELECT DISTINCT c FROM Chat c JOIN c.members m WHERE m.user = :user ORDER BY c.updatedAt DESC")
     List<Chat> findAllChatsByUserForAdmin(User user);
 
@@ -66,11 +68,11 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     // keeps the bind type unambiguously text — concatenating a nullable param
     // inside SQL made Postgres infer bytea (lower(bytea) does not exist).
     @Query("SELECT DISTINCT c FROM Chat c LEFT JOIN c.tags t " +
-           "WHERE c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC AND c.isDeleted = false " +
-           "AND c.chatType IN :types " +
-           "AND (:pattern IS NULL OR LOWER(c.name) LIKE :pattern OR LOWER(c.slug) LIKE :pattern) " +
-           "AND (:tag IS NULL OR t = :tag) " +
-           "ORDER BY c.updatedAt DESC")
+            "WHERE c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC AND c.isDeleted = false " +
+            "AND c.chatType IN :types " +
+            "AND (:pattern IS NULL OR LOWER(c.name) LIKE :pattern OR LOWER(c.slug) LIKE :pattern) " +
+            "AND (:tag IS NULL OR t = :tag) " +
+            "ORDER BY c.updatedAt DESC")
     List<Chat> findPublicForDiscovery(@Param("types") List<ChatType> types,
                                       @Param("pattern") String pattern,
                                       @Param("tag") Interest tag,
@@ -81,20 +83,22 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
      * first, then most-recently-active. Bounded by {@code Pageable}.
      */
     @Query("SELECT c FROM Chat c WHERE c.isDeleted = false " +
-           "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
-           "AND c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC " +
-           "ORDER BY c.roomCurated DESC, c.updatedAt DESC")
+            "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
+            "AND c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC " +
+            "ORDER BY c.roomCurated DESC, c.updatedAt DESC")
     List<Chat> findTrendingRooms(Pageable pageable);
 
     /**
      * Public ROOMs seeded into a Virtual Night City district (feature #25), newest-active first.
      */
     @Query("SELECT c FROM Chat c WHERE c.isDeleted = false " +
-           "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
-           "AND c.cityLocation = :loc ORDER BY c.updatedAt DESC")
+            "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
+            "AND c.cityLocation = :loc ORDER BY c.updatedAt DESC")
     List<Chat> findByCityLocation(@Param("loc") CityLocation loc);
 
-    /** Whether a curated room already exists for a district — idempotent seeding guard. */
+    /**
+     * Whether a curated room already exists for a district — idempotent seeding guard.
+     */
     boolean existsByCityLocationAndRoomCuratedTrue(CityLocation cityLocation);
 
     /**

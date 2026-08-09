@@ -30,8 +30,10 @@ import static org.mockito.Mockito.when;
 @DisplayName("FeatureGuard (unit)")
 class FeatureGuardUnitTest {
 
-    @Mock private FeatureAccessService featureAccessService;
-    @InjectMocks private FeatureGuard guard;
+    @Mock
+    private FeatureAccessService featureAccessService;
+    @InjectMocks
+    private FeatureGuard guard;
 
     @AfterEach
     void tearDown() {

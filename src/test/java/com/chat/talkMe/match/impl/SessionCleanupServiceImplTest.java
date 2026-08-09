@@ -49,11 +49,16 @@ class SessionCleanupServiceImplTest {
     private static final String QUEUE = "/queue/match";
     private static final String ACTIVE_USERS = "matchmaking:active_users";
 
-    @Mock private SessionService sessionService;
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private SetOperations<String, String> setOps;
-    @Mock private OnlineCountPublisher onlineCountPublisher;
+    @Mock
+    private SessionService sessionService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private SetOperations<String, String> setOps;
+    @Mock
+    private OnlineCountPublisher onlineCountPublisher;
 
     private SessionCleanupServiceImpl service;
 

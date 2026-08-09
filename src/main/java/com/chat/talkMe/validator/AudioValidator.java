@@ -2,6 +2,7 @@ package com.chat.talkMe.validator;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+
 import java.util.Set;
 
 public class AudioValidator implements ConstraintValidator<ValidAudio, String> {
@@ -17,7 +18,9 @@ public class AudioValidator implements ConstraintValidator<ValidAudio, String> {
         return hasAudioExtension(filename);
     }
 
-    /** Whether a URL/filename ends in a supported audio extension. Reusable outside bean validation. */
+    /**
+     * Whether a URL/filename ends in a supported audio extension. Reusable outside bean validation.
+     */
     public static boolean hasAudioExtension(String filename) {
         if (filename == null) return false;
         int idx = filename.lastIndexOf('.');

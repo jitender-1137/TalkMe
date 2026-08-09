@@ -7,7 +7,6 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.NotificationDispatchService;
 import com.chat.talkMe.service.PresenceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,6 +19,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,12 +43,18 @@ import static org.mockito.Mockito.when;
 @DisplayName("StatusDeliveryService (unit)")
 class StatusDeliveryServiceTest {
 
-    @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private NotificationDispatchService notificationDispatchService;
-    @Mock private UserRepository userRepository;
-    @Mock private OutboxEventRepository outboxRepo;
-    @Mock private ObjectMapper objectMapper;
-    @Mock private PresenceService presenceService;
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private NotificationDispatchService notificationDispatchService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private OutboxEventRepository outboxRepo;
+    @Mock
+    private ObjectMapper objectMapper;
+    @Mock
+    private PresenceService presenceService;
 
     private StatusDeliveryService service;
 

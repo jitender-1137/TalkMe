@@ -115,7 +115,9 @@ class DailyCompanionControllerUnitTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
-    /** A fully-populated companion card with a nested compatibility score. */
+    /**
+     * A fully-populated companion card with a nested compatibility score.
+     */
     private static DailyCompanionResponse fullCard(String status) {
         return DailyCompanionResponse.builder()
                 .pairingUuid(PAIRING_UUID)
@@ -139,7 +141,9 @@ class DailyCompanionControllerUnitTest {
                 .build();
     }
 
-    /** An "empty card" — assigner hasn't run / user ineligible, so all companion fields are null. */
+    /**
+     * An "empty card" — assigner hasn't run / user ineligible, so all companion fields are null.
+     */
     private static DailyCompanionResponse emptyCard() {
         return DailyCompanionResponse.builder().build();
     }

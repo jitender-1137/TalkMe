@@ -3,12 +3,12 @@ package com.chat.talkMe.security;
 import com.chat.talkMe.domain.Permission;
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
-import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 
+import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 

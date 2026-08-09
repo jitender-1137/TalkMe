@@ -17,7 +17,7 @@ import java.util.List;
  * when the recipient reconnects and re-subscribes. Match messages are otherwise
  * ephemeral (relayed over STOMP, never persisted), so without this a message sent
  * during the reconnect grace would be lost from the thread even though a push fired.
- *
+ * <p>
  * Buffer lives in Redis (per-recipient list) with a TTL a little longer than the
  * 45s reconnect grace, and is capped to bound memory for a pathological sender.
  */
@@ -31,12 +31,18 @@ public class MatchMessageBufferService {
     private final ObjectMapper objectMapper;
 
     private static final String BUFFER_PREFIX = "match:msgbuffer:";
-    /** Outlive the 45s reconnect grace so buffered messages are still flushable on resubscribe. */
+    /**
+     * Outlive the 45s reconnect grace so buffered messages are still flushable on resubscribe.
+     */
     private static final Duration BUFFER_TTL = Duration.ofSeconds(60);
-    /** Safety cap on buffered messages per recipient. */
+    /**
+     * Safety cap on buffered messages per recipient.
+     */
     private static final long MAX_BUFFERED = 100;
 
-    /** Queue an undelivered match event for a recipient that currently has no live socket. */
+    /**
+     * Queue an undelivered match event for a recipient that currently has no live socket.
+     */
     public void buffer(String recipient, MatchServerEvent event) {
         String key = BUFFER_PREFIX + recipient;
         try {

@@ -8,12 +8,20 @@ import java.util.List;
 
 public interface FriendService {
     FriendRequestResponse sendFriendRequest(String receiverUuid, User currentUser);
+
     void acceptFriendRequest(String requestUuid, User currentUser);
+
     void rejectFriendRequest(String requestUuid, User currentUser);
+
     void cancelFriendRequest(String requestUuid, User currentUser);
+
     List<AuthUserResponse> getFriends(User currentUser);
+
     List<FriendRequestResponse> getFriendRequests(User currentUser);
+
     void removeFriend(String friendUuid, User currentUser);
+
     void blockUser(String userUuid, User currentUser);
+
     void unblockUser(String userUuid, User currentUser);
 }

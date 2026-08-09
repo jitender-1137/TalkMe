@@ -30,7 +30,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @DisplayName("EventPublisher (unit)")
 class EventPublisherTest {
 
-    @Mock private RabbitTemplate rabbitTemplate;
+    @Mock
+    private RabbitTemplate rabbitTemplate;
 
     private MessageSentEvent event() {
         return MessageSentEvent.builder()

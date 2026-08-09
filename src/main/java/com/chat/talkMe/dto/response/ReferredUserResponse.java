@@ -5,7 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** One person who joined via the current user's invite link. Public, non-PII fields only. */
+/**
+ * One person who joined via the current user's invite link. Public, non-PII fields only.
+ */
 @Data
 @Builder
 @NoArgsConstructor

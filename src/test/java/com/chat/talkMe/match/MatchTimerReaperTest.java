@@ -28,7 +28,8 @@ import static org.mockito.Mockito.verify;
 @DisplayName("MatchTimerReaper (unit)")
 class MatchTimerReaperTest {
 
-    @Mock private MatchTimerService matchTimerService;
+    @Mock
+    private MatchTimerService matchTimerService;
 
     private MatchTimerReaper reaper;
 

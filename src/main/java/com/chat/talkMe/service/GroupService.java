@@ -25,25 +25,37 @@ public interface GroupService {
 
     void removeMember(String chatUuid, String memberUuid, User currentUser);
 
-    /** Promote/demote: change a member's role (OWNER-only in MVP). */
+    /**
+     * Promote/demote: change a member's role (OWNER-only in MVP).
+     */
     void setRole(String chatUuid, String memberUuid, MemberRole role, User currentUser);
 
     void leaveGroup(String chatUuid, User currentUser);
 
     void transferOwnership(String chatUuid, String newOwnerUuid, User currentUser);
 
-    /** Discover public channels/rooms. type = "channel" | "room" (null = both). */
+    /**
+     * Discover public channels/rooms. type = "channel" | "room" (null = both).
+     */
     List<ChatResponse> discover(String type, String query, String tag, User currentUser);
 
-    /** Join a public, open-join channel/room. Returns the joined chat. */
+    /**
+     * Join a public, open-join channel/room. Returns the joined chat.
+     */
     ChatResponse joinChat(String chatUuid, User currentUser);
 
-    /** Accept a pending group invite (join the group). */
+    /**
+     * Accept a pending group invite (join the group).
+     */
     ChatResponse acceptGroupInvite(String chatUuid, User currentUser);
 
-    /** Decline a pending group invite. */
+    /**
+     * Decline a pending group invite.
+     */
     void declineGroupInvite(String chatUuid, User currentUser);
 
-    /** Report a group/channel/room for review. */
+    /**
+     * Report a group/channel/room for review.
+     */
     void reportChat(String chatUuid, String reason, String details, User currentUser);
 }

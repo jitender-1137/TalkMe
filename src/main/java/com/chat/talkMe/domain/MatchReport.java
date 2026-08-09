@@ -1,9 +1,19 @@
 package com.chat.talkMe.domain;
 
-import jakarta.persistence.*;
-import java.time.Instant;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+
+import java.time.Instant;
 
 @Entity
 @Table(name = "match_reports")
@@ -33,13 +43,17 @@ public class MatchReport extends BaseEntity {
     private String details;
 
     // ── Moderation review lifecycle ───────────────────────────────────────────
-    /** PENDING → (ACTION_TAKEN | DISMISSED). Reviewed reports leave PENDING. */
+    /**
+     * PENDING → (ACTION_TAKEN | DISMISSED). Reviewed reports leave PENDING.
+     */
     @ColumnDefault("'PENDING'")
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "PENDING";
 
-    /** What the admin did: NONE / REVIEWED / WARNED / BANNED_REPORTED. */
+    /**
+     * What the admin did: NONE / REVIEWED / WARNED / BANNED_REPORTED.
+     */
     @Column(name = "action_taken", length = 30)
     private String actionTaken;
 

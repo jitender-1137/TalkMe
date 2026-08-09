@@ -62,15 +62,24 @@ import static org.mockito.Mockito.when;
 @DisplayName("RelationshipJourneyServiceImpl (unit)")
 class RelationshipJourneyServiceImplTest {
 
-    @Mock private RelationshipMilestoneRepository milestoneRepository;
-    @Mock private FriendRepository friendRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private ChatRepository chatRepository;
-    @Mock private MessageRepository messageRepository;
-    @Mock private MessageAttachmentRepository messageAttachmentRepository;
-    @Mock private GameSessionRepository gameSessionRepository;
-    @Mock private ObjectProvider<RelationshipJourneyService> selfProvider;
-    @Mock private RelationshipJourneyService selfProxy;
+    @Mock
+    private RelationshipMilestoneRepository milestoneRepository;
+    @Mock
+    private FriendRepository friendRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private ChatRepository chatRepository;
+    @Mock
+    private MessageRepository messageRepository;
+    @Mock
+    private MessageAttachmentRepository messageAttachmentRepository;
+    @Mock
+    private GameSessionRepository gameSessionRepository;
+    @Mock
+    private ObjectProvider<RelationshipJourneyService> selfProvider;
+    @Mock
+    private RelationshipJourneyService selfProxy;
 
     private RelationshipJourneyServiceImpl service;
 
@@ -116,7 +125,9 @@ class RelationshipJourneyServiceImplTest {
         return c;
     }
 
-    /** Stub the pair as active friends (viewer→other direction), formed at {@code formedAt}. */
+    /**
+     * Stub the pair as active friends (viewer→other direction), formed at {@code formedAt}.
+     */
     private void friendsSince(Instant formedAt) {
         lenient().when(friendRepository.findByUserAndFriend(viewer, other))
                 .thenReturn(Optional.of(friendFormedAt(formedAt)));

@@ -119,7 +119,9 @@ class StoryControllerUnitTest {
                 .audience("EVERYONE").viewedByMe(false).build();
     }
 
-    /** A story enriched with the owner-facing fields (view count / ownership / archive flag). */
+    /**
+     * A story enriched with the owner-facing fields (view count / ownership / archive flag).
+     */
     private static StoryResponse ownStory(String id, String mediaUrl, long viewCount, boolean expired) {
         return StoryResponse.builder()
                 .id(id).mediaUrl(mediaUrl).caption("A caption")

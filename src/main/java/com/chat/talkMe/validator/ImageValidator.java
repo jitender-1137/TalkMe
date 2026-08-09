@@ -2,6 +2,7 @@ package com.chat.talkMe.validator;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+
 import java.util.Set;
 
 public class ImageValidator implements ConstraintValidator<ValidImage, String> {

@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -26,10 +28,14 @@ public class StorageServiceImpl implements StorageService {
 
     private final MediaStorage mediaStorage;
 
-    /** Resolves the ffmpeg binary (bundled with the app by default). */
+    /**
+     * Resolves the ffmpeg binary (bundled with the app by default).
+     */
     private final FfmpegSupport ffmpeg;
 
-    /** Max wall-clock time for a single transcode before we give up. */
+    /**
+     * Max wall-clock time for a single transcode before we give up.
+     */
     private static final long TRANSCODE_TIMEOUT_MINUTES = 5;
 
     public StorageServiceImpl(MediaStorage mediaStorage, FfmpegSupport ffmpeg) {
@@ -119,7 +125,9 @@ public class StorageServiceImpl implements StorageService {
         }
     }
 
-    /** Normalize the subdir: trim, drop leading/trailing slashes, reject traversal. */
+    /**
+     * Normalize the subdir: trim, drop leading/trailing slashes, reject traversal.
+     */
     private String normalizeSubdir(String subdir) {
         if (subdir == null || subdir.isBlank()) return "";
         String s = subdir.trim().replaceAll("^/+", "").replaceAll("/+$", "");

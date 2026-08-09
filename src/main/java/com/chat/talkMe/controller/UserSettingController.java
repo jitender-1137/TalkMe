@@ -39,7 +39,9 @@ public class UserSettingController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Settings updated successfully", "TM_066"));
     }
 
-    /** Dedicated, param-based update for the "who can message me" preference. */
+    /**
+     * Dedicated, param-based update for the "who can message me" preference.
+     */
     @PutMapping("/messaging-privacy")
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateMessagingPrivacy(
             @RequestParam("value") String value,
@@ -49,7 +51,9 @@ public class UserSettingController {
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Settings updated successfully", "TM_066"));
     }
 
-    /** Dedicated, param-based update for the "who can add me to groups/rooms" preference. */
+    /**
+     * Dedicated, param-based update for the "who can add me to groups/rooms" preference.
+     */
     @PutMapping("/group-add-privacy")
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateGroupAddPrivacy(
             @RequestParam("value") String value,

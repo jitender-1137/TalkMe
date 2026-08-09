@@ -12,7 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
  * RabbitMQ publish, and Redis cache updates. Isolated from Spring's default
  * SimpleAsyncTaskExecutor so message fan-out never competes with scheduled jobs
  * or other @Async tasks.
- *
+ * <p>
  * Sizing: 8 core / 32 max / 10 000 queue — enough to absorb bursts of concurrent
  * sends without shedding load. CallerRunsPolicy is the backstop: under extreme
  * saturation the HTTP thread does the broadcast itself (same latency as the old
