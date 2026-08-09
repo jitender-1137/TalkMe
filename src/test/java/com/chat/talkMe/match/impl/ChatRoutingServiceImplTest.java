@@ -10,6 +10,7 @@ import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.moderation.ModerationResult;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.NotificationDispatchService;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -125,7 +126,7 @@ class ChatRoutingServiceImplTest {
             MatchSession s = session(ConsentStatus.NONE, false);
             when(sessionService.getSessionByUser(SENDER)).thenReturn(Optional.of(s));
             when(moderationService.moderateText("dirty"))
-                    .thenReturn(ModerationResult.explicit(ModerationResult.Category.SEXUAL, 0.9, java.util.List.of()));
+                    .thenReturn(ModerationResult.explicit(ModerationResult.Category.SEXUAL, 0.9, List.of()));
 
             service.relayMessage(SENDER, "dirty", "c1");
 
@@ -139,7 +140,7 @@ class ChatRoutingServiceImplTest {
             when(sessionService.getSessionByUser(SENDER))
                     .thenReturn(Optional.of(session(ConsentStatus.GRANTED, false)));
             when(moderationService.moderateText("dirty"))
-                    .thenReturn(ModerationResult.explicit(ModerationResult.Category.SEXUAL, 0.9, java.util.List.of()));
+                    .thenReturn(ModerationResult.explicit(ModerationResult.Category.SEXUAL, 0.9, List.of()));
             recipientOnline();
 
             service.relayMessage(SENDER, "dirty", "c1");

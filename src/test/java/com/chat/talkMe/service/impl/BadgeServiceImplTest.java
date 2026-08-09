@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -450,7 +451,7 @@ class BadgeServiceImplTest {
             when(userBadgeRepository.findByUserAndBadgeType(recipient, TYPE))
                     .thenReturn(Optional.empty());
             when(userBadgeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-            org.mockito.Mockito.doThrow(new RuntimeException("ledger down"))
+            Mockito.doThrow(new RuntimeException("ledger down"))
                     .when(reputationRecorder).record(any(), any(), any());
 
             BadgeResponse res = service.endorse(endorser, rid.toString(), TYPE);

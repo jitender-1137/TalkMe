@@ -86,7 +86,7 @@ class FeatureAccessServiceImplTest {
         // with a null loader during recording, which would otherwise NPE.
         lenient().when(cache.getOrCompute(anyLong(), any())).thenAnswer(inv -> {
             Supplier<?> loader = inv.getArgument(1, Supplier.class);
-            return loader == null ? java.util.Set.of() : loader.get();
+            return loader == null ? Set.of() : loader.get();
         });
     }
 

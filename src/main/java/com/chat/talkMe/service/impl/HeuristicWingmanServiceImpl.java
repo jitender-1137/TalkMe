@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -177,7 +178,7 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
     // ── Rewrite my message ───────────────────────────────────────────────────────
 
     /** Tone → (prefix, suffix) decoration templates for the heuristic rewriter. */
-    private static final java.util.Map<String, String[]> TONE_TEMPLATES = java.util.Map.of(
+    private static final Map<String, String[]> TONE_TEMPLATES = Map.of(
             "friendly", new String[]{"Hey! ", " 😊"},
             "flirty", new String[]{"", " 😉"},
             "casual", new String[]{"", " haha"},

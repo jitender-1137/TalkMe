@@ -9,10 +9,12 @@ import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.JwtTokensResponse;
 import com.chat.talkMe.dto.response.LoginResponse;
 import com.chat.talkMe.dto.response.SessionResponse;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.GlobalExceptionHandler;
 import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.AuthService;
@@ -31,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -580,7 +583,7 @@ class AuthControllerUnitTest {
         void shouldReturn429WhenServiceRateLimitsLogin() throws Exception {
             allowCaptcha();
             when(authService.login(any(), any(), any(), any()))
-                    .thenThrow(new com.chat.talkMe.exception.TooManyRequestsException(
+                    .thenThrow(new TooManyRequestsException(
                             "Too many failed attempts", "TM_025"));
 
             mockMvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON).content(CREDENTIALS))
@@ -950,7 +953,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldReturn403WhenSpringAccessDeniedRaised() throws Exception {
             authenticateAsTestUser();
-            doThrow(new org.springframework.security.access.AccessDeniedException("denied"))
+            doThrow(new AccessDeniedException("denied"))
                     .when(authService).revokeSession(any(), any());
 
             mockMvc.perform(delete(SESSIONS + "/x"))
@@ -1072,7 +1075,7 @@ class AuthControllerUnitTest {
 
         @Test
         void shouldReturn400WhenServiceRejectsToken() throws Exception {
-            doThrow(new com.chat.talkMe.exception.BadRequestException("Token expired", "TM_038"))
+            doThrow(new BadRequestException("Token expired", "TM_038"))
                     .when(authService).resetPassword(any());
 
             mockMvc.perform(post(RESET_PASSWORD).contentType(MediaType.APPLICATION_JSON)
@@ -1168,7 +1171,7 @@ class AuthControllerUnitTest {
 
         @Test
         void shouldReturn400WhenServiceRejectsToken() throws Exception {
-            doThrow(new com.chat.talkMe.exception.BadRequestException("Invalid or expired token", "TM_407"))
+            doThrow(new BadRequestException("Invalid or expired token", "TM_407"))
                     .when(authService).verifyEmail(any());
 
             mockMvc.perform(post(VERIFY_EMAIL).contentType(MediaType.APPLICATION_JSON)

@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -76,5 +77,5 @@ public class UserResponse {
     private long postsCount;
 
     /** Granted role names (e.g. ["ROLE_USER","ROLE_SUPER_ADMIN"]) — drives the admin UI guard. */
-    private java.util.List<String> roles;
+    private List<String> roles;
 }

@@ -3,6 +3,7 @@ package com.chat.talkMe.controller;
 import com.chat.talkMe.dto.response.ListenerShiftResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
+import com.chat.talkMe.enums.ListenerReason;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.ListenerService;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +55,7 @@ public class ListenerController {
     public ResponseEntity<ResponseDto<ListenerShiftResponse>> request(
             @RequestBody(required = false) RequestListenerBody body,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        com.chat.talkMe.enums.ListenerReason reason = com.chat.talkMe.enums.ListenerReason
+        ListenerReason reason = ListenerReason
                 .fromWireOrDefault(body == null ? null : body.reason());
         ListenerShiftResponse match = listenerService.requestListener(userDetails.getUser(), reason);
         return ResponseEntity.ok(SuccessResponseDto.success(match, "Connected you with a listener", "TM_992"));

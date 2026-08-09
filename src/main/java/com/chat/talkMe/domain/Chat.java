@@ -2,8 +2,10 @@ package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.ChatVisibility;
+import com.chat.talkMe.enums.CityLocation;
 import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.JoinPolicy;
+import com.chat.talkMe.enums.RoomMode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -127,14 +129,14 @@ public class Chat extends BaseEntity {
     /** Which Virtual Night City district this ROOM belongs to, if any (feature #25). */
     @Enumerated(EnumType.STRING)
     @Column(name = "city_location", length = 32)
-    private com.chat.talkMe.enums.CityLocation cityLocation;
+    private CityLocation cityLocation;
 
     /** Behavioural mode of a ROOM (features #26/#27). STANDARD for every ordinary room. */
     @Enumerated(EnumType.STRING)
     @Column(name = "room_mode", length = 20, nullable = false)
     @ColumnDefault("'STANDARD'")
     @Builder.Default
-    private com.chat.talkMe.enums.RoomMode roomMode = com.chat.talkMe.enums.RoomMode.STANDARD;
+    private RoomMode roomMode = RoomMode.STANDARD;
 
     /** True for GROUP/CHANNEL/ROOM. Convenience delegate to chatType. */
     @Transient

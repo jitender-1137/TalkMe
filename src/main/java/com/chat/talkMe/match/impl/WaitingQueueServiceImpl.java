@@ -1,6 +1,9 @@
 package com.chat.talkMe.match.impl;
 
 import com.chat.talkMe.match.WaitingQueueService;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -41,15 +44,15 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     }
 
     @Override
-    public java.util.List<String> peekCandidates(int max, String exclude) {
+    public List<String> peekCandidates(int max, String exclude) {
         // The queue is a LIST filled via leftPush, so index 0 is newest; read the TAIL
         // range (oldest-first) to favour users who've waited longest.
         Long size = redisTemplate.opsForList().size(QUEUE_KEY);
-        if (size == null || size == 0) return java.util.List.of();
-        java.util.List<String> all = redisTemplate.opsForList().range(QUEUE_KEY, 0, -1);
-        if (all == null || all.isEmpty()) return java.util.List.of();
-        java.util.Collections.reverse(all); // oldest-first
-        java.util.List<String> out = new java.util.ArrayList<>();
+        if (size == null || size == 0) return List.of();
+        List<String> all = redisTemplate.opsForList().range(QUEUE_KEY, 0, -1);
+        if (all == null || all.isEmpty()) return List.of();
+        Collections.reverse(all); // oldest-first
+        List<String> out = new ArrayList<>();
         for (String u : all) {
             if (u == null || u.equals(exclude)) continue;
             out.add(u);

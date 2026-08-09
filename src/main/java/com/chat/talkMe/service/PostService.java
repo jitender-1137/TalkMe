@@ -6,6 +6,7 @@ import com.chat.talkMe.dto.request.PostRequest;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.PostCommentResponse;
 import com.chat.talkMe.dto.response.PostResponse;
+import java.time.Instant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -20,7 +21,7 @@ public interface PostService {
     void deletePost(String postUuid, User currentUser);
 
     /** Soft-delete temporary posts whose TTL has elapsed; returns how many were reaped. */
-    int reapExpiredPosts(java.time.Instant now);
+    int reapExpiredPosts(Instant now);
     void likePost(String postUuid, User currentUser);
     void unlikePost(String postUuid, User currentUser);
     Page<AuthUserResponse> getPostLikes(String postUuid, Pageable pageable, User currentUser);

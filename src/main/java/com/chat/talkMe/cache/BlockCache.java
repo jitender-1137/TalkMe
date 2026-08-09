@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -59,7 +60,7 @@ public class BlockCache {
         }
         Set<Long> ids = blockUserRepository.findByUser(blocker).stream()
                 .map(b -> b.getBlocked() != null ? b.getBlocked().getId() : null)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         try {
             redis.opsForValue().set(k,

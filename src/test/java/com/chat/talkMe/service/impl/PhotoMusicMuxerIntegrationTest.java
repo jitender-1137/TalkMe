@@ -2,6 +2,8 @@ package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.storage.StorageProperties;
+import org.bytedeco.ffmpeg.ffmpeg;
+import org.bytedeco.javacpp.Loader;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -139,11 +141,11 @@ class PhotoMusicMuxerIntegrationTest {
     private static String resolveFfmpeg() {
         try {
             try {
-                org.bytedeco.javacpp.Loader.load(Class.forName("org.bytedeco.openh264.global.openh264"));
+                Loader.load(Class.forName("org.bytedeco.openh264.global.openh264"));
             } catch (Throwable ignored) {
                 // ffmpeg preset resolves openh264 transitively
             }
-            return org.bytedeco.javacpp.Loader.load(org.bytedeco.ffmpeg.ffmpeg.class);
+            return Loader.load(ffmpeg.class);
         } catch (Throwable t) {
             return null;
         }

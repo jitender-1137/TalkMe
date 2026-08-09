@@ -21,12 +21,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -348,7 +350,7 @@ class CityServiceImplTest {
         @DisplayName("room with tags → tag enum names mapped into the card")
         void roomWithTagsMapsTagNames() {
             Chat curated = room("neon", true);
-            curated.setTags(new java.util.HashSet<>(Set.of(Interest.MUSIC, Interest.GAMING)));
+            curated.setTags(new HashSet<>(Set.of(Interest.MUSIC, Interest.GAMING)));
             when(chatRepository.findByCityLocation(CityLocation.NEON_DISTRICT)).thenReturn(List.of(curated));
             when(memberCountCache.get(curated)).thenReturn(3);
 
@@ -389,7 +391,7 @@ class CityServiceImplTest {
             when(presenceService.getOnlineUsernames()).thenReturn(Set.of("alice"));
             when(setOps.members(anyString())).thenReturn(Set.of("alice"));
             when(chatRepository.findByCityLocation(CityLocation.NEON_DISTRICT)).thenReturn(List.of());
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
 
             CityDistrictDetailResponse out = service.enterDistrict(alice, SLUG);

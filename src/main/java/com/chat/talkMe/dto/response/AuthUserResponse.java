@@ -1,5 +1,6 @@
 package com.chat.talkMe.dto.response;
-
+import java.util.List;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,7 +32,7 @@ public class AuthUserResponse {
     private String city;
     private String mobileNumber;
     private String bio;
-    private java.util.Set<String> interests;
+    private Set<String> interests;
     // ── Optional "About me" attributes (self view) ──
     private String occupation;
     private String education;
@@ -48,8 +49,8 @@ public class AuthUserResponse {
     // ── Late-Night Social attributes ──
     private String mood;
     private String conversationEnergy;
-    private java.util.Set<String> languages;
-    private java.util.Set<String> lookingFor;
+    private Set<String> languages;
+    private Set<String> lookingFor;
     private String voiceIntroUrl;
     private Integer voiceIntroDurationMs;
     private int profileCompletion;
@@ -60,11 +61,11 @@ public class AuthUserResponse {
     private Boolean messagingFriendsOnly;
     /** Granted role names — kept in sync with UserResponse so the /admin guard works
      *  even from the /auth/me-seeded profile cache (before /users/me refetches). */
-    private java.util.List<String> roles;
+    private List<String> roles;
     /**
      * Effective feature wire-names this user may use. Self-only: populated ONLY on the
      * authenticated-user paths (login / /auth/me / updateProfile) and never in the mapper,
      * so third-party views (post likes, story viewers, chat peers) never leak entitlements.
      */
-    private java.util.Set<String> features;
+    private Set<String> features;
 }

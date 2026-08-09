@@ -45,11 +45,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -303,7 +305,7 @@ class GroupServiceImplTest {
 
             // owner + exactly the one friend saved (2 member saves total).
             ArgumentCaptor<ChatMember> cap = ArgumentCaptor.forClass(ChatMember.class);
-            verify(chatMemberRepository, org.mockito.Mockito.times(2)).save(cap.capture());
+            verify(chatMemberRepository, Mockito.times(2)).save(cap.capture());
             assertThat(cap.getAllValues()).anySatisfy(m -> {
                 assertThat(m.getUser()).isEqualTo(friend);
                 assertThat(m.getRole()).isEqualTo(MemberRole.MEMBER);
@@ -338,7 +340,7 @@ class GroupServiceImplTest {
             verify(chatRepository).save(chatCap.capture());
             assertThat(chatCap.getValue().isAllowNonFriends()).isTrue();
             // owner + the non-friend saved (2 member saves), and NO friendship lookup happened.
-            verify(chatMemberRepository, org.mockito.Mockito.times(2)).save(any(ChatMember.class));
+            verify(chatMemberRepository, Mockito.times(2)).save(any(ChatMember.class));
             verify(friendRepository, never()).findByUserAndFriend(any(), any());
         }
 
@@ -347,12 +349,12 @@ class GroupServiceImplTest {
         void skipsBlankNullUndefinedMemberIds() {
             CreateGroupRequest req = new CreateGroupRequest();
             req.setName("Squad");
-            req.setMemberIds(java.util.Arrays.asList(null, "   ", "undefined", "null"));
+            req.setMemberIds(Arrays.asList(null, "   ", "undefined", "null"));
 
             service.createGroup(req, creator);
 
             // Only the owner is saved; every member id was rejected before any lookup.
-            verify(chatMemberRepository, org.mockito.Mockito.times(1)).save(any(ChatMember.class));
+            verify(chatMemberRepository, Mockito.times(1)).save(any(ChatMember.class));
             verify(userRepository, never()).findByUuid(any());
         }
     }

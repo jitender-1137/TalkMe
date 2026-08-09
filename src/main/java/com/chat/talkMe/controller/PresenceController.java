@@ -6,10 +6,12 @@ import com.chat.talkMe.dto.response.PresenceResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.enums.PresenceStatus;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.PresenceService;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +36,7 @@ public class PresenceController {
         try {
             status = PresenceStatus.valueOf(statusStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new com.chat.talkMe.exception.BadRequestException("Invalid presence status value. Allowed values are ONLINE, OFFLINE, AWAY, IDLE, INVISIBLE.", "TM_PRESENCE_INVALID_STATUS");
+            throw new BadRequestException("Invalid presence status value. Allowed values are ONLINE, OFFLINE, AWAY, IDLE, INVISIBLE.", "TM_PRESENCE_INVALID_STATUS");
         }
 
         presenceService.setStatus(userDetails.getUser(), status);
@@ -95,7 +97,7 @@ public class PresenceController {
             // from Redis (the DB values are only written on OFFLINE and are otherwise stale);
             // flags come from the durable DB record. This is what the client uses to hydrate
             // the privacy toggles correctly on load (incl. a fresh browser/device).
-            java.time.Instant lastSeen = presenceService.getLastSeen(targetUser);
+            Instant lastSeen = presenceService.getLastSeen(targetUser);
             builder.status(presenceService.getRawStatus(targetUser).name())
                     .lastSeenAt(lastSeen != null ? lastSeen.toString() : null)
                     .ghostModeEnabled(targetPresence.isGhostModeEnabled())
@@ -107,7 +109,7 @@ public class PresenceController {
             // the service so every consumer is consistent.
             PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
             builder.status(apparentStatus.name());
-            java.time.Instant lastSeen = presenceService.getApparentLastSeen(targetUser);
+            Instant lastSeen = presenceService.getApparentLastSeen(targetUser);
             builder.lastSeenAt(lastSeen != null ? lastSeen.toString() : null);
 
             // Hide configuration flags for other users

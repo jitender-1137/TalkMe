@@ -11,6 +11,8 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.FriendRepository;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -132,7 +134,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                         Object payloadObj = message.getPayload();
                         String payloadStr = "";
                         if (payloadObj instanceof byte[]) {
-                            payloadStr = new String((byte[]) payloadObj, java.nio.charset.StandardCharsets.UTF_8);
+                            payloadStr = new String((byte[]) payloadObj, StandardCharsets.UTF_8);
                         } else if (payloadObj instanceof String) {
                             payloadStr = (String) payloadObj;
                         }
@@ -146,7 +148,7 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                                     String currentUsername = userDetails.getUsername();
                                     
                                     try {
-                                        java.util.Optional<Chat> chatOpt = chatRepository.findByUuidWithMembers(java.util.UUID.fromString(chatUuid));
+                                        Optional<Chat> chatOpt = chatRepository.findByUuidWithMembers(UUID.fromString(chatUuid));
                                         if (chatOpt.isPresent()) {
                                             Chat chat = chatOpt.get();
                                             if (chat.getChatType() == ChatType.PRIVATE) {

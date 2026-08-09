@@ -3,6 +3,8 @@ package com.chat.talkMe.dto.request;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.chat.talkMe.dto.response.AudioTrackDto;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @Data
@@ -17,11 +19,11 @@ public class PostRequest {
     private List<PostMediaRequest> media;
 
     // Optional: when present, this post is created as a poll.
-    @jakarta.validation.Valid
+    @Valid
     private PollRequest poll;
 
     // Optional soundtrack.
-    private com.chat.talkMe.dto.response.AudioTrackDto audio;
+    private AudioTrackDto audio;
 
     // Who can see the post: "EVERYONE" (default) or "FRIENDS".
     private String audience;

@@ -1,9 +1,12 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.cache.FeatureAccessCache;
 import com.chat.talkMe.domain.RefreshToken;
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.Session;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserSetting;
+import com.chat.talkMe.dto.OAuthUserInfo;
 import com.chat.talkMe.dto.request.ChangePasswordRequest;
 import com.chat.talkMe.dto.request.ForgotPasswordRequest;
 import com.chat.talkMe.dto.request.GuestLoginRequest;
@@ -15,27 +18,39 @@ import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.JwtTokensResponse;
 import com.chat.talkMe.dto.response.LoginResponse;
 import com.chat.talkMe.dto.response.SessionResponse;
+import com.chat.talkMe.enums.ReputationEventType;
 import com.chat.talkMe.exception.ConflictException;
+import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.mapper.SessionMapper;
 import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.PermissionRepository;
 import com.chat.talkMe.repository.RefreshTokenRepository;
 import com.chat.talkMe.repository.RoleRepository;
 import com.chat.talkMe.repository.SessionRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.security.JwtTokenProvider;
 import com.chat.talkMe.service.AuthService;
 import com.chat.talkMe.service.EmailService;
+import com.chat.talkMe.service.FeatureAccessService;
+import com.chat.talkMe.service.LoginAttemptService;
+import com.chat.talkMe.service.PwnedPasswordService;
+import com.chat.talkMe.service.ReputationRecorder;
+import com.chat.talkMe.service.WebPushService;
+import com.chat.talkMe.util.ProfileCompletion;
 import com.chat.talkMe.dto.response.CountryDetectionResult;
 import com.chat.talkMe.service.CountryDetectionService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -48,9 +63,14 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -70,16 +90,16 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final SessionMapper sessionMapper;
     private final CountryDetectionService countryDetectionService;
-    private final com.chat.talkMe.service.LoginAttemptService loginAttemptService;
+    private final LoginAttemptService loginAttemptService;
     private final StringRedisTemplate redisTemplate;
-    private final com.chat.talkMe.service.PwnedPasswordService pwnedPasswordService;
+    private final PwnedPasswordService pwnedPasswordService;
     private final EmailService emailService;
-    private final com.chat.talkMe.service.WebPushService webPushService;
-    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
-    private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
-    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
-    private final com.chat.talkMe.cache.FeatureAccessCache featureAccessCache;
-    private final com.chat.talkMe.service.ReputationRecorder reputationRecorder;
+    private final WebPushService webPushService;
+    private final ContentModerationService moderationService;
+    private final UserSettingRepository userSettingRepository;
+    private final FeatureAccessService featureAccessService;
+    private final FeatureAccessCache featureAccessCache;
+    private final ReputationRecorder reputationRecorder;
 
     @Value("${security.jwt.access-token-expiration-ms}")
     private long accessTokenExpirationMs;
@@ -212,7 +232,7 @@ public class AuthServiceImpl implements AuthService {
 
         // The display name is publicly visible — reject a non-clean one at signup.
         if (moderationService.moderateText(request.getName()).isExplicit()) {
-            throw new com.chat.talkMe.exception.ContentModerationException(
+            throw new ContentModerationException(
                     "Your display name contains content that violates our community guidelines.");
         }
 
@@ -301,7 +321,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public LoginResponse oauthLogin(com.chat.talkMe.dto.OAuthUserInfo info, String userAgent,
+    public LoginResponse oauthLogin(OAuthUserInfo info, String userAgent,
                                     HttpServletRequest httpRequest) {
         // Geo-locate from the callback request IP — the OAuth callback is a top-level
         // browser navigation so the client IP is the real user's. Google's profile has
@@ -348,14 +368,14 @@ public class AuthServiceImpl implements AuthService {
                 newlyProvisioned = true;
                 log.info("New Google user provisioned: {} (email: {}, country: {}, source: {})",
                         user.getUsername(), info.getEmail(), detection.getCountry(), detection.getSource());
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            } catch (DataIntegrityViolationException e) {
                 // Concurrent first-login for the same identity: the unique google_id/
                 // email constraint rejected the duplicate. Reuse the row that won the
                 // race so the same Google account always maps to one user id.
                 user = userRepository.findByGoogleId(info.getProviderId())
                         .or(() -> oauthEmail != null
                                 ? userRepository.findByEmailIgnoreCase(oauthEmail)
-                                : java.util.Optional.empty())
+                                : Optional.empty())
                         .orElseThrow(() -> e);
                 log.info("Reused existing Google user after create race: {}", user.getUsername());
             }
@@ -483,7 +503,7 @@ public class AuthServiceImpl implements AuthService {
             // the race is a benign "already rotated" attempt → give it a clean 401
             // (TM_026), which the client handles by re-authenticating.
             refreshTokenRepository.saveAndFlush(token);
-        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+        } catch (OptimisticLockingFailureException e) {
             throw new UnauthorizedException(
                     "Session was just refreshed by another request. Please log in again.", "TM_026");
         }
@@ -693,16 +713,16 @@ public class AuthServiceImpl implements AuthService {
                 return;
             }
             boolean alertsOn = userSettingRepository.findByUser(user)
-                    .map(com.chat.talkMe.domain.UserSetting::isEmailLoginAlerts)
+                    .map(UserSetting::isEmailLoginAlerts)
                     .orElse(true);
             if (!alertsOn) {
                 return;
             }
             // Show the time in the LOGIN LOCATION's own timezone (e.g. "August 7 at
             // 10:42 AM (IST)"), falling back to UTC when GeoIP gave no zone.
-            java.time.ZoneId zone = detection != null ? detection.getZoneId() : java.time.ZoneOffset.UTC;
-            String when = java.time.format.DateTimeFormatter
-                    .ofPattern("MMMM d 'at' h:mm a (zzz)", java.util.Locale.ENGLISH)
+            ZoneId zone = detection != null ? detection.getZoneId() : ZoneOffset.UTC;
+            String when = DateTimeFormatter
+                    .ofPattern("MMMM d 'at' h:mm a (zzz)", Locale.ENGLISH)
                     .withZone(zone)
                     .format(Instant.now());
             String device = friendlyDevice(userAgent);
@@ -1050,12 +1070,12 @@ public class AuthServiceImpl implements AuthService {
             user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());
         }
         // Recompute the cached completion score from the merged state.
-        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
+        user.setProfileCompletion(ProfileCompletion.compute(user));
 
         user = userRepository.save(user);
         if (user.getProfileCompletion() >= 100) {
             reputationRecorder.record(user.getId(),
-                    com.chat.talkMe.enums.ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
+                    ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
         }
         log.info("User profile updated successfully for: {}", user.getUsername());
         // Age (and later verification) can change entitlement — evict so the returned

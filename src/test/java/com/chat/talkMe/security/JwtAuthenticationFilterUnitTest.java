@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -55,7 +56,7 @@ class JwtAuthenticationFilterUnitTest {
     }
 
     private UserDetails enabledUser() {
-        UserDetails ud = org.mockito.Mockito.mock(UserDetails.class);
+        UserDetails ud = Mockito.mock(UserDetails.class);
         when(ud.isEnabled()).thenReturn(true);
         doReturn(List.of()).when(ud).getAuthorities();
         return ud;
@@ -121,7 +122,7 @@ class JwtAuthenticationFilterUnitTest {
 
     @Test
     void shouldRejectDisabledAccountEvenWithValidToken() throws Exception {
-        UserDetails disabled = org.mockito.Mockito.mock(UserDetails.class);
+        UserDetails disabled = Mockito.mock(UserDetails.class);
         when(disabled.isEnabled()).thenReturn(false);
         request.addHeader("Authorization", "Bearer good.token");
         when(tokenProvider.validateToken("good.token")).thenReturn(true);

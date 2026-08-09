@@ -1,7 +1,9 @@
 package com.chat.talkMe.domain;
 
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "match_reports")
@@ -32,7 +34,7 @@ public class MatchReport extends BaseEntity {
 
     // ── Moderation review lifecycle ───────────────────────────────────────────
     /** PENDING → (ACTION_TAKEN | DISMISSED). Reviewed reports leave PENDING. */
-    @org.hibernate.annotations.ColumnDefault("'PENDING'")
+    @ColumnDefault("'PENDING'")
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private String status = "PENDING";
@@ -45,7 +47,7 @@ public class MatchReport extends BaseEntity {
     private String reviewedBy;
 
     @Column(name = "reviewed_at")
-    private java.time.Instant reviewedAt;
+    private Instant reviewedAt;
 
     @Column(name = "resolution_note", columnDefinition = "TEXT")
     private String resolutionNote;

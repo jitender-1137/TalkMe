@@ -7,16 +7,22 @@ import com.chat.talkMe.repository.UserPresenceRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.websocket.PresenceNotification;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 
@@ -255,7 +261,7 @@ public class PresenceServiceImpl implements PresenceService {
     @Transactional
     public int reapTimedOutUsers(Duration timeout) {
         long cutoff = Instant.now().toEpochMilli() - timeout.toMillis();
-        java.util.Set<String> stale = redisTemplate.opsForZSet().rangeByScore(HEARTBEAT_ZSET, 0, cutoff);
+        Set<String> stale = redisTemplate.opsForZSet().rangeByScore(HEARTBEAT_ZSET, 0, cutoff);
         if (stale == null || stale.isEmpty()) {
             return 0;
         }
@@ -302,7 +308,7 @@ public class PresenceServiceImpl implements PresenceService {
     @Transactional
     public int reapExpiredIdleUsers() {
         long now = Instant.now().toEpochMilli();
-        java.util.Set<String> due = redisTemplate.opsForZSet().rangeByScore(IDLE_DEADLINE_ZSET, 0, now);
+        Set<String> due = redisTemplate.opsForZSet().rangeByScore(IDLE_DEADLINE_ZSET, 0, now);
         if (due == null || due.isEmpty()) {
             return 0;
         }
@@ -331,7 +337,7 @@ public class PresenceServiceImpl implements PresenceService {
     @Transactional
     public int reapBackgroundedAwayUsers() {
         long now = Instant.now().toEpochMilli();
-        java.util.Set<String> due = redisTemplate.opsForZSet().rangeByScore(AWAY_DEADLINE_ZSET, 0, now);
+        Set<String> due = redisTemplate.opsForZSet().rangeByScore(AWAY_DEADLINE_ZSET, 0, now);
         if (due == null || due.isEmpty()) {
             return 0;
         }
@@ -412,15 +418,15 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    public java.util.Set<String> getOnlineUsernames() {
-        return liveUsernamesWithStatus(java.util.EnumSet.of(PresenceStatus.ONLINE));
+    public Set<String> getOnlineUsernames() {
+        return liveUsernamesWithStatus(EnumSet.of(PresenceStatus.ONLINE));
     }
 
     @Override
-    public java.util.Set<String> getAwayUsernames() {
+    public Set<String> getAwayUsernames() {
         // "Away" = IDLE. (AWAY is included defensively, though only IDLE is written
         // to live presence today.)
-        return liveUsernamesWithStatus(java.util.EnumSet.of(PresenceStatus.IDLE, PresenceStatus.AWAY));
+        return liveUsernamesWithStatus(EnumSet.of(PresenceStatus.IDLE, PresenceStatus.AWAY));
     }
 
     /**
@@ -428,14 +434,14 @@ public class PresenceServiceImpl implements PresenceService {
      * {@code wanted} (Invisible mode masked to OFFLINE, so excluded). Backs both
      * {@link #getOnlineUsernames()} and {@link #getAwayUsernames()}.
      */
-    private java.util.Set<String> liveUsernamesWithStatus(java.util.Set<PresenceStatus> wanted) {
+    private Set<String> liveUsernamesWithStatus(Set<PresenceStatus> wanted) {
         // Candidate live users (ONLINE seeds the heartbeat set; IDLE stays in it;
         // OFFLINE removes it).
-        java.util.Set<String> live = redisTemplate.opsForZSet().range(HEARTBEAT_ZSET, 0, -1);
+        Set<String> live = redisTemplate.opsForZSet().range(HEARTBEAT_ZSET, 0, -1);
         if (live == null || live.isEmpty()) {
-            return java.util.Collections.emptySet();
+            return Collections.emptySet();
         }
-        java.util.Set<String> result = new java.util.HashSet<>();
+        Set<String> result = new HashSet<>();
         for (String username : live) {
             Map<Object, Object> presence = redisTemplate.opsForHash().entries(REDIS_KEY_PREFIX + username);
             if (presence == null || presence.isEmpty()) {
@@ -470,7 +476,7 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    public java.time.Instant getLastSeen(User user) {
+    public Instant getLastSeen(User user) {
         Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + user.getUsername(), "lastSeenAt");
         if (ls != null) {
             try { return Instant.parse(ls.toString()); } catch (Exception ignored) { /* fall through */ }
@@ -481,7 +487,7 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    public java.time.Instant getApparentLastSeen(User user) {
+    public Instant getApparentLastSeen(User user) {
         // Invisible or Hide-last-seen hides the timestamp from others. Ghost does NOT
         // (ghost only suppresses message receipts; presence is unaffected).
         PresenceFlags flags = readFlags(user);
@@ -497,9 +503,9 @@ public class PresenceServiceImpl implements PresenceService {
     }
 
     @Override
-    public java.util.Set<Long> getGhostUserIds(java.util.Collection<User> users) {
-        if (users == null || users.isEmpty()) return java.util.Collections.emptySet();
-        java.util.Set<Long> ghosts = new java.util.HashSet<>();
+    public Set<Long> getGhostUserIds(Collection<User> users) {
+        if (users == null || users.isEmpty()) return Collections.emptySet();
+        Set<Long> ghosts = new HashSet<>();
         for (User u : users) {
             if (u != null && readFlags(u).ghost()) ghosts.add(u.getId());
         }
@@ -716,7 +722,7 @@ public class PresenceServiceImpl implements PresenceService {
         log.debug("Broadcasting STOMP presence update for user {}: {}", user.getUsername(), status);
         try {
             simpMessagingTemplate.convertAndSend("/topic/presence/" + user.getUsername(), notification);
-        } catch (org.springframework.messaging.MessagingException e) {
+        } catch (MessagingException e) {
             // e.g. "Message broker not active" when the STOMP relay can't reach
             // RabbitMQ. Presence is best-effort — never let it break the connect/
             // disconnect lifecycle (which runs this on the WS event thread).

@@ -13,6 +13,7 @@ import com.chat.talkMe.match.AliasGenerator;
 import com.chat.talkMe.match.MatchPreferenceService;
 import com.chat.talkMe.match.MatchPreferenceSnapshot;
 import com.chat.talkMe.match.MatchSession;
+import com.chat.talkMe.match.MatchTimerService;
 import com.chat.talkMe.match.MatchServerEvent;
 import com.chat.talkMe.match.MatchmakingService;
 import com.chat.talkMe.match.OnlineCountPublisher;
@@ -27,6 +28,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +50,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     private final OnlineCountPublisher onlineCountPublisher;
     private final MatchPreferenceService matchPreferenceService;
     private final CompatibilityService compatibilityService;
-    private final com.chat.talkMe.match.MatchTimerService matchTimerService;
+    private final MatchTimerService matchTimerService;
 
     private static final String ACTIVE_USERS_KEY = "matchmaking:active_users";
     /** How many waiting users to scan when ranking a preference match. */
@@ -182,8 +184,8 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         // Rank all eligible candidates, then atomically claim the best (retrying the
         // next-best if a concurrent seeker claims it first) so two seekers never pair
         // with the same peer.
-        java.util.List<String> ranked = new java.util.ArrayList<>();
-        java.util.Map<String, Integer> scores = new java.util.HashMap<>();
+        List<String> ranked = new ArrayList<>();
+        Map<String, Integer> scores = new HashMap<>();
 
         for (String c : candidates) {
             MatchPreferenceSnapshot cs = matchPreferenceService.load(c).orElse(null);

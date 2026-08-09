@@ -1,14 +1,33 @@
 package com.chat.talkMe.controller;
 
+import com.chat.talkMe.dto.request.AdminCreateUserRequest;
+import com.chat.talkMe.dto.request.AdminUpdateUserRequest;
+import com.chat.talkMe.dto.request.AdminUserFilter;
+import com.chat.talkMe.dto.response.AdminAnalyticsResponse;
+import com.chat.talkMe.dto.response.AdminAttachmentView;
+import com.chat.talkMe.dto.response.AdminAuditView;
 import com.chat.talkMe.dto.response.AdminChatView;
+import com.chat.talkMe.dto.response.AdminConnectorView;
+import com.chat.talkMe.dto.response.AdminFeedbackView;
+import com.chat.talkMe.dto.response.AdminMediaListResponse;
+import com.chat.talkMe.dto.response.AdminMediaOwnershipResponse;
 import com.chat.talkMe.dto.response.AdminMessageView;
+import com.chat.talkMe.dto.response.AdminPostCommentView;
+import com.chat.talkMe.dto.response.AdminPostLikeView;
+import com.chat.talkMe.dto.response.AdminPostView;
+import com.chat.talkMe.dto.response.AdminReportView;
 import com.chat.talkMe.dto.response.AdminStatsResponse;
+import com.chat.talkMe.dto.response.AdminStorageListResponse;
+import com.chat.talkMe.dto.response.AdminTimeseriesPoint;
+import com.chat.talkMe.dto.response.AdminTimeseriesResult;
+import com.chat.talkMe.dto.response.AdminUserFullView;
 import com.chat.talkMe.dto.response.AdminUserView;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.AdminService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,7 +56,7 @@ public class AdminController {
 
     @GetMapping("/users")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminUserView>>> users(
-            @org.springframework.web.bind.annotation.ModelAttribute com.chat.talkMe.dto.request.AdminUserFilter filter,
+            @ModelAttribute AdminUserFilter filter,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "25") int size) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.listUsers(filter, page, size)));
@@ -49,7 +68,7 @@ public class AdminController {
     }
 
     @GetMapping("/users/{uuid}/full")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminUserFullView>> userFull(@PathVariable("uuid") String uuid) {
+    public ResponseEntity<ResponseDto<AdminUserFullView>> userFull(@PathVariable("uuid") String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUserFull(uuid)));
     }
 
@@ -124,7 +143,7 @@ public class AdminController {
     }
 
     @GetMapping("/audit")
-    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView>>> audit(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminAuditView>>> audit(
             @RequestParam(value = "action", required = false) String action,
             @RequestParam(value = "targetType", required = false) String targetType,
             @RequestParam(value = "admin", required = false) String admin,
@@ -140,7 +159,7 @@ public class AdminController {
 
     @PostMapping("/users")
     public ResponseEntity<ResponseDto<AdminUserView>> createUser(
-            @jakarta.validation.Valid @RequestBody com.chat.talkMe.dto.request.AdminCreateUserRequest req,
+            @Valid @RequestBody AdminCreateUserRequest req,
             @AuthenticationPrincipal CustomUserDetails admin) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.createUser(req, name(admin))));
     }
@@ -148,7 +167,7 @@ public class AdminController {
     @PatchMapping("/users/{uuid}")
     public ResponseEntity<ResponseDto<AdminUserView>> updateUser(
             @PathVariable("uuid") String uuid,
-            @RequestBody com.chat.talkMe.dto.request.AdminUpdateUserRequest req,
+            @RequestBody AdminUpdateUserRequest req,
             @AuthenticationPrincipal CustomUserDetails admin) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.updateUser(uuid, req, name(admin))));
     }
@@ -170,19 +189,19 @@ public class AdminController {
     }
 
     @GetMapping("/stats/timeseries")
-    public ResponseEntity<ResponseDto<java.util.List<com.chat.talkMe.dto.response.AdminTimeseriesPoint>>> timeseries(
+    public ResponseEntity<ResponseDto<List<AdminTimeseriesPoint>>> timeseries(
             @RequestParam(value = "days", defaultValue = "30") int days) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getSignupTimeseries(days)));
     }
 
     @GetMapping("/analytics")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminAnalyticsResponse>> analytics(
+    public ResponseEntity<ResponseDto<AdminAnalyticsResponse>> analytics(
             @RequestParam(value = "range", defaultValue = "30d") String range) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getAnalytics(range)));
     }
 
     @GetMapping("/timeseries")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminTimeseriesResult>> timeseriesMetric(
+    public ResponseEntity<ResponseDto<AdminTimeseriesResult>> timeseriesMetric(
             @RequestParam(value = "metric", defaultValue = "messages") String metric,
             @RequestParam(value = "range", defaultValue = "30d") String range,
             @RequestParam(value = "interval", required = false) String interval,
@@ -193,7 +212,7 @@ public class AdminController {
     }
 
     @GetMapping("/attachments")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView>>> attachments(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminAttachmentView>>> attachments(
             @AuthenticationPrincipal CustomUserDetails admin,
             @RequestParam(value = "userId", required = false) String userId,
             @RequestParam(value = "type", required = false) String type,
@@ -205,7 +224,7 @@ public class AdminController {
     }
 
     @GetMapping("/storage/objects")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminStorageListResponse>> storageObjects(
+    public ResponseEntity<ResponseDto<AdminStorageListResponse>> storageObjects(
             @AuthenticationPrincipal CustomUserDetails admin,
             @RequestParam(value = "prefix", required = false) String prefix,
             @RequestParam(value = "category", required = false) String category,
@@ -230,7 +249,7 @@ public class AdminController {
     // ── Media-ownership analytics (media_assets ledger) ─────────────────────────
 
     @GetMapping("/media/stats")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse>> mediaStats(
+    public ResponseEntity<ResponseDto<AdminMediaOwnershipResponse>> mediaStats(
             @AuthenticationPrincipal CustomUserDetails admin,
             @RequestParam(value = "range", defaultValue = "30d") String range) {
         return ResponseEntity.ok(SuccessResponseDto.success(
@@ -238,7 +257,7 @@ public class AdminController {
     }
 
     @GetMapping("/media/user")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminMediaListResponse>> userMedia(
+    public ResponseEntity<ResponseDto<AdminMediaListResponse>> userMedia(
             @AuthenticationPrincipal CustomUserDetails admin,
             @RequestParam("userId") String userId,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -248,7 +267,7 @@ public class AdminController {
     }
 
     @GetMapping("/media/chat")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminMediaListResponse>> chatMedia(
+    public ResponseEntity<ResponseDto<AdminMediaListResponse>> chatMedia(
             @AuthenticationPrincipal CustomUserDetails admin,
             @RequestParam("chatId") String chatId,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -258,14 +277,14 @@ public class AdminController {
     }
 
     @GetMapping("/posts")
-    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminPostView>>> posts(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostView>>> posts(
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.listPosts(page, size)));
     }
 
     @GetMapping("/posts/{uuid}/likes")
-    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminPostLikeView>>> postLikes(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostLikeView>>> postLikes(
             @PathVariable String uuid,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
@@ -273,7 +292,7 @@ public class AdminController {
     }
 
     @GetMapping("/posts/{uuid}/comments")
-    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminPostCommentView>>> postComments(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostCommentView>>> postComments(
             @PathVariable String uuid,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
@@ -281,7 +300,7 @@ public class AdminController {
     }
 
     @GetMapping("/moderation/reports")
-    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminReportView>>> reports(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminReportView>>> reports(
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
@@ -289,12 +308,12 @@ public class AdminController {
     }
 
     @GetMapping("/moderation/reports/{uuid}")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminReportView>> report(@PathVariable String uuid) {
+    public ResponseEntity<ResponseDto<AdminReportView>> report(@PathVariable String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getReport(uuid)));
     }
 
     @PostMapping("/moderation/reports/{uuid}/review")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminReportView>> reviewReport(
+    public ResponseEntity<ResponseDto<AdminReportView>> reviewReport(
             @AuthenticationPrincipal CustomUserDetails admin,
             @PathVariable String uuid,
             @RequestParam("action") String action,
@@ -306,7 +325,7 @@ public class AdminController {
     // ── User feedback ─────────────────────────────────────────────────────────
 
     @GetMapping("/feedback")
-    public ResponseEntity<ResponseDto<PaginatedResponse<com.chat.talkMe.dto.response.AdminFeedbackView>>> feedback(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminFeedbackView>>> feedback(
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -315,7 +334,7 @@ public class AdminController {
     }
 
     @PostMapping("/feedback/{uuid}/status")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.AdminFeedbackView>> updateFeedbackStatus(
+    public ResponseEntity<ResponseDto<AdminFeedbackView>> updateFeedbackStatus(
             @AuthenticationPrincipal CustomUserDetails admin,
             @PathVariable String uuid,
             @RequestParam("status") String status) {
@@ -324,7 +343,7 @@ public class AdminController {
     }
 
     @GetMapping("/social/friends")
-    public ResponseEntity<ResponseDto<java.util.List<com.chat.talkMe.dto.response.AdminConnectorView>>> userFriends(
+    public ResponseEntity<ResponseDto<List<AdminConnectorView>>> userFriends(
             @RequestParam("userId") String userId) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUserFriends(userId)));
     }

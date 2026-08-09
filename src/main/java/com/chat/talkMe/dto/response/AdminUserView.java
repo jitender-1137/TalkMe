@@ -1,8 +1,9 @@
 package com.chat.talkMe.dto.response;
-
+import java.util.Set;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
+import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
@@ -12,8 +13,8 @@ import java.util.List;
  */
 @Data
 @Builder
-@lombok.NoArgsConstructor
-@lombok.AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 public class AdminUserView {
     private String id;            // uuid
     private String username;
@@ -32,7 +33,7 @@ public class AdminUserView {
     private String lastLocationAt;
     private String occupation;
     private String education;
-    private java.util.Set<String> interests;
+    private Set<String> interests;
     private List<String> roles;
     private boolean verified;
     private boolean guest;

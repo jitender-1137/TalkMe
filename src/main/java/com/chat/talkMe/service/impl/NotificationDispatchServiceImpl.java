@@ -1,14 +1,19 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.config.WebPushProperties;
+import com.chat.talkMe.crypto.MessageCryptoService;
+import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.enums.InstallationType;
+import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.security.JwtTokenProvider;
 import com.chat.talkMe.service.NotificationDispatchService;
 import com.chat.talkMe.service.WebPushService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -25,13 +30,13 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
 
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
-    private final com.chat.talkMe.repository.ChatRepository chatRepository;
-    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
+    private final ChatRepository chatRepository;
+    private final MessageCryptoService messageCryptoService;
     private final SimpMessagingTemplate messagingTemplate;
     private final WebPushService webPushService;
     private final WebPushProperties webPushProperties;
     private final ObjectMapper objectMapper;
-    private final com.chat.talkMe.security.JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Override
     @Transactional
@@ -69,7 +74,7 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
             data.put("url", url);
             // Unique tag per push so successive ephemeral alerts each surface (these
             // messages have no stable server id to de-dup on).
-            data.put("messageId", java.util.UUID.randomUUID().toString());
+            data.put("messageId", UUID.randomUUID().toString());
             data.put("timestamp", System.currentTimeMillis());
             webPushService.sendToUser(recipientUserId, objectMapper.writeValueAsString(data));
         } catch (Exception e) {
@@ -125,17 +130,17 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         // Wire payloads are ciphertext; a push body leaves the app (no client to
         // decrypt), so decrypt here. m.getChatId() is the chat UUID → resolve to id.
         String content = m.getContent();
-        if (content != null && content.startsWith(com.chat.talkMe.crypto.MessageCryptoService.MARKER)
+        if (content != null && content.startsWith(MessageCryptoService.MARKER)
                 && m.getChatId() != null) {
             try {
-                Long chatId = chatRepository.findByUuid(java.util.UUID.fromString(m.getChatId()))
-                        .map(com.chat.talkMe.domain.Chat::getId).orElse(null);
+                Long chatId = chatRepository.findByUuid(UUID.fromString(m.getChatId()))
+                        .map(Chat::getId).orElse(null);
                 if (chatId != null) content = messageCryptoService.decrypt(chatId, content);
             } catch (Exception ignored) {
                 // Best-effort preview; fall through to the attachment label below.
             }
         }
-        if (content == null || content.isBlank() || content.startsWith(com.chat.talkMe.crypto.MessageCryptoService.MARKER)) {
+        if (content == null || content.isBlank() || content.startsWith(MessageCryptoService.MARKER)) {
             return "📎 Attachment";
         }
         return content.length() > 120 ? content.substring(0, 117) + "…" : content;

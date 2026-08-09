@@ -1,12 +1,15 @@
 package com.chat.talkMe.controller;
 
+import com.chat.talkMe.dto.request.ChangeUsernameRequest;
 import com.chat.talkMe.dto.request.DeleteAccountRequest;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.dto.response.PostResponse;
+import com.chat.talkMe.dto.response.PublicProfileResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
+import com.chat.talkMe.dto.response.SmartProfileCardResponse;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.security.CustomUserDetails;
@@ -15,9 +18,11 @@ import com.chat.talkMe.service.FriendService;
 import com.chat.talkMe.service.PostService;
 import com.chat.talkMe.service.UserService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,7 +62,7 @@ public class UserController {
      *  pending deletion — are rejected, while fully-purged names are free). */
     @PatchMapping("/me/username")
     public ResponseEntity<ResponseDto<UserResponse>> changeUsername(
-            @Valid @RequestBody com.chat.talkMe.dto.request.ChangeUsernameRequest request,
+            @Valid @RequestBody ChangeUsernameRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse response = userService.changeUsername(request.getUsername(), userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Username updated", "TM_060"));
@@ -129,7 +134,7 @@ public class UserController {
      */
     @GetMapping("/by-username/{username}")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.PublicProfileResponse>> getPublicProfileByUsername(
+    public ResponseEntity<ResponseDto<PublicProfileResponse>> getPublicProfileByUsername(
             @PathVariable("username") String username) {
         return ResponseEntity.ok(SuccessResponseDto.success(
                 userService.getPublicProfileByUsername(username)));
@@ -138,7 +143,7 @@ public class UserController {
     /** Smart Profile Card (feature #20) — late-night attributes + compatibility hint. */
     @GetMapping("/{userId}/card")
     @PreAuthorize("@featureGuard.check('SMART_PROFILE_CARD')")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.SmartProfileCardResponse>> getSmartProfileCard(
+    public ResponseEntity<ResponseDto<SmartProfileCardResponse>> getSmartProfileCard(
             @PathVariable("userId") String userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(SuccessResponseDto.success(
@@ -198,7 +203,7 @@ public class UserController {
     @GetMapping("/{userId}/posts")
     public ResponseEntity<ResponseDto<Page<PostResponse>>> getUserPosts(
             @PathVariable("userId") String userId,
-            @PageableDefault(size = 20, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         
         Page<PostResponse> response = postService.getProfileFeed(userId, pageable, userDetails.getUser());
@@ -225,9 +230,9 @@ public class UserController {
 
     @GetMapping("/lobby")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<ResponseDto<java.util.List<UserResponse>>> getLobbyUsers(
+    public ResponseEntity<ResponseDto<List<UserResponse>>> getLobbyUsers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        java.util.List<UserResponse> response = userService.getLobbyUsers(userDetails != null ? userDetails.getUser() : null);
+        List<UserResponse> response = userService.getLobbyUsers(userDetails != null ? userDetails.getUser() : null);
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 }

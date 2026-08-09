@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -186,7 +187,7 @@ class GameServiceImplTest {
             assertThat(existing.getState()).isEqualTo(GameState.ENDED);
 
             ArgumentCaptor<GameSession> saved = ArgumentCaptor.forClass(GameSession.class);
-            verify(gameSessionRepository, org.mockito.Mockito.times(2)).save(saved.capture());
+            verify(gameSessionRepository, Mockito.times(2)).save(saved.capture());
             // First save retires the old session; second persists the fresh IN_PROGRESS one.
             assertThat(saved.getAllValues().get(0)).isSameAs(existing);
             assertThat(saved.getAllValues().get(1).getState()).isEqualTo(GameState.IN_PROGRESS);

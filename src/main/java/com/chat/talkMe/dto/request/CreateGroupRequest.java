@@ -31,7 +31,7 @@ public class CreateGroupRequest {
     private String category;
 
     /** Room/channel interest tags (enum names of com.chat.talkMe.enums.Interest). */
-    private java.util.List<String> tags;
+    private List<String> tags;
 
     /** true = any user can be added; false/null = only the creator's friends. */
     private Boolean allowNonFriends;

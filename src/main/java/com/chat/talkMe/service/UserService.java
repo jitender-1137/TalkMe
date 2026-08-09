@@ -5,7 +5,10 @@ import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
+import com.chat.talkMe.dto.response.PublicProfileResponse;
+import com.chat.talkMe.dto.response.SmartProfileCardResponse;
 import com.chat.talkMe.dto.response.UserResponse;
+import java.util.List;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
@@ -26,12 +29,12 @@ public interface UserService {
      * Trimmed, UNAUTHENTICATED profile lookup by username for the shareable {@code /@username}
      * link. Returns only public fields (never PII); 404s for missing/guest/banned/deleted users.
      */
-    com.chat.talkMe.dto.response.PublicProfileResponse getPublicProfileByUsername(String username);
+    PublicProfileResponse getPublicProfileByUsername(String username);
     /** At-a-glance "smart card" (feature #20) with late-night attributes + compatibility. */
-    com.chat.talkMe.dto.response.SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser);
+    SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser);
     PaginatedResponse<UserResponse> searchUsers(String query, int limit, String cursor, User currentUser);
     PaginatedResponse<BlockedUserResponse> getBlockedUsers(User currentUser);
     void reportUser(String userId, String reason, String description, User currentUser);
     MutualFriendsResponse getMutualFriends(String userId, User currentUser);
-    java.util.List<UserResponse> getLobbyUsers(User currentUser);
+    List<UserResponse> getLobbyUsers(User currentUser);
 }

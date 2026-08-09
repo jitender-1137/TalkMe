@@ -8,6 +8,9 @@ import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.NotificationRepository;
 import com.chat.talkMe.repository.UserFollowRepository;
 import com.chat.talkMe.service.NotificationService;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -96,7 +99,7 @@ public class NotificationServiceImpl implements NotificationService {
         if (actor == null) {
             return;
         }
-        java.util.List<User> friends;
+        List<User> friends;
         try {
             friends = friendRepository.findFriendsByUser(actor);
         } catch (Exception e) {
@@ -122,7 +125,7 @@ public class NotificationServiceImpl implements NotificationService {
         if (actor == null) {
             return;
         }
-        java.util.Map<Long, User> recipients = new java.util.LinkedHashMap<>();
+        Map<Long, User> recipients = new LinkedHashMap<>();
         try {
             for (User u : userFollowRepository.findAcceptedFollowers(actor)) {
                 if (u != null) recipients.put(u.getId(), u);

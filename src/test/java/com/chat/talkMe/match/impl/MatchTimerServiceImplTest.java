@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -118,7 +119,7 @@ class MatchTimerServiceImplTest {
             verify(zSetOps).add(eq(TIMER_ZSET), eq(SID), anyDouble());
             // Both a start event and the first prompt go to each peer.
             ArgumentCaptor<MatchServerEvent> toA = ArgumentCaptor.forClass(MatchServerEvent.class);
-            verify(messagingTemplate, org.mockito.Mockito.times(2))
+            verify(messagingTemplate, Mockito.times(2))
                     .convertAndSendToUser(eq(A), eq("/queue/match"), toA.capture());
             assertThat(toA.getAllValues()).extracting(MatchServerEvent::getEvent)
                     .containsExactly("CHEMISTRY_STARTED", "CHEMISTRY_PROMPT");

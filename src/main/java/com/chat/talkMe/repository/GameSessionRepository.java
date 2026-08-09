@@ -2,7 +2,10 @@ package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.GameSession;
 import com.chat.talkMe.enums.GameState;
+import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -20,6 +23,6 @@ public interface GameSessionRepository extends JpaRepository<GameSession, Long> 
     // ── Social Memory / Relationship Journey (feature #19) — "games played together" ──
     long countByChatId(String chatId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT MIN(g.createdAt) FROM GameSession g WHERE g.chatId = :chatId")
-    java.time.Instant findFirstGameAt(@org.springframework.data.repository.query.Param("chatId") String chatId);
+    @Query("SELECT MIN(g.createdAt) FROM GameSession g WHERE g.chatId = :chatId")
+    Instant findFirstGameAt(@Param("chatId") String chatId);
 }

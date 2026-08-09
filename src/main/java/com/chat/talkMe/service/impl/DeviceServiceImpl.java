@@ -3,6 +3,7 @@ package com.chat.talkMe.service.impl;
 import com.chat.talkMe.domain.Device;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.RegisterDeviceRequest;
+import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.repository.DeviceRepository;
 import com.chat.talkMe.service.DeviceService;
@@ -59,7 +60,7 @@ public class DeviceServiceImpl implements DeviceService {
             log.info("Successfully unregistered device token: {}", deviceToken);
         } else {
             log.warn("User {} tried to unregister device token owned by another user", currentUser.getUsername());
-            throw new com.chat.talkMe.exception.ForbiddenException("Cannot unregister device of another user", "TM_029");
+            throw new ForbiddenException("Cannot unregister device of another user", "TM_029");
         }
     }
 }

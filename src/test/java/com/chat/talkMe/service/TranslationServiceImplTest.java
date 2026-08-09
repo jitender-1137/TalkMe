@@ -9,6 +9,11 @@ import com.chat.talkMe.dto.response.TranslateResponse;
 import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.service.impl.TranslationServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -310,7 +315,7 @@ class TranslationServiceImplTest {
     class Batch {
 
         private TranslateBatchRequest batchOf(String target, String source, String... idTextPairs) {
-            java.util.List<TranslateBatchRequest.Item> items = new java.util.ArrayList<>();
+            List<TranslateBatchRequest.Item> items = new ArrayList<>();
             for (int i = 0; i < idTextPairs.length; i += 2) {
                 items.add(new TranslateBatchRequest.Item(idTextPairs[i], idTextPairs[i + 1]));
             }
@@ -380,7 +385,7 @@ class TranslationServiceImplTest {
         @Test
         void emptyItems_returnsEmptyResults_providerNone() {
             TranslateBatchResponse res = service.translateBatch(
-                    capUser, new TranslateBatchRequest(java.util.List.of(), "es", null));
+                    capUser, new TranslateBatchRequest(List.of(), "es", null));
 
             assertThat(res.getProvider()).isEqualTo("none");
             assertThat(res.getResults()).isEmpty();
@@ -481,9 +486,9 @@ class TranslationServiceImplTest {
                 @Override public int statusCode() { return status; }
                 @Override public String body() { return body; }
                 @Override public HttpRequest request() { return null; }
-                @Override public java.util.Optional<HttpResponse<String>> previousResponse() { return java.util.Optional.empty(); }
-                @Override public HttpHeaders headers() { return HttpHeaders.of(java.util.Map.of(), (a, b) -> true); }
-                @Override public java.util.Optional<javax.net.ssl.SSLSession> sslSession() { return java.util.Optional.empty(); }
+                @Override public Optional<HttpResponse<String>> previousResponse() { return Optional.empty(); }
+                @Override public HttpHeaders headers() { return HttpHeaders.of(Map.of(), (a, b) -> true); }
+                @Override public Optional<SSLSession> sslSession() { return Optional.empty(); }
                 @Override public URI uri() { return URI.create("https://test.local"); }
                 @Override public HttpClient.Version version() { return HttpClient.Version.HTTP_1_1; }
             };
@@ -497,7 +502,7 @@ class TranslationServiceImplTest {
         }
 
         private TranslateBatchRequest twoItemBatch() {
-            return new TranslateBatchRequest(java.util.List.of(
+            return new TranslateBatchRequest(List.of(
                     new TranslateBatchRequest.Item("m1", "hello"),
                     new TranslateBatchRequest.Item("m2", "world")), "es", null);
         }

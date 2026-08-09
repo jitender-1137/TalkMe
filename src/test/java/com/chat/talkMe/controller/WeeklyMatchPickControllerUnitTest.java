@@ -10,6 +10,7 @@ import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.exception.ServiceException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.WeeklyMatchPickService;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
@@ -172,7 +174,7 @@ class WeeklyMatchPickControllerUnitTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.messageCode").value(SUCCESS_CODE))
-                    .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasSize(1)))
+                    .andExpect(jsonPath("$.data", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.data[0].id").value("u-1"))
                     .andExpect(jsonPath("$.data[0].name").value("Alice"))
                     .andExpect(jsonPath("$.data[0].username").value("user-1"))
@@ -215,7 +217,7 @@ class WeeklyMatchPickControllerUnitTest {
 
             mockMvc.perform(get(BASE))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasSize(3)))
+                    .andExpect(jsonPath("$.data", Matchers.hasSize(3)))
                     .andExpect(jsonPath("$.data[0].id").value("u-1"))
                     .andExpect(jsonPath("$.data[0].rank").value(1))
                     .andExpect(jsonPath("$.data[1].id").value("u-2"))
@@ -398,7 +400,7 @@ class WeeklyMatchPickControllerUnitTest {
             // getCurrent is the ONLY method the read path may touch; generateFor / pruneOlderThan
             // must never be reached from the controller.
             verify(weeklyMatchPickService).getCurrent(testUser);
-            org.mockito.Mockito.verifyNoMoreInteractions(weeklyMatchPickService);
+            Mockito.verifyNoMoreInteractions(weeklyMatchPickService);
         }
     }
 

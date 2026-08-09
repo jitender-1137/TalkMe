@@ -2,6 +2,7 @@ package com.chat.talkMe.controller;
 
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserPresence;
 import com.chat.talkMe.repository.RoleRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.UserPresenceRepository;
@@ -113,7 +114,7 @@ public class DiscoverControllerTest {
                 .build();
         onlineUser = userRepository.save(onlineUser);
 
-        com.chat.talkMe.domain.UserPresence presence = com.chat.talkMe.domain.UserPresence.builder()
+        UserPresence presence = UserPresence.builder()
                 .user(onlineUser)
                 .status("ONLINE")
                 .invisibleModeEnabled(false)

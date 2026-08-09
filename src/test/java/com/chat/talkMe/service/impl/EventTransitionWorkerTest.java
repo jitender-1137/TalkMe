@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -155,7 +156,7 @@ class EventTransitionWorkerTest {
             EventRsvp r1 = EventRsvp.builder().event(e).user(host).status(RsvpStatus.GOING).build();
             EventRsvp r2 = EventRsvp.builder().event(e).user(other).status(RsvpStatus.INTERESTED).build();
             when(eventRsvpRepository.findByEventAndStatusIn(eq(e), any())).thenReturn(List.of(r1, r2));
-            org.mockito.Mockito.doThrow(new RuntimeException("push down"))
+            Mockito.doThrow(new RuntimeException("push down"))
                     .when(notificationService).createNotification(eq(host), anyString(), anyString(), anyString(), anyString());
 
             boolean started = worker.startEvent(10L);

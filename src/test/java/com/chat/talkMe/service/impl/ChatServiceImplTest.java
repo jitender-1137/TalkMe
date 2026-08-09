@@ -18,6 +18,7 @@ import com.chat.talkMe.dto.response.ChatKeyResponse;
 import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.enums.ChatType;
+import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.event.StatusUpdateEvent;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -811,7 +813,7 @@ class ChatServiceImplTest {
         }
 
         private void doThrowOnBroadcast() {
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
         }
     }
@@ -1126,7 +1128,7 @@ class ChatServiceImplTest {
             when(chatRepository.findChatsByUser(currentUser)).thenReturn(List.of(chat));
             when(presenceService.isGhost(currentUser)).thenReturn(false);
             when(readReceiptRepository.bulkMarkAsDelivered(eq(chat), eq(1L), any())).thenReturn(1);
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
 
             // Must not propagate — the catch at the broadcast site swallows it.
@@ -1204,7 +1206,7 @@ class ChatServiceImplTest {
                 return c;
             });
             when(chatMemberRepository.save(any(ChatMember.class))).thenAnswer(inv -> inv.getArgument(0));
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
 
             ChatResponse resp = service.createChat(privateRequest(), currentUser);
@@ -1219,7 +1221,7 @@ class ChatServiceImplTest {
             Chat existing = privateChat();
             when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(otherUser));
             when(chatRepository.findPrivateChatBetweenUsers(1L, 2L)).thenReturn(List.of(existing));
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
 
             ChatResponse resp = service.createChat(privateRequest(), currentUser);
@@ -1648,7 +1650,7 @@ class ChatServiceImplTest {
         void groupInfoWithOwnerPinnedAndTags() {
             Chat chat = groupChat(MemberRole.OWNER);
             chat.setOwnerId(2L);
-            chat.setTags(Set.of(com.chat.talkMe.enums.Interest.MUSIC));
+            chat.setTags(Set.of(Interest.MUSIC));
             when(chatRepository.findByUuid(UUID.fromString(CHAT_UUID))).thenReturn(Optional.of(chat));
             when(chatMemberRepository.findByChatAndUser(any(), any()))
                     .thenReturn(Optional.of(selfMemberOf(chat)));

@@ -9,6 +9,7 @@ import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.JwtTokenProvider;
+import com.chat.talkMe.service.WebPushService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -56,7 +58,7 @@ class NotificationDispatchServiceImplTest {
     @Mock private ChatRepository chatRepository;
     @Mock private MessageCryptoService messageCryptoService;
     @Mock private SimpMessagingTemplate messagingTemplate;
-    @Mock private com.chat.talkMe.service.WebPushService webPushService;
+    @Mock private WebPushService webPushService;
     @Mock private WebPushProperties webPushProperties;
     @Mock private JwtTokenProvider jwtTokenProvider;
 
@@ -249,7 +251,7 @@ class NotificationDispatchServiceImplTest {
             when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/unread"), any());
 
             service.onNewMessage(r, "c", message("m1", "c", "hi"), "Alice", null);
@@ -314,7 +316,7 @@ class NotificationDispatchServiceImplTest {
         @Test
         @DisplayName("serialization failure is swallowed — no push, no throw")
         void serializationFailureSwallowed() throws Exception {
-            ObjectMapper failing = org.mockito.Mockito.mock(ObjectMapper.class);
+            ObjectMapper failing = Mockito.mock(ObjectMapper.class);
             when(failing.writeValueAsString(any())).thenThrow(new RuntimeException("boom"));
             NotificationDispatchServiceImpl svc = new NotificationDispatchServiceImpl(
                     userRepository, messageRepository, chatRepository, messageCryptoService,
@@ -360,7 +362,7 @@ class NotificationDispatchServiceImplTest {
         void broadcastFailureSwallowed() {
             User u = recipient(7L, "bob", 0);
             when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(3L);
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
 
             assertThat(service.recomputeUnread(u)).isEqualTo(3);

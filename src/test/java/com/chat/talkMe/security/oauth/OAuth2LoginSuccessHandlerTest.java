@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
@@ -69,7 +70,7 @@ class OAuth2LoginSuccessHandlerTest {
 
     /** OAuth2User with the standard OIDC attributes; individual tests override as needed. */
     private OAuth2User principalWithName(String name) {
-        OAuth2User p = org.mockito.Mockito.mock(OAuth2User.class);
+        OAuth2User p = Mockito.mock(OAuth2User.class);
         lenient().when(p.getAttribute("sub")).thenReturn("google-sub-1");
         lenient().when(p.getAttribute("email")).thenReturn("user@example.com");
         lenient().when(p.getAttribute("picture")).thenReturn("https://pic/x.png");
@@ -79,7 +80,7 @@ class OAuth2LoginSuccessHandlerTest {
     }
 
     private OAuth2AuthenticationToken tokenWith(OAuth2User principal) {
-        OAuth2AuthenticationToken token = org.mockito.Mockito.mock(OAuth2AuthenticationToken.class);
+        OAuth2AuthenticationToken token = Mockito.mock(OAuth2AuthenticationToken.class);
         lenient().when(token.getPrincipal()).thenReturn(principal);
         lenient().when(token.getAuthorizedClientRegistrationId()).thenReturn("google");
         lenient().when(token.getName()).thenReturn("google-sub-1");
@@ -109,11 +110,11 @@ class OAuth2LoginSuccessHandlerTest {
             OAuth2User principal = principalWithName("Ada Lovelace");
             OAuth2AuthenticationToken token = tokenWith(principal);
 
-            OAuth2AuthorizedClientService svc = org.mockito.Mockito.mock(OAuth2AuthorizedClientService.class);
+            OAuth2AuthorizedClientService svc = Mockito.mock(OAuth2AuthorizedClientService.class);
             when(authorizedClientServiceProvider.getIfAvailable()).thenReturn(svc);
-            OAuth2AuthorizedClient client = org.mockito.Mockito.mock(OAuth2AuthorizedClient.class);
+            OAuth2AuthorizedClient client = Mockito.mock(OAuth2AuthorizedClient.class);
             when(svc.loadAuthorizedClient("google", "google-sub-1")).thenReturn(client);
-            OAuth2AccessToken accessToken = org.mockito.Mockito.mock(OAuth2AccessToken.class);
+            OAuth2AccessToken accessToken = Mockito.mock(OAuth2AccessToken.class);
             when(client.getAccessToken()).thenReturn(accessToken);
             when(accessToken.getTokenValue()).thenReturn("access-tok");
             when(googleProfileService.fetch("access-tok"))
@@ -134,7 +135,7 @@ class OAuth2LoginSuccessHandlerTest {
 
             // two auth cookies set
             ArgumentCaptor<String> cookies = ArgumentCaptor.forClass(String.class);
-            verify(response, org.mockito.Mockito.times(2))
+            verify(response, Mockito.times(2))
                     .addHeader(eq(HttpHeaders.SET_COOKIE), cookies.capture());
             List<String> values = cookies.getAllValues();
             assertThat(values).anyMatch(c -> c.startsWith("refreshToken=refresh-tok"));
@@ -212,7 +213,7 @@ class OAuth2LoginSuccessHandlerTest {
         @DisplayName("no authorized client for the user → age/gender null, fetch never called")
         void noAuthorizedClient() throws Exception {
             OAuth2AuthenticationToken token = tokenWith(principalWithName("Ada"));
-            OAuth2AuthorizedClientService svc = org.mockito.Mockito.mock(OAuth2AuthorizedClientService.class);
+            OAuth2AuthorizedClientService svc = Mockito.mock(OAuth2AuthorizedClientService.class);
             when(authorizedClientServiceProvider.getIfAvailable()).thenReturn(svc);
             when(svc.loadAuthorizedClient("google", "google-sub-1")).thenReturn(null);
             stubLogin();
@@ -227,11 +228,11 @@ class OAuth2LoginSuccessHandlerTest {
         @DisplayName("People-API fetch throws → swallowed, login still proceeds with null age/gender")
         void fetchFailureNonFatal() throws Exception {
             OAuth2AuthenticationToken token = tokenWith(principalWithName("Ada"));
-            OAuth2AuthorizedClientService svc = org.mockito.Mockito.mock(OAuth2AuthorizedClientService.class);
+            OAuth2AuthorizedClientService svc = Mockito.mock(OAuth2AuthorizedClientService.class);
             when(authorizedClientServiceProvider.getIfAvailable()).thenReturn(svc);
-            OAuth2AuthorizedClient client = org.mockito.Mockito.mock(OAuth2AuthorizedClient.class);
+            OAuth2AuthorizedClient client = Mockito.mock(OAuth2AuthorizedClient.class);
             when(svc.loadAuthorizedClient("google", "google-sub-1")).thenReturn(client);
-            OAuth2AccessToken accessToken = org.mockito.Mockito.mock(OAuth2AccessToken.class);
+            OAuth2AccessToken accessToken = Mockito.mock(OAuth2AccessToken.class);
             when(client.getAccessToken()).thenReturn(accessToken);
             when(accessToken.getTokenValue()).thenReturn("access-tok");
             when(googleProfileService.fetch("access-tok")).thenThrow(new RuntimeException("boom"));
@@ -248,7 +249,7 @@ class OAuth2LoginSuccessHandlerTest {
         @Test
         @DisplayName("plain Authentication (not OAuth2AuthenticationToken) → no enrichment attempted")
         void nonOAuth2Token() throws Exception {
-            Authentication auth = org.mockito.Mockito.mock(Authentication.class);
+            Authentication auth = Mockito.mock(Authentication.class);
             // Build the principal BEFORE opening the getPrincipal() stub — principalWithName()
             // performs its own stubbing, which would nest inside an in-progress when(...).
             OAuth2User principal = principalWithName("Ada");
@@ -278,7 +279,7 @@ class OAuth2LoginSuccessHandlerTest {
             handler.onAuthenticationSuccess(request, response, token);
 
             ArgumentCaptor<String> cookies = ArgumentCaptor.forClass(String.class);
-            verify(response, org.mockito.Mockito.times(2))
+            verify(response, Mockito.times(2))
                     .addHeader(eq(HttpHeaders.SET_COOKIE), cookies.capture());
             assertThat(cookies.getAllValues())
                     .filteredOn(c -> c.startsWith("refreshToken="))

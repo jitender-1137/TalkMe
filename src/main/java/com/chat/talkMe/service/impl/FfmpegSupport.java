@@ -1,6 +1,8 @@
 package com.chat.talkMe.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.bytedeco.ffmpeg.ffmpeg;
+import org.bytedeco.javacpp.Loader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +38,7 @@ public class FfmpegSupport {
                 return resolved;
             }
             try {
-                resolved = org.bytedeco.javacpp.Loader.load(org.bytedeco.ffmpeg.ffmpeg.class);
+                resolved = Loader.load(ffmpeg.class);
                 log.info("Using bundled ffmpeg at {}", resolved);
             } catch (Throwable t) {
                 log.warn("Bundled ffmpeg unavailable ({}); falling back to '{}' on PATH",

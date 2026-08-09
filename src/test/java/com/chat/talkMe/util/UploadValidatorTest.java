@@ -1,6 +1,7 @@
 package com.chat.talkMe.util;
 
 import com.chat.talkMe.exception.ServiceException;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -82,8 +83,8 @@ class UploadValidatorTest {
     private static void assertRejected(MultipartFile file, String type, String code) {
         assertThatThrownBy(() -> UploadValidator.validate(file, type))
                 .isInstanceOfSatisfying(ServiceException.class, ex -> {
-                    org.assertj.core.api.Assertions.assertThat(ex.getMessageCode()).isEqualTo(code);
-                    org.assertj.core.api.Assertions.assertThat(ex.getStatus()).isEqualTo(415);
+                    Assertions.assertThat(ex.getMessageCode()).isEqualTo(code);
+                    Assertions.assertThat(ex.getStatus()).isEqualTo(415);
                 });
     }
 

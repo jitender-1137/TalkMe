@@ -1,6 +1,7 @@
 package com.chat.talkMe.controller;
 
 import com.chat.talkMe.dto.request.CreateChatRequest;
+import com.chat.talkMe.dto.response.ChatKeyResponse;
 import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.ResponseDto;
 import com.chat.talkMe.dto.response.SuccessResponseDto;
@@ -56,10 +57,10 @@ public class ChatController {
      */
     @GetMapping("/{id}/key")
     @PreAuthorize("hasAnyRole('USER','GUEST')")
-    public ResponseEntity<ResponseDto<com.chat.talkMe.dto.response.ChatKeyResponse>> getChatKey(
+    public ResponseEntity<ResponseDto<ChatKeyResponse>> getChatKey(
             @PathVariable("id") String uuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        com.chat.talkMe.dto.response.ChatKeyResponse response =
+        ChatKeyResponse response =
                 chatService.getChatKey(uuid, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }

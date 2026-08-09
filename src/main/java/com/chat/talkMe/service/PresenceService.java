@@ -1,8 +1,13 @@
 package com.chat.talkMe.service;
 
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserPresence;
 import com.chat.talkMe.enums.PresenceStatus;
 import com.chat.talkMe.websocket.PresenceNotification;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.Set;
 
 public interface PresenceService {
     void setStatus(User user, PresenceStatus status);
@@ -15,7 +20,7 @@ public interface PresenceService {
      * deadline is owned by the first idle trigger and is cleared the moment the
      * user comes back ONLINE (or is reaped OFFLINE).
      */
-    void markIdle(User user, java.time.Duration offlineAfter);
+    void markIdle(User user, Duration offlineAfter);
 
     /**
      * Tab backgrounded (hidden/minimized) while still connected. The user keeps
@@ -43,7 +48,7 @@ public interface PresenceService {
      * frozen last-seen are kept. Otherwise this behaves like {@link #markIdle}
      * with {@code idleGrace} (a genuine ungraceful disconnect while active).
      */
-    void markDisconnected(User user, java.time.Duration idleGrace);
+    void markDisconnected(User user, Duration idleGrace);
 
     /** Refresh a user's liveness timestamp (called on connect + every client heartbeat). */
     void recordHeartbeat(User user);
@@ -55,7 +60,7 @@ public interface PresenceService {
      * a short grace window. {@link #reapExpiredIdleUsers()} then flips them OFFLINE.
      * @return number of users transitioned.
      */
-    int reapTimedOutUsers(java.time.Duration timeout);
+    int reapTimedOutUsers(Duration timeout);
 
     /**
      * Flip to OFFLINE every IDLE user whose scheduled offline deadline has passed.
@@ -74,7 +79,7 @@ public interface PresenceService {
      * (e.g. Discover) at the DB layer, so online-first ordering holds across
      * pagination rather than just within a single page.
      */
-    java.util.Set<String> getOnlineUsernames();
+    Set<String> getOnlineUsernames();
 
     /**
      * Usernames of every user who is currently APPARENT-AWAY — live status IDLE
@@ -82,13 +87,13 @@ public interface PresenceService {
      * Used together with {@link #getOnlineUsernames()} to rank listings (e.g.
      * Discover) as ONLINE → AWAY → offline at the DB layer, across pagination.
      */
-    java.util.Set<String> getAwayUsernames();
+    Set<String> getAwayUsernames();
 
     /** The user's TRUE status, unmasked by Invisible mode — for the owner's own view. Redis-first. */
     PresenceStatus getRawStatus(User user);
 
     /** Live last-seen timestamp, read from Redis (the DB value is only durable-on-OFFLINE). */
-    java.time.Instant getLastSeen(User user);
+    Instant getLastSeen(User user);
 
     /**
      * Last-seen as OTHER viewers should see it: {@code null} when the target has
@@ -98,18 +103,18 @@ public interface PresenceService {
      * (chat list, friends, profile, lobby, presence endpoint) MUST use this, never
      * the raw {@link #getLastSeen}.
      */
-    java.time.Instant getApparentLastSeen(User user);
+    Instant getApparentLastSeen(User user);
 
     /** Whether the user has Ghost mode on (suppresses outbound delivered/seen receipts). */
     boolean isGhost(User user);
 
     /** Of the given users, the ids of those in Ghost mode (batched receipt-suppression check). */
-    java.util.Set<Long> getGhostUserIds(java.util.Collection<User> users);
+    Set<Long> getGhostUserIds(Collection<User> users);
 
     void toggleGhostMode(User user, boolean enabled);
     void toggleInvisibleMode(User user, boolean enabled);
     void toggleHideLastSeen(User user, boolean enabled);
     void resetPresence(User user);
     boolean isUserOnline(User user);
-    com.chat.talkMe.domain.UserPresence getUserPresence(User user);
+    UserPresence getUserPresence(User user);
 }

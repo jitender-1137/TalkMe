@@ -1,8 +1,8 @@
 package com.chat.talkMe.dto.response;
-
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
+import lombok.NoArgsConstructor;
 import java.util.List;
 
 /** A feed post as seen by an admin — author, content, media and engagement counts. */
@@ -26,8 +26,8 @@ public class AdminPostView {
     private boolean deleted;       // soft-deleted post (admin sees it flagged)
 
     @Data
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Media {
         private String url;
         private String type;      // IMAGE / VIDEO

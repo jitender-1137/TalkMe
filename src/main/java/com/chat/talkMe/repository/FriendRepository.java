@@ -2,6 +2,7 @@ package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.Friend;
 import com.chat.talkMe.domain.User;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -25,5 +26,5 @@ public interface FriendRepository extends JpaRepository<Friend, Long> {
 
     /** [User, friendCount] most-connected first — the top of the social graph. */
     @Query("SELECT f.user, COUNT(f) FROM Friend f WHERE f.isDeleted = false GROUP BY f.user ORDER BY COUNT(f) DESC")
-    List<Object[]> topConnectors(org.springframework.data.domain.Pageable pageable);
+    List<Object[]> topConnectors(Pageable pageable);
 }

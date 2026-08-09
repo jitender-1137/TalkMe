@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -43,7 +44,7 @@ class FeedbackServiceImplTest {
         user.setId(1L);
         // Echo the saved entity back with a uuid/timestamp (JPA would set these).
         // Lenient: the empty-submission test rejects before ever saving.
-        org.mockito.Mockito.lenient().when(feedbackRepository.save(any(Feedback.class))).thenAnswer(inv -> {
+        Mockito.lenient().when(feedbackRepository.save(any(Feedback.class))).thenAnswer(inv -> {
             Feedback f = inv.getArgument(0);
             f.setUuid(UUID.randomUUID());
             f.setCreatedAt(Instant.now());
@@ -91,7 +92,7 @@ class FeedbackServiceImplTest {
         service.submit(req(4, null, "x", "   "), user);
         service.submit(req(4, null, "x", "NONSENSE"), user);
         ArgumentCaptor<Feedback> saved = ArgumentCaptor.forClass(Feedback.class);
-        verify(feedbackRepository, org.mockito.Mockito.times(2)).save(saved.capture());
+        verify(feedbackRepository, Mockito.times(2)).save(saved.capture());
         assertThat(saved.getAllValues().get(0).getType()).isEqualTo(FeedbackType.MANUAL);
         assertThat(saved.getAllValues().get(1).getType()).isEqualTo(FeedbackType.OTHER);
     }

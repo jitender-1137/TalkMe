@@ -14,9 +14,11 @@ import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.service.BucketListService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -36,7 +38,7 @@ public class BucketListServiceImpl implements BucketListService {
     private final ChatMemberRepository chatMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
     /** Self-proxy so the lazy list-create runs in its OWN transaction (see getOrCreateList). */
-    private final org.springframework.beans.factory.ObjectProvider<BucketListServiceImpl> self;
+    private final ObjectProvider<BucketListServiceImpl> self;
 
     /** IDOR guard: the caller must be a member of the chat the list belongs to. */
     private void requireChatMember(User user, String chatId) {
@@ -132,7 +134,7 @@ public class BucketListServiceImpl implements BucketListService {
     }
 
     /** Insert a fresh list row in an isolated transaction (see getOrCreateList). */
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public BucketList createListInNewTx(String chatUuid) {
         return bucketListRepository.save(BucketList.builder().chatUuid(chatUuid).build());
     }

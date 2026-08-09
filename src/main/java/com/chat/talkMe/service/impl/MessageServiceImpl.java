@@ -1,30 +1,52 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.config.RabbitConfig;
+import com.chat.talkMe.crypto.MessageCryptoService;
 import com.chat.talkMe.domain.*;
+import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.enums.ModerationStatus;
 import com.chat.talkMe.event.MessageSentEvent;
+import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.dto.request.SendMessageRequest;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.enums.ChatType;
+import com.chat.talkMe.enums.ConsentStatus;
+import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.dto.response.MessagePageResponse;
 import com.chat.talkMe.enums.MessageType;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.dto.request.ReactToMessageRequest;
 import com.chat.talkMe.mapper.MessageMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.*;
+import com.chat.talkMe.service.GroupAuthzService;
 import com.chat.talkMe.service.MessageService;
 import com.chat.talkMe.service.PresenceService;
+import com.chat.talkMe.storage.MediaStorage;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -38,22 +60,22 @@ public class MessageServiceImpl implements MessageService {
     private final MessageAttachmentRepository messageAttachmentRepository;
     private final MessageReadReceiptRepository readReceiptRepository;
     private final MessageReactionRepository messageReactionRepository;
-    private final com.chat.talkMe.repository.MessageStarRepository messageStarRepository;
+    private final MessageStarRepository messageStarRepository;
     private final MessageMapper messageMapper;
     private final BlockUserRepository blockUserRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
     private final OutboxEventRepository outboxEventRepository;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper;
     private final PresenceService presenceService;
-    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final ContentModerationService moderationService;
     private final ChatExplicitConsentRepository consentRepository;
     private final FriendRepository friendRepository;
     private final UserSettingRepository userSettingRepository;
-    private final com.chat.talkMe.service.GroupAuthzService groupAuthzService;
-    private final com.chat.talkMe.repository.UserRepository userRepository;
-    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
-    private final com.chat.talkMe.storage.MediaStorage mediaStorage;
+    private final GroupAuthzService groupAuthzService;
+    private final UserRepository userRepository;
+    private final MessageCryptoService messageCryptoService;
+    private final MediaStorage mediaStorage;
 
     @Override
     @Transactional
@@ -79,18 +101,18 @@ public class MessageServiceImpl implements MessageService {
         // Ban/mute, channel read-only (ADMINS_ONLY), and slow mode.
         if (chat.isMultiParty()) {
             if (!groupAuthzService.canSend(chat, member)) {
-                boolean isChannel = chat.getChatType() == com.chat.talkMe.enums.ChatType.CHANNEL;
+                boolean isChannel = chat.getChatType() == ChatType.CHANNEL;
                 throw new ForbiddenException(
                         isChannel ? "Only admins can post in this channel"
                                   : "You can't send messages here right now",
                         isChannel ? "TM_294" : "TM_295");
             }
             int slow = chat.getSettings() != null ? chat.getSettings().getSlowModeSeconds() : 0;
-            if (slow > 0 && !member.getRole().atLeast(com.chat.talkMe.enums.MemberRole.ADMIN)) {
+            if (slow > 0 && !member.getRole().atLeast(MemberRole.ADMIN)) {
                 Message last = messageRepository.findFirstByChatAndSenderOrderByIdDesc(chat, currentUser).orElse(null);
                 if (last != null && last.getCreatedAt() != null
                         && last.getCreatedAt().plusSeconds(slow).isAfter(Instant.now())) {
-                    throw new com.chat.talkMe.exception.TooManyRequestsException(
+                    throw new TooManyRequestsException(
                             "Slow mode is on. Please wait before sending another message.", "TM_296");
                 }
             }
@@ -127,7 +149,7 @@ public class MessageServiceImpl implements MessageService {
 
         // Check blocking logic
         boolean isBlocked = false;
-        if (chat.getChatType() == com.chat.talkMe.enums.ChatType.PRIVATE || chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER) {
+        if (chat.getChatType() == ChatType.PRIVATE || chat.getChatType() == ChatType.STRANGER) {
             User otherUser = chat.getMembers().stream()
                     .map(ChatMember::getUser)
                     .filter(u -> !u.getId().equals(currentUser.getId()))
@@ -145,11 +167,11 @@ public class MessageServiceImpl implements MessageService {
                 // "Who can message me": if the recipient only accepts messages from
                 // friends, a non-friend cannot send. (Stranger/anonymous chats are
                 // exempt — friendship has no meaning there.)
-                if (chat.getChatType() == com.chat.talkMe.enums.ChatType.PRIVATE) {
-                    com.chat.talkMe.enums.MessagingPrivacy privacy = userSettingRepository.findByUser(otherUser)
+                if (chat.getChatType() == ChatType.PRIVATE) {
+                    MessagingPrivacy privacy = userSettingRepository.findByUser(otherUser)
                             .map(UserSetting::getMessagingPrivacy)
-                            .orElse(com.chat.talkMe.enums.MessagingPrivacy.EVERYONE);
-                    if (privacy == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY) {
+                            .orElse(MessagingPrivacy.EVERYONE);
+                    if (privacy == MessagingPrivacy.FRIENDS_ONLY) {
                         boolean isFriend = friendRepository.findByUserAndFriend(currentUser, otherUser)
                                 .map(f -> !f.isDeleted())
                                 .orElse(false);
@@ -167,7 +189,7 @@ public class MessageServiceImpl implements MessageService {
         // Explicit (vulgar/abusive/sexual) text is hard-blocked in GROUP chats and
         // held pending mutual consent in 1:1 (PRIVATE/STRANGER) chats. (NSFW media is
         // screened at upload time.)
-        com.chat.talkMe.enums.ModerationStatus moderationStatus = com.chat.talkMe.enums.ModerationStatus.CLEAN;
+        ModerationStatus moderationStatus = ModerationStatus.CLEAN;
         // The client encrypts before sending, so decrypt here to moderate the real
         // text/path (decrypt is a passthrough for plaintext / disabled encryption).
         String plainContent = messageCryptoService.decrypt(chat.getId(), request.getContent());
@@ -188,18 +210,18 @@ public class MessageServiceImpl implements MessageService {
             // allows it (entry required age confirmation).
             if (chat.isMultiParty()) {
                 if (!chat.isAllowExplicitContent()) {
-                    throw new com.chat.talkMe.exception.ContentModerationException(
+                    throw new ContentModerationException(
                             "Your message contains content that violates our community guidelines.");
                 }
                 // Group allows explicit content: allow (fall through, stays CLEAN).
             } else {
-            com.chat.talkMe.enums.ConsentStatus consent = consentRepository.findByChat(chat)
+            ConsentStatus consent = consentRepository.findByChat(chat)
                     .map(ChatExplicitConsent::getStatus)
-                    .orElse(com.chat.talkMe.enums.ConsentStatus.NONE);
+                    .orElse(ConsentStatus.NONE);
             // 1:1 explicit text requires the normal mutual-consent handshake.
-            if (consent != com.chat.talkMe.enums.ConsentStatus.GRANTED) {
+            if (consent != ConsentStatus.GRANTED) {
                 // Saved but withheld from the recipient until consent is granted.
-                moderationStatus = com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
+                moderationStatus = ModerationStatus.BLOCKED_PENDING_CONSENT;
             }
             }
         }
@@ -234,7 +256,7 @@ public class MessageServiceImpl implements MessageService {
         // @mentions (multi-party only): resolve the mentioned member UUIDs → user ids.
         if (chat.isMultiParty() && request.getMentionedUserIds() != null
                 && !request.getMentionedUserIds().isEmpty()) {
-            java.util.Set<Long> mentionIds = new java.util.HashSet<>();
+            Set<Long> mentionIds = new HashSet<>();
             for (String uuid : request.getMentionedUserIds()) {
                 if (uuid == null || uuid.isBlank()) continue;
                 try {
@@ -248,7 +270,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
         message = messageRepository.save(message);
-        final boolean held = moderationStatus == com.chat.talkMe.enums.ModerationStatus.BLOCKED_PENDING_CONSENT;
+        final boolean held = moderationStatus == ModerationStatus.BLOCKED_PENDING_CONSENT;
 
         // Attachment mapping
         if (type != MessageType.TEXT && request.getFileUrl() != null) {
@@ -345,7 +367,7 @@ public class MessageServiceImpl implements MessageService {
                 .parentMessage(parentMessage)
                 .isForwarded(request.isForwarded())
                 .isBlocked(isBlocked)
-                .moderationStatus(com.chat.talkMe.enums.ModerationStatus.CLEAN)
+                .moderationStatus(ModerationStatus.CLEAN)
                 .allowDownload(type != MessageType.TEXT && request.isAllowDownload())
                 .build();
         // Transient identity so the response looks like a real message to clients, without a row.
@@ -375,9 +397,9 @@ public class MessageServiceImpl implements MessageService {
         if (!isBlocked) {
             try {
                 messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) response);
-                java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+                Map<String, Object> eventWrapper = new HashMap<>();
                 eventWrapper.put("event", "message_received");
-                java.util.Map<String, Object> eventPayload = new java.util.HashMap<>();
+                Map<String, Object> eventPayload = new HashMap<>();
                 eventPayload.put("chatId", chatUuid);
                 eventPayload.put("message", response);
                 eventWrapper.put("payload", eventPayload);
@@ -406,7 +428,7 @@ public class MessageServiceImpl implements MessageService {
                 .sender(actor)
                 .content(contentJson)
                 .messageType(MessageType.SYSTEM)
-                .moderationStatus(com.chat.talkMe.enums.ModerationStatus.CLEAN)
+                .moderationStatus(ModerationStatus.CLEAN)
                 .build();
         message = messageRepository.save(message);
 
@@ -454,10 +476,10 @@ public class MessageServiceImpl implements MessageService {
         messageRepository.save(message);
         // Notify subscribers so the pinned banner updates live.
         try {
-            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            Map<String, Object> payload = new HashMap<>();
             payload.put("chatId", chatUuid);
             payload.put("messageId", pinned ? messageUuid : null);
-            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", pinned ? "message_pinned" : "message_unpinned");
             eventWrapper.put("payload", payload);
             messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
@@ -474,7 +496,7 @@ public class MessageServiceImpl implements MessageService {
         if (starred) {
             if (messageStarRepository.findByMessageAndUser(message, currentUser).isEmpty()) {
                 messageStarRepository.save(
-                        com.chat.talkMe.domain.MessageStar.builder().message(message).user(currentUser).build());
+                        MessageStar.builder().message(message).user(currentUser).build());
             }
         } else {
             messageStarRepository.deleteByMessageAndUser(message, currentUser);
@@ -490,14 +512,14 @@ public class MessageServiceImpl implements MessageService {
             MessageResponse r = messageMapper.toMessageResponse(m);
             r.setStarred(true);
             return r;
-        }).collect(java.util.stream.Collectors.toList());
+        }).collect(Collectors.toList());
     }
 
     /** Flag {@code starred} on a page of responses for the current user (one query). */
     private void applyStarredFlags(List<Message> rows, List<MessageResponse> responses, User user) {
         if (rows.isEmpty()) return;
-        List<Long> ids = rows.stream().map(Message::getId).collect(java.util.stream.Collectors.toList());
-        java.util.Set<Long> starred = new java.util.HashSet<>(
+        List<Long> ids = rows.stream().map(Message::getId).collect(Collectors.toList());
+        Set<Long> starred = new HashSet<>(
                 messageStarRepository.findStarredMessageIds(user.getId(), ids));
         if (starred.isEmpty()) return;
         for (int i = 0; i < rows.size(); i++) {
@@ -563,7 +585,7 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
 
         Page<Message> messages = messageRepository.searchMessagesInChat(chat, query, currentUser.getId(), member.getClearedAt(), pageable);
-        java.util.Set<Long> ghostIds = ghostReceiptUserIds(messages.getContent(), currentUser);
+        Set<Long> ghostIds = ghostReceiptUserIds(messages.getContent(), currentUser);
         return messages.map(m -> toResponseGhostAware(m, ghostIds));
     }
 
@@ -573,13 +595,13 @@ public class MessageServiceImpl implements MessageService {
     // suppressed in StatusDeliveryService.) Zero overhead when no participant is ghost.
 
     private List<MessageResponse> toResponsesGhostAware(List<Message> rows, User viewer) {
-        java.util.Set<Long> ghostIds = ghostReceiptUserIds(rows, viewer);
+        Set<Long> ghostIds = ghostReceiptUserIds(rows, viewer);
         return rows.stream()
                 .map(m -> toResponseGhostAware(m, ghostIds))
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
     }
 
-    private MessageResponse toResponseGhostAware(Message m, java.util.Set<Long> ghostIds) {
+    private MessageResponse toResponseGhostAware(Message m, Set<Long> ghostIds) {
         MessageResponse r = messageMapper.toMessageResponse(m);
         if (!ghostIds.isEmpty()) {
             r.setStatus(resolveStatusExcludingGhosts(m, ghostIds));
@@ -588,8 +610,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /** Distinct receipt users (other than the viewer) who are in Ghost mode. */
-    private java.util.Set<Long> ghostReceiptUserIds(java.util.Collection<Message> rows, User viewer) {
-        java.util.Map<Long, User> users = new java.util.HashMap<>();
+    private Set<Long> ghostReceiptUserIds(Collection<Message> rows, User viewer) {
+        Map<Long, User> users = new HashMap<>();
         for (Message m : rows) {
             if (m.getReadReceipts() == null) continue;
             for (var rec : m.getReadReceipts()) {
@@ -597,12 +619,12 @@ public class MessageServiceImpl implements MessageService {
                 if (u != null && !u.getId().equals(viewer.getId())) users.putIfAbsent(u.getId(), u);
             }
         }
-        if (users.isEmpty()) return java.util.Collections.emptySet();
+        if (users.isEmpty()) return Collections.emptySet();
         return presenceService.getGhostUserIds(users.values());
     }
 
     /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
-    private String resolveStatusExcludingGhosts(Message m, java.util.Set<Long> ghostIds) {
+    private String resolveStatusExcludingGhosts(Message m, Set<Long> ghostIds) {
         if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
         boolean delivered = false;
         for (var rec : m.getReadReceipts()) {
@@ -635,7 +657,7 @@ public class MessageServiceImpl implements MessageService {
         boolean isSender = message.getSender().getId().equals(currentUser.getId());
         // Group/channel admins & owners can delete anyone's message for everyone (moderation).
         boolean isGroupAdminDelete = !isSender && chat.isMultiParty()
-                && callerMember.getRole().atLeast(com.chat.talkMe.enums.MemberRole.ADMIN);
+                && callerMember.getRole().atLeast(MemberRole.ADMIN);
         if (isSender || isGroupAdminDelete) {
             // Sender deletes their own message → delete for EVERYONE. Tombstone it
             // globally and broadcast so any ONLINE recipient's view updates in real
@@ -667,11 +689,11 @@ public class MessageServiceImpl implements MessageService {
     /** Notifies chat subscribers that a message was deleted for everyone (tombstone). */
     private void broadcastMessageDeleted(String chatUuid, String messageUuid) {
         try {
-            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            Map<String, Object> payload = new HashMap<>();
             payload.put("chatId", chatUuid);
             payload.put("messageId", messageUuid);
 
-            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", "message_deleted");
             eventWrapper.put("payload", payload);
 
@@ -739,13 +761,13 @@ public class MessageServiceImpl implements MessageService {
             throw new ForbiddenException("You can only edit your own messages", "TM_163");
         }
         if (message.isDeleted()) {
-            throw new com.chat.talkMe.exception.BadRequestException("This message was deleted and can't be edited", "TM_164");
+            throw new BadRequestException("This message was deleted and can't be edited", "TM_164");
         }
         if (message.getMessageType() != MessageType.TEXT) {
-            throw new com.chat.talkMe.exception.BadRequestException("Only text messages can be edited", "TM_165");
+            throw new BadRequestException("Only text messages can be edited", "TM_165");
         }
         if (content == null || content.isBlank()) {
-            throw new com.chat.talkMe.exception.BadRequestException("Message can't be empty", "TM_166");
+            throw new BadRequestException("Message can't be empty", "TM_166");
         }
 
         Long chatId = message.getChat().getId();
@@ -756,7 +778,7 @@ public class MessageServiceImpl implements MessageService {
             Chat chat = message.getChat();
             boolean allowedExplicit = chat.isMultiParty() && chat.isAllowExplicitContent();
             if (!allowedExplicit) {
-                throw new com.chat.talkMe.exception.ContentModerationException(
+                throw new ContentModerationException(
                         "Your message contains content that violates our community guidelines.");
             }
         }
@@ -767,11 +789,11 @@ public class MessageServiceImpl implements MessageService {
 
         // Live update for all participants.
         try {
-            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            Map<String, Object> payload = new HashMap<>();
             payload.put("chatId", chatUuid);
             payload.put("messageId", messageUuid);
             payload.put("content", message.getContent());
-            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", "message_edited");
             eventWrapper.put("payload", payload);
             messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
@@ -831,10 +853,10 @@ public class MessageServiceImpl implements MessageService {
 
     private void broadcastMediaExpired(String chatUuid, String messageUuid) {
         try {
-            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            Map<String, Object> payload = new HashMap<>();
             payload.put("chatId", chatUuid);
             payload.put("messageId", messageUuid);
-            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", "media_expired");
             eventWrapper.put("payload", payload);
             messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) eventWrapper);
@@ -867,7 +889,7 @@ public class MessageServiceImpl implements MessageService {
         }
 
         // Check if user already reacted with this emoji
-        java.util.Optional<MessageReaction> existingReaction = messageReactionRepository.findByMessageAndUserAndEmoji(message, currentUser, request.getEmoji());
+        Optional<MessageReaction> existingReaction = messageReactionRepository.findByMessageAndUserAndEmoji(message, currentUser, request.getEmoji());
 
         if (existingReaction.isEmpty()) {
             MessageReaction reaction = MessageReaction.builder()
@@ -903,7 +925,7 @@ public class MessageServiceImpl implements MessageService {
             throw new ForbiddenException("Message does not belong to this chat", "TM_103");
         }
 
-        java.util.Optional<MessageReaction> reactionOpt = messageReactionRepository.findByMessageAndUserAndEmoji(message, currentUser, emoji);
+        Optional<MessageReaction> reactionOpt = messageReactionRepository.findByMessageAndUserAndEmoji(message, currentUser, emoji);
 
         if (reactionOpt.isPresent()) {
             MessageReaction reaction = reactionOpt.get();
@@ -933,7 +955,7 @@ public class MessageServiceImpl implements MessageService {
 
         for (Message message : held) {
             // Flip to RELEASED so history queries now return it to BOTH parties.
-            message.setModerationStatus(com.chat.talkMe.enums.ModerationStatus.RELEASED);
+            message.setModerationStatus(ModerationStatus.RELEASED);
             messageRepository.save(message);
 
             MessageResponse response = messageMapper.toMessageResponse(message);
@@ -970,7 +992,7 @@ public class MessageServiceImpl implements MessageService {
             String payload = objectMapper.writeValueAsString(event);
             OutboxEvent row = OutboxEvent.builder()
                     .eventKey(messageId)
-                    .eventType(com.chat.talkMe.config.RabbitConfig.RK_MESSAGE_SEND)
+                    .eventType(RabbitConfig.RK_MESSAGE_SEND)
                     .payload(payload)
                     .status(OutboxEvent.STATUS_PENDING)
                     .attempts(0)
@@ -987,12 +1009,12 @@ public class MessageServiceImpl implements MessageService {
     private void broadcastReactionUpdate(String chatUuid, String messageUuid, Message message) {
         try {
             MessageResponse msgRes = messageMapper.toMessageResponse(message);
-            java.util.Map<String, Object> reactionUpdate = new java.util.HashMap<>();
+            Map<String, Object> reactionUpdate = new HashMap<>();
             reactionUpdate.put("chatId", chatUuid);
             reactionUpdate.put("messageId", messageUuid);
             reactionUpdate.put("reactions", msgRes.getReactions());
 
-            java.util.Map<String, Object> eventWrapper = new java.util.HashMap<>();
+            Map<String, Object> eventWrapper = new HashMap<>();
             eventWrapper.put("event", "reaction_updated");
             eventWrapper.put("payload", reactionUpdate);
 

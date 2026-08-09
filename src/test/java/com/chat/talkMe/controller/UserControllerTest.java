@@ -5,6 +5,8 @@ import com.chat.talkMe.domain.Friend;
 import com.chat.talkMe.domain.Post;
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.moderation.ContentModerationService;
+import com.chat.talkMe.moderation.ModerationResult;
 import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.FriendRequestRepository;
@@ -78,7 +80,7 @@ public class UserControllerTest {
     // Avatar upload runs the (real) NSFW moderation sidecar, which is unavailable in tests —
     // mock it so uploadAvatar doesn't fail on a connection error.
     @MockitoBean
-    private com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private ContentModerationService moderationService;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -128,8 +130,8 @@ public class UserControllerTest {
         // ContentModerationService is mocked (its NSFW sidecar isn't available in tests). Several
         // endpoints moderate input (updateProfile → moderateText(bio), uploadAvatar → moderateUpload),
         // so return a non-explicit result by default to avoid NPEs on the unstubbed mock.
-        com.chat.talkMe.moderation.ModerationResult clean =
-                Mockito.mock(com.chat.talkMe.moderation.ModerationResult.class);
+        ModerationResult clean =
+                Mockito.mock(ModerationResult.class);
         Mockito.lenient().when(clean.isExplicit()).thenReturn(false);
         Mockito.lenient().when(moderationService.moderateText(any())).thenReturn(clean);
         Mockito.lenient().when(moderationService.moderateUpload(any())).thenReturn(clean);

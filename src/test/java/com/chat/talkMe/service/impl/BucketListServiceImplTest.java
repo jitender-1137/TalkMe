@@ -13,6 +13,7 @@ import com.chat.talkMe.repository.BucketListItemRepository;
 import com.chat.talkMe.repository.BucketListRepository;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -369,7 +370,7 @@ class BucketListServiceImplTest {
             UUID itemUuid = UUID.randomUUID();
             BucketListItem it = item(itemUuid, "Go", true, 0);
             it.setCompletedByUserId(9L);
-            it.setCompletedAt(java.time.Instant.now());
+            it.setCompletedAt(Instant.now());
             when(bucketListItemRepository.findByBucketListAndUuid(list, itemUuid))
                     .thenReturn(Optional.of(it));
             when(bucketListItemRepository.findByBucketListOrderByOrderIndexAsc(list))

@@ -5,11 +5,13 @@ import com.chat.talkMe.domain.PushSubscription;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.SavePushSubscriptionRequest;
 import com.chat.talkMe.enums.InstallationType;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.repository.PushSubscriptionRepository;
 import com.chat.talkMe.service.WebPushService;
 import com.chat.talkMe.util.SsrfGuard;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.martijndwars.webpush.Notification;
@@ -43,7 +45,7 @@ public class WebPushServiceImpl implements WebPushService {
         try {
             SsrfGuard.assertSafeHttps(request.getEndpoint());
         } catch (IllegalArgumentException e) {
-            throw new com.chat.talkMe.exception.BadRequestException(
+            throw new BadRequestException(
                     "Invalid push subscription endpoint", "TM_PUSH_ENDPOINT");
         }
         PushSubscription sub = subscriptionRepository.findByEndpoint(request.getEndpoint())
@@ -114,7 +116,7 @@ public class WebPushServiceImpl implements WebPushService {
                 // HIGH urgency + a TTL so push services still deliver to a
                 // closed/dozing device instead of dropping the message.
                 .urgency(Urgency.HIGH)
-                .ttl((int) java.util.concurrent.TimeUnit.HOURS.toSeconds(24))
+                .ttl((int) TimeUnit.HOURS.toSeconds(24))
                 .build();
         // Guard the outbound push with a circuit breaker: if the push relays are
         // failing/slow, the breaker opens and these calls fail fast (throwing

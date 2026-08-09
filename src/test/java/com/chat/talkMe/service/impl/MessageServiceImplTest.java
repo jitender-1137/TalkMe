@@ -57,6 +57,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -69,8 +70,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -994,7 +997,7 @@ class MessageServiceImplTest {
             Page<Message> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
             when(messageRepository.searchMessagesInChat(any(), eq("hi"), anyLong(), any(), any()))
                     .thenReturn(page);
-            when(presenceService.getGhostUserIds(any())).thenReturn(java.util.Set.of(otherUser.getId()));
+            when(presenceService.getGhostUserIds(any())).thenReturn(Set.of(otherUser.getId()));
 
             Page<MessageResponse> res = service.searchMessages(chat.getUuid().toString(),
                     "hi", PageRequest.of(0, 20), currentUser);
@@ -2011,7 +2014,7 @@ class MessageServiceImplTest {
             when(chatRepository.findByUuid(any())).thenReturn(Optional.of(chat));
             when(chatMemberRepository.findByChatAndUser(chat, currentUser)).thenReturn(Optional.of(me));
             when(groupAuthzService.canSend(chat, me)).thenReturn(true);
-            org.mockito.Mockito.doThrow(new RuntimeException("ws down"))
+            Mockito.doThrow(new RuntimeException("ws down"))
                     .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
 
             MessageResponse res = service.sendMessage(chat.getUuid().toString(), textRequest("hi"), currentUser);
@@ -2152,7 +2155,7 @@ class MessageServiceImplTest {
             m.getReadReceipts().add(receipt(m, otherUser, "DELIVERED")); // non-ghost → delivered
             m.getReadReceipts().add(receipt(m, ghost, "READ"));          // ghost → skipped
             arrange(chat, m);
-            when(presenceService.getGhostUserIds(any())).thenReturn(java.util.Set.of(ghost.getId()));
+            when(presenceService.getGhostUserIds(any())).thenReturn(Set.of(ghost.getId()));
 
             Page<MessageResponse> res = service.searchMessages(chat.getUuid().toString(),
                     "q", PageRequest.of(0, 20), currentUser);
@@ -2169,7 +2172,7 @@ class MessageServiceImplTest {
             m.getReadReceipts().add(receipt(m, otherUser, "READ"));  // non-ghost READ
             m.getReadReceipts().add(receipt(m, ghost, "DELIVERED")); // ghost → skipped
             arrange(chat, m);
-            when(presenceService.getGhostUserIds(any())).thenReturn(java.util.Set.of(ghost.getId()));
+            when(presenceService.getGhostUserIds(any())).thenReturn(Set.of(ghost.getId()));
 
             Page<MessageResponse> res = service.searchMessages(chat.getUuid().toString(),
                     "q", PageRequest.of(0, 20), currentUser);
@@ -2194,7 +2197,7 @@ class MessageServiceImplTest {
                     .thenReturn(Optional.of(member(chat, currentUser, MemberRole.MEMBER)));
             Page<Message> page = new PageImpl<>(List.of(m, noReceipts), PageRequest.of(0, 20), 2);
             when(messageRepository.searchMessagesInChat(any(), eq("q"), anyLong(), any(), any())).thenReturn(page);
-            when(presenceService.getGhostUserIds(any())).thenReturn(java.util.Collections.emptySet());
+            when(presenceService.getGhostUserIds(any())).thenReturn(Collections.emptySet());
 
             Page<MessageResponse> res = service.searchMessages(chat.getUuid().toString(),
                     "q", PageRequest.of(0, 20), currentUser);
@@ -2363,7 +2366,7 @@ class MessageServiceImplTest {
                     .fileUrl("/media/f.jpg").thumbnailUrl(null).fileName("f").fileSize(1L).build();
             Message msg = armedMediaMessage(chat, att);
             arrangeReceiverConsume(chat, msg);
-            org.mockito.Mockito.doThrow(new RuntimeException("storage down"))
+            Mockito.doThrow(new RuntimeException("storage down"))
                     .when(mediaStorage).delete("/media/f.jpg");
 
             service.consumeSelfDestruct(chat.getUuid().toString(), msg.getUuid().toString(), currentUser);

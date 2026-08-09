@@ -1,5 +1,6 @@
 package com.chat.talkMe.match;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface WaitingQueueService {
@@ -9,7 +10,7 @@ public interface WaitingQueueService {
     boolean isInQueue(String username);
 
     /** Oldest-first snapshot of up to {@code max} waiting usernames, excluding {@code exclude}. */
-    java.util.List<String> peekCandidates(int max, String exclude);
+    List<String> peekCandidates(int max, String exclude);
 
     /**
      * Atomically claim a specific waiting user. Returns true only if THIS caller actually

@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -513,7 +514,7 @@ class ReputationServiceImplTest {
             when(reputationRepository.findByUser(user)).thenReturn(Optional.of(r));
             when(ledgerRepository.findUnappliedIds(1L)).thenReturn(List.of());
             when(reputationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSendToUser(any(), any(), any());
 
             ReputationResponse[] holder = new ReputationResponse[1];

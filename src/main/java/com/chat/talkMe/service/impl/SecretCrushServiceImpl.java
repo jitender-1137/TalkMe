@@ -9,6 +9,7 @@ import com.chat.talkMe.enums.SecretCrushStatus;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.exception.TooManyRequestsException;
+import com.chat.talkMe.repository.BlockUserRepository;
 import com.chat.talkMe.repository.SecretCrushRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.CompatibilityService;
@@ -51,7 +52,7 @@ public class SecretCrushServiceImpl implements SecretCrushService {
     private final NotificationService notificationService;
     private final ReputationRecorder reputationRecorder;
     private final SimpMessagingTemplate messagingTemplate;
-    private final com.chat.talkMe.repository.BlockUserRepository blockUserRepository;
+    private final BlockUserRepository blockUserRepository;
 
     @Override
     public SecretCrushMatchResponse addCrush(User crusher, String targetUuid) {

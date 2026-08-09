@@ -17,6 +17,7 @@ import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.service.ChatConsentService;
+import com.chat.talkMe.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -44,7 +45,7 @@ public class ChatConsentServiceImpl implements ChatConsentService {
     private final MessageRepository messageRepository;
     private final MessageMapper messageMapper;
     private final SimpMessagingTemplate messagingTemplate;
-    private final com.chat.talkMe.service.MessageService messageService;
+    private final MessageService messageService;
 
     @Override
     @Transactional(readOnly = true)

@@ -7,12 +7,14 @@ import com.chat.talkMe.dto.response.BlockedUserResponse;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.dto.response.PostResponse;
+import com.chat.talkMe.dto.response.PublicProfileResponse;
 import com.chat.talkMe.dto.response.SmartProfileCardResponse;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.GlobalExceptionHandler;
 import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.AuthService;
 import com.chat.talkMe.service.FriendService;
@@ -322,7 +324,7 @@ class UserControllerUnitTest {
 
         @Test
         void shouldReturn401WhenPasswordWrong() throws Exception {
-            doThrow(new com.chat.talkMe.exception.UnauthorizedException("Wrong password", "TM_042"))
+            doThrow(new UnauthorizedException("Wrong password", "TM_042"))
                     .when(authService).requestAccountDeletion(any(), any());
             mockMvc.perform(delete(BASE + "/me").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"password\":\"nope\"}"))
@@ -387,8 +389,8 @@ class UserControllerUnitTest {
     @Nested
     @DisplayName("GET /users/by-username/{username} (public)")
     class PublicProfileByUsername {
-        private com.chat.talkMe.dto.response.PublicProfileResponse pub(String username) {
-            return com.chat.talkMe.dto.response.PublicProfileResponse.builder()
+        private PublicProfileResponse pub(String username) {
+            return PublicProfileResponse.builder()
                     .id("u-1").username(username).name("Test User").avatar("/a.png")
                     .bio("hi").isVerified(true).presence("online").createdAt("2026-01-01T00:00:00Z")
                     .followersCount(3).followingCount(2).postsCount(5)

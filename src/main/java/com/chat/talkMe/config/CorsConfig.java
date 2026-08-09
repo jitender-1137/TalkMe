@@ -1,5 +1,5 @@
 package com.chat.talkMe.config;
-
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,19 +41,19 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(isHasOrigins() ?
-                Arrays.stream(allowedOrigins.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
+                Arrays.stream(allowedOrigins.split(",")).map(String::trim).collect(Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setAllowedMethods(allowedMethods != null && !allowedMethods.isBlank() ?
-                Arrays.stream(allowedMethods.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
+                Arrays.stream(allowedMethods.split(",")).map(String::trim).collect(Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setAllowedHeaders(allowedHeaders != null && !allowedHeaders.isBlank() ?
-                Arrays.stream(allowedHeaders.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
+                Arrays.stream(allowedHeaders.split(",")).map(String::trim).collect(Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setExposedHeaders(exposedHeaders != null && !exposedHeaders.isBlank() ?
-                Arrays.stream(exposedHeaders.split(",")).map(String::trim).collect(java.util.stream.Collectors.toList()) :
+                Arrays.stream(exposedHeaders.split(",")).map(String::trim).collect(Collectors.toList()) :
                 Collections.singletonList("*"));
 
         configuration.setAllowCredentials(allowCredentials);

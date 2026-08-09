@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
@@ -523,7 +524,7 @@ class AnonymousComplimentControllerUnitTest {
             verify(complimentService).requestReveal(user.capture(), uuid.capture());
             assertThat(user.getValue()).isSameAs(testUser);
             assertThat(uuid.getValue()).isEqualTo(COMPLIMENT_UUID);
-            verify(complimentService, never()).respondReveal(any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+            verify(complimentService, never()).respondReveal(any(), any(), ArgumentMatchers.anyBoolean());
         }
 
         @Test
@@ -626,7 +627,7 @@ class AnonymousComplimentControllerUnitTest {
         @Test
         void shouldReturn404WhenCallerIsNotTheSender() throws Exception {
             authenticate();
-            when(complimentService.respondReveal(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+            when(complimentService.respondReveal(any(), any(), ArgumentMatchers.anyBoolean()))
                     .thenThrow(new NotFoundException("Compliment not found", "TM_966"));
 
             mockMvc.perform(post(BASE + "/" + COMPLIMENT_UUID + "/reveal-response").param("accept", "true"))
@@ -637,7 +638,7 @@ class AnonymousComplimentControllerUnitTest {
         @Test
         void shouldReturn400WhenNoPendingRequest() throws Exception {
             authenticate();
-            when(complimentService.respondReveal(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+            when(complimentService.respondReveal(any(), any(), ArgumentMatchers.anyBoolean()))
                     .thenThrow(new BadRequestException(
                             "There is no pending reveal request for this compliment", "TM_968"));
 
@@ -660,7 +661,7 @@ class AnonymousComplimentControllerUnitTest {
         @Test
         void shouldReturn500OnUnexpectedServiceError() throws Exception {
             authenticate();
-            when(complimentService.respondReveal(any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+            when(complimentService.respondReveal(any(), any(), ArgumentMatchers.anyBoolean()))
                     .thenThrow(new RuntimeException("boom"));
 
             mockMvc.perform(post(BASE + "/" + COMPLIMENT_UUID + "/reveal-response").param("accept", "true"))

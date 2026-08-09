@@ -1,32 +1,49 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.cache.MemberCountCache;
+import com.chat.talkMe.cache.UserSettingsCache;
+import com.chat.talkMe.domain.AuditLog;
 import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.ChatSettings;
 import com.chat.talkMe.domain.GroupInvite;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.dto.request.CreateChatRequest;
 import com.chat.talkMe.dto.request.CreateGroupRequest;
+import com.chat.talkMe.dto.request.SendMessageRequest;
 import com.chat.talkMe.dto.request.UpdateGroupRequest;
 import com.chat.talkMe.dto.response.ChatResponse;
+import com.chat.talkMe.dto.response.GroupInfoResponse;
 import com.chat.talkMe.dto.response.GroupMemberResponse;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.ChatVisibility;
+import com.chat.talkMe.enums.GroupAddPrivacy;
+import com.chat.talkMe.enums.Interest;
 import com.chat.talkMe.enums.JoinPolicy;
 import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.enums.SendPolicy;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.repository.AuditLogRepository;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
+import com.chat.talkMe.repository.FriendRepository;
+import com.chat.talkMe.repository.GroupInviteRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.ChatService;
+import com.chat.talkMe.service.EventService;
 import com.chat.talkMe.service.GroupAuthzService;
 import com.chat.talkMe.service.GroupService;
 import com.chat.talkMe.service.MessageService;
+import com.chat.talkMe.service.NotificationService;
 import com.chat.talkMe.service.PresenceService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +51,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -52,16 +71,16 @@ public class GroupServiceImpl implements GroupService {
     private final MessageService messageService;
     private final PresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
-    private final com.chat.talkMe.repository.FriendRepository friendRepository;
-    private final com.chat.talkMe.repository.AuditLogRepository auditLogRepository;
-    private final com.chat.talkMe.service.NotificationService notificationService;
-    private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
-    private final com.chat.talkMe.repository.GroupInviteRepository groupInviteRepository;
-    private final com.chat.talkMe.cache.MemberCountCache memberCountCache;
-    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
+    private final ObjectMapper objectMapper;
+    private final FriendRepository friendRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final NotificationService notificationService;
+    private final UserSettingRepository userSettingRepository;
+    private final GroupInviteRepository groupInviteRepository;
+    private final MemberCountCache memberCountCache;
+    private final UserSettingsCache userSettingsCache;
     /** Lazy to break the GroupService ⇄ EventService constructor cycle (Events spins up rooms via GroupService). */
-    private final org.springframework.beans.factory.ObjectProvider<com.chat.talkMe.service.EventService> eventServiceProvider;
+    private final ObjectProvider<EventService> eventServiceProvider;
 
     @Override
     @Transactional
@@ -86,11 +105,11 @@ public class GroupServiceImpl implements GroupService {
                 .whoCanSend(type == ChatType.CHANNEL ? SendPolicy.ADMINS_ONLY : SendPolicy.EVERYONE)
                 .build();
 
-        java.util.Set<com.chat.talkMe.enums.Interest> tags = new java.util.HashSet<>();
+        Set<Interest> tags = new HashSet<>();
         if (request.getTags() != null) {
             for (String t : request.getTags()) {
                 try {
-                    tags.add(com.chat.talkMe.enums.Interest.valueOf(t.toUpperCase()));
+                    tags.add(Interest.valueOf(t.toUpperCase()));
                 } catch (Exception ignored) { /* skip unknown tag */ }
             }
         }
@@ -361,15 +380,15 @@ public class GroupServiceImpl implements GroupService {
         // Pre-build the lowercased LIKE pattern (null = no text filter).
         String pattern = (query != null && !query.isBlank())
                 ? "%" + query.trim().toLowerCase() + "%" : null;
-        com.chat.talkMe.enums.Interest tagEnum = null;
+        Interest tagEnum = null;
         if (tag != null && !tag.isBlank()) {
             try {
-                tagEnum = com.chat.talkMe.enums.Interest.valueOf(tag.toUpperCase());
+                tagEnum = Interest.valueOf(tag.toUpperCase());
             } catch (Exception ignored) { /* unknown tag → no tag filter */ }
         }
 
         List<Chat> chats = chatRepository.findPublicForDiscovery(
-                types, pattern, tagEnum, org.springframework.data.domain.PageRequest.of(0, 50));
+                types, pattern, tagEnum, PageRequest.of(0, 50));
 
         User me = userRepository.findById(currentUser.getId()).orElse(currentUser);
         // Build membership-FREE discovery cards. Discovery lists PUBLIC rooms the caller is (by
@@ -400,7 +419,7 @@ public class GroupServiceImpl implements GroupService {
                 .name(chat.getName())
                 .chatType(chat.getChatType().name())
                 .avatar(chat.getImageUrl())
-                .group(com.chat.talkMe.dto.response.GroupInfoResponse.builder()
+                .group(GroupInfoResponse.builder()
                         .subtype(chat.getChatType().name().toLowerCase())
                         .visibility(chat.getVisibility().name())
                         .joinPolicy(chat.getJoinPolicy().name())
@@ -465,7 +484,7 @@ public class GroupServiceImpl implements GroupService {
     @Transactional
     public void reportChat(String chatUuid, String reason, String details, User currentUser) {
         Chat chat = loadGroup(chatUuid);
-        com.chat.talkMe.domain.AuditLog log = com.chat.talkMe.domain.AuditLog.builder()
+        AuditLog log = AuditLog.builder()
                 .eventName("chat.report")
                 .entityName("Chat")
                 .entityId(chat.getId())
@@ -507,11 +526,11 @@ public class GroupServiceImpl implements GroupService {
      * false the caller sends a group invite instead of a direct add.
      */
     private boolean allowsDirectAdd(User adder, User target) {
-        com.chat.talkMe.enums.GroupAddPrivacy privacy = userSettingsCache.getGroupAddPrivacy(target);
-        if (privacy == null || privacy == com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE) {
+        GroupAddPrivacy privacy = userSettingsCache.getGroupAddPrivacy(target);
+        if (privacy == null || privacy == GroupAddPrivacy.EVERYONE) {
             return true;
         }
-        if (privacy == com.chat.talkMe.enums.GroupAddPrivacy.FRIENDS_ONLY) {
+        if (privacy == GroupAddPrivacy.FRIENDS_ONLY) {
             return areFriends(adder, target);
         }
         return false; // NOBODY
@@ -545,12 +564,12 @@ public class GroupServiceImpl implements GroupService {
                         "groupName", chat.getName() == null ? "a group" : chat.getName(),
                         "groupAvatar", chat.getImageUrl() == null ? "" : chat.getImageUrl(),
                         "inviterName", inviter.getName() == null ? "" : inviter.getName()));
-                com.chat.talkMe.dto.request.CreateChatRequest chatReq =
-                        new com.chat.talkMe.dto.request.CreateChatRequest();
+                CreateChatRequest chatReq =
+                        new CreateChatRequest();
                 chatReq.setRecipientId(invitee.getUuid().toString());
-                com.chat.talkMe.dto.response.ChatResponse dm = chatService.createChat(chatReq, inviter);
-                com.chat.talkMe.dto.request.SendMessageRequest msg =
-                        new com.chat.talkMe.dto.request.SendMessageRequest();
+                ChatResponse dm = chatService.createChat(chatReq, inviter);
+                SendMessageRequest msg =
+                        new SendMessageRequest();
                 msg.setContent(payload);
                 msg.setMessageType("TEXT");
                 messageService.sendMessage(dm.getId(), msg, inviter);

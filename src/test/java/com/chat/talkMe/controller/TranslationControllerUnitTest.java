@@ -11,6 +11,7 @@ import com.chat.talkMe.exception.GlobalExceptionHandler;
 import com.chat.talkMe.exception.TooManyRequestsException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.TranslationService;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -406,7 +407,7 @@ class TranslationControllerUnitTest {
             authenticate();
             TranslateBatchResponse resp = TranslateBatchResponse.builder()
                     .provider("azure")
-                    .results(java.util.List.of(
+                    .results(List.of(
                             TranslateBatchResponse.Result.builder()
                                     .id("m1").translatedText("hola").detectedSource("en").cached(false).build(),
                             TranslateBatchResponse.Result.builder()

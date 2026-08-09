@@ -7,6 +7,7 @@ import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.repository.ChatMemberRepository;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -43,7 +44,7 @@ public class GroupAuthzService {
     /** True if the user may currently post in the chat (role/send-policy/ban/mute aware). */
     public boolean canSend(Chat chat, ChatMember member) {
         if (member == null || member.isBanned()) return false;
-        if (member.getMutedUntil() != null && member.getMutedUntil().isAfter(java.time.Instant.now())) return false;
+        if (member.getMutedUntil() != null && member.getMutedUntil().isAfter(Instant.now())) return false;
         switch (chat.getSettings().getWhoCanSend()) {
             case ADMINS_ONLY:
                 return member.getRole().atLeast(MemberRole.ADMIN);

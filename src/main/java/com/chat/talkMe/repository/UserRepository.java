@@ -1,6 +1,10 @@
 package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.User;
+import java.time.Instant;
+import java.util.Collection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -10,13 +14,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByUsername(String username);
     // Batch lookup for fan-out (avoids N+1 when notifying all chat recipients).
-    List<User> findByUsernameIn(java.util.Collection<String> usernames);
+    List<User> findByUsernameIn(Collection<String> usernames);
     Optional<User> findByEmail(String email);
     Optional<User> findByGoogleId(String googleId);
     Optional<User> findByUuid(UUID uuid);
@@ -36,7 +41,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     // Count excludes soft-deleted joiners so the headline matches the listed rows.
     long countByReferredByAndIsDeletedFalse(User referredBy);
     List<User> findByReferredByAndIsDeletedFalseOrderByCreatedAtDesc(
-            User referredBy, org.springframework.data.domain.Pageable pageable);
+            User referredBy, Pageable pageable);
 
     // ── Admin dashboard counters ─────────────────────────────────────────────
     long countByIsVerifiedTrue();
@@ -44,11 +49,11 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     /** Recently-joined real accounts (Night Owl Lobby "recently joined", feature #2). */
     List<User> findByIsGuestFalseAndBannedFalseAndIsDeletedFalseOrderByCreatedAtDesc(
-            org.springframework.data.domain.Pageable pageable);
-    long countByCreatedAtAfter(java.time.Instant since);
+            Pageable pageable);
+    long countByCreatedAtAfter(Instant since);
     /** Signup timestamps since a cutoff — bucketed by day in the service for charts. */
     @Query("SELECT u.createdAt FROM User u WHERE u.createdAt >= :since")
-    List<java.time.Instant> findSignupTimesSince(@Param("since") java.time.Instant since);
+    List<Instant> findSignupTimesSince(@Param("since") Instant since);
     long countByBannedTrue();
     /** Soft-deleted (is_deleted = true) vs active account counts for the dashboard. */
     long countByIsDeletedTrue();
@@ -58,7 +63,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("UPDATE User u SET u.isVerified = false WHERE u.isGuest = true AND u.isVerified = true")
     int unverifyAllGuests();
     /** Users seen since a cutoff — "active" counts for the analytics dashboard. */
-    long countByPresenceLastSeenAtAfter(java.time.Instant since);
+    long countByPresenceLastSeenAtAfter(Instant since);
     /** Accounts soft-deleted and awaiting purge (grace window), newest request first. */
     List<User> findByIsDeletedTrueAndDeletionRequestedAtIsNotNullOrderByDeletionRequestedAtDesc();
     @Query("SELECT u.gender, COUNT(u) FROM User u WHERE u.isGuest = false GROUP BY u.gender")
@@ -66,9 +71,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("SELECT u.country, COUNT(u) FROM User u WHERE u.isGuest = false AND u.country IS NOT NULL GROUP BY u.country ORDER BY COUNT(u) DESC")
     List<Object[]> countGroupedByCountry();
     // Paginated search over name/username/email for the admin user list.
-    org.springframework.data.domain.Page<User>
+    Page<User>
         findByUsernameContainingIgnoreCaseOrNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
-            String username, String name, String email, org.springframework.data.domain.Pageable pageable);
+            String username, String name, String email, Pageable pageable);
 
     @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u " +
            "WHERE up.status = 'ONLINE' " +
@@ -79,7 +84,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     List<User> findAllOnlineUsersExcludeSelf(@Param("currentUserId") Long currentUserId);
 
     @Query("SELECT u FROM User u WHERE u.username IN :usernames AND (:currentUserId IS NULL OR u.id <> :currentUserId) AND u.isDeleted = false")
-    List<User> findAllByUsernameInExcludeSelf(@Param("usernames") java.util.Set<String> usernames, @Param("currentUserId") Long currentUserId);
+    List<User> findAllByUsernameInExcludeSelf(@Param("usernames") Set<String> usernames, @Param("currentUserId") Long currentUserId);
 
     // ── Unread badge counter — atomic updates avoid optimistic-lock conflicts
     //    and lost updates from concurrent writers (presence, multiple messages).
@@ -97,5 +102,5 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     /** Soft-deleted accounts whose recovery window has elapsed — due for permanent purge. */
     @Query("SELECT u FROM User u WHERE u.isDeleted = true AND u.deletionRequestedAt IS NOT NULL AND u.deletionRequestedAt < :cutoff")
-    List<User> findAccountsDueForPurge(@Param("cutoff") java.time.Instant cutoff);
+    List<User> findAccountsDueForPurge(@Param("cutoff") Instant cutoff);
 }

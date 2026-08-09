@@ -2,6 +2,11 @@ package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.enums.ChatType;
+import com.chat.talkMe.enums.CityLocation;
+import com.chat.talkMe.enums.Interest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,7 +23,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // ── Admin analytics ──────────────────────────────────────────────────────
     @Query("SELECT c.chatType, COUNT(c) FROM Chat c WHERE c.isDeleted = false GROUP BY c.chatType")
-    java.util.List<Object[]> countGroupedByType();
+    List<Object[]> countGroupedByType();
 
     /**
      * Admin: page ALL chats, optionally filtered by type / search (chat name OR any
@@ -32,11 +37,11 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
             "WHERE (:type IS NULL OR c.chatType = :type) " +
             "AND (:includeDeleted = true OR c.isDeleted = false) " +
             "AND (:q IS NULL OR LOWER(c.name) LIKE :q OR LOWER(u.username) LIKE :q OR LOWER(u.name) LIKE :q)")
-    org.springframework.data.domain.Page<Chat> findForAdmin(
-            @Param("type") com.chat.talkMe.enums.ChatType type,
+    Page<Chat> findForAdmin(
+            @Param("type") ChatType type,
             @Param("q") String q,
             @Param("includeDeleted") boolean includeDeleted,
-            org.springframework.data.domain.Pageable pageable);
+            Pageable pageable);
 
     Optional<Chat> findByUuid(UUID uuid);
 
@@ -66,10 +71,10 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
            "AND (:pattern IS NULL OR LOWER(c.name) LIKE :pattern OR LOWER(c.slug) LIKE :pattern) " +
            "AND (:tag IS NULL OR t = :tag) " +
            "ORDER BY c.updatedAt DESC")
-    List<Chat> findPublicForDiscovery(@Param("types") List<com.chat.talkMe.enums.ChatType> types,
+    List<Chat> findPublicForDiscovery(@Param("types") List<ChatType> types,
                                       @Param("pattern") String pattern,
-                                      @Param("tag") com.chat.talkMe.enums.Interest tag,
-                                      org.springframework.data.domain.Pageable pageable);
+                                      @Param("tag") Interest tag,
+                                      Pageable pageable);
 
     /**
      * Trending public ROOMs for the Night Owl rail (feature #23): editorially-curated rooms
@@ -79,7 +84,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
            "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
            "AND c.visibility = com.chat.talkMe.enums.ChatVisibility.PUBLIC " +
            "ORDER BY c.roomCurated DESC, c.updatedAt DESC")
-    List<Chat> findTrendingRooms(org.springframework.data.domain.Pageable pageable);
+    List<Chat> findTrendingRooms(Pageable pageable);
 
     /**
      * Public ROOMs seeded into a Virtual Night City district (feature #25), newest-active first.
@@ -87,10 +92,10 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     @Query("SELECT c FROM Chat c WHERE c.isDeleted = false " +
            "AND c.chatType = com.chat.talkMe.enums.ChatType.ROOM " +
            "AND c.cityLocation = :loc ORDER BY c.updatedAt DESC")
-    List<Chat> findByCityLocation(@Param("loc") com.chat.talkMe.enums.CityLocation loc);
+    List<Chat> findByCityLocation(@Param("loc") CityLocation loc);
 
     /** Whether a curated room already exists for a district — idempotent seeding guard. */
-    boolean existsByCityLocationAndRoomCuratedTrue(com.chat.talkMe.enums.CityLocation cityLocation);
+    boolean existsByCityLocationAndRoomCuratedTrue(CityLocation cityLocation);
 
     /**
      * Bump a chat's sort timestamp without touching the @Version column, so concurrent

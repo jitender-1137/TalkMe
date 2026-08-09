@@ -9,21 +9,29 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.SessionRepository;
 import com.chat.talkMe.repository.RefreshTokenRepository;
 import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.service.PwnedPasswordService;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
 
@@ -54,12 +62,12 @@ public class AuthControllerTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    private StringRedisTemplate redisTemplate;
 
     // The breached-password check (HaveIBeenPwned) rejects common passwords; mock it so the
     // signup/change/reset happy-paths don't depend on the network or a breach list.
-    @org.springframework.test.context.bean.override.mockito.MockitoBean
-    private com.chat.talkMe.service.PwnedPasswordService pwnedPasswordService;
+    @MockitoBean
+    private PwnedPasswordService pwnedPasswordService;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -85,7 +93,7 @@ public class AuthControllerTest {
                 .build();
         testUser = userRepository.save(testUser);
 
-        org.mockito.Mockito.when(pwnedPasswordService.isBreached(org.mockito.ArgumentMatchers.anyString()))
+        Mockito.when(pwnedPasswordService.isBreached(ArgumentMatchers.anyString()))
                 .thenReturn(false);
     }
 
@@ -419,9 +427,9 @@ public class AuthControllerTest {
         // Seed a valid reset token the way forgotPassword does: Redis key
         // "pwreset:token:<sha256hex(token)>" → the user's uuid.
         String token = "valid-token-value";
-        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-        String hash = java.util.HexFormat.of()
-                .formatHex(md.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        String hash = HexFormat.of()
+                .formatHex(md.digest(token.getBytes(StandardCharsets.UTF_8)));
         redisTemplate.opsForValue().set("pwreset:token:" + hash, testUser.getUuid().toString());
 
         String payload = """

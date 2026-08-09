@@ -2,13 +2,26 @@ package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.request.StoryRequest;
+import com.chat.talkMe.dto.response.AudioTrackDto;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.StoryResponse;
+import com.chat.talkMe.dto.response.StoryViewerResponse;
+import com.chat.talkMe.enums.FeatureKey;
+import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.enums.PostAudience;
+import com.chat.talkMe.enums.StoryKind;
+import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ContentModerationException;
+import com.chat.talkMe.exception.FeatureLockedException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.*;
+import com.chat.talkMe.service.FeatureAccessService;
+import com.chat.talkMe.service.NotificationService;
 import com.chat.talkMe.service.StoryService;
+import com.chat.talkMe.validator.AudioValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,12 +41,12 @@ public class StoryServiceImpl implements StoryService {
     private final StoryRepository storyRepository;
     private final StoryViewRepository storyViewRepository;
     private final UserMapper userMapper;
-    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final ContentModerationService moderationService;
     private final UserSettingRepository userSettingRepository;
     private final PhotoMusicMuxer photoMusicMuxer;
-    private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
-    private final com.chat.talkMe.service.NotificationService notificationService;
-    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
+    private final UserFollowRepository userFollowRepository;
+    private final NotificationService notificationService;
+    private final FeatureAccessService featureAccessService;
 
     @Override
     @Transactional
@@ -41,26 +54,26 @@ public class StoryServiceImpl implements StoryService {
         // Stories are publicly visible — the caption must be clean. (The media image
         // is hard-blocked at upload time for the "story" context in UploadController.)
         if (moderationService.moderateText(request.getCaption()).isExplicit()) {
-            throw new com.chat.talkMe.exception.ContentModerationException(
+            throw new ContentModerationException(
                     "Your story caption contains content that violates our community guidelines.");
         }
 
-        com.chat.talkMe.enums.StoryKind kind = "VOICE".equalsIgnoreCase(
+        StoryKind kind = "VOICE".equalsIgnoreCase(
                 request.getKind() == null ? "" : request.getKind().trim())
-                ? com.chat.talkMe.enums.StoryKind.VOICE
-                : com.chat.talkMe.enums.StoryKind.VISUAL;
+                ? StoryKind.VOICE
+                : StoryKind.VISUAL;
 
         String mediaUrl = request.getMediaUrl();
         var audioReq = request.getAudio();
 
-        if (kind == com.chat.talkMe.enums.StoryKind.VOICE) {
+        if (kind == StoryKind.VOICE) {
             // Voice status (feature #21): mediaUrl IS the voice clip. Gate + validate; no image
             // moderation / photo-music muxing applies (it's pure audio).
-            if (!featureAccessService.hasAccess(currentUser, com.chat.talkMe.enums.FeatureKey.VOICE_STATUS)) {
-                throw new com.chat.talkMe.exception.FeatureLockedException();
+            if (!featureAccessService.hasAccess(currentUser, FeatureKey.VOICE_STATUS)) {
+                throw new FeatureLockedException();
             }
-            if (!com.chat.talkMe.validator.AudioValidator.hasAudioExtension(mediaUrl)) {
-                throw new com.chat.talkMe.exception.BadRequestException(
+            if (!AudioValidator.hasAudioExtension(mediaUrl)) {
+                throw new BadRequestException(
                         "A voice status must be an audio clip", "TM_232");
             }
         } else {
@@ -76,9 +89,9 @@ public class StoryServiceImpl implements StoryService {
             }
         }
 
-        com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+        PostAudience audience = PostAudience.EVERYONE;
         if (request.getAudience() != null && "FRIENDS".equalsIgnoreCase(request.getAudience().trim())) {
-            audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
+            audience = PostAudience.FRIENDS;
         }
 
         Story story = Story.builder()
@@ -126,7 +139,7 @@ public class StoryServiceImpl implements StoryService {
      * ACCEPTED follow in either direction); EVERYONE stories are visible to all.
      */
     private boolean canViewStory(Story story, User viewer) {
-        if (story.getAudience() != com.chat.talkMe.enums.PostAudience.FRIENDS) return true;
+        if (story.getAudience() != PostAudience.FRIENDS) return true;
         if (viewer == null) return false;
         if (story.getUser().getId().equals(viewer.getId())) return true;
         return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, story.getUser(), "ACCEPTED")
@@ -172,7 +185,7 @@ public class StoryServiceImpl implements StoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<com.chat.talkMe.dto.response.StoryViewerResponse> getStoryViewers(String storyUuid, User currentUser) {
+    public List<StoryViewerResponse> getStoryViewers(String storyUuid, User currentUser) {
         Story story = storyRepository.findByUuid(UUID.fromString(storyUuid))
                 .orElseThrow(() -> new NotFoundException("Story not found", "TM_231"));
 
@@ -182,7 +195,7 @@ public class StoryServiceImpl implements StoryService {
 
         // Scoped query (most-recent first) instead of scanning every StoryView row.
         return storyViewRepository.findByStoryOrderByViewedAtDesc(story).stream()
-                .map(v -> com.chat.talkMe.dto.response.StoryViewerResponse.builder()
+                .map(v -> StoryViewerResponse.builder()
                         .user(userMapper.toAuthUserResponse(v.getUser()))
                         .viewedAt(v.getViewedAt() != null ? v.getViewedAt().toString() : null)
                         .build())
@@ -204,7 +217,7 @@ public class StoryServiceImpl implements StoryService {
 
         AuthUserResponse owner = userMapper.toAuthUserResponse(story.getUser());
         owner.setMessagingFriendsOnly(userSettingRepository.findByUser(story.getUser())
-                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
+                .map(s -> s.getMessagingPrivacy() == MessagingPrivacy.FRIENDS_ONLY)
                 .orElse(false));
 
         return StoryResponse.builder()
@@ -221,7 +234,7 @@ public class StoryServiceImpl implements StoryService {
                 .owner(isOwner)
                 .expired(story.isExpired())
                 .audience(story.getAudience() != null ? story.getAudience().name() : "EVERYONE")
-                .audio(com.chat.talkMe.dto.response.AudioTrackDto.from(story.getAudio()))
+                .audio(AudioTrackDto.from(story.getAudio()))
                 .kind(story.getKind() != null ? story.getKind().name() : "VISUAL")
                 .build();
     }

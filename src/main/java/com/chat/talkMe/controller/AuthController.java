@@ -19,6 +19,7 @@ import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.AuthService;
 import com.chat.talkMe.service.CaptchaService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -152,7 +153,7 @@ public class AuthController {
             HttpServletResponse httpResponse) {
 
         String ip = getClientIp(httpRequest);
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
         Object parsed = parseBody(bodyRaw);
 
         // Bot/human gate (CAPTCHA + honeypot) before any auth processing.
@@ -181,7 +182,7 @@ public class AuthController {
 
     private Object parseBody(String json) {
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Map.class);
+            return new ObjectMapper().readValue(json, Map.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid login json structure");
         }

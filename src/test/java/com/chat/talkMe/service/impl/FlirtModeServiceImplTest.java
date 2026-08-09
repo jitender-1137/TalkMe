@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -342,7 +343,7 @@ class FlirtModeServiceImplTest {
 
             // The new row must be keyed low=10/high=20 and carry the caller's (low) opt-in.
             ArgumentCaptor<ChatFlirtMode> saved = ArgumentCaptor.forClass(ChatFlirtMode.class);
-            verify(flirtModeRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+            verify(flirtModeRepository, Mockito.atLeastOnce()).save(saved.capture());
             ChatFlirtMode finalRow = saved.getValue();
             assertThat(finalRow.getLowUserId()).isEqualTo(LOW_ID);
             assertThat(finalRow.getHighUserId()).isEqualTo(HIGH_ID);
@@ -351,7 +352,7 @@ class FlirtModeServiceImplTest {
             assertThat(finalRow.isActive()).isFalse();
             // Create path was taken via the self-proxy.
             verify(chatRepository).getReferenceById(CHAT_PK);
-            verify(self, org.mockito.Mockito.atLeastOnce()).getObject();
+            verify(self, Mockito.atLeastOnce()).getObject();
         }
 
         @Test

@@ -1,10 +1,19 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.storage.MediaKeys;
 import com.chat.talkMe.storage.MediaStorage;
+import com.chat.talkMe.storage.StorageProperties;
+import com.chat.talkMe.util.SsrfGuard;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -32,10 +41,10 @@ public class PhotoMusicMuxer {
 
     private final FfmpegSupport ffmpeg;
     private final MediaStorage mediaStorage;
-    private final com.chat.talkMe.storage.StorageProperties storageProperties;
+    private final StorageProperties storageProperties;
 
     public PhotoMusicMuxer(FfmpegSupport ffmpeg, MediaStorage mediaStorage,
-                           com.chat.talkMe.storage.StorageProperties storageProperties) {
+                           StorageProperties storageProperties) {
         this.ffmpeg = ffmpeg;
         this.mediaStorage = mediaStorage;
         this.storageProperties = storageProperties;
@@ -156,13 +165,13 @@ public class PhotoMusicMuxer {
             final Process running = process;
             final StringBuilder err = new StringBuilder();
             Thread drain = new Thread(() -> {
-                try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(
-                        running.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                        running.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
                         if (err.length() < 8000) err.append(line).append('\n');
                     }
-                } catch (java.io.IOException ignored) {
+                } catch (IOException ignored) {
                     // stream closed on process exit
                 }
             }, "ffmpeg-stderr");
@@ -182,7 +191,7 @@ public class PhotoMusicMuxer {
                 return false;
             }
             return true;
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             log.warn("Photo+music mux failed to run ffmpeg ('{}'): {}", ffmpeg.path(), e.getMessage());
             return false;
         } catch (InterruptedException e) {
@@ -215,13 +224,13 @@ public class PhotoMusicMuxer {
             final Process running = p;
             final StringBuilder err = new StringBuilder();
             Thread drain = new Thread(() -> {
-                try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(
-                        running.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                        running.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
                         if (err.length() < 8000) err.append(line).append('\n');
                     }
-                } catch (java.io.IOException ignored) {
+                } catch (IOException ignored) {
                     // stream closed on process exit
                 }
             }, "ffmpeg-probe");
@@ -229,14 +238,14 @@ public class PhotoMusicMuxer {
             drain.start();
             p.waitFor(20, TimeUnit.SECONDS);
             drain.join(2000);
-            java.util.regex.Matcher m =
-                    java.util.regex.Pattern.compile("Duration:\\s*(\\d+):(\\d+):(\\d+)").matcher(err);
+            Matcher m =
+                    Pattern.compile("Duration:\\s*(\\d+):(\\d+):(\\d+)").matcher(err);
             if (m.find()) {
                 return Integer.parseInt(m.group(1)) * 3600
                         + Integer.parseInt(m.group(2)) * 60
                         + Integer.parseInt(m.group(3));
             }
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             log.debug("Audio duration probe could not run ffmpeg: {}", e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -249,12 +258,12 @@ public class PhotoMusicMuxer {
     /**
      * Download an external audio URL to a temp file for ffmpeg (avoids relying on ffmpeg's network/TLS).
      */
-    private Path downloadToTemp(String url) throws java.io.IOException {
+    private Path downloadToTemp(String url) throws IOException {
         // SSRF guard: the only legitimate external audio is a public preview URL.
         // Reject anything resolving to loopback/link-local (incl. cloud metadata)/
         // private hosts, and don't follow redirects into them.
         Path tmp = Files.createTempFile("talkme-music-", ".audio");
-        try (InputStream in = com.chat.talkMe.util.SsrfGuard.openStream(url)) {
+        try (InputStream in = SsrfGuard.openStream(url)) {
             Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
         }
         return tmp;
@@ -265,7 +274,7 @@ public class PhotoMusicMuxer {
      * Falls back to {@code others/} when the image reference carries no derivable folder.
      */
     private String siblingKey(String imageRef, String newName) {
-        String imageKey = com.chat.talkMe.storage.MediaKeys.key(imageRef, storageProperties.getMediaRoot());
+        String imageKey = MediaKeys.key(imageRef, storageProperties.getMediaRoot());
         if (imageKey == null) return "others/" + newName;
         int slash = imageKey.lastIndexOf('/');
         return slash >= 0 ? imageKey.substring(0, slash + 1) + newName : newName;
@@ -275,7 +284,7 @@ public class PhotoMusicMuxer {
         if (p == null) return;
         try {
             Files.deleteIfExists(p);
-        } catch (java.io.IOException ignored) {
+        } catch (IOException ignored) {
             // best-effort temp cleanup
         }
     }

@@ -30,6 +30,7 @@ import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -80,7 +81,7 @@ class WebSocketControllerUnitTest {
 
         Role role = Role.builder().name("ROLE_USER").build();
         testUser = User.builder().username("alice").email("a@e.com").name("Alice")
-                .isGuest(false).roles(java.util.Set.of(role)).build();
+                .isGuest(false).roles(Set.of(role)).build();
         testUser.setUuid(UUID.fromString("22222222-2222-2222-2222-222222222222"));
     }
 

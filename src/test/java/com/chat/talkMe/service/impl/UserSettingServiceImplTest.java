@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -247,7 +248,7 @@ class UserSettingServiceImplTest {
             service.updateSettings(req, user);
 
             // createDefaultSettings save + the final save.
-            verify(userSettingRepository, org.mockito.Mockito.times(2)).save(any(UserSetting.class));
+            verify(userSettingRepository, Mockito.times(2)).save(any(UserSetting.class));
             verify(userSettingsCache).evict(USER_ID);
         }
 
@@ -364,7 +365,7 @@ class UserSettingServiceImplTest {
 
             service.updateMessagingPrivacy("FRIENDS_ONLY", user);
 
-            verify(userSettingRepository, org.mockito.Mockito.times(2)).save(any(UserSetting.class));
+            verify(userSettingRepository, Mockito.times(2)).save(any(UserSetting.class));
             verify(userSettingsCache).evict(USER_ID);
         }
 
@@ -417,7 +418,7 @@ class UserSettingServiceImplTest {
 
             service.updateGroupAddPrivacy("NOBODY", user);
 
-            verify(userSettingRepository, org.mockito.Mockito.times(2)).save(any(UserSetting.class));
+            verify(userSettingRepository, Mockito.times(2)).save(any(UserSetting.class));
             verify(userSettingsCache).evict(USER_ID);
         }
 

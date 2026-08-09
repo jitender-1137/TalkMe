@@ -4,7 +4,21 @@ import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.AdminCreateUserRequest;
 import com.chat.talkMe.dto.request.AdminUserFilter;
+import com.chat.talkMe.dto.response.AdminAnalyticsResponse;
+import com.chat.talkMe.dto.response.AdminAttachmentView;
+import com.chat.talkMe.dto.response.AdminAuditView;
+import com.chat.talkMe.dto.response.AdminChatView;
+import com.chat.talkMe.dto.response.AdminFeedbackView;
+import com.chat.talkMe.dto.response.AdminMediaListResponse;
+import com.chat.talkMe.dto.response.AdminMediaOwnershipResponse;
+import com.chat.talkMe.dto.response.AdminMessageView;
+import com.chat.talkMe.dto.response.AdminPostCommentView;
+import com.chat.talkMe.dto.response.AdminPostLikeView;
+import com.chat.talkMe.dto.response.AdminPostView;
+import com.chat.talkMe.dto.response.AdminReportView;
 import com.chat.talkMe.dto.response.AdminStatsResponse;
+import com.chat.talkMe.dto.response.AdminStorageListResponse;
+import com.chat.talkMe.dto.response.AdminTimeseriesResult;
 import com.chat.talkMe.dto.response.AdminUserView;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.exception.ConflictException;
@@ -208,7 +222,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListChatsForwardingAdminNameAndDefaults() throws Exception {
             when(adminService.listChats(any(), any(), eq(true), anyInt(), anyInt(), eq(ADMIN_NAME)))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminChatView>builder()
+                    .thenReturn(PaginatedResponse.<AdminChatView>builder()
                             .items(List.of()).build());
 
             mockMvc.perform(get(BASE + "/chats")).andExpect(status().isOk());
@@ -219,7 +233,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetChatMessagesForwardingAdminName() throws Exception {
             when(adminService.getChatMessages(eq("chat-1"), anyInt(), anyInt(), eq(ADMIN_NAME)))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminMessageView>builder()
+                    .thenReturn(PaginatedResponse.<AdminMessageView>builder()
                             .items(List.of()).build());
 
             mockMvc.perform(get(BASE + "/chats/chat-1/messages")).andExpect(status().isOk());
@@ -237,7 +251,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetAnalyticsWithDefaultRange() throws Exception {
             when(adminService.getAnalytics(eq("30d")))
-                    .thenReturn(new com.chat.talkMe.dto.response.AdminAnalyticsResponse());
+                    .thenReturn(new AdminAnalyticsResponse());
             mockMvc.perform(get(BASE + "/analytics")).andExpect(status().isOk());
             verify(adminService).getAnalytics("30d");
         }
@@ -245,7 +259,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetMetricTimeseriesWithDefaults() throws Exception {
             when(adminService.getTimeseries(eq("messages"), eq("30d"), any(), any(), any()))
-                    .thenReturn(new com.chat.talkMe.dto.response.AdminTimeseriesResult());
+                    .thenReturn(new AdminTimeseriesResult());
             mockMvc.perform(get(BASE + "/timeseries")).andExpect(status().isOk());
             verify(adminService).getTimeseries("messages", "30d", null, null, null);
         }
@@ -253,7 +267,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListAuditWithDefaults() throws Exception {
             when(adminService.listAudit(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminAuditView>builder()
+                    .thenReturn(PaginatedResponse.<AdminAuditView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/audit")).andExpect(status().isOk());
             // Optional filter params default to null; page/size default to 0/50.
@@ -263,7 +277,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListAuditForwardingFilterParams() throws Exception {
             when(adminService.listAudit(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminAuditView>builder()
+                    .thenReturn(PaginatedResponse.<AdminAuditView>builder()
                             .items(List.of()).build());
 
             mockMvc.perform(get(BASE + "/audit")
@@ -295,7 +309,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetMediaStatsWithDefaultRange() throws Exception {
             when(adminService.getMediaOwnership(eq("30d"), eq(ADMIN_NAME)))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.builder()
+                    .thenReturn(AdminMediaOwnershipResponse.builder()
                             .totalAssets(5).build());
 
             mockMvc.perform(get(BASE + "/media/stats"))
@@ -309,7 +323,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetMediaStatsForwardingRange() throws Exception {
             when(adminService.getMediaOwnership(eq("7d"), eq(ADMIN_NAME)))
-                    .thenReturn(new com.chat.talkMe.dto.response.AdminMediaOwnershipResponse());
+                    .thenReturn(new AdminMediaOwnershipResponse());
 
             mockMvc.perform(get(BASE + "/media/stats").param("range", "7d"))
                     .andExpect(status().isOk());
@@ -320,7 +334,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetUserMediaForwardingParams() throws Exception {
             when(adminService.getUserMedia(eq("u-1"), anyInt(), anyInt(), eq(ADMIN_NAME)))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+                    .thenReturn(AdminMediaListResponse.builder()
                             .items(List.of()).build());
 
             mockMvc.perform(get(BASE + "/media/user")
@@ -341,7 +355,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetChatMediaWithDefaults() throws Exception {
             when(adminService.getChatMedia(eq("c-1"), anyInt(), anyInt(), eq(ADMIN_NAME)))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+                    .thenReturn(AdminMediaListResponse.builder()
                             .items(List.of()).build());
 
             mockMvc.perform(get(BASE + "/media/chat").param("chatId", "c-1"))
@@ -613,7 +627,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListAttachmentsWithDefaults() throws Exception {
             when(adminService.getAttachments(any(), any(), eq(false), anyInt(), anyInt(), eq(ADMIN_NAME)))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminAttachmentView>builder()
+                    .thenReturn(PaginatedResponse.<AdminAttachmentView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/attachments")).andExpect(status().isOk());
             verify(adminService).getAttachments(null, null, false, 0, 30, ADMIN_NAME);
@@ -623,7 +637,7 @@ class AdminControllerUnitTest {
         void shouldListStorageObjectsWithDefaults() throws Exception {
             when(adminService.getStorageObjects(any(), any(), any(), eq(false), any(), any(),
                     anyInt(), anyInt(), eq(ADMIN_NAME)))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminStorageListResponse.builder().build());
+                    .thenReturn(AdminStorageListResponse.builder().build());
             mockMvc.perform(get(BASE + "/storage/objects")).andExpect(status().isOk());
             verify(adminService).getStorageObjects(null, null, null, false, null, null, 0, 40, ADMIN_NAME);
         }
@@ -631,7 +645,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListPosts() throws Exception {
             when(adminService.listPosts(anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminPostView>builder()
+                    .thenReturn(PaginatedResponse.<AdminPostView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/posts")).andExpect(status().isOk());
             verify(adminService).listPosts(0, 20);
@@ -640,7 +654,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListPostLikes() throws Exception {
             when(adminService.getPostLikes(eq("p-1"), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminPostLikeView>builder()
+                    .thenReturn(PaginatedResponse.<AdminPostLikeView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/posts/p-1/likes")).andExpect(status().isOk());
             verify(adminService).getPostLikes("p-1", 0, 50);
@@ -649,7 +663,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListPostComments() throws Exception {
             when(adminService.getPostComments(eq("p-1"), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminPostCommentView>builder()
+                    .thenReturn(PaginatedResponse.<AdminPostCommentView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/posts/p-1/comments")).andExpect(status().isOk());
             verify(adminService).getPostComments("p-1", 0, 50);
@@ -658,7 +672,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListReportsWithStatusFilter() throws Exception {
             when(adminService.listReports(eq("PENDING"), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminReportView>builder()
+                    .thenReturn(PaginatedResponse.<AdminReportView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/moderation/reports").param("status", "PENDING"))
                     .andExpect(status().isOk());
@@ -668,7 +682,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldGetSingleReport() throws Exception {
             when(adminService.getReport("r-1"))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminReportView.builder().build());
+                    .thenReturn(AdminReportView.builder().build());
             mockMvc.perform(get(BASE + "/moderation/reports/r-1")).andExpect(status().isOk());
             verify(adminService).getReport("r-1");
         }
@@ -676,7 +690,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldReviewReportForwardingActionAndAdmin() throws Exception {
             when(adminService.reviewReport(eq("r-1"), eq("DISMISS"), any(), eq(ADMIN_NAME)))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminReportView.builder().build());
+                    .thenReturn(AdminReportView.builder().build());
             mockMvc.perform(post(BASE + "/moderation/reports/r-1/review")
                             .param("action", "DISMISS").param("note", "not a violation"))
                     .andExpect(status().isOk());
@@ -711,8 +725,8 @@ class AdminControllerUnitTest {
         @Test
         void shouldListFeedbackForwardingTypeStatusAndDefaults() throws Exception {
             when(adminService.listFeedback(eq("MANUAL"), eq("NEW"), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminFeedbackView>builder()
-                            .items(List.of(com.chat.talkMe.dto.response.AdminFeedbackView.builder()
+                    .thenReturn(PaginatedResponse.<AdminFeedbackView>builder()
+                            .items(List.of(AdminFeedbackView.builder()
                                     .id("fb-1").rating(5).type("MANUAL").status("NEW").build()))
                             .build());
 
@@ -729,7 +743,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldListFeedbackWithNoFilters() throws Exception {
             when(adminService.listFeedback(any(), any(), anyInt(), anyInt()))
-                    .thenReturn(PaginatedResponse.<com.chat.talkMe.dto.response.AdminFeedbackView>builder()
+                    .thenReturn(PaginatedResponse.<AdminFeedbackView>builder()
                             .items(List.of()).build());
             mockMvc.perform(get(BASE + "/feedback")).andExpect(status().isOk());
             verify(adminService).listFeedback(null, null, 0, 20);
@@ -738,7 +752,7 @@ class AdminControllerUnitTest {
         @Test
         void shouldUpdateFeedbackStatusForwardingParamAndAdmin() throws Exception {
             when(adminService.updateFeedbackStatus(eq("fb-1"), eq("REVIEWED"), eq(ADMIN_NAME)))
-                    .thenReturn(com.chat.talkMe.dto.response.AdminFeedbackView.builder()
+                    .thenReturn(AdminFeedbackView.builder()
                             .id("fb-1").status("REVIEWED").build());
 
             mockMvc.perform(post(BASE + "/feedback/fb-1/status").param("status", "REVIEWED"))

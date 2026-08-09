@@ -1,6 +1,8 @@
 package com.chat.talkMe.domain;
 
+import com.chat.talkMe.enums.GroupAddPrivacy;
 import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.enums.NightOwlMode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -59,7 +61,7 @@ public class UserSetting extends BaseEntity {
     @ColumnDefault("'EVERYONE'")
     @Column(name = "group_add_privacy", nullable = false, length = 20)
     @Builder.Default
-    private com.chat.talkMe.enums.GroupAddPrivacy groupAddPrivacy = com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE;
+    private GroupAddPrivacy groupAddPrivacy = GroupAddPrivacy.EVERYONE;
 
     // ── Transactional-email preferences ─────────────────────────────────────────
     // User-controllable opt-outs for NON-critical emails. Security/verification/reset
@@ -93,7 +95,7 @@ public class UserSetting extends BaseEntity {
     @ColumnDefault("'AUTO'")
     @Column(name = "night_owl_mode", nullable = false, length = 10)
     @Builder.Default
-    private com.chat.talkMe.enums.NightOwlMode nightOwlMode = com.chat.talkMe.enums.NightOwlMode.AUTO;
+    private NightOwlMode nightOwlMode = NightOwlMode.AUTO;
 
     /** Local hour Night Owl auto-activates (0–23). */
     @ColumnDefault("22")

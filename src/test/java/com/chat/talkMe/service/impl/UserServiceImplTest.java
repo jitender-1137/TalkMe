@@ -52,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -505,7 +506,7 @@ class UserServiceImplTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(me));
             when(moderationService.moderateUpload(file)).thenReturn(ModerationResult.clean());
             when(storageService.storeFile(file, "avatar", "profiles/" + VIEWER_UUID)).thenReturn("new.png");
-            org.mockito.Mockito.doThrow(new RuntimeException("push down"))
+            Mockito.doThrow(new RuntimeException("push down"))
                     .when(notificationService).notifyFriends(any(), any(), any(), any(), any(), any());
 
             Map<String, String> res = service.uploadAvatar(file, me);

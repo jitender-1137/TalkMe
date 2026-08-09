@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -114,7 +115,7 @@ class SendMessageRequestJsonTest {
                 """
                 {"content":"just text","messageType":"TEXT"}""",
                 SendMessageRequest.class))
-                .isInstanceOf(tools.jackson.databind.exc.MismatchedInputException.class)
+                .isInstanceOf(MismatchedInputException.class)
                 .hasMessageContaining("boolean");
     }
 }

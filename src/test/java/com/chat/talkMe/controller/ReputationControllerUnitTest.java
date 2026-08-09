@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.security.access.AccessDeniedException;
@@ -421,7 +422,7 @@ class ReputationControllerUnitTest {
 
             verify(reputationService).prestige(any());
             // getMine/why/getFor are unrelated read paths — never hit by a prestige POST.
-            org.mockito.Mockito.verifyNoMoreInteractions(reputationService);
+            Mockito.verifyNoMoreInteractions(reputationService);
         }
     }
 }

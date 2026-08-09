@@ -12,6 +12,7 @@ import com.chat.talkMe.repository.ScheduledEventRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.GroupService;
 import com.chat.talkMe.service.NotificationService;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -52,7 +53,7 @@ public class EventTransitionWorker {
         }
         // Don't spin up a room / notify for an event that's already past its end time (e.g. the
         // orchestrator was down through the whole window) — just retire it.
-        if (event.getEndAt() != null && !event.getEndAt().isAfter(java.time.Instant.now())) {
+        if (event.getEndAt() != null && !event.getEndAt().isAfter(Instant.now())) {
             event.setStatus(EventStatus.ENDED);
             scheduledEventRepository.save(event);
             return false;

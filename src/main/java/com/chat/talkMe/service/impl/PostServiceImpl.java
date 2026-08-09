@@ -10,14 +10,24 @@ import com.chat.talkMe.dto.response.PollOptionResponse;
 import com.chat.talkMe.dto.response.PollResponse;
 import com.chat.talkMe.dto.response.PostMediaResponse;
 import com.chat.talkMe.dto.response.PostResponse;
+import com.chat.talkMe.enums.FeatureKey;
+import com.chat.talkMe.enums.MessageType;
+import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.enums.PostAudience;
 import com.chat.talkMe.exception.*;
 import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.*;
+import com.chat.talkMe.service.FeatureAccessService;
 import com.chat.talkMe.service.PostService;
+import com.chat.talkMe.storage.MediaStorage;
+import com.chat.talkMe.util.ShortCodes;
+import java.time.Instant;
 import com.chat.talkMe.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,11 +55,11 @@ public class PostServiceImpl implements PostService {
     private final UserSettingRepository userSettingRepository;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
-    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final ContentModerationService moderationService;
     private final PhotoMusicMuxer photoMusicMuxer;
-    private final com.chat.talkMe.storage.MediaStorage mediaStorage;
-    private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
-    private final com.chat.talkMe.service.FeatureAccessService featureAccessService;
+    private final MediaStorage mediaStorage;
+    private final UserFollowRepository userFollowRepository;
+    private final FeatureAccessService featureAccessService;
 
     /** Temporary-post TTL bounds (feature #22): 5 minutes … 7 days. */
     private static final long TEMP_POST_MIN_SECONDS = 300L;
@@ -69,28 +79,28 @@ public class PostServiceImpl implements PostService {
         }
         // Public feed is hard-blocked: explicit captions are rejected outright.
         if (moderationService.moderateText(request.getContent()).isExplicit()) {
-            throw new com.chat.talkMe.exception.ContentModerationException(
+            throw new ContentModerationException(
                     "Your post contains content that violates our community guidelines.");
         }
-        com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+        PostAudience audience = PostAudience.EVERYONE;
         if (request.getAudience() != null && "FRIENDS".equalsIgnoreCase(request.getAudience().trim())) {
-            audience = com.chat.talkMe.enums.PostAudience.FRIENDS;
+            audience = PostAudience.FRIENDS;
         }
 
         // Temporary post (feature #22): opt-in TTL, gated + clamped server-side.
-        java.time.Instant expiresAt = null;
+        Instant expiresAt = null;
         if (request.getExpiresInSeconds() != null && request.getExpiresInSeconds() > 0) {
-            if (!featureAccessService.hasAccess(currentUser, com.chat.talkMe.enums.FeatureKey.TEMPORARY_POSTS)) {
-                throw new com.chat.talkMe.exception.FeatureLockedException();
+            if (!featureAccessService.hasAccess(currentUser, FeatureKey.TEMPORARY_POSTS)) {
+                throw new FeatureLockedException();
             }
             long ttl = Math.max(TEMP_POST_MIN_SECONDS,
                     Math.min(TEMP_POST_MAX_SECONDS, request.getExpiresInSeconds()));
-            expiresAt = java.time.Instant.now().plusSeconds(ttl);
+            expiresAt = Instant.now().plusSeconds(ttl);
         }
 
         if (request.getCaption() != null && !request.getCaption().isBlank()
                 && moderationService.moderateText(request.getCaption()).isExplicit()) {
-            throw new com.chat.talkMe.exception.ContentModerationException(
+            throw new ContentModerationException(
                     "Your post contains content that violates our community guidelines.");
         }
 
@@ -101,7 +111,7 @@ public class PostServiceImpl implements PostService {
                 .caption(request.getCaption())
                 .audience(audience)
                 .expiresAt(expiresAt)
-                .shortCode(com.chat.talkMe.util.ShortCodes.unique(c -> !postRepository.existsByShortCode(c)))
+                .shortCode(ShortCodes.unique(c -> !postRepository.existsByShortCode(c)))
                 .build();
 
         post = postRepository.save(post);
@@ -123,8 +133,8 @@ public class PostServiceImpl implements PostService {
             if (isImage) {
                 // Moderate the still image up front (public feed hard-blocks NSFW).
                 try (var local = mediaStorage.localCopy(only.getMediaUrl()).orElse(null)) {
-                    if (local != null && moderationService.moderateMedia(local.path(), com.chat.talkMe.enums.MessageType.IMAGE).isExplicit()) {
-                        throw new com.chat.talkMe.exception.ContentModerationException(
+                    if (local != null && moderationService.moderateMedia(local.path(), MessageType.IMAGE).isExplicit()) {
+                        throw new ContentModerationException(
                                 "Your post contains media that violates our community guidelines.");
                     }
                 }
@@ -150,9 +160,9 @@ public class PostServiceImpl implements PostService {
                     try (var local = mediaStorage.localCopy(mediaReq.getMediaUrl()).orElse(null)) {
                         if (local != null) {
                             boolean isVideo = "VIDEO".equalsIgnoreCase(mediaReq.getMediaType());
-                            var mt = isVideo ? com.chat.talkMe.enums.MessageType.VIDEO : com.chat.talkMe.enums.MessageType.IMAGE;
+                            var mt = isVideo ? MessageType.VIDEO : MessageType.IMAGE;
                             if (moderationService.moderateMedia(local.path(), mt).isExplicit()) {
-                                throw new com.chat.talkMe.exception.ContentModerationException(
+                                throw new ContentModerationException(
                                         "Your post contains media that violates our community guidelines.");
                             }
                         }
@@ -187,7 +197,7 @@ public class PostServiceImpl implements PostService {
             // Poll question + options are public → hard-block explicit content.
             if (moderationService.moderateText(pollReq.getQuestion()).isExplicit()
                     || options.stream().anyMatch(o -> moderationService.moderateText(o).isExplicit())) {
-                throw new com.chat.talkMe.exception.ContentModerationException(
+                throw new ContentModerationException(
                         "Your poll contains content that violates our community guidelines.");
             }
 
@@ -328,7 +338,7 @@ public class PostServiceImpl implements PostService {
     }
 
     private boolean canViewPost(Post post, User viewer) {
-        if (post.getAudience() != com.chat.talkMe.enums.PostAudience.FRIENDS) return true;
+        if (post.getAudience() != PostAudience.FRIENDS) return true;
         if (viewer == null) return false;
         if (post.getUser().getId().equals(viewer.getId())) return true;
         return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, post.getUser(), "ACCEPTED")
@@ -350,7 +360,7 @@ public class PostServiceImpl implements PostService {
         // formatted body is left untouched on edit).
         if (request.getContent() != null) {
             if (moderationService.moderateText(request.getContent()).isExplicit()) {
-                throw new com.chat.talkMe.exception.ContentModerationException(
+                throw new ContentModerationException(
                         "Your post contains content that violates our community guidelines.");
             }
             post.setContent(request.getContent());
@@ -358,7 +368,7 @@ public class PostServiceImpl implements PostService {
         if (request.getCaption() != null) {
             if (!request.getCaption().isBlank()
                     && moderationService.moderateText(request.getCaption()).isExplicit()) {
-                throw new com.chat.talkMe.exception.ContentModerationException(
+                throw new ContentModerationException(
                         "Your post contains content that violates our community guidelines.");
             }
             post.setCaption(request.getCaption());
@@ -411,12 +421,12 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public int reapExpiredPosts(java.time.Instant now) {
+    public int reapExpiredPosts(Instant now) {
         // Soft-delete expired temporary posts (consistent with deletePost). The feed queries
         // already hide them the instant expiresAt passes; this frees them from every listing
         // and count. Bounded per tick; a backlog drains over successive runs.
         List<Post> expired = postRepository.findExpiredActive(
-                now, org.springframework.data.domain.PageRequest.of(0, EXPIRY_REAP_BATCH));
+                now, PageRequest.of(0, EXPIRY_REAP_BATCH));
         for (Post post : expired) {
             post.setDeleted(true);
         }
@@ -480,7 +490,7 @@ public class PostServiceImpl implements PostService {
     public PostCommentResponse addComment(String postUuid, PostCommentRequest request, User currentUser) {
         // Comments are public → hard-block explicit content.
         if (moderationService.moderateText(request.getContent()).isExplicit()) {
-            throw new com.chat.talkMe.exception.ContentModerationException(
+            throw new ContentModerationException(
                     "Your comment contains content that violates our community guidelines.");
         }
         Post post = postRepository.findByUuid(UUID.fromString(postUuid))
@@ -629,7 +639,7 @@ public class PostServiceImpl implements PostService {
     /** Whether a user restricts messaging to friends (drives the avatar lock badge). */
     private boolean isFriendsOnly(User user) {
         return userSettingRepository.findByUser(user)
-                .map(s -> s.getMessagingPrivacy() == com.chat.talkMe.enums.MessagingPrivacy.FRIENDS_ONLY)
+                .map(s -> s.getMessagingPrivacy() == MessagingPrivacy.FRIENDS_ONLY)
                 .orElse(false);
     }
 

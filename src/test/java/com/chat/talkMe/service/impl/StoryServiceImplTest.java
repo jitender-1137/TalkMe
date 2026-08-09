@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -260,7 +261,7 @@ class StoryServiceImplTest {
             StoryRequest r = visualRequest();
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
             stubSaveEchoesWithUuid();
-            org.mockito.Mockito.doThrow(new RuntimeException("fanout down"))
+            Mockito.doThrow(new RuntimeException("fanout down"))
                     .when(notificationService).notifyFollowersAndFollowing(any(), anyString(), anyString(),
                             anyString(), anyString(), any());
 

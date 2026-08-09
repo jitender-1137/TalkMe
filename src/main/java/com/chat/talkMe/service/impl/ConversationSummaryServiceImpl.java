@@ -13,6 +13,7 @@ import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.MessageAttachmentRepository;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.service.ConversationSummaryService;
+import java.util.function.LongSupplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -107,7 +108,7 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         return null;
     }
 
-    private static long safeCount(java.util.function.LongSupplier supplier) {
+    private static long safeCount(LongSupplier supplier) {
         try {
             return supplier.getAsLong();
         } catch (Exception e) {

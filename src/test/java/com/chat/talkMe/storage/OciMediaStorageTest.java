@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
@@ -305,7 +306,7 @@ class OciMediaStorageTest {
             List<StoredObject> out = storage.list(null);
 
             assertThat(out).extracting(StoredObject::key).containsExactly("a.jpg", "b.jpg");
-            verify(client, org.mockito.Mockito.times(2)).listObjects(any());
+            verify(client, Mockito.times(2)).listObjects(any());
         }
 
         @Test

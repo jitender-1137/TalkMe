@@ -1,6 +1,7 @@
 package com.chat.talkMe.controller;
 
 import com.chat.talkMe.dto.request.SendMessageRequest;
+import com.chat.talkMe.dto.request.EditMessageRequest;
 import com.chat.talkMe.dto.request.ReactToMessageRequest;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.dto.response.MessagePageResponse;
@@ -9,6 +10,7 @@ import com.chat.talkMe.dto.response.SuccessResponseDto;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.MessageService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,11 +47,11 @@ public class MessageController {
     }
 
     @GetMapping("/sync")
-    public ResponseEntity<ResponseDto<java.util.List<MessageResponse>>> syncMessages(
+    public ResponseEntity<ResponseDto<List<MessageResponse>>> syncMessages(
             @PathVariable("chatId") String chatUuid,
             @RequestParam("afterSequence") Long afterSequence,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        java.util.List<MessageResponse> response = messageService.getMessagesAfter(chatUuid, afterSequence, userDetails.getUser());
+        List<MessageResponse> response = messageService.getMessagesAfter(chatUuid, afterSequence, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response));
     }
 
@@ -67,7 +69,7 @@ public class MessageController {
     public ResponseEntity<ResponseDto<MessageResponse>> editMessage(
             @PathVariable("chatId") String chatUuid,
             @PathVariable("messageId") String messageUuid,
-            @RequestBody com.chat.talkMe.dto.request.EditMessageRequest request,
+            @RequestBody EditMessageRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         MessageResponse response = messageService.editMessage(
                 chatUuid, messageUuid, request.getContent(), userDetails.getUser());

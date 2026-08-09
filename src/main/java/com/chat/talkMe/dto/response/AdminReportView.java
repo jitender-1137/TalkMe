@@ -1,5 +1,6 @@
 package com.chat.talkMe.dto.response;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
@@ -32,7 +33,7 @@ public class AdminReportView {
 
     // ── Deep review context (populated only on the single-report fetch) ────────
     private ReportedSummary reportedSummary;      // reported user's account at a glance
-    private java.util.List<HistoryItem> history;  // all reports against the reported user
+    private List<HistoryItem> history;  // all reports against the reported user
     private String relatedChatId;                 // persisted conversation between the two (evidence), nullable
 
     @Data

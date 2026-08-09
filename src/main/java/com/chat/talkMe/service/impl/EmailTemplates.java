@@ -1,6 +1,7 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.dto.EmailUnreadPreview;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -161,7 +162,7 @@ public class EmailTemplates {
     public String loginAlert(String name, String device, String location, String ip, String when, String secureLink) {
         // IG-style: one prominent "device · location" line, the timestamp below it,
         // and the IP as a subtle line — instead of a label/value table.
-        String deviceLine = java.util.stream.Stream.of(device, location)
+        String deviceLine = Stream.of(device, location)
                 .filter(s -> s != null && !s.isBlank())
                 .map(s -> esc(s))
                 .reduce((a, b) -> a + " &middot; " + b)

@@ -25,6 +25,7 @@ import org.springframework.http.MediaType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -45,7 +46,7 @@ public class UploadController {
     private final MediaAssetService mediaAssetService;
 
     /** Upload categories whose images/videos must be CLEAN (publicly visible content). */
-    private static final java.util.Set<String> MODERATED_CONTEXTS = java.util.Set.of("profile", "post", "story");
+    private static final Set<String> MODERATED_CONTEXTS = Set.of("profile", "post", "story");
 
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<UploadResponse>> uploadFile(

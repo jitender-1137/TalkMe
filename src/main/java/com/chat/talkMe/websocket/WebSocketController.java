@@ -2,9 +2,15 @@ package com.chat.talkMe.websocket;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.UserResponse;
+import com.chat.talkMe.enums.PresenceStatus;
+import com.chat.talkMe.repository.ChatMemberRepository;
+import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.service.NotificationDispatchService;
+import com.chat.talkMe.service.PresenceService;
 import com.chat.talkMe.service.UserService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -18,6 +24,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,10 +37,10 @@ public class WebSocketController {
     private final StringRedisTemplate redisTemplate;
     private final UserService userService;
     private final UserRepository userRepository;
-    private final com.chat.talkMe.service.PresenceService presenceService;
-    private final com.chat.talkMe.service.NotificationDispatchService notificationDispatchService;
-    private final com.chat.talkMe.repository.ChatRepository chatRepository;
-    private final com.chat.talkMe.repository.ChatMemberRepository chatMemberRepository;
+    private final PresenceService presenceService;
+    private final NotificationDispatchService notificationDispatchService;
+    private final ChatRepository chatRepository;
+    private final ChatMemberRepository chatMemberRepository;
 
     /**
      * Deadline ZSET for grace-evicting lobby members whose socket dropped.
@@ -87,10 +94,10 @@ public class WebSocketController {
     public void handleVisibility(@Payload boolean visible, Principal principal) {
         if (principal instanceof UsernamePasswordAuthenticationToken auth
                 && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
-            com.chat.talkMe.domain.User user = userDetails.getUser();
+            User user = userDetails.getUser();
             if (visible) {
                 presenceService.recordHeartbeat(user);
-                presenceService.setStatus(user, com.chat.talkMe.enums.PresenceStatus.ONLINE);
+                presenceService.setStatus(user, PresenceStatus.ONLINE);
             } else {
                 presenceService.markBackgrounded(user);
             }
@@ -102,7 +109,7 @@ public class WebSocketController {
      * doesn't hit the DB on every keystroke. Fail-OPEN on a transient error (never
      * break typing), but a genuinely-missing chat/membership returns false.
      */
-    private boolean isChatMember(String chatUuid, com.chat.talkMe.domain.User user) {
+    private boolean isChatMember(String chatUuid, User user) {
         if (user == null || chatUuid == null || chatUuid.isBlank()) return false;
         String key = "ws:member:" + user.getUuid() + ":" + chatUuid;
         try {
@@ -114,7 +121,7 @@ public class WebSocketController {
         }
         boolean member;
         try {
-            member = chatRepository.findByUuid(java.util.UUID.fromString(chatUuid))
+            member = chatRepository.findByUuid(UUID.fromString(chatUuid))
                     .flatMap(c -> chatMemberRepository.findByChatAndUser(c, user))
                     .isPresent();
         } catch (IllegalArgumentException badUuid) {
@@ -123,7 +130,7 @@ public class WebSocketController {
             return true; // transient DB issue → don't break the typing indicator
         }
         try {
-            redisTemplate.opsForValue().set(key, member ? "1" : "0", java.time.Duration.ofSeconds(60));
+            redisTemplate.opsForValue().set(key, member ? "1" : "0", Duration.ofSeconds(60));
         } catch (Exception ignored) {
             // cache is best-effort
         }
@@ -140,7 +147,7 @@ public class WebSocketController {
         String username = principal.getName();
 
         String userId = "";
-        com.chat.talkMe.domain.User user = null;
+        User user = null;
         if (principal instanceof UsernamePasswordAuthenticationToken auth) {
             if (auth.getPrincipal() instanceof CustomUserDetails userDetails) {
                 user = userDetails.getUser();
@@ -259,7 +266,7 @@ public class WebSocketController {
         if (recipient == null || content == null) return;
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("id", java.util.UUID.randomUUID().toString());
+        payload.put("id", UUID.randomUUID().toString());
         payload.put("sender", sender);
         payload.put("recipient", recipient);
         payload.put("content", content);

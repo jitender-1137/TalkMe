@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -641,7 +642,7 @@ class EventServiceImplTest {
             when(scheduledEventRepository.findByUuid(EVENT_UUID)).thenReturn(Optional.of(e));
             when(userRepository.findById(1L)).thenReturn(Optional.of(host));
             memberOfRoom();
-            org.mockito.Mockito.doThrow(new RuntimeException("ledger down"))
+            Mockito.doThrow(new RuntimeException("ledger down"))
                     .when(reputationRecorder).record(anyLong(), any(), any());
             stubResponseCounts(); // broad findByEventAndUser → empty (walk-in)
 

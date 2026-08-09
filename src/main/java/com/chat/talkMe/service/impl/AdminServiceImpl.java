@@ -1,39 +1,117 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.crypto.MessageCryptoService;
+import com.chat.talkMe.domain.AdminAuditLog;
 import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.ChatMember;
+import com.chat.talkMe.domain.Feedback;
+import com.chat.talkMe.domain.MatchReport;
+import com.chat.talkMe.domain.MatchSession;
+import com.chat.talkMe.domain.MediaAsset;
 import com.chat.talkMe.domain.Message;
 import com.chat.talkMe.domain.MessageAttachment;
+import com.chat.talkMe.domain.Post;
+import com.chat.talkMe.domain.PostComment;
+import com.chat.talkMe.domain.PostLike;
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.dto.request.AdminCreateUserRequest;
+import com.chat.talkMe.dto.request.AdminUpdateUserRequest;
+import com.chat.talkMe.dto.request.AdminUserFilter;
+import com.chat.talkMe.dto.response.AdminAnalyticsResponse;
+import com.chat.talkMe.dto.response.AdminAttachmentView;
+import com.chat.talkMe.dto.response.AdminAuditView;
 import com.chat.talkMe.dto.response.AdminChatView;
+import com.chat.talkMe.dto.response.AdminConnectorView;
+import com.chat.talkMe.dto.response.AdminFeedbackView;
+import com.chat.talkMe.dto.response.AdminMediaAssetView;
+import com.chat.talkMe.dto.response.AdminMediaListResponse;
+import com.chat.talkMe.dto.response.AdminMediaOwnershipResponse;
 import com.chat.talkMe.dto.response.AdminMessageView;
+import com.chat.talkMe.dto.response.AdminPostCommentView;
+import com.chat.talkMe.dto.response.AdminPostLikeView;
+import com.chat.talkMe.dto.response.AdminPostView;
+import com.chat.talkMe.dto.response.AdminReportView;
+import com.chat.talkMe.dto.response.AdminStorageListResponse;
 import com.chat.talkMe.dto.response.AdminStorageObjectView;
+import com.chat.talkMe.dto.response.AdminTimeseriesPoint;
+import com.chat.talkMe.dto.response.AdminTimeseriesResult;
+import com.chat.talkMe.dto.response.AdminUserFullView;
+import com.chat.talkMe.storage.MediaKeys;
 import com.chat.talkMe.storage.MediaStorage;
+import com.chat.talkMe.storage.StorageProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import com.chat.talkMe.dto.response.AdminStatsResponse;
 import com.chat.talkMe.dto.response.AdminUserView;
+import com.chat.talkMe.dto.response.LabelCount;
 import com.chat.talkMe.dto.response.PaginatedResponse;
+import com.chat.talkMe.enums.ChatType;
+import com.chat.talkMe.enums.FeedbackStatus;
+import com.chat.talkMe.enums.FeedbackType;
+import com.chat.talkMe.enums.Interest;
+import com.chat.talkMe.enums.MediaContext;
+import com.chat.talkMe.enums.MessageType;
+import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.NotFoundException;
+import com.chat.talkMe.mapper.MessageMapper;
+import com.chat.talkMe.repository.AdminAuditLogRepository;
 import com.chat.talkMe.repository.ChatRepository;
+import com.chat.talkMe.repository.FeedbackRepository;
+import com.chat.talkMe.repository.FriendRepository;
+import com.chat.talkMe.repository.FriendRequestRepository;
+import com.chat.talkMe.repository.MatchReportRepository;
+import com.chat.talkMe.repository.MediaAssetRepository;
+import com.chat.talkMe.repository.MessageAttachmentRepository;
+import com.chat.talkMe.repository.MessageReactionRepository;
 import com.chat.talkMe.repository.MessageRepository;
+import com.chat.talkMe.repository.PostCommentRepository;
+import com.chat.talkMe.repository.PostLikeRepository;
+import com.chat.talkMe.repository.PostRepository;
+import com.chat.talkMe.repository.ProfileViewRepository;
+import com.chat.talkMe.repository.RoleRepository;
+import com.chat.talkMe.repository.StoryRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
+import com.chat.talkMe.repository.UserPresenceRepository;
 import com.chat.talkMe.repository.UserRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.AdminService;
 import com.chat.talkMe.service.PresenceService;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -46,32 +124,32 @@ public class AdminServiceImpl implements AdminService {
     private final MessageRepository messageRepository;
     private final PresenceService presenceService;
     private final MessageCryptoService messageCryptoService;
-    private final com.chat.talkMe.mapper.MessageMapper messageMapper;
-    private final com.chat.talkMe.repository.RoleRepository roleRepository;
-    private final com.chat.talkMe.repository.AdminAuditLogRepository auditRepository;
+    private final MessageMapper messageMapper;
+    private final RoleRepository roleRepository;
+    private final AdminAuditLogRepository auditRepository;
     private final AdminAuditLogger auditLogger;
-    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     // ── Analytics-only dependencies ───────────────────────────────────────────
-    private final com.chat.talkMe.repository.MessageAttachmentRepository attachmentRepository;
-    private final com.chat.talkMe.repository.PostRepository postRepository;
-    private final com.chat.talkMe.repository.StoryRepository storyRepository;
-    private final com.chat.talkMe.repository.ProfileViewRepository profileViewRepository;
-    private final com.chat.talkMe.repository.MatchReportRepository matchReportRepository;
-    private final com.chat.talkMe.repository.FeedbackRepository feedbackRepository;
-    private final com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
-    private final com.chat.talkMe.repository.FriendRepository friendRepository;
-    private final com.chat.talkMe.repository.FriendRequestRepository friendRequestRepository;
-    private final com.chat.talkMe.repository.MessageReactionRepository reactionRepository;
-    private final com.chat.talkMe.repository.PostLikeRepository postLikeRepository;
-    private final com.chat.talkMe.repository.PostCommentRepository postCommentRepository;
-    private final com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
-    private final com.chat.talkMe.repository.UserPresenceRepository userPresenceRepository;
-    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final MessageAttachmentRepository attachmentRepository;
+    private final PostRepository postRepository;
+    private final StoryRepository storyRepository;
+    private final ProfileViewRepository profileViewRepository;
+    private final MatchReportRepository matchReportRepository;
+    private final FeedbackRepository feedbackRepository;
+    private final UserFollowRepository userFollowRepository;
+    private final FriendRepository friendRepository;
+    private final FriendRequestRepository friendRequestRepository;
+    private final MessageReactionRepository reactionRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final PostCommentRepository postCommentRepository;
+    private final UserSettingRepository userSettingRepository;
+    private final UserPresenceRepository userPresenceRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
     // ── Storage reconciliation (Attachments gallery: storage ⇄ DB) ────────────
-    private final com.chat.talkMe.storage.MediaStorage mediaStorage;
-    private final com.chat.talkMe.storage.StorageProperties storageProperties;
-    private final com.chat.talkMe.repository.MediaAssetRepository mediaAssetRepository;
+    private final MediaStorage mediaStorage;
+    private final StorageProperties storageProperties;
+    private final MediaAssetRepository mediaAssetRepository;
 
     /**
      * Redis-backed read-through cache for the expensive analytics aggregates, so the
@@ -92,7 +170,7 @@ public class AdminServiceImpl implements AdminService {
         catch (Exception e) { log.debug("[AdminCache] gen bump failed: {}", e.getMessage()); }
     }
 
-    private <T> T cached(String key, long ttlSeconds, Class<T> type, java.util.function.Supplier<T> loader) {
+    private <T> T cached(String key, long ttlSeconds, Class<T> type, Supplier<T> loader) {
         try {
             String hit = redisTemplate.opsForValue().get(key);
             if (hit != null) return objectMapper.readValue(hit, type);
@@ -102,7 +180,7 @@ public class AdminServiceImpl implements AdminService {
         T value = loader.get();
         try {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value),
-                    java.time.Duration.ofSeconds(ttlSeconds));
+                    Duration.ofSeconds(ttlSeconds));
         } catch (Exception e) {
             log.warn("[AdminCache] write failed for {}: {}", key, e.getMessage());
         }
@@ -110,8 +188,8 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** Roles an admin may grant/revoke from the dashboard. */
-    private static final java.util.Set<String> ASSIGNABLE_ROLES =
-            java.util.Set.of("ROLE_SUPER_ADMIN", "ROLE_MODERATOR", "ROLE_USER");
+    private static final Set<String> ASSIGNABLE_ROLES =
+            Set.of("ROLE_SUPER_ADMIN", "ROLE_MODERATOR", "ROLE_USER");
 
     @Override
     @Transactional(readOnly = true)
@@ -137,9 +215,9 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<AdminUserView> listUsers(com.chat.talkMe.dto.request.AdminUserFilter filter, int page, int size) {
-        com.chat.talkMe.dto.request.AdminUserFilter f =
-                filter != null ? filter : new com.chat.talkMe.dto.request.AdminUserFilter();
+    public PaginatedResponse<AdminUserView> listUsers(AdminUserFilter filter, int page, int size) {
+        AdminUserFilter f =
+                filter != null ? filter : new AdminUserFilter();
 
         // Sort — whitelist the sortable columns to avoid injection into the property path.
         String sortField = switch (f.getSort() == null ? "" : f.getSort()) {
@@ -175,10 +253,10 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** Translate the filter DTO into a JPA Specification over User. */
-    private org.springframework.data.jpa.domain.Specification<User> buildUserSpec(
-            com.chat.talkMe.dto.request.AdminUserFilter f) {
+    private Specification<User> buildUserSpec(
+            AdminUserFilter f) {
         return (root, cq, cb) -> {
-            java.util.List<jakarta.persistence.criteria.Predicate> ps = new java.util.ArrayList<>();
+            List<Predicate> ps = new ArrayList<>();
 
             if (f.getQuery() != null && !f.getQuery().isBlank()) {
                 String like = "%" + f.getQuery().trim().toLowerCase() + "%";
@@ -204,7 +282,7 @@ public class AdminServiceImpl implements AdminService {
             if (f.getGender() != null && !f.getGender().isBlank())
                 ps.add(cb.equal(cb.lower(root.get("gender")), f.getGender().trim().toLowerCase()));
             if (f.getCountries() != null && !f.getCountries().isBlank()) {
-                java.util.List<String> wanted = java.util.Arrays.stream(f.getCountries().split("\\|"))
+                List<String> wanted = Arrays.stream(f.getCountries().split("\\|"))
                         .map(s -> s.trim().toLowerCase())
                         .filter(s -> !s.isEmpty())
                         .collect(Collectors.toList());
@@ -231,12 +309,12 @@ public class AdminServiceImpl implements AdminService {
                 String roleName = f.getRole().trim().toUpperCase();
                 var sub = cq.subquery(Long.class);
                 var subRoot = sub.from(User.class);
-                var subRole = subRoot.join("roles", jakarta.persistence.criteria.JoinType.INNER);
+                var subRole = subRoot.join("roles", JoinType.INNER);
                 sub.select(subRoot.get("id"))
                         .where(cb.equal(subRole.get("name"), roleName));
                 ps.add(root.get("id").in(sub));
             }
-            return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            return cb.and(ps.toArray(new Predicate[0]));
         };
     }
 
@@ -246,9 +324,9 @@ public class AdminServiceImpl implements AdminService {
         String v = s.trim();
         try { return Instant.parse(v); } catch (Exception ignored) {}
         try {
-            java.time.LocalDate d = java.time.LocalDate.parse(v);
+            LocalDate d = LocalDate.parse(v);
             return (endOfDay ? d.atTime(23, 59, 59) : d.atStartOfDay())
-                    .toInstant(java.time.ZoneOffset.UTC);
+                    .toInstant(ZoneOffset.UTC);
         } catch (Exception ignored) {}
         return null;
     }
@@ -266,11 +344,11 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminUserFullView getUserFull(String uuid) {
+    public AdminUserFullView getUserFull(String uuid) {
         User u = userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
 
-        java.util.Map<String, Object> account = new java.util.LinkedHashMap<>();
+        Map<String, Object> account = new LinkedHashMap<>();
         account.put("uuid", u.getUuid() != null ? u.getUuid().toString() : null);
         account.put("id", u.getId());
         account.put("username", u.getUsername());
@@ -306,7 +384,7 @@ public class AdminServiceImpl implements AdminService {
         account.put("createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : null);
         account.put("updatedAt", u.getUpdatedAt() != null ? u.getUpdatedAt().toString() : null);
 
-        java.util.Map<String, Object> settings = new java.util.LinkedHashMap<>();
+        Map<String, Object> settings = new LinkedHashMap<>();
         userSettingRepository.findByUser(u).ifPresentOrElse(s -> {
             settings.put("theme", s.getTheme());
             settings.put("language", s.getLanguage());
@@ -319,7 +397,7 @@ public class AdminServiceImpl implements AdminService {
             settings.put("emailAnnouncements", s.isEmailAnnouncements());
         }, () -> settings.put("_note", "No settings row — user is on defaults"));
 
-        java.util.Map<String, Object> presence = new java.util.LinkedHashMap<>();
+        Map<String, Object> presence = new LinkedHashMap<>();
         userPresenceRepository.findByUser(u).ifPresentOrElse(p -> {
             presence.put("status", p.getStatus());
             presence.put("lastSeenAt", p.getLastSeenAt() != null ? p.getLastSeenAt().toString() : null);
@@ -328,7 +406,7 @@ public class AdminServiceImpl implements AdminService {
             presence.put("hideLastSeenEnabled", p.isHideLastSeenEnabled());
         }, () -> presence.put("_note", "No presence row yet"));
 
-        return com.chat.talkMe.dto.response.AdminUserFullView.builder()
+        return AdminUserFullView.builder()
                 .account(account).settings(settings).presence(presence).build();
     }
 
@@ -349,9 +427,9 @@ public class AdminServiceImpl implements AdminService {
         audit(adminUsername, "VIEW_CHATS", "CHAT", "all",
                 "type=" + type + " q=" + query + " page=" + page);
 
-        com.chat.talkMe.enums.ChatType chatType = null;
+        ChatType chatType = null;
         if (type != null && !type.isBlank() && !type.equalsIgnoreCase("all")) {
-            try { chatType = com.chat.talkMe.enums.ChatType.valueOf(type.trim().toUpperCase()); }
+            try { chatType = ChatType.valueOf(type.trim().toUpperCase()); }
             catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
         }
         String q = (query == null || query.isBlank()) ? null : "%" + query.trim().toLowerCase() + "%";
@@ -465,8 +543,8 @@ public class AdminServiceImpl implements AdminService {
     public AdminUserView grantRole(String uuid, String roleName, String adminUsername) {
         String role = normalizeRole(roleName);
         User u = requireUser(uuid);
-        com.chat.talkMe.domain.Role r = roleRepository.findByName(role)
-                .orElseGet(() -> roleRepository.save(com.chat.talkMe.domain.Role.builder().name(role).build()));
+        Role r = roleRepository.findByName(role)
+                .orElseGet(() -> roleRepository.save(Role.builder().name(role).build()));
         boolean has = u.getRoles().stream().anyMatch(x -> role.equals(x.getName()));
         if (!has) {
             u.getRoles().add(r);
@@ -491,15 +569,15 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView> listAudit(
+    public PaginatedResponse<AdminAuditView> listAudit(
             String action, String targetType, String admin, String from, String to, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
         Instant fromI = parseFilterInstant(from, false);
         Instant toI = parseFilterInstant(to, true);
-        org.springframework.data.jpa.domain.Specification<com.chat.talkMe.domain.AdminAuditLog> spec =
+        Specification<AdminAuditLog> spec =
                 (root, cq, cb) -> {
-                    java.util.List<jakarta.persistence.criteria.Predicate> ps = new java.util.ArrayList<>();
+                    List<Predicate> ps = new ArrayList<>();
                     if (action != null && !action.isBlank())
                         ps.add(cb.equal(root.get("action"), action.trim()));
                     if (targetType != null && !targetType.isBlank())
@@ -509,21 +587,21 @@ public class AdminServiceImpl implements AdminService {
                                 "%" + admin.trim().toLowerCase() + "%"));
                     if (fromI != null) ps.add(cb.greaterThanOrEqualTo(root.get("createdAt"), fromI));
                     if (toI != null) ps.add(cb.lessThanOrEqualTo(root.get("createdAt"), toI));
-                    return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+                    return cb.and(ps.toArray(new Predicate[0]));
                 };
-        Page<com.chat.talkMe.domain.AdminAuditLog> result = auditRepository.findAll(spec, pageable);
+        Page<AdminAuditLog> result = auditRepository.findAll(spec, pageable);
         // Batch-resolve the acting admins' uuids once for the whole page (for cross-linking).
-        java.util.Set<String> adminUsernames = result.getContent().stream()
-                .map(com.chat.talkMe.domain.AdminAuditLog::getAdminUsername)
-                .filter(java.util.Objects::nonNull)
+        Set<String> adminUsernames = result.getContent().stream()
+                .map(AdminAuditLog::getAdminUsername)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        java.util.Map<String, String> adminUuidByUsername = adminUsernames.isEmpty()
-                ? java.util.Map.of()
+        Map<String, String> adminUuidByUsername = adminUsernames.isEmpty()
+                ? Map.of()
                 : userRepository.findByUsernameIn(adminUsernames).stream()
                     .filter(u -> u.getUuid() != null)
                     .collect(Collectors.toMap(User::getUsername, u -> u.getUuid().toString(), (x, y) -> x));
-        List<com.chat.talkMe.dto.response.AdminAuditView> items = result.getContent().stream()
-                .map(a -> com.chat.talkMe.dto.response.AdminAuditView.builder()
+        List<AdminAuditView> items = result.getContent().stream()
+                .map(a -> AdminAuditView.builder()
                         .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
                         .adminUsername(a.getAdminUsername())
                         .adminId(adminUuidByUsername.get(a.getAdminUsername()))
@@ -534,7 +612,7 @@ public class AdminServiceImpl implements AdminService {
                         .createdAt(a.getCreatedAt() != null ? a.getCreatedAt().toString() : null)
                         .build())
                 .collect(Collectors.toList());
-        return PaginatedResponse.<com.chat.talkMe.dto.response.AdminAuditView>builder()
+        return PaginatedResponse.<AdminAuditView>builder()
                 .items(items)
                 .pagination(PaginatedResponse.PaginationInfo.builder()
                         .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
@@ -581,7 +659,7 @@ public class AdminServiceImpl implements AdminService {
         String r = roleName == null ? "" : roleName.trim().toUpperCase();
         if (!r.startsWith("ROLE_")) r = "ROLE_" + r;
         if (!ASSIGNABLE_ROLES.contains(r)) {
-            throw new com.chat.talkMe.exception.BadRequestException("Role not assignable: " + r, "TM_071");
+            throw new BadRequestException("Role not assignable: " + r, "TM_071");
         }
         return r;
     }
@@ -612,13 +690,13 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public AdminUserView createUser(com.chat.talkMe.dto.request.AdminCreateUserRequest req, String adminUsername) {
+    public AdminUserView createUser(AdminCreateUserRequest req, String adminUsername) {
         String email = req.getEmail() == null ? null : req.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new com.chat.talkMe.exception.ConflictException("TM_047");
+            throw new ConflictException("TM_047");
         }
         if (userRepository.existsByUsernameIgnoreCase(req.getUsername().trim())) {
-            throw new com.chat.talkMe.exception.ConflictException("TM_048");
+            throw new ConflictException("TM_048");
         }
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseGet(() -> roleRepository.save(Role.builder().name("ROLE_USER").build()));
@@ -632,7 +710,7 @@ public class AdminServiceImpl implements AdminService {
                 .age(req.getAge())
                 .gender(req.getGender())
                 .country(req.getCountry())
-                .roles(new java.util.HashSet<>(java.util.Set.of(userRole)))
+                .roles(new HashSet<>(Set.of(userRole)))
                 .build();
         u = userRepository.save(u);
         audit(adminUsername, "CREATE_USER", "USER", u.getUuid().toString(), "@" + u.getUsername() + " <" + email + ">");
@@ -641,7 +719,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public AdminUserView updateUser(String uuid, com.chat.talkMe.dto.request.AdminUpdateUserRequest req, String adminUsername) {
+    public AdminUserView updateUser(String uuid, AdminUpdateUserRequest req, String adminUsername) {
         User u = requireUser(uuid);
         if (req.getName() != null) u.setName(req.getName());
         if (req.getBio() != null) u.setBio(req.getBio());
@@ -657,23 +735,23 @@ public class AdminServiceImpl implements AdminService {
         if (req.getEmail() != null) {
             String email = req.getEmail().trim().toLowerCase();
             if (!email.equalsIgnoreCase(u.getEmail()) && userRepository.existsByEmailIgnoreCase(email)) {
-                throw new com.chat.talkMe.exception.ConflictException("TM_047");
+                throw new ConflictException("TM_047");
             }
             u.setEmail(email);
         }
         if (req.getUsername() != null) {
             String username = req.getUsername().trim();
             if (!username.equalsIgnoreCase(u.getUsername()) && userRepository.existsByUsernameIgnoreCase(username)) {
-                throw new com.chat.talkMe.exception.ConflictException("TM_048");
+                throw new ConflictException("TM_048");
             }
             u.setUsername(username);
         }
         if (req.getInterests() != null) {
             u.setInterests(req.getInterests().stream()
-                    .map(s -> { try { return com.chat.talkMe.enums.Interest.valueOf(s.trim().toUpperCase()); }
+                    .map(s -> { try { return Interest.valueOf(s.trim().toUpperCase()); }
                                 catch (IllegalArgumentException e) { return null; } })
-                    .filter(java.util.Objects::nonNull)
-                    .collect(Collectors.toCollection(java.util.HashSet::new)));
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(HashSet::new)));
         }
         if (req.getNewPassword() != null && !req.getNewPassword().isBlank()) {
             u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
@@ -707,18 +785,18 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> getSignupTimeseries(int days) {
+    public List<AdminTimeseriesPoint> getSignupTimeseries(int days) {
         int d = Math.min(Math.max(days, 1), 365);
-        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
-        Instant since = today.minusDays(d - 1L).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-        java.util.Map<java.time.LocalDate, Long> counts = userRepository.findSignupTimesSince(since).stream()
-                .filter(java.util.Objects::nonNull)
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        Instant since = today.minusDays(d - 1L).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Map<LocalDate, Long> counts = userRepository.findSignupTimesSince(since).stream()
+                .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(
-                        t -> t.atZone(java.time.ZoneOffset.UTC).toLocalDate(), Collectors.counting()));
-        List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> out = new java.util.ArrayList<>(d);
+                        t -> t.atZone(ZoneOffset.UTC).toLocalDate(), Collectors.counting()));
+        List<AdminTimeseriesPoint> out = new ArrayList<>(d);
         for (int i = d - 1; i >= 0; i--) {
-            java.time.LocalDate day = today.minusDays(i);
-            out.add(new com.chat.talkMe.dto.response.AdminTimeseriesPoint(day.toString(), counts.getOrDefault(day, 0L)));
+            LocalDate day = today.minusDays(i);
+            out.add(new AdminTimeseriesPoint(day.toString(), counts.getOrDefault(day, 0L)));
         }
         return out;
     }
@@ -750,7 +828,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** Bucket raw timestamps into fixed windows, zero-filled; labels are ISO bucket-starts. */
-    private List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> bucketize(List<Instant> times, RangeSpec spec) {
+    private List<AdminTimeseriesPoint> bucketize(List<Instant> times, RangeSpec spec) {
         long[] counts = new long[spec.buckets()];
         long start = spec.since().toEpochMilli();
         for (Instant t : times) {
@@ -758,10 +836,10 @@ public class AdminServiceImpl implements AdminService {
             long idx = (t.toEpochMilli() - start) / spec.bucketMillis();
             if (idx >= 0 && idx < spec.buckets()) counts[(int) idx]++;
         }
-        List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> out = new java.util.ArrayList<>(spec.buckets());
+        List<AdminTimeseriesPoint> out = new ArrayList<>(spec.buckets());
         for (int i = 0; i < spec.buckets(); i++) {
             Instant bucketStart = spec.since().plusMillis((long) i * spec.bucketMillis());
-            out.add(new com.chat.talkMe.dto.response.AdminTimeseriesPoint(bucketStart.toString(), counts[i]));
+            out.add(new AdminTimeseriesPoint(bucketStart.toString(), counts[i]));
         }
         return out;
     }
@@ -830,7 +908,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminTimeseriesResult getTimeseries(
+    public AdminTimeseriesResult getTimeseries(
             String metric, String range, String interval, String fromIso, String toIso) {
         // Custom from/to windows aren't cached (unbounded key space); ranged ones are.
         if (fromIso != null && !fromIso.isBlank()) {
@@ -838,11 +916,11 @@ public class AdminServiceImpl implements AdminService {
         }
         String key = genKey(String.join(":", "ts", String.valueOf(metric),
                 String.valueOf(range), String.valueOf(interval)));
-        return cached(key, 30, com.chat.talkMe.dto.response.AdminTimeseriesResult.class,
+        return cached(key, 30, AdminTimeseriesResult.class,
                 () -> computeTimeseries(metric, range, interval, fromIso, toIso));
     }
 
-    private com.chat.talkMe.dto.response.AdminTimeseriesResult computeTimeseries(
+    private AdminTimeseriesResult computeTimeseries(
             String metric, String range, String interval, String fromIso, String toIso) {
         RangeSpec spec = resolveWindow(range, interval, fromIso, toIso);
         String m = metric == null ? "messages" : metric.trim().toLowerCase();
@@ -860,9 +938,9 @@ public class AdminServiceImpl implements AdminService {
             case "reactions" -> reactionRepository.findTimesSince(since);
             default -> messageRepository.findMessageTimesSince(since);
         };
-        List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> points = bucketize(times, spec);
-        long total = points.stream().mapToLong(com.chat.talkMe.dto.response.AdminTimeseriesPoint::getCount).sum();
-        return com.chat.talkMe.dto.response.AdminTimeseriesResult.builder()
+        List<AdminTimeseriesPoint> points = bucketize(times, spec);
+        long total = points.stream().mapToLong(AdminTimeseriesPoint::getCount).sum();
+        return AdminTimeseriesResult.builder()
                 .metric(m)
                 .granularity(spec.granularity())
                 .interval(describeBucket(spec.bucketMillis()))
@@ -873,13 +951,13 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminAnalyticsResponse getAnalytics(String range) {
+    public AdminAnalyticsResponse getAnalytics(String range) {
         String key = genKey("analytics:" + (range == null ? "30d" : range));
-        return cached(key, 20, com.chat.talkMe.dto.response.AdminAnalyticsResponse.class,
+        return cached(key, 20, AdminAnalyticsResponse.class,
                 () -> computeAnalytics(range));
     }
 
-    private com.chat.talkMe.dto.response.AdminAnalyticsResponse computeAnalytics(String range) {
+    private AdminAnalyticsResponse computeAnalytics(String range) {
         RangeSpec spec = resolveRange(range);
         Instant now = Instant.now();
 
@@ -897,10 +975,10 @@ public class AdminServiceImpl implements AdminService {
         long online = presenceService.getOnlineUsernames().size();
         long idle = presenceService.getAwayUsernames().size();
         long offline = Math.max(0, total - online - idle);
-        List<com.chat.talkMe.dto.response.LabelCount> usersByStatus = List.of(
-                new com.chat.talkMe.dto.response.LabelCount("Online", online),
-                new com.chat.talkMe.dto.response.LabelCount("Idle", idle),
-                new com.chat.talkMe.dto.response.LabelCount("Offline", offline));
+        List<LabelCount> usersByStatus = List.of(
+                new LabelCount("Online", online),
+                new LabelCount("Idle", idle),
+                new LabelCount("Offline", offline));
 
         // Accounts pending purge — full details (capped for payload sanity).
         Set<String> onlineSet = presenceService.getOnlineUsernames();
@@ -912,7 +990,7 @@ public class AdminServiceImpl implements AdminService {
                 .map(u -> toView(u, onlineSet, awaySet, true))
                 .collect(Collectors.toList());
 
-        return com.chat.talkMe.dto.response.AdminAnalyticsResponse.builder()
+        return AdminAnalyticsResponse.builder()
                 // headline totals
                 .totalUsers(total)
                 .verifiedUsers(userRepository.countByIsVerifiedTrue())
@@ -955,24 +1033,24 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** Map a JPA {@code GROUP BY} result ([label, count]) to sorted LabelCounts. */
-    private List<com.chat.talkMe.dto.response.LabelCount> toLabelCounts(List<Object[]> rows) {
+    private List<LabelCount> toLabelCounts(List<Object[]> rows) {
         return rows.stream()
                 .map(r -> {
                     Object k = r[0];
                     String label = k == null ? "Unknown" : (k instanceof Enum<?> e ? e.name() : String.valueOf(k));
                     long count = r[1] == null ? 0L : ((Number) r[1]).longValue();
-                    return new com.chat.talkMe.dto.response.LabelCount(label, count);
+                    return new LabelCount(label, count);
                 })
                 .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
                 .collect(Collectors.toList());
     }
 
-    private List<com.chat.talkMe.dto.response.LabelCount> topN(List<com.chat.talkMe.dto.response.LabelCount> in, int n) {
-        return in.size() <= n ? in : new java.util.ArrayList<>(in.subList(0, n));
+    private List<LabelCount> topN(List<LabelCount> in, int n) {
+        return in.size() <= n ? in : new ArrayList<>(in.subList(0, n));
     }
 
     /** Bucket users by how many friends they have (0 bucket derived from total). */
-    private List<com.chat.talkMe.dto.response.LabelCount> friendCountDistribution(long totalUsers) {
+    private List<LabelCount> friendCountDistribution(long totalUsers) {
         long[] buckets = new long[6]; // 0 | 1-5 | 6-10 | 11-25 | 26-50 | 50+
         long usersWithFriends = 0;
         for (Object[] row : friendRepository.countFriendsPerUser()) {
@@ -986,22 +1064,22 @@ public class AdminServiceImpl implements AdminService {
         }
         buckets[0] = Math.max(0, totalUsers - usersWithFriends); // no friend links at all
         String[] labels = {"0 friends", "1-5", "6-10", "11-25", "26-50", "50+"};
-        List<com.chat.talkMe.dto.response.LabelCount> out = new java.util.ArrayList<>(6);
+        List<LabelCount> out = new ArrayList<>(6);
         for (int i = 0; i < labels.length; i++) {
-            out.add(new com.chat.talkMe.dto.response.LabelCount(labels[i], buckets[i]));
+            out.add(new LabelCount(labels[i], buckets[i]));
         }
         return out;
     }
 
     /** Most-connected users first — the roots of the friends hierarchy. */
-    private List<com.chat.talkMe.dto.response.AdminConnectorView> topConnectors(int n) {
+    private List<AdminConnectorView> topConnectors(int n) {
         return friendRepository.topConnectors(PageRequest.of(0, Math.max(1, n))).stream()
                 .map(row -> connectorView((User) row[0], ((Number) row[1]).longValue()))
                 .collect(Collectors.toList());
     }
 
-    private com.chat.talkMe.dto.response.AdminConnectorView connectorView(User u, long friendCount) {
-        return com.chat.talkMe.dto.response.AdminConnectorView.builder()
+    private AdminConnectorView connectorView(User u, long friendCount) {
+        return AdminConnectorView.builder()
                 .id(u.getUuid() != null ? u.getUuid().toString() : null)
                 .username(u.getUsername())
                 .name(u.getName())
@@ -1015,27 +1093,27 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminPostView> listPosts(int page, int size) {
+    public PaginatedResponse<AdminPostView> listPosts(int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "id"));
         // Admin sees ALL posts, including soft-deleted ones (flagged in the DTO).
-        Page<com.chat.talkMe.domain.Post> result = postRepository.findAll(pageable);
-        List<com.chat.talkMe.dto.response.AdminPostView> items =
+        Page<Post> result = postRepository.findAll(pageable);
+        List<AdminPostView> items =
                 result.getContent().stream().map(this::toPostView).collect(Collectors.toList());
         return page(items, result, page);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminPostLikeView> getPostLikes(String postUuid, int page, int size) {
-        com.chat.talkMe.domain.Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
+    public PaginatedResponse<AdminPostLikeView> getPostLikes(String postUuid, int page, int size) {
+        Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_180"));
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "id"));
-        Page<com.chat.talkMe.domain.PostLike> result = postLikeRepository.findByPost(post, pageable);
-        List<com.chat.talkMe.dto.response.AdminPostLikeView> items = result.getContent().stream().map(l -> {
+        Page<PostLike> result = postLikeRepository.findByPost(post, pageable);
+        List<AdminPostLikeView> items = result.getContent().stream().map(l -> {
             User u = l.getUser();
-            return com.chat.talkMe.dto.response.AdminPostLikeView.builder()
+            return AdminPostLikeView.builder()
                     .id(l.getUuid() != null ? l.getUuid().toString() : String.valueOf(l.getId()))
                     .userId(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
                     .username(u != null ? u.getUsername() : null)
@@ -1049,14 +1127,14 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminPostCommentView> getPostComments(String postUuid, int page, int size) {
-        com.chat.talkMe.domain.Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
+    public PaginatedResponse<AdminPostCommentView> getPostComments(String postUuid, int page, int size) {
+        Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_180"));
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
-        Page<com.chat.talkMe.domain.PostComment> result = postCommentRepository.findAllForPost(post, pageable);
-        List<com.chat.talkMe.dto.response.AdminPostCommentView> items = result.getContent().stream().map(c -> {
+        Page<PostComment> result = postCommentRepository.findAllForPost(post, pageable);
+        List<AdminPostCommentView> items = result.getContent().stream().map(c -> {
             User u = c.getUser();
-            return com.chat.talkMe.dto.response.AdminPostCommentView.builder()
+            return AdminPostCommentView.builder()
                     .id(c.getUuid() != null ? c.getUuid().toString() : String.valueOf(c.getId()))
                     .userId(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
                     .username(u != null ? u.getUsername() : null)
@@ -1070,14 +1148,14 @@ public class AdminServiceImpl implements AdminService {
         return page(items, result, page);
     }
 
-    private com.chat.talkMe.dto.response.AdminPostView toPostView(com.chat.talkMe.domain.Post p) {
+    private AdminPostView toPostView(Post p) {
         User a = p.getUser();
-        List<com.chat.talkMe.dto.response.AdminPostView.Media> media = p.getMedia() == null ? List.of()
+        List<AdminPostView.Media> media = p.getMedia() == null ? List.of()
                 : p.getMedia().stream()
-                    .map(m -> new com.chat.talkMe.dto.response.AdminPostView.Media(
+                    .map(m -> new AdminPostView.Media(
                             m.getMediaUrl(), m.getMediaType()))
                     .collect(Collectors.toList());
-        return com.chat.talkMe.dto.response.AdminPostView.builder()
+        return AdminPostView.builder()
                 .id(p.getUuid() != null ? p.getUuid().toString() : String.valueOf(p.getId()))
                 .shortCode(p.getShortCode())
                 .authorId(a != null && a.getUuid() != null ? a.getUuid().toString() : null)
@@ -1100,30 +1178,30 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminReportView> listReports(String status, int page, int size) {
+    public PaginatedResponse<AdminReportView> listReports(String status, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "id"));
         String s = status == null ? "" : status.trim().toUpperCase();
-        Page<com.chat.talkMe.domain.MatchReport> result =
+        Page<MatchReport> result =
                 (s.isEmpty() || "ALL".equals(s))
                         ? matchReportRepository.findAll(pageable)
                         : matchReportRepository.findByStatus(s, pageable);
-        List<com.chat.talkMe.dto.response.AdminReportView> items =
+        List<AdminReportView> items =
                 result.getContent().stream().map(r -> toReportView(r, true)).collect(Collectors.toList());
         return page(items, result, page);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminReportView getReport(String reportUuid) {
-        com.chat.talkMe.domain.MatchReport r = matchReportRepository.findByUuid(parseUuid(reportUuid, "Report not found", "TM_181"))
+    public AdminReportView getReport(String reportUuid) {
+        MatchReport r = matchReportRepository.findByUuid(parseUuid(reportUuid, "Report not found", "TM_181"))
                 .orElseThrow(() -> new NotFoundException("Report not found", "TM_181"));
-        com.chat.talkMe.dto.response.AdminReportView view = toReportView(r, true);
+        AdminReportView view = toReportView(r, true);
 
         User reported = r.getReported();
         User reporter = r.getReporter();
         if (reported != null) {
-            view.setReportedSummary(com.chat.talkMe.dto.response.AdminReportView.ReportedSummary.builder()
+            view.setReportedSummary(AdminReportView.ReportedSummary.builder()
                     .joined(reported.getCreatedAt() != null ? reported.getCreatedAt().toString() : null)
                     .verified(reported.isVerified())
                     .guest(reported.isGuest())
@@ -1136,7 +1214,7 @@ public class AdminServiceImpl implements AdminService {
             view.setHistory(matchReportRepository
                     .findByReportedId(reported.getId(), PageRequest.of(0, 25, Sort.by(Sort.Direction.DESC, "id")))
                     .getContent().stream()
-                    .map(h -> com.chat.talkMe.dto.response.AdminReportView.HistoryItem.builder()
+                    .map(h -> AdminReportView.HistoryItem.builder()
                             .id(h.getUuid() != null ? h.getUuid().toString() : String.valueOf(h.getId()))
                             .reason(h.getReason())
                             .reporterUsername(h.getReporter() != null ? h.getReporter().getUsername() : null)
@@ -1159,8 +1237,8 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public com.chat.talkMe.dto.response.AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername) {
-        com.chat.talkMe.domain.MatchReport r = matchReportRepository.findByUuid(parseUuid(reportUuid, "Report not found", "TM_181"))
+    public AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername) {
+        MatchReport r = matchReportRepository.findByUuid(parseUuid(reportUuid, "Report not found", "TM_181"))
                 .orElseThrow(() -> new NotFoundException("Report not found", "TM_181"));
         String a = action == null ? "" : action.trim().toUpperCase();
         switch (a) {
@@ -1181,7 +1259,7 @@ public class AdminServiceImpl implements AdminService {
                 r.setStatus("ACTION_TAKEN");
                 r.setActionTaken("BANNED_REPORTED");
             }
-            default -> throw new com.chat.talkMe.exception.BadRequestException("Unknown review action: " + a, "TM_071");
+            default -> throw new BadRequestException("Unknown review action: " + a, "TM_071");
         }
         r.setReviewedBy(adminUsername);
         r.setReviewedAt(Instant.now());
@@ -1196,13 +1274,13 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminFeedbackView> listFeedback(String type, String status, int page, int size) {
+    public PaginatedResponse<AdminFeedbackView> listFeedback(String type, String status, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "id"));
-        com.chat.talkMe.enums.FeedbackType t = parseFeedbackType(type);
-        com.chat.talkMe.enums.FeedbackStatus s = parseFeedbackStatus(status);
+        FeedbackType t = parseFeedbackType(type);
+        FeedbackStatus s = parseFeedbackStatus(status);
 
-        Page<com.chat.talkMe.domain.Feedback> result;
+        Page<Feedback> result;
         if (t != null && s != null) {
             result = feedbackRepository.findByTypeAndStatus(t, s, pageable);
         } else if (t != null) {
@@ -1213,19 +1291,19 @@ public class AdminServiceImpl implements AdminService {
             result = feedbackRepository.findAll(pageable);
         }
 
-        List<com.chat.talkMe.dto.response.AdminFeedbackView> items =
+        List<AdminFeedbackView> items =
                 result.getContent().stream().map(this::toFeedbackView).collect(Collectors.toList());
         return page(items, result, page);
     }
 
     @Override
     @Transactional
-    public com.chat.talkMe.dto.response.AdminFeedbackView updateFeedbackStatus(String feedbackUuid, String status, String adminUsername) {
-        com.chat.talkMe.domain.Feedback f = feedbackRepository.findByUuid(parseUuid(feedbackUuid, "Feedback not found", "TM_312"))
+    public AdminFeedbackView updateFeedbackStatus(String feedbackUuid, String status, String adminUsername) {
+        Feedback f = feedbackRepository.findByUuid(parseUuid(feedbackUuid, "Feedback not found", "TM_312"))
                 .orElseThrow(() -> new NotFoundException("Feedback not found", "TM_312"));
-        com.chat.talkMe.enums.FeedbackStatus s = parseFeedbackStatus(status);
+        FeedbackStatus s = parseFeedbackStatus(status);
         if (s == null) {
-            throw new com.chat.talkMe.exception.BadRequestException("Unknown feedback status: " + status, "TM_071");
+            throw new BadRequestException("Unknown feedback status: " + status, "TM_071");
         }
         f.setStatus(s);
         feedbackRepository.save(f);
@@ -1234,32 +1312,32 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** Returns null for blank/"ALL" so the caller skips that filter. */
-    private static com.chat.talkMe.enums.FeedbackType parseFeedbackType(String raw) {
+    private static FeedbackType parseFeedbackType(String raw) {
         if (raw == null) return null;
         String v = raw.trim().toUpperCase();
         if (v.isEmpty() || "ALL".equals(v)) return null;
         try {
-            return com.chat.talkMe.enums.FeedbackType.valueOf(v);
+            return FeedbackType.valueOf(v);
         } catch (IllegalArgumentException ex) {
             return null;
         }
     }
 
-    private static com.chat.talkMe.enums.FeedbackStatus parseFeedbackStatus(String raw) {
+    private static FeedbackStatus parseFeedbackStatus(String raw) {
         if (raw == null) return null;
         String v = raw.trim().toUpperCase();
         if (v.isEmpty() || "ALL".equals(v)) return null;
         try {
-            return com.chat.talkMe.enums.FeedbackStatus.valueOf(v);
+            return FeedbackStatus.valueOf(v);
         } catch (IllegalArgumentException ex) {
             return null;
         }
     }
 
-    private com.chat.talkMe.dto.response.AdminFeedbackView toFeedbackView(com.chat.talkMe.domain.Feedback f) {
+    private AdminFeedbackView toFeedbackView(Feedback f) {
         User u = f.getUser();
-        com.chat.talkMe.dto.response.AdminFeedbackView.Author author = u == null ? null
-                : com.chat.talkMe.dto.response.AdminFeedbackView.Author.builder()
+        AdminFeedbackView.Author author = u == null ? null
+                : AdminFeedbackView.Author.builder()
                         .id(u.getUuid() != null ? u.getUuid().toString() : null)
                         .username(u.getUsername())
                         .name(u.getName())
@@ -1269,7 +1347,7 @@ public class AdminServiceImpl implements AdminService {
                         .verified(u.isVerified())
                         .guest(u.isGuest())
                         .build();
-        return com.chat.talkMe.dto.response.AdminFeedbackView.builder()
+        return AdminFeedbackView.builder()
                 .id(f.getUuid() != null ? f.getUuid().toString() : null)
                 .rating(f.getRating())
                 .reason(f.getReason())
@@ -1283,13 +1361,13 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private com.chat.talkMe.dto.response.AdminReportView toReportView(com.chat.talkMe.domain.MatchReport r, boolean withCounts) {
+    private AdminReportView toReportView(MatchReport r, boolean withCounts) {
         User reporter = r.getReporter();
         User reported = r.getReported();
-        com.chat.talkMe.domain.MatchSession session = r.getSession();
+        MatchSession session = r.getSession();
 
-        com.chat.talkMe.dto.response.AdminReportView.Session sessionView = session == null ? null
-                : com.chat.talkMe.dto.response.AdminReportView.Session.builder()
+        AdminReportView.Session sessionView = session == null ? null
+                : AdminReportView.Session.builder()
                     .id(session.getUuid() != null ? session.getUuid().toString() : null)
                     .hostUsername(session.getHost() != null ? session.getHost().getUsername() : null)
                     .hostId(uuidOf(session.getHost()))
@@ -1299,7 +1377,7 @@ public class AdminServiceImpl implements AdminService {
                     .endedAt(session.getEndedAt() != null ? session.getEndedAt().toString() : null)
                     .build();
 
-        return com.chat.talkMe.dto.response.AdminReportView.builder()
+        return AdminReportView.builder()
                 .id(r.getUuid() != null ? r.getUuid().toString() : String.valueOf(r.getId()))
                 .reason(r.getReason())
                 .details(r.getDetails())
@@ -1320,9 +1398,9 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private com.chat.talkMe.dto.response.AdminReportView.Party party(User u) {
+    private AdminReportView.Party party(User u) {
         if (u == null) return null;
-        return com.chat.talkMe.dto.response.AdminReportView.Party.builder()
+        return AdminReportView.Party.builder()
                 .id(u.getUuid() != null ? u.getUuid().toString() : null)
                 .username(u.getUsername())
                 .name(u.getName())
@@ -1350,7 +1428,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<com.chat.talkMe.dto.response.AdminConnectorView> getUserFriends(String userUuid) {
+    public List<AdminConnectorView> getUserFriends(String userUuid) {
         User u = requireUser(userUuid);
         return friendRepository.findFriendsByUser(u).stream()
                 .map(f -> connectorView(f, friendRepository.countByUserAndIsDeletedFalse(f)))
@@ -1360,15 +1438,15 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional // NOT readOnly: writes an admin audit row + decrypts URLs
-    public PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView> getAttachments(
+    public PaginatedResponse<AdminAttachmentView> getAttachments(
             String userUuid, String type, boolean includeDeleted, int page, int size, String adminUsername) {
         Long senderId = null;
         if (userUuid != null && !userUuid.isBlank()) {
             senderId = requireUser(userUuid).getId();
         }
-        com.chat.talkMe.enums.MessageType mt = null;
+        MessageType mt = null;
         if (type != null && !type.isBlank()) {
-            try { mt = com.chat.talkMe.enums.MessageType.valueOf(type.trim().toUpperCase()); }
+            try { mt = MessageType.valueOf(type.trim().toUpperCase()); }
             catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
         }
         audit(adminUsername, "VIEW_ATTACHMENTS", "ATTACHMENT",
@@ -1377,11 +1455,11 @@ public class AdminServiceImpl implements AdminService {
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
         Page<MessageAttachment> result = attachmentRepository.findForAdmin(senderId, mt, includeDeleted, pageable);
 
-        List<com.chat.talkMe.dto.response.AdminAttachmentView> items = result.getContent().stream()
+        List<AdminAttachmentView> items = result.getContent().stream()
                 .map(this::toAttachmentView)
                 .collect(Collectors.toList());
 
-        return PaginatedResponse.<com.chat.talkMe.dto.response.AdminAttachmentView>builder()
+        return PaginatedResponse.<AdminAttachmentView>builder()
                 .items(items)
                 .pagination(PaginatedResponse.PaginationInfo.builder()
                         .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
@@ -1395,19 +1473,19 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private com.chat.talkMe.dto.response.AdminAttachmentView toAttachmentView(MessageAttachment a) {
+    private AdminAttachmentView toAttachmentView(MessageAttachment a) {
         // An attachment can be orphaned (its message row gone) — guard every deref of m.
         Message m = a.getMessage();
         Chat chat = m != null ? m.getChat() : null;
         Long chatId = chat != null ? chat.getId() : null;
         User sender = m != null ? m.getSender() : null;
 
-        List<com.chat.talkMe.dto.response.AdminAttachmentView.SharedUser> sharedWith =
+        List<AdminAttachmentView.SharedUser> sharedWith =
                 chat == null || chat.getMembers() == null ? List.of()
                 : chat.getMembers().stream()
                     .map(ChatMember::getUser)
                     .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
-                    .map(mu -> com.chat.talkMe.dto.response.AdminAttachmentView.SharedUser.builder()
+                    .map(mu -> AdminAttachmentView.SharedUser.builder()
                             .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
                             .username(mu.getUsername())
                             .name(mu.getName())
@@ -1415,7 +1493,7 @@ public class AdminServiceImpl implements AdminService {
                             .build())
                     .collect(Collectors.toList());
 
-        return com.chat.talkMe.dto.response.AdminAttachmentView.builder()
+        return AdminAttachmentView.builder()
                 .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
                 .messageId(m.getUuid() != null ? m.getUuid().toString() : null)
                 .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
@@ -1443,13 +1521,13 @@ public class AdminServiceImpl implements AdminService {
 
     /** Cached reconcile of one storage prefix (OCI list can be slow — TTL-guarded). */
     private record StorageSnapshot(long builtAtMs, List<AdminStorageObjectView> objects) {}
-    private final java.util.concurrent.ConcurrentHashMap<String, StorageSnapshot> storageCache =
-            new java.util.concurrent.ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StorageSnapshot> storageCache =
+            new ConcurrentHashMap<>();
     private static final long STORAGE_CACHE_TTL_MS = 60_000L;
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminStorageListResponse getStorageObjects(
+    @Transactional(readOnly = true)
+    public AdminStorageListResponse getStorageObjects(
             String prefix, String category, String kind, boolean onlyOrphans,
             String search, String sort, int page, int size, String adminUsername) {
 
@@ -1462,7 +1540,7 @@ public class AdminServiceImpl implements AdminService {
         // Kind chips must show per-kind totals within the current context, so counts
         // are computed over this base — before the active kind filter is applied.
         String q = search == null ? "" : search.trim().toLowerCase();
-        java.util.stream.Stream<AdminStorageObjectView> stream = reconciled.stream();
+        Stream<AdminStorageObjectView> stream = reconciled.stream();
         if (category != null && !category.isBlank() && !category.equalsIgnoreCase("all")) {
             String c = category.trim().toLowerCase();
             stream = stream.filter(o -> c.equals(o.getCategory()));
@@ -1477,8 +1555,8 @@ public class AdminServiceImpl implements AdminService {
         List<AdminStorageObjectView> base = stream.collect(Collectors.toList());
 
         // ── counts over the base set (storage-accurate, kind-independent) ──────
-        com.chat.talkMe.dto.response.AdminStorageListResponse.Counts counts =
-                com.chat.talkMe.dto.response.AdminStorageListResponse.Counts.builder()
+        AdminStorageListResponse.Counts counts =
+                AdminStorageListResponse.Counts.builder()
                         .all(base.size())
                         .image(base.stream().filter(o -> "image".equals(o.getKind())).count())
                         .video(base.stream().filter(o -> "video".equals(o.getKind())).count())
@@ -1498,18 +1576,18 @@ public class AdminServiceImpl implements AdminService {
         }
 
         // ── sort ────────────────────────────────────────────────────────────────
-        java.util.Comparator<AdminStorageObjectView> cmp = switch (sort == null ? "newest" : sort) {
-            case "oldest" -> java.util.Comparator.comparing(
+        Comparator<AdminStorageObjectView> cmp = switch (sort == null ? "newest" : sort) {
+            case "oldest" -> Comparator.comparing(
                     AdminStorageObjectView::getLastModified,
-                    java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()));
-            case "largest" -> java.util.Comparator.comparingLong(AdminStorageObjectView::getSize).reversed();
-            case "smallest" -> java.util.Comparator.comparingLong(AdminStorageObjectView::getSize);
-            case "name" -> java.util.Comparator.comparing(
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "largest" -> Comparator.comparingLong(AdminStorageObjectView::getSize).reversed();
+            case "smallest" -> Comparator.comparingLong(AdminStorageObjectView::getSize);
+            case "name" -> Comparator.comparing(
                     o -> o.getFileName() != null ? o.getFileName() : o.getKey(),
                     String.CASE_INSENSITIVE_ORDER);
-            default -> java.util.Comparator.comparing( // newest
+            default -> Comparator.comparing( // newest
                     AdminStorageObjectView::getLastModified,
-                    java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())).reversed();
+                    Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
         };
         filtered.sort(cmp);
 
@@ -1520,7 +1598,7 @@ public class AdminServiceImpl implements AdminService {
         int to = Math.min(from + s, filtered.size());
         List<AdminStorageObjectView> pageItems = filtered.subList(from, to);
 
-        return com.chat.talkMe.dto.response.AdminStorageListResponse.builder()
+        return AdminStorageListResponse.builder()
                 .items(pageItems)
                 .counts(counts)
                 .page(p)
@@ -1531,10 +1609,10 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void deleteStorageObject(String key, String adminUsername) {
-        if (key == null || !com.chat.talkMe.storage.MediaKeys.isSafeKey(key)) {
-            throw new com.chat.talkMe.exception.BadRequestException("Invalid object key", "TM_071");
+        if (key == null || !MediaKeys.isSafeKey(key)) {
+            throw new BadRequestException("Invalid object key", "TM_071");
         }
         String reference = storageProperties.getMediaRoot() + "/" + key;
         mediaStorage.delete(reference);
@@ -1546,24 +1624,24 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminMediaOwnershipResponse getMediaOwnership(
+    public AdminMediaOwnershipResponse getMediaOwnership(
             String range, String adminUsername) {
         audit(adminUsername, "VIEW_MEDIA_STATS", "MEDIA", range != null ? range : "30d", null);
         String key = genKey("media:" + (range == null ? "30d" : range));
-        return cached(key, 20, com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.class,
+        return cached(key, 20, AdminMediaOwnershipResponse.class,
                 () -> computeMediaOwnership(range));
     }
 
-    private com.chat.talkMe.dto.response.AdminMediaOwnershipResponse computeMediaOwnership(String range) {
+    private AdminMediaOwnershipResponse computeMediaOwnership(String range) {
         long total = mediaAssetRepository.count();
         long unattributed = mediaAssetRepository.countByOwnerIsNull();
 
-        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket> byContext =
+        List<AdminMediaOwnershipResponse.Bucket> byContext =
                 mediaAssetRepository.aggregateByContext().stream()
                         .map(r -> bucket(String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
                         .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
                         .collect(Collectors.toList());
-        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket> byType =
+        List<AdminMediaOwnershipResponse.Bucket> byType =
                 mediaAssetRepository.aggregateByType().stream()
                         .map(r -> bucket(r[0] == null ? "unknown" : String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
                         .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
@@ -1571,14 +1649,14 @@ public class AdminServiceImpl implements AdminService {
 
         // Top uploaders — group in SQL, then batch-load the users for names/avatars.
         List<Object[]> rows = mediaAssetRepository.topUploaders(
-                com.chat.talkMe.enums.MediaContext.STRANGER, PageRequest.of(0, 10));
+                MediaContext.STRANGER, PageRequest.of(0, 10));
         List<Long> ownerIds = rows.stream().map(r -> ((Number) r[0]).longValue()).collect(Collectors.toList());
-        java.util.Map<Long, User> owners = userRepository.findAllById(ownerIds).stream()
+        Map<Long, User> owners = userRepository.findAllById(ownerIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
-        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.UploaderStat> topUploaders = rows.stream()
+        List<AdminMediaOwnershipResponse.UploaderStat> topUploaders = rows.stream()
                 .map(r -> {
                     User u = owners.get(((Number) r[0]).longValue());
-                    return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.UploaderStat.builder()
+                    return AdminMediaOwnershipResponse.UploaderStat.builder()
                             .id(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
                             .username(u != null ? u.getUsername() : null)
                             .name(u != null ? u.getName() : null)
@@ -1590,25 +1668,25 @@ public class AdminServiceImpl implements AdminService {
                 })
                 .collect(Collectors.toList());
 
-        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.RecentUpload> recent =
+        List<AdminMediaOwnershipResponse.RecentUpload> recent =
                 mediaAssetRepository.recentWithOwner(PageRequest.of(0, 16)).stream()
                         .map(this::toRecentUpload)
                         .collect(Collectors.toList());
 
         RangeSpec spec = resolveRange(range);
-        List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> series =
+        List<AdminTimeseriesPoint> series =
                 bucketize(mediaAssetRepository.findUploadTimesSince(spec.since()), spec);
 
-        return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.builder()
+        return AdminMediaOwnershipResponse.builder()
                 .totalAssets(total)
                 .totalBytes(mediaAssetRepository.sumBytes())
                 .attributedAssets(total - unattributed)
                 .unattributedAssets(unattributed)
                 .uploaderCount(mediaAssetRepository.countDistinctOwners())
-                .strangerAssets(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.STRANGER))
-                .strangerBytes(mediaAssetRepository.sumBytesByContext(com.chat.talkMe.enums.MediaContext.STRANGER))
-                .lobbyAssets(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.LOBBY))
-                .conversationAssets(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.CONVERSATION))
+                .strangerAssets(mediaAssetRepository.countByContext(MediaContext.STRANGER))
+                .strangerBytes(mediaAssetRepository.sumBytesByContext(MediaContext.STRANGER))
+                .lobbyAssets(mediaAssetRepository.countByContext(MediaContext.LOBBY))
+                .conversationAssets(mediaAssetRepository.countByContext(MediaContext.CONVERSATION))
                 .byContext(byContext)
                 .byType(byType)
                 .topUploaders(topUploaders)
@@ -1621,19 +1699,19 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.AdminMediaListResponse getUserMedia(
+    public AdminMediaListResponse getUserMedia(
             String userUuid, int page, int size, String adminUsername) {
         User user = requireUser(userUuid);
         audit(adminUsername, "VIEW_USER_MEDIA", "MEDIA", userUuid, "page=" + page);
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
-        Page<com.chat.talkMe.domain.MediaAsset> result =
+        Page<MediaAsset> result =
                 mediaAssetRepository.findByOwner_IdOrderByCreatedAtDesc(user.getId(), pageable);
-        List<com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket> byContext =
+        List<AdminMediaOwnershipResponse.Bucket> byContext =
                 mediaAssetRepository.aggregateByContextForOwner(user.getId()).stream()
                         .map(r -> bucket(String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
                         .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
                         .collect(Collectors.toList());
-        return com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+        return AdminMediaListResponse.builder()
                 .items(result.getContent().stream().map(this::toMediaAssetView).collect(Collectors.toList()))
                 .total(mediaAssetRepository.countByOwner_Id(user.getId()))
                 .totalBytes(mediaAssetRepository.sumBytesByOwner(user.getId()))
@@ -1646,7 +1724,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional // NOT readOnly: decrypts file refs + writes a VIEW audit row
-    public com.chat.talkMe.dto.response.AdminMediaListResponse getChatMedia(
+    public AdminMediaListResponse getChatMedia(
             String chatUuid, int page, int size, String adminUsername) {
         // Source from MessageAttachment (the authoritative, always-populated media of a
         // persisted conversation) rather than the media_assets ledger — the ledger only
@@ -1656,10 +1734,10 @@ public class AdminServiceImpl implements AdminService {
         audit(adminUsername, "VIEW_CHAT_MEDIA", "MEDIA", chatUuid, "page=" + page);
         Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
         Page<MessageAttachment> result = attachmentRepository.findByChatForAdmin(chat.getId(), pageable);
-        List<com.chat.talkMe.dto.response.AdminMediaAssetView> items = result.getContent().stream()
+        List<AdminMediaAssetView> items = result.getContent().stream()
                 .map(a -> toChatMediaView(a, chat))
                 .collect(Collectors.toList());
-        return com.chat.talkMe.dto.response.AdminMediaListResponse.builder()
+        return AdminMediaListResponse.builder()
                 .items(items)
                 .total(attachmentRepository.countByChatForAdmin(chat.getId()))
                 .totalBytes(attachmentRepository.sumFileSizeByChat(chat.getId()))
@@ -1671,22 +1749,22 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** Map a chat's {@link MessageAttachment} to the shared media-asset view (owner = sender). */
-    private com.chat.talkMe.dto.response.AdminMediaAssetView toChatMediaView(
+    private AdminMediaAssetView toChatMediaView(
             MessageAttachment a, Chat chat) {
         Message m = a.getMessage();
         Long chatId = chat.getId();
         User sender = m != null ? m.getSender() : null;
         String ref = safeDecrypt(chatId, a.getFileUrl());
         String name = safeDecrypt(chatId, a.getFileName());
-        String key = com.chat.talkMe.storage.MediaKeys.key(ref, storageProperties.getMediaRoot());
-        boolean stranger = chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER;
-        return com.chat.talkMe.dto.response.AdminMediaAssetView.builder()
+        String key = MediaKeys.key(ref, storageProperties.getMediaRoot());
+        boolean stranger = chat.getChatType() == ChatType.STRANGER;
+        return AdminMediaAssetView.builder()
                 .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
                 .key(key)
                 .reference(ref)
                 .url(mediaServeUrl(ref))
                 .kind(kindForLinked(m != null ? m.getMessageType() : null, a.getMimeType(), name, key != null ? key : ""))
-                .context(com.chat.talkMe.enums.MediaContext.CONVERSATION.name())
+                .context(MediaContext.CONVERSATION.name())
                 .contextId(chat.getUuid() != null ? chat.getUuid().toString() : null)
                 .uploadType(m != null && m.getMessageType() != null ? m.getMessageType().name() : null)
                 .contentType(a.getMimeType())
@@ -1703,9 +1781,9 @@ public class AdminServiceImpl implements AdminService {
 
     // ── media_assets mappers ──────────────────────────────────────────────────
 
-    private static com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket bucket(
+    private static AdminMediaOwnershipResponse.Bucket bucket(
             String label, Number count, Number bytes) {
-        return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket.builder()
+        return AdminMediaOwnershipResponse.Bucket.builder()
                 .label(label)
                 .count(count != null ? count.longValue() : 0L)
                 .bytes(bytes != null ? bytes.longValue() : 0L)
@@ -1715,15 +1793,15 @@ public class AdminServiceImpl implements AdminService {
     /** Serve URL for a stored reference (same shape the storage gallery uses). */
     private static String mediaServeUrl(String reference) {
         if (reference == null) return null;
-        return "/api/v1/uploads/media?path=" + java.net.URLEncoder.encode(
-                reference, java.nio.charset.StandardCharsets.UTF_8);
+        return "/api/v1/uploads/media?path=" + URLEncoder.encode(
+                reference, StandardCharsets.UTF_8);
     }
 
-    private com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.RecentUpload toRecentUpload(
-            com.chat.talkMe.domain.MediaAsset m) {
+    private AdminMediaOwnershipResponse.RecentUpload toRecentUpload(
+            MediaAsset m) {
         User o = m.getOwner();
-        boolean stranger = m.getContext() == com.chat.talkMe.enums.MediaContext.STRANGER;
-        return com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.RecentUpload.builder()
+        boolean stranger = m.getContext() == MediaContext.STRANGER;
+        return AdminMediaOwnershipResponse.RecentUpload.builder()
                 .key(m.getStorageKey())
                 .reference(m.getReference())
                 .url(mediaServeUrl(m.getReference()))
@@ -1741,11 +1819,11 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private com.chat.talkMe.dto.response.AdminMediaAssetView toMediaAssetView(
-            com.chat.talkMe.domain.MediaAsset m) {
+    private AdminMediaAssetView toMediaAssetView(
+            MediaAsset m) {
         User o = m.getOwner();
-        boolean stranger = m.getContext() == com.chat.talkMe.enums.MediaContext.STRANGER;
-        return com.chat.talkMe.dto.response.AdminMediaAssetView.builder()
+        boolean stranger = m.getContext() == MediaContext.STRANGER;
+        return AdminMediaAssetView.builder()
                 .id(m.getUuid() != null ? m.getUuid().toString() : String.valueOf(m.getId()))
                 .key(m.getStorageKey())
                 .reference(m.getReference())
@@ -1788,17 +1866,17 @@ public class AdminServiceImpl implements AdminService {
         // Reference maps built from every chat attachment (fileUrl decrypted per chat).
         // key → attachment for enrichment; a separate set of thumbnail keys so a video's
         // poster frame doesn't show up as its own tile.
-        java.util.Map<String, MessageAttachment> byKey = new java.util.HashMap<>();
-        java.util.Set<String> thumbKeys = new java.util.HashSet<>();
+        Map<String, MessageAttachment> byKey = new HashMap<>();
+        Set<String> thumbKeys = new HashSet<>();
         for (MessageAttachment a : attachmentRepository.findAll()) {
             try {
                 Message m = a.getMessage();
                 Long chatId = m != null && m.getChat() != null ? m.getChat().getId() : null;
                 String fileRef = messageCryptoService.decrypt(chatId, a.getFileUrl());
-                String k = com.chat.talkMe.storage.MediaKeys.key(fileRef, mediaRoot);
+                String k = MediaKeys.key(fileRef, mediaRoot);
                 if (k != null) byKey.putIfAbsent(k, a);
                 if (a.getThumbnailUrl() != null) {
-                    String tk = com.chat.talkMe.storage.MediaKeys.key(
+                    String tk = MediaKeys.key(
                             messageCryptoService.decrypt(chatId, a.getThumbnailUrl()), mediaRoot);
                     if (tk != null) thumbKeys.add(tk);
                 }
@@ -1809,18 +1887,18 @@ public class AdminServiceImpl implements AdminService {
 
         // Admin-only upload-ownership rows — the authoritative owner for objects that
         // never became a chat attachment (stranger & lobby media). Bulk-loaded by key.
-        java.util.Map<String, com.chat.talkMe.domain.MediaAsset> assetByKey = new java.util.HashMap<>();
+        Map<String, MediaAsset> assetByKey = new HashMap<>();
         List<String> objectKeys = stored.stream().map(MediaStorage.StoredObject::key).collect(Collectors.toList());
         for (int i = 0; i < objectKeys.size(); i += 1000) { // chunk the IN-list
             List<String> chunk = objectKeys.subList(i, Math.min(i + 1000, objectKeys.size()));
-            for (com.chat.talkMe.domain.MediaAsset ma : mediaAssetRepository.findByStorageKeyIn(chunk)) {
+            for (MediaAsset ma : mediaAssetRepository.findByStorageKeyIn(chunk)) {
                 assetByKey.putIfAbsent(ma.getStorageKey(), ma);
             }
         }
         // Per-reconcile cache for the legacy owner-in-path fallback (uuid → User).
-        java.util.Map<String, User> userByUuid = new java.util.HashMap<>();
+        Map<String, User> userByUuid = new HashMap<>();
 
-        List<AdminStorageObjectView> out = new java.util.ArrayList<>(stored.size());
+        List<AdminStorageObjectView> out = new ArrayList<>(stored.size());
         for (MediaStorage.StoredObject o : stored) {
             String key = o.key();
             if (thumbKeys.contains(key)) continue; // fold thumbnails into their parent
@@ -1832,8 +1910,8 @@ public class AdminServiceImpl implements AdminService {
             AdminStorageObjectView.AdminStorageObjectViewBuilder b = AdminStorageObjectView.builder()
                     .key(key)
                     .reference(o.reference())
-                    .url("/api/v1/uploads/media?path=" + java.net.URLEncoder.encode(
-                            o.reference(), java.nio.charset.StandardCharsets.UTF_8))
+                    .url("/api/v1/uploads/media?path=" + URLEncoder.encode(
+                            o.reference(), StandardCharsets.UTF_8))
                     .category(cat)
                     .size(o.size())
                     .contentType(o.contentType())
@@ -1870,7 +1948,7 @@ public class AdminServiceImpl implements AdminService {
                  .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
                  .chatName(chat != null ? chat.getName() : null)
                  .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
-                 .strangerMode(chat != null && chat.getChatType() == com.chat.talkMe.enums.ChatType.STRANGER)
+                 .strangerMode(chat != null && chat.getChatType() == ChatType.STRANGER)
                  .ownerSource("MESSAGE_ATTACHMENT")
                  .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
                  .senderUsername(sender != null ? sender.getUsername() : null)
@@ -1922,8 +2000,8 @@ public class AdminServiceImpl implements AdminService {
      */
     private void enrichOrphanOwner(AdminStorageObjectView.AdminStorageObjectViewBuilder b,
                                    String key, String category,
-                                   com.chat.talkMe.domain.MediaAsset asset,
-                                   java.util.Map<String, User> userByUuid) {
+                                   MediaAsset asset,
+                                   Map<String, User> userByUuid) {
         if (asset != null) {
             User owner = asset.getOwner();
             boolean anon = asset.getContext() != null && asset.getContext().isAnonymousToPeer();
@@ -1967,7 +2045,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /** UUID → User with a per-reconcile cache; null on missing/invalid uuid. */
-    private User lookupUser(String uuid, java.util.Map<String, User> cache) {
+    private User lookupUser(String uuid, Map<String, User> cache) {
         if (uuid == null || uuid.isBlank()) return null;
         if (cache.containsKey(uuid)) return cache.get(uuid);
         User u = null;
@@ -2020,19 +2098,19 @@ public class AdminServiceImpl implements AdminService {
      * sent as {@code voice-message-*.webm}, and {@code .webm} otherwise reads as video,
      * so classify on message type + mime + name rather than extension alone.
      */
-    private static String kindForLinked(com.chat.talkMe.enums.MessageType type, String mimeType,
+    private static String kindForLinked(MessageType type, String mimeType,
                                         String fileName, String key) {
         String mt = mimeType != null ? mimeType.toLowerCase() : "";
         String fn = fileName != null ? fileName.toLowerCase() : "";
-        boolean isAudioKind = type == com.chat.talkMe.enums.MessageType.AUDIO || mt.startsWith("audio/");
+        boolean isAudioKind = type == MessageType.AUDIO || mt.startsWith("audio/");
         if (isAudioKind) {
             boolean voice = fn.contains("voice-message") || fn.startsWith("voice") || fn.startsWith("ptt")
                     || mt.equals("audio/webm") || mt.equals("audio/ogg") || mt.equals("audio/opus");
             return voice ? "voice" : "audio";
         }
-        if (type == com.chat.talkMe.enums.MessageType.VIDEO || mt.startsWith("video/")) return "video";
-        if (type == com.chat.talkMe.enums.MessageType.IMAGE || mt.startsWith("image/")) return "image";
-        if (type == com.chat.talkMe.enums.MessageType.DOCUMENT) return "file";
+        if (type == MessageType.VIDEO || mt.startsWith("video/")) return "video";
+        if (type == MessageType.IMAGE || mt.startsWith("image/")) return "image";
+        if (type == MessageType.DOCUMENT) return "file";
         return kindOf(key, mimeType);
     }
 
@@ -2103,7 +2181,7 @@ public class AdminServiceImpl implements AdminService {
             if (decrypted != null && !decrypted.isBlank()) {
                 preview = decrypted.length() > 140 ? decrypted.substring(0, 140) + "…" : decrypted;
             } else if (last.getMessageType() != null
-                    && last.getMessageType() != com.chat.talkMe.enums.MessageType.TEXT) {
+                    && last.getMessageType() != MessageType.TEXT) {
                 // Media-only message — label by type (IMAGE / VIDEO / VOICE / …).
                 preview = last.getMessageType().name();
             }

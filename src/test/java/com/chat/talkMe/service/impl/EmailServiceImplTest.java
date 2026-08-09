@@ -11,7 +11,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -154,7 +156,7 @@ class EmailServiceImplTest {
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
 
-            verify(templates, never()).passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong());
+            verify(templates, never()).passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong());
             verify(http, never()).send(any(), any());
         }
 
@@ -180,7 +182,7 @@ class EmailServiceImplTest {
             withResend();
             withBrevo();
             stubByHost(200, 200);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -196,7 +198,7 @@ class EmailServiceImplTest {
             withResend();
             withBrevo();
             stubByHost(500, 200);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -214,7 +216,7 @@ class EmailServiceImplTest {
             withBrevo();
             withSmtp();
             stubByHost(500, 502);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -230,9 +232,9 @@ class EmailServiceImplTest {
             withBrevo();
             withSmtp();
             stubByHost(500, 502);
-            org.mockito.Mockito.doThrow(new RuntimeException("smtp down"))
+            Mockito.doThrow(new RuntimeException("smtp down"))
                     .when(mailSender).send(any(MimeMessage.class));
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             assertThatCode(() -> service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30))
@@ -246,7 +248,7 @@ class EmailServiceImplTest {
         void noResendKeySkipsToBrevo() throws Exception {
             withBrevo();
             stubByHost(200, 200);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -262,7 +264,7 @@ class EmailServiceImplTest {
             ReflectionTestUtils.setField(service, "from", "noreply@neochathub.com");
             withBrevo();
             stubByHost(200, 200);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -284,7 +286,7 @@ class EmailServiceImplTest {
                 }
                 return response(200);
             });
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -304,7 +306,7 @@ class EmailServiceImplTest {
                 }
                 return response(200);
             });
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             assertThatCode(() -> service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30))
@@ -331,7 +333,7 @@ class EmailServiceImplTest {
             withResend();
             when(valueOps.increment(anyString())).thenReturn(1L);
             stubSend(response(200));
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -358,7 +360,7 @@ class EmailServiceImplTest {
             withResend();
             when(valueOps.increment(anyString())).thenReturn(null);
             stubSend(response(200));
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -373,7 +375,7 @@ class EmailServiceImplTest {
             withResend();
             when(valueOps.increment(anyString())).thenThrow(new RuntimeException("redis down"));
             stubSend(response(200));
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -387,7 +389,7 @@ class EmailServiceImplTest {
             withResend();
             when(valueOps.increment(anyString())).thenReturn(1L);
             stubSend(response(500));
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -477,7 +479,7 @@ class EmailServiceImplTest {
         void passwordResetExemptFromVerification() throws Exception {
             withResend();
             stubSend(response(200));
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -700,7 +702,7 @@ class EmailServiceImplTest {
             when(resp.statusCode()).thenReturn(500);
             when(resp.body()).thenReturn(null);
             stubSend(resp);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             assertThatCode(() -> service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30))
@@ -717,7 +719,7 @@ class EmailServiceImplTest {
             when(resp.statusCode()).thenReturn(500);
             when(resp.body()).thenReturn("x".repeat(301));
             stubSend(resp);
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             assertThatCode(() -> service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30))
@@ -776,7 +778,7 @@ class EmailServiceImplTest {
             when(valueOps.increment(anyString())).thenReturn(1L);
             when(valueOps.decrement(anyString())).thenThrow(new RuntimeException("redis down"));
             stubSend(response(500)); // Resend rejects → the reserved slot is released
-            when(templates.passwordReset(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong()))
+            when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
                     .thenReturn("<html>");
 
             assertThatCode(() -> service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30))

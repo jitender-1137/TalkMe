@@ -1,9 +1,11 @@
 package com.chat.talkMe.service;
 
+import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.MessageAttachment;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.SendMessageRequest;
 import com.chat.talkMe.dto.response.MessageResponse;
+import java.time.Instant;
 import com.chat.talkMe.dto.response.MessagePageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,7 +24,7 @@ public interface MessageService {
      * 1:1 chat (marks them RELEASED and delivers them to the recipient through the
      * normal durable broadcast pipeline). Called when consent is granted.
      */
-    void releaseHeldMessages(com.chat.talkMe.domain.Chat chat);
+    void releaseHeldMessages(Chat chat);
 
 
     /**
@@ -51,7 +53,7 @@ public interface MessageService {
     /** Receiver finished viewing → destroy the media now (file + attachment, broadcast). */
     void consumeSelfDestruct(String chatUuid, String messageUuid, User currentUser);
     /** Backstop reaper: destroy every armed self-destruct media whose deadline has passed. */
-    int reapExpiredSelfDestruct(java.time.Instant now);
+    int reapExpiredSelfDestruct(Instant now);
     MessageResponse reactToMessage(String chatUuid, String messageUuid, ReactToMessageRequest request, User currentUser);
     MessageResponse removeReaction(String chatUuid, String messageUuid, String emoji, User currentUser);
 }

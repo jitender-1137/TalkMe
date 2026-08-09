@@ -1,14 +1,21 @@
 package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.crypto.MessageCryptoService;
+import com.chat.talkMe.domain.AdminAuditLog;
+import com.chat.talkMe.domain.AudioTrack;
 import com.chat.talkMe.domain.Chat;
+import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.Feedback;
 import com.chat.talkMe.domain.MatchReport;
+import com.chat.talkMe.domain.MatchSession;
+import com.chat.talkMe.domain.MediaAsset;
 import com.chat.talkMe.domain.Message;
 import com.chat.talkMe.domain.MessageAttachment;
+import com.chat.talkMe.domain.Poll;
 import com.chat.talkMe.domain.Post;
 import com.chat.talkMe.domain.PostComment;
 import com.chat.talkMe.domain.PostLike;
+import com.chat.talkMe.domain.PostMedia;
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserPresence;
@@ -17,23 +24,33 @@ import com.chat.talkMe.dto.request.AdminCreateUserRequest;
 import com.chat.talkMe.dto.request.AdminUpdateUserRequest;
 import com.chat.talkMe.dto.request.AdminUserFilter;
 import com.chat.talkMe.dto.response.AdminAnalyticsResponse;
+import com.chat.talkMe.dto.response.AdminAttachmentView;
+import com.chat.talkMe.dto.response.AdminAuditView;
 import com.chat.talkMe.dto.response.AdminChatView;
 import com.chat.talkMe.dto.response.AdminConnectorView;
 import com.chat.talkMe.dto.response.AdminFeedbackView;
+import com.chat.talkMe.dto.response.AdminMediaOwnershipResponse;
 import com.chat.talkMe.dto.response.AdminMessageView;
+import com.chat.talkMe.dto.response.AdminPostCommentView;
+import com.chat.talkMe.dto.response.AdminPostLikeView;
 import com.chat.talkMe.dto.response.AdminPostView;
 import com.chat.talkMe.dto.response.AdminReportView;
 import com.chat.talkMe.dto.response.AdminStatsResponse;
 import com.chat.talkMe.dto.response.AdminStorageListResponse;
+import com.chat.talkMe.dto.response.AdminStorageObjectView;
+import com.chat.talkMe.dto.response.AdminTimeseriesPoint;
 import com.chat.talkMe.dto.response.AdminTimeseriesResult;
 import com.chat.talkMe.dto.response.AdminUserFullView;
 import com.chat.talkMe.dto.response.AdminUserView;
+import com.chat.talkMe.dto.response.LabelCount;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.FeedbackStatus;
 import com.chat.talkMe.enums.FeedbackType;
 import com.chat.talkMe.enums.Interest;
+import com.chat.talkMe.enums.MediaContext;
 import com.chat.talkMe.enums.MessageType;
+import com.chat.talkMe.enums.ModerationStatus;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.NotFoundException;
@@ -44,6 +61,7 @@ import com.chat.talkMe.repository.FeedbackRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.FriendRequestRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
+import com.chat.talkMe.repository.MediaAssetRepository;
 import com.chat.talkMe.repository.MessageAttachmentRepository;
 import com.chat.talkMe.repository.MessageReactionRepository;
 import com.chat.talkMe.repository.MessageRepository;
@@ -67,7 +85,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -79,7 +99,9 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -142,7 +164,7 @@ class AdminServiceImplTest {
     @Mock private SetOperations<String, String> setOps;
     @Mock private MediaStorage mediaStorage;
     @Mock private StorageProperties storageProperties;
-    @Mock private com.chat.talkMe.repository.MediaAssetRepository mediaAssetRepository;
+    @Mock private MediaAssetRepository mediaAssetRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -193,12 +215,12 @@ class AdminServiceImplTest {
     }
 
     /** A media_assets ownership row (for the media-analytics / user-media tests). */
-    private com.chat.talkMe.domain.MediaAsset mediaAsset(
-            User owner, com.chat.talkMe.enums.MediaContext ctx, String key, String uploadType, long size) {
-        com.chat.talkMe.domain.MediaAsset a = com.chat.talkMe.domain.MediaAsset.builder()
+    private MediaAsset mediaAsset(
+            User owner, MediaContext ctx, String key, String uploadType, long size) {
+        MediaAsset a = MediaAsset.builder()
                 .owner(owner).context(ctx).storageKey(key).reference("/media/" + key)
                 .uploadType(uploadType).contentType("image/jpeg").fileSize(size).originalFileName("orig.jpg")
-                .contextId(ctx == com.chat.talkMe.enums.MediaContext.CONVERSATION ? "cid" : null)
+                .contextId(ctx == MediaContext.CONVERSATION ? "cid" : null)
                 .build();
         a.setId(idSeq++);
         a.setUuid(UUID.randomUUID());
@@ -361,7 +383,7 @@ class AdminServiceImplTest {
         @DisplayName("returns a detailed view with chat + message counts")
         void returnsDetailView() {
             User u = user("bob");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(chatRepository.findChatsByUser(u)).thenReturn(List.of(chat(ChatType.PRIVATE)));
             when(messageRepository.countBySenderId(u.getId())).thenReturn(42L);
 
@@ -376,7 +398,7 @@ class AdminServiceImplTest {
         @DisplayName("absent user → NotFoundException TM_064")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getUser(id.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -401,11 +423,11 @@ class AdminServiceImplTest {
         @DisplayName("assembles account + settings + presence when both rows exist")
         void withSettingsAndPresence() {
             User u = user("carol");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             UserSetting s = UserSetting.builder().user(u).theme("DARK").language("fr").build();
-            when(userSettingRepository.findByUser(u)).thenReturn(java.util.Optional.of(s));
+            when(userSettingRepository.findByUser(u)).thenReturn(Optional.of(s));
             UserPresence p = UserPresence.builder().user(u).status("ONLINE").build();
-            when(userPresenceRepository.findByUser(u)).thenReturn(java.util.Optional.of(p));
+            when(userPresenceRepository.findByUser(u)).thenReturn(Optional.of(p));
 
             AdminUserFullView v = service.getUserFull(u.getUuid().toString());
 
@@ -418,9 +440,9 @@ class AdminServiceImplTest {
         @DisplayName("missing settings/presence rows fall back to explanatory notes")
         void missingSettingsPresence() {
             User u = user("dave");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
-            when(userSettingRepository.findByUser(u)).thenReturn(java.util.Optional.empty());
-            when(userPresenceRepository.findByUser(u)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
+            when(userSettingRepository.findByUser(u)).thenReturn(Optional.empty());
+            when(userPresenceRepository.findByUser(u)).thenReturn(Optional.empty());
 
             AdminUserFullView v = service.getUserFull(u.getUuid().toString());
 
@@ -432,7 +454,7 @@ class AdminServiceImplTest {
         @DisplayName("absent user → NotFoundException TM_064")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getUserFull(id.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -450,11 +472,11 @@ class AdminServiceImplTest {
         void mapsChats() {
             User u = user("erin");
             Chat c = chat(ChatType.GROUP);
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(chatRepository.findAllChatsByUserForAdmin(u)).thenReturn(List.of(c));
             when(messageRepository.countByChat(c)).thenReturn(3L);
             when(messageRepository.findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(c))
-                    .thenReturn(java.util.Optional.empty());
+                    .thenReturn(Optional.empty());
 
             List<AdminChatView> views = service.getUserChats(u.getUuid().toString());
 
@@ -467,7 +489,7 @@ class AdminServiceImplTest {
         @DisplayName("absent user → NotFoundException TM_064")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getUserChats(id.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -486,7 +508,7 @@ class AdminServiceImplTest {
             Chat c = chat(ChatType.PRIVATE);
             when(messageRepository.countByChat(c)).thenReturn(0L);
             when(messageRepository.findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(c))
-                    .thenReturn(java.util.Optional.empty());
+                    .thenReturn(Optional.empty());
             when(chatRepository.findForAdmin(eq(ChatType.PRIVATE), any(), anyBoolean(), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(c)));
 
@@ -523,7 +545,7 @@ class AdminServiceImplTest {
                     .messageType(MessageType.TEXT).build();
             m.setId(9L);
             m.setUuid(UUID.randomUUID());
-            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(java.util.Optional.of(c));
+            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(Optional.of(c));
             when(messageRepository.findByChat(eq(c), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(m)));
             when(messageCryptoService.decrypt(c.getId(), "cipher")).thenReturn("hello world");
@@ -542,7 +564,7 @@ class AdminServiceImplTest {
         @DisplayName("absent chat → NotFoundException TM_121")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(chatRepository.findByUuidWithMembers(id)).thenReturn(java.util.Optional.empty());
+            when(chatRepository.findByUuidWithMembers(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getChatMessages(id.toString(), 0, 50, "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -565,7 +587,7 @@ class AdminServiceImplTest {
 
         private User stubbedUser(String name) {
             User u = user(name);
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             return u;
         }
 
@@ -633,7 +655,7 @@ class AdminServiceImplTest {
         @DisplayName("setBanned on absent user → NotFoundException TM_064, no save")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.setBanned(id.toString(), true, "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -651,9 +673,9 @@ class AdminServiceImplTest {
         @DisplayName("grants a new role (found existing Role), saves, and audits GRANT_ROLE")
         void grantExistingRole() {
             User u = user("pat");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             Role r = Role.builder().name("ROLE_MODERATOR").build();
-            when(roleRepository.findByName("ROLE_MODERATOR")).thenReturn(java.util.Optional.of(r));
+            when(roleRepository.findByName("ROLE_MODERATOR")).thenReturn(Optional.of(r));
 
             service.grantRole(u.getUuid().toString(), "moderator", "root");
 
@@ -666,8 +688,8 @@ class AdminServiceImplTest {
         @DisplayName("grants a role that doesn't exist yet → the Role is created")
         void grantCreatesMissingRole() {
             User u = user("pat");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
-            when(roleRepository.findByName("ROLE_USER")).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
+            when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.empty());
             when(roleRepository.save(any(Role.class)))
                     .thenAnswer(inv -> inv.getArgument(0));
 
@@ -682,9 +704,9 @@ class AdminServiceImplTest {
         void grantIdempotent() {
             User u = user("pat");
             u.getRoles().add(Role.builder().name("ROLE_MODERATOR").build());
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(roleRepository.findByName("ROLE_MODERATOR"))
-                    .thenReturn(java.util.Optional.of(Role.builder().name("ROLE_MODERATOR").build()));
+                    .thenReturn(Optional.of(Role.builder().name("ROLE_MODERATOR").build()));
 
             service.grantRole(u.getUuid().toString(), "ROLE_MODERATOR", "root");
 
@@ -706,7 +728,7 @@ class AdminServiceImplTest {
         void revokeHeldRole() {
             User u = user("quinn");
             u.getRoles().add(Role.builder().name("ROLE_MODERATOR").build());
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
 
             service.revokeRole(u.getUuid().toString(), "ROLE_MODERATOR", "root");
 
@@ -719,7 +741,7 @@ class AdminServiceImplTest {
         @DisplayName("revoking a role the user doesn't have is a no-op (no save, no audit)")
         void revokeNotHeld() {
             User u = user("quinn");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
 
             service.revokeRole(u.getUuid().toString(), "ROLE_MODERATOR", "root");
 
@@ -745,7 +767,7 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("maps audit rows and resolves acting-admin uuids in one batch")
         void mapsAndResolvesAdminUuids() {
-            com.chat.talkMe.domain.AdminAuditLog log = com.chat.talkMe.domain.AdminAuditLog.builder()
+            AdminAuditLog log = AdminAuditLog.builder()
                     .adminUsername("root").action("BAN_USER").targetType("USER").targetId("u1").build();
             log.setId(1L);
             log.setUuid(UUID.randomUUID());
@@ -754,7 +776,7 @@ class AdminServiceImplTest {
             User admin = user("root");
             when(userRepository.findByUsernameIn(Set.of("root"))).thenReturn(List.of(admin));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView> res =
+            PaginatedResponse<AdminAuditView> res =
                     service.listAudit(null, null, null, null, null, 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
@@ -769,7 +791,7 @@ class AdminServiceImplTest {
             when(auditRepository.findAll(any(Specification.class), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of()));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView> res =
+            PaginatedResponse<AdminAuditView> res =
                     service.listAudit("BAN_USER", "USER", "root", "2020-01-01", "2020-12-31", 0, 20);
 
             assertThat(res.getItems()).isEmpty();
@@ -800,7 +822,7 @@ class AdminServiceImplTest {
             when(userRepository.existsByEmailIgnoreCase("new@x.com")).thenReturn(false);
             when(userRepository.existsByUsernameIgnoreCase("newbie")).thenReturn(false);
             when(roleRepository.findByName("ROLE_USER"))
-                    .thenReturn(java.util.Optional.of(Role.builder().name("ROLE_USER").build()));
+                    .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
             when(passwordEncoder.encode("secret")).thenReturn("HASHED");
             when(userRepository.save(any(User.class))).thenAnswer(inv -> {
                 User x = inv.getArgument(0);
@@ -855,7 +877,7 @@ class AdminServiceImplTest {
         @DisplayName("applies only the non-null fields, parses interests, resets password, and audits")
         void appliesPartialUpdate() {
             User u = user("rick");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(passwordEncoder.encode("newpw")).thenReturn("NEWHASH");
 
             AdminUpdateUserRequest req = new AdminUpdateUserRequest();
@@ -878,7 +900,7 @@ class AdminServiceImplTest {
         @DisplayName("changing email to one already taken → ConflictException TM_047")
         void emailConflict() {
             User u = user("rick");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(userRepository.existsByEmailIgnoreCase("taken@x.com")).thenReturn(true);
 
             AdminUpdateUserRequest req = new AdminUpdateUserRequest();
@@ -893,7 +915,7 @@ class AdminServiceImplTest {
         @DisplayName("changing username to one already taken → ConflictException TM_048")
         void usernameConflict() {
             User u = user("rick");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(userRepository.existsByUsernameIgnoreCase("taken")).thenReturn(true);
 
             AdminUpdateUserRequest req = new AdminUpdateUserRequest();
@@ -908,7 +930,7 @@ class AdminServiceImplTest {
         @DisplayName("absent user → NotFoundException TM_064")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.updateUser(id.toString(), new AdminUpdateUserRequest(), "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -927,7 +949,7 @@ class AdminServiceImplTest {
             Chat c = chat(ChatType.PRIVATE);
             Message m = Message.builder().chat(c).build();
             m.setUuid(UUID.randomUUID());
-            when(messageRepository.findByUuid(m.getUuid())).thenReturn(java.util.Optional.of(m));
+            when(messageRepository.findByUuid(m.getUuid())).thenReturn(Optional.of(m));
 
             service.deleteMessage(m.getUuid().toString(), "root");
 
@@ -940,7 +962,7 @@ class AdminServiceImplTest {
         @DisplayName("deleteMessage absent → NotFoundException TM_150")
         void deleteMessageNotFound() {
             UUID id = UUID.randomUUID();
-            when(messageRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(messageRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.deleteMessage(id.toString(), "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -951,7 +973,7 @@ class AdminServiceImplTest {
         @DisplayName("deleteChat soft-deletes, saves, and audits DELETE_CHAT")
         void deleteChat() {
             Chat c = chat(ChatType.GROUP);
-            when(chatRepository.findByUuid(c.getUuid())).thenReturn(java.util.Optional.of(c));
+            when(chatRepository.findByUuid(c.getUuid())).thenReturn(Optional.of(c));
 
             service.deleteChat(c.getUuid().toString(), "root");
 
@@ -964,7 +986,7 @@ class AdminServiceImplTest {
         @DisplayName("deleteChat absent → NotFoundException TM_121")
         void deleteChatNotFound() {
             UUID id = UUID.randomUUID();
-            when(chatRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(chatRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.deleteChat(id.toString(), "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -982,10 +1004,10 @@ class AdminServiceImplTest {
         void zeroFilled() {
             when(userRepository.findSignupTimesSince(any())).thenReturn(List.of(Instant.now()));
 
-            List<com.chat.talkMe.dto.response.AdminTimeseriesPoint> pts = service.getSignupTimeseries(7);
+            List<AdminTimeseriesPoint> pts = service.getSignupTimeseries(7);
 
             assertThat(pts).hasSize(7);
-            assertThat(pts.stream().mapToLong(com.chat.talkMe.dto.response.AdminTimeseriesPoint::getCount).sum())
+            assertThat(pts.stream().mapToLong(AdminTimeseriesPoint::getCount).sum())
                     .isEqualTo(1L);
         }
 
@@ -1041,7 +1063,7 @@ class AdminServiceImplTest {
 
             assertThat(res).isNotNull();
             // custom windows never read the ts cache key
-            verify(valueOps, never()).get(org.mockito.ArgumentMatchers.startsWith("admin:g0:ts"));
+            verify(valueOps, never()).get(ArgumentMatchers.startsWith("admin:g0:ts"));
         }
     }
 
@@ -1096,7 +1118,7 @@ class AdminServiceImplTest {
             assertThat(res.getOnlineNow()).isEqualTo(2L);
             assertThat(res.getFriendLinks()).isEqualTo(4L);
             assertThat(res.getFriendships()).isEqualTo(2L); // links / 2
-            assertThat(res.getUsersByStatus()).extracting(com.chat.talkMe.dto.response.LabelCount::getLabel)
+            assertThat(res.getUsersByStatus()).extracting(LabelCount::getLabel)
                     .containsExactly("Online", "Idle", "Offline");
             assertThat(res.getRange()).isEqualTo("30d");
         }
@@ -1149,12 +1171,12 @@ class AdminServiceImplTest {
             AdminAnalyticsResponse res = service.getAnalytics("30d");
 
             // 7 rows had friends → bucket[0] = 20 - 7 = 13
-            assertThat(res.getFriendCountDistribution()).extracting(com.chat.talkMe.dto.response.LabelCount::getLabel)
+            assertThat(res.getFriendCountDistribution()).extracting(LabelCount::getLabel)
                     .containsExactly("0 friends", "1-5", "6-10", "11-25", "26-50", "50+");
             assertThat(res.getFriendCountDistribution().get(0).getCount()).isEqualTo(13L); // 20 total - 7 with friends
             assertThat(res.getFriendCountDistribution().get(1).getCount()).isEqualTo(3L);  // counts 0, 3, and null→0 all ≤5
             assertThat(res.getFriendCountDistribution().get(5).getCount()).isEqualTo(1L);  // count 100
-            assertThat(res.getMessagesByType()).extracting(com.chat.talkMe.dto.response.LabelCount::getLabel)
+            assertThat(res.getMessagesByType()).extracting(LabelCount::getLabel)
                     .contains("TEXT", "Unknown", "CUSTOM");
             assertThat(res.getPendingDeletion()).extracting(AdminUserView::getUsername).containsExactly("pending");
             assertThat(res.getTopConnectors()).extracting(AdminConnectorView::getUsername).containsExactly("hub");
@@ -1172,7 +1194,7 @@ class AdminServiceImplTest {
             User u = user("sam");
             User f1 = user("f1");
             User f2 = user("f2");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(friendRepository.findFriendsByUser(u)).thenReturn(List.of(f1, f2));
             when(friendRepository.countByUserAndIsDeletedFalse(f1)).thenReturn(2L);
             when(friendRepository.countByUserAndIsDeletedFalse(f2)).thenReturn(9L);
@@ -1187,7 +1209,7 @@ class AdminServiceImplTest {
         @DisplayName("absent user → NotFoundException TM_064")
         void notFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getUserFriends(id.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1216,12 +1238,12 @@ class AdminServiceImplTest {
         @DisplayName("maps attachments (decrypted urls) and audits VIEW_ATTACHMENTS for a user filter")
         void mapsWithUserFilter() {
             User u = user("target");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             MessageAttachment a = attachment("/media/conversations/x/f.jpg", MessageType.IMAGE);
             when(attachmentRepository.findForAdmin(eq(u.getId()), eq(MessageType.IMAGE), eq(false), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(a)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView> res =
+            PaginatedResponse<AdminAttachmentView> res =
                     service.getAttachments(u.getUuid().toString(), "image", false, 0, 20, "root");
 
             assertThat(res.getItems()).hasSize(1);
@@ -1245,7 +1267,7 @@ class AdminServiceImplTest {
         @DisplayName("user filter with an absent user → NotFoundException TM_064")
         void userFilterNotFound() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getAttachments(id.toString(), null, false, 0, 20, "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1411,11 +1433,11 @@ class AdminServiceImplTest {
             Post p = post(user("author"));
             PostLike like = PostLike.builder().post(p).user(user("liker")).build();
             like.setUuid(UUID.randomUUID());
-            when(postRepository.findByUuid(p.getUuid())).thenReturn(java.util.Optional.of(p));
+            when(postRepository.findByUuid(p.getUuid())).thenReturn(Optional.of(p));
             when(postLikeRepository.findByPost(eq(p), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(like)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminPostLikeView> res =
+            PaginatedResponse<AdminPostLikeView> res =
                     service.getPostLikes(p.getUuid().toString(), 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
@@ -1426,7 +1448,7 @@ class AdminServiceImplTest {
         @DisplayName("getPostLikes on absent post → NotFoundException TM_180")
         void postLikesNotFound() {
             UUID id = UUID.randomUUID();
-            when(postRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(postRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getPostLikes(id.toString(), 0, 20))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1439,11 +1461,11 @@ class AdminServiceImplTest {
             Post p = post(user("author"));
             PostComment cm = PostComment.builder().post(p).user(user("commenter")).content("nice").build();
             cm.setUuid(UUID.randomUUID());
-            when(postRepository.findByUuid(p.getUuid())).thenReturn(java.util.Optional.of(p));
+            when(postRepository.findByUuid(p.getUuid())).thenReturn(Optional.of(p));
             when(postCommentRepository.findAllForPost(eq(p), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(cm)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminPostCommentView> res =
+            PaginatedResponse<AdminPostCommentView> res =
                     service.getPostComments(p.getUuid().toString(), 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
@@ -1454,7 +1476,7 @@ class AdminServiceImplTest {
         @DisplayName("getPostComments on absent post → NotFoundException TM_180")
         void postCommentsNotFound() {
             UUID id = UUID.randomUUID();
-            when(postRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(postRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getPostComments(id.toString(), 0, 20))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1506,7 +1528,7 @@ class AdminServiceImplTest {
         @DisplayName("getReport enriches with the reported user's summary + history")
         void getReportEnriched() {
             MatchReport r = report("PENDING");
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
             when(matchReportRepository.findByReportedId(eq(r.getReported().getId()), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of()));
             when(chatRepository.findChatsByUser(r.getReported())).thenReturn(List.of());
@@ -1522,7 +1544,7 @@ class AdminServiceImplTest {
         @DisplayName("getReport absent → NotFoundException TM_181")
         void getReportNotFound() {
             UUID id = UUID.randomUUID();
-            when(matchReportRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(matchReportRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getReport(id.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1533,7 +1555,7 @@ class AdminServiceImplTest {
         @DisplayName("reviewReport DISMISS → status DISMISSED, actionTaken NONE, audited")
         void reviewDismiss() {
             MatchReport r = report("PENDING");
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
 
             service.reviewReport(r.getUuid().toString(), "dismiss", "spammy", "root");
 
@@ -1549,7 +1571,7 @@ class AdminServiceImplTest {
         @DisplayName("reviewReport RESOLVE → status ACTION_TAKEN, actionTaken REVIEWED")
         void reviewResolve() {
             MatchReport r = report("PENDING");
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
 
             service.reviewReport(r.getUuid().toString(), "RESOLVE", null, "root");
 
@@ -1561,7 +1583,7 @@ class AdminServiceImplTest {
         @DisplayName("reviewReport BAN_REPORTED → bans the reported user and saves them")
         void reviewBan() {
             MatchReport r = report("PENDING");
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
 
             service.reviewReport(r.getUuid().toString(), "BAN_REPORTED", null, "root");
 
@@ -1574,7 +1596,7 @@ class AdminServiceImplTest {
         @DisplayName("reviewReport unknown action → BadRequestException TM_071, nothing saved")
         void reviewUnknownAction() {
             MatchReport r = report("PENDING");
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
 
             assertThatThrownBy(() -> service.reviewReport(r.getUuid().toString(), "NUKE", null, "root"))
                     .isInstanceOfSatisfying(BadRequestException.class,
@@ -1586,7 +1608,7 @@ class AdminServiceImplTest {
         @DisplayName("reviewReport absent → NotFoundException TM_181")
         void reviewNotFound() {
             UUID id = UUID.randomUUID();
-            when(matchReportRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(matchReportRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.reviewReport(id.toString(), "DISMISS", null, "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1656,7 +1678,7 @@ class AdminServiceImplTest {
         @DisplayName("updateFeedbackStatus moves the row, saves, and audits")
         void updateStatus() {
             Feedback f = feedback();
-            when(feedbackRepository.findByUuid(f.getUuid())).thenReturn(java.util.Optional.of(f));
+            when(feedbackRepository.findByUuid(f.getUuid())).thenReturn(Optional.of(f));
 
             AdminFeedbackView v = service.updateFeedbackStatus(f.getUuid().toString(), "ARCHIVED", "root");
 
@@ -1670,7 +1692,7 @@ class AdminServiceImplTest {
         @DisplayName("updateFeedbackStatus with an unknown status → BadRequestException TM_071")
         void updateInvalidStatus() {
             Feedback f = feedback();
-            when(feedbackRepository.findByUuid(f.getUuid())).thenReturn(java.util.Optional.of(f));
+            when(feedbackRepository.findByUuid(f.getUuid())).thenReturn(Optional.of(f));
 
             assertThatThrownBy(() -> service.updateFeedbackStatus(f.getUuid().toString(), "NONSENSE", "root"))
                     .isInstanceOfSatisfying(BadRequestException.class,
@@ -1682,7 +1704,7 @@ class AdminServiceImplTest {
         @DisplayName("updateFeedbackStatus absent → NotFoundException TM_312")
         void updateNotFound() {
             UUID id = UUID.randomUUID();
-            when(feedbackRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(feedbackRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.updateFeedbackStatus(id.toString(), "NEW", "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -1700,13 +1722,13 @@ class AdminServiceImplTest {
         void detailedIdleUserPopulated() {
             User u = user("populated");
             u.setGoogleId("g-123");
-            u.setInterests(new java.util.HashSet<>(Set.of(Interest.SPORTS)));
+            u.setInterests(new HashSet<>(Set.of(Interest.SPORTS)));
             u.setLastLocation("NY");
             u.setLastLocationAt(Instant.now());
             u.setPresenceLastSeenAt(Instant.now());
             u.setDeletionRequestedAt(Instant.now());
             u.setCreatedAt(Instant.now());
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(presenceService.getAwayUsernames()).thenReturn(Set.of("populated")); // idle bucket
 
             AdminUserView v = service.getUser(u.getUuid().toString());
@@ -1743,16 +1765,16 @@ class AdminServiceImplTest {
             User u = user("full");
             u.setPasswordHash("HASH");
             u.setGoogleId("g-abc");
-            u.setInterests(new java.util.HashSet<>(Set.of(Interest.SPORTS)));
+            u.setInterests(new HashSet<>(Set.of(Interest.SPORTS)));
             u.getRoles().add(Role.builder().name("ROLE_USER").build());
             u.setLastLocationAt(Instant.now());
             u.setPresenceLastSeenAt(Instant.now());
             u.setDeletionRequestedAt(Instant.now());
             u.setCreatedAt(Instant.now());
             u.setUpdatedAt(Instant.now());
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
-            when(userSettingRepository.findByUser(u)).thenReturn(java.util.Optional.empty());
-            when(userPresenceRepository.findByUser(u)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
+            when(userSettingRepository.findByUser(u)).thenReturn(Optional.empty());
+            when(userPresenceRepository.findByUser(u)).thenReturn(Optional.empty());
 
             AdminUserFullView v = service.getUserFull(u.getUuid().toString());
 
@@ -1774,7 +1796,7 @@ class AdminServiceImplTest {
         @DisplayName("sets every scalar field; same-case-insensitive email/username short-circuit the uniqueness checks; blank password is ignored")
         void appliesAllRemainingFields() {
             User u = user("multi"); // username "multi", email "multi@x.com"
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
 
             AdminUpdateUserRequest req = new AdminUpdateUserRequest();
             req.setBio("bio");
@@ -1823,7 +1845,7 @@ class AdminServiceImplTest {
             MessageAttachment att = MessageAttachment.builder().message(m).fileUrl("mediacipher").build();
             att.setUuid(UUID.randomUUID());
             m.getAttachments().add(att);
-            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(java.util.Optional.of(c));
+            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(Optional.of(c));
             when(messageRepository.findByChat(eq(c), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(m)));
             when(messageMapper.resolveMessageStatus(m)).thenReturn("SENT");
@@ -1847,9 +1869,9 @@ class AdminServiceImplTest {
             Chat c = chat(ChatType.PRIVATE);
             User sender = user("sn");
             User receiver = user("rc");
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(sender).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(receiver).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(null).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(sender).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(receiver).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(null).build());
             Message m = Message.builder().chat(c).sender(sender).messageType(MessageType.IMAGE).build();
             m.setUuid(UUID.randomUUID());
             MessageAttachment a = MessageAttachment.builder().message(m).fileName("f.jpg")
@@ -1858,12 +1880,12 @@ class AdminServiceImplTest {
             when(attachmentRepository.findForAdmin(eq(null), eq(null), eq(false), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(a)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView> res =
+            PaginatedResponse<AdminAttachmentView> res =
                     service.getAttachments(null, null, false, 0, 20, "root");
 
             var item = res.getItems().get(0);
             assertThat(item.getSharedWith())
-                    .extracting(com.chat.talkMe.dto.response.AdminAttachmentView.SharedUser::getUsername)
+                    .extracting(AdminAttachmentView.SharedUser::getUsername)
                     .containsExactly("rc"); // sender + null-user member filtered out
             assertThat(item.getThumbnailUrl()).isEqualTo("/t.jpg");
             assertThat(item.getChatType()).isEqualTo("PRIVATE");
@@ -1881,7 +1903,7 @@ class AdminServiceImplTest {
             when(attachmentRepository.findForAdmin(eq(null), eq(null), eq(true), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(a)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminAttachmentView> res =
+            PaginatedResponse<AdminAttachmentView> res =
                     service.getAttachments(null, "bogus", true, 0, 20, "root");
 
             var item = res.getItems().get(0);
@@ -1898,8 +1920,8 @@ class AdminServiceImplTest {
     @DisplayName("toPostView + like/comment mappers (media/poll/audio + null-relation branches)")
     class PostViewMappers {
 
-        private com.chat.talkMe.domain.Post post(User author) {
-            com.chat.talkMe.domain.Post p = com.chat.talkMe.domain.Post.builder().user(author).content("a post").build();
+        private Post post(User author) {
+            Post p = Post.builder().user(author).content("a post").build();
             p.setId(idSeq++);
             p.setUuid(UUID.randomUUID());
             return p;
@@ -1908,12 +1930,12 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("a rich post (media + poll + audio) maps every media item and the poll/audio flags")
         void richPost() {
-            com.chat.talkMe.domain.Post p = post(user("author"));
+            Post p = post(user("author"));
             p.setShortCode("SC1");
-            p.getMedia().add(com.chat.talkMe.domain.PostMedia.builder().mediaUrl("m1").mediaType("IMAGE").build());
-            p.getMedia().add(com.chat.talkMe.domain.PostMedia.builder().mediaUrl("m2").mediaType("VIDEO").build());
-            p.setPoll(com.chat.talkMe.domain.Poll.builder().build());
-            p.setAudio(com.chat.talkMe.domain.AudioTrack.builder().build());
+            p.getMedia().add(PostMedia.builder().mediaUrl("m1").mediaType("IMAGE").build());
+            p.getMedia().add(PostMedia.builder().mediaUrl("m2").mediaType("VIDEO").build());
+            p.setPoll(Poll.builder().build());
+            p.setAudio(AudioTrack.builder().build());
             when(postRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(p)));
             when(postLikeRepository.countByPost(p)).thenReturn(2L);
             when(postCommentRepository.countForPost(p)).thenReturn(1L);
@@ -1930,7 +1952,7 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("a post with no author and no uuid → null author fields + numeric id")
         void authorlessPost() {
-            com.chat.talkMe.domain.Post p = com.chat.talkMe.domain.Post.builder().content("c").build();
+            Post p = Post.builder().content("c").build();
             p.setId(88L); // no uuid, no author
             when(postRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(p)));
             when(postLikeRepository.countByPost(p)).thenReturn(0L);
@@ -1947,13 +1969,13 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("getPostLikes tolerates a like whose user row is gone (null username)")
         void nullUserLike() {
-            com.chat.talkMe.domain.Post p = post(user("author"));
+            Post p = post(user("author"));
             PostLike like = PostLike.builder().post(p).user(null).build();
-            when(postRepository.findByUuid(p.getUuid())).thenReturn(java.util.Optional.of(p));
+            when(postRepository.findByUuid(p.getUuid())).thenReturn(Optional.of(p));
             when(postLikeRepository.findByPost(eq(p), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(like)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminPostLikeView> res =
+            PaginatedResponse<AdminPostLikeView> res =
                     service.getPostLikes(p.getUuid().toString(), 0, 20);
 
             assertThat(res.getItems().get(0).getUsername()).isNull();
@@ -1962,15 +1984,15 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("getPostComments maps a null-user reply and resolves its parent id")
         void nullUserReplyWithParent() {
-            com.chat.talkMe.domain.Post p = post(user("author"));
+            Post p = post(user("author"));
             PostComment parent = PostComment.builder().post(p).content("parent").build();
             parent.setUuid(UUID.randomUUID());
             PostComment child = PostComment.builder().post(p).user(null).content("child").parent(parent).build();
-            when(postRepository.findByUuid(p.getUuid())).thenReturn(java.util.Optional.of(p));
+            when(postRepository.findByUuid(p.getUuid())).thenReturn(Optional.of(p));
             when(postCommentRepository.findAllForPost(eq(p), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(child)));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminPostCommentView> res =
+            PaginatedResponse<AdminPostCommentView> res =
                     service.getPostComments(p.getUuid().toString(), 0, 20);
 
             var item = res.getItems().get(0);
@@ -2001,7 +2023,7 @@ class AdminServiceImplTest {
             User reporter = user("rp");
             User reported = user("rd");
             MatchReport r = report("PENDING", reporter, reported);
-            com.chat.talkMe.domain.MatchSession s = com.chat.talkMe.domain.MatchSession.builder()
+            MatchSession s = MatchSession.builder()
                     .host(user("h")).peer(user("pe")).endedAt(Instant.now()).build();
             s.setUuid(UUID.randomUUID());
             r.setSession(s);
@@ -2025,7 +2047,7 @@ class AdminServiceImplTest {
         @DisplayName("null reporter/reported and a session with no host/peer → null parties, zeroed counts, no count query")
         void nullPartiesAndEmptySession() {
             MatchReport r = report("PENDING", null, null);
-            com.chat.talkMe.domain.MatchSession s = com.chat.talkMe.domain.MatchSession.builder().build();
+            MatchSession s = MatchSession.builder().build();
             s.setUuid(UUID.randomUUID());
             r.setSession(s);
             when(matchReportRepository.findByStatus(eq("PENDING"), any(Pageable.class)))
@@ -2047,16 +2069,16 @@ class AdminServiceImplTest {
     @DisplayName("reconcileStorage — linked-attachment enrichment + kind classification")
     class ReconcileStorageLinked {
 
-        private com.chat.talkMe.storage.MediaStorage.StoredObject obj(String key, long size, String ct) {
-            return new com.chat.talkMe.storage.MediaStorage.StoredObject("/media/" + key, key, size, Instant.now(), ct);
+        private MediaStorage.StoredObject obj(String key, long size, String ct) {
+            return new MediaStorage.StoredObject("/media/" + key, key, size, Instant.now(), ct);
         }
 
         /** Build a chat with a sender member, a receiver member, and a null-user member. */
         private Chat chatWithMembers(User sender, User receiver) {
             Chat c = chat(ChatType.PRIVATE);
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(sender).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(receiver).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(null).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(sender).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(receiver).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(null).build());
             return c;
         }
 
@@ -2113,7 +2135,7 @@ class AdminServiceImplTest {
             var imageItem = res.getItems().stream()
                     .filter(o -> "image".equals(o.getKind())).findFirst().orElseThrow();
             assertThat(imageItem.getReceivers())
-                    .extracting(com.chat.talkMe.dto.response.AdminStorageObjectView.SharedUser::getUsername)
+                    .extracting(AdminStorageObjectView.SharedUser::getUsername)
                     .containsExactly("receiver"); // sender + null-user filtered out
             assertThat(imageItem.getThumbnailUrl()).isEqualTo("/media/" + thumbKey);
         }
@@ -2124,8 +2146,8 @@ class AdminServiceImplTest {
     @DisplayName("reconcileStorage — orphan / non-chat classification from extension + content-type")
     class ReconcileStorageKinds {
 
-        private com.chat.talkMe.storage.MediaStorage.StoredObject obj(String key, String ct) {
-            return new com.chat.talkMe.storage.MediaStorage.StoredObject("/media/" + key, key, 10, Instant.now(), ct);
+        private MediaStorage.StoredObject obj(String key, String ct) {
+            return new MediaStorage.StoredObject("/media/" + key, key, 10, Instant.now(), ct);
         }
 
         @Test
@@ -2153,7 +2175,7 @@ class AdminServiceImplTest {
             assertThat(res.getCounts().getOrphan()).isEqualTo(4L);
             assertThat(res.getCounts().getLinked()).isZero();
             assertThat(res.getItems()).extracting(
-                    com.chat.talkMe.dto.response.AdminStorageObjectView::getCategory)
+                    AdminStorageObjectView::getCategory)
                     .contains("conversations", "lobby", "strangers", "posts", "stories", "profiles", "other");
         }
     }
@@ -2163,8 +2185,8 @@ class AdminServiceImplTest {
     @DisplayName("getStorageObjects — alternate sorts + un-decryptable row skip")
     class StorageSortsAndFailures {
 
-        private com.chat.talkMe.storage.MediaStorage.StoredObject obj(String key, long size) {
-            return new com.chat.talkMe.storage.MediaStorage.StoredObject("/media/" + key, key, size, Instant.now(), "image/jpeg");
+        private MediaStorage.StoredObject obj(String key, long size) {
+            return new MediaStorage.StoredObject("/media/" + key, key, size, Instant.now(), "image/jpeg");
         }
 
         @Test
@@ -2204,11 +2226,11 @@ class AdminServiceImplTest {
     class ToChatViewMapper {
 
         private void stubGetUserChats(User owner, Chat c, Message last, long count) {
-            when(userRepository.findByUuid(owner.getUuid())).thenReturn(java.util.Optional.of(owner));
+            when(userRepository.findByUuid(owner.getUuid())).thenReturn(Optional.of(owner));
             when(chatRepository.findAllChatsByUserForAdmin(owner)).thenReturn(List.of(c));
             when(messageRepository.countByChat(c)).thenReturn(count);
             when(messageRepository.findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(c))
-                    .thenReturn(java.util.Optional.ofNullable(last));
+                    .thenReturn(Optional.ofNullable(last));
         }
 
         @Test
@@ -2220,9 +2242,9 @@ class AdminServiceImplTest {
             Chat c = Chat.builder().chatType(ChatType.GROUP).name("   ").build(); // blank → derive
             c.setId(idSeq++); c.setUuid(UUID.randomUUID());
             c.setUpdatedAt(Instant.now());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(null).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(m1).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(m2).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(null).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(m1).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(m2).build());
             User sender = user("cs");
             Message last = Message.builder().chat(c).sender(sender).content("x".repeat(200))
                     .messageType(MessageType.TEXT).build();
@@ -2286,8 +2308,8 @@ class AdminServiceImplTest {
     @DisplayName("reconcileStorage — populated flags / null-relation / edge references / cache-hit")
     class ReconcileStorageEdgeBranches {
 
-        private com.chat.talkMe.storage.MediaStorage.StoredObject obj(String key, long size, String ct, Instant lm) {
-            return new com.chat.talkMe.storage.MediaStorage.StoredObject("/media/" + key, key, size, lm, ct);
+        private MediaStorage.StoredObject obj(String key, long size, String ct, Instant lm) {
+            return new MediaStorage.StoredObject("/media/" + key, key, size, lm, ct);
         }
 
         @Test
@@ -2296,14 +2318,14 @@ class AdminServiceImplTest {
             User sender = user("rs");
             User receiver = user("rr");
             Chat c = chat(ChatType.PRIVATE);
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(sender).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(receiver).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(sender).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(receiver).build());
             Message m = Message.builder().chat(c).sender(sender).messageType(MessageType.IMAGE)
                     .content("caption").build();
             m.setId(idSeq++); m.setUuid(UUID.randomUUID());
             m.setForwarded(true);
             m.setEdited(true);
-            m.setModerationStatus(com.chat.talkMe.enums.ModerationStatus.RELEASED);
+            m.setModerationStatus(ModerationStatus.RELEASED);
             m.setSelfDestructSeconds(10);
             m.setSelfDestructExpired(true);
             m.setDeleted(true);
@@ -2330,7 +2352,7 @@ class AdminServiceImplTest {
             assertThat(item.getCreatedAt()).isNotNull();
             assertThat(item.getUpdatedAt()).isNotNull();
             assertThat(item.getReceivers())
-                    .extracting(com.chat.talkMe.dto.response.AdminStorageObjectView.SharedUser::getUsername)
+                    .extracting(AdminStorageObjectView.SharedUser::getUsername)
                     .containsExactly("rr");
         }
 
@@ -2367,8 +2389,8 @@ class AdminServiceImplTest {
             User m1 = user("mm1"); m1.setUuid(null);
             User m2 = user("mm2");
             Chat c = chat(ChatType.PRIVATE);
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(m1).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(m2).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(m1).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(m2).build());
             Message m = Message.builder().chat(c).sender(null).messageType(MessageType.IMAGE).build();
             m.setId(idSeq++); m.setUuid(UUID.randomUUID());
             MessageAttachment a = MessageAttachment.builder().message(m).fileName("p.jpg")
@@ -2382,7 +2404,7 @@ class AdminServiceImplTest {
                     .getItems().get(0);
 
             assertThat(item.getReceivers())
-                    .extracting(com.chat.talkMe.dto.response.AdminStorageObjectView.SharedUser::getUsername)
+                    .extracting(AdminStorageObjectView.SharedUser::getUsername)
                     .containsExactlyInAnyOrder("mm1", "mm2"); // sender null → every member included
             assertThat(item.getReceivers().stream()
                     .filter(su -> "mm1".equals(su.getUsername())).findFirst().orElseThrow().getId()).isNull();
@@ -2418,8 +2440,8 @@ class AdminServiceImplTest {
             service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root");
             service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root");
 
-            verify(mediaStorage, org.mockito.Mockito.times(1)).list(null);
-            verify(attachmentRepository, org.mockito.Mockito.times(1)).findAll();
+            verify(mediaStorage, Mockito.times(1)).list(null);
+            verify(attachmentRepository, Mockito.times(1)).findAll();
         }
     }
 
@@ -2428,11 +2450,11 @@ class AdminServiceImplTest {
     @DisplayName("kindForLinked (mime-driven arms + voice variants) & categoryOf (no-slash key)")
     class KindForLinkedArms {
 
-        private com.chat.talkMe.storage.MediaStorage.StoredObject obj(String key) {
-            return new com.chat.talkMe.storage.MediaStorage.StoredObject("/media/" + key, key, 10, Instant.now(), null);
+        private MediaStorage.StoredObject obj(String key) {
+            return new MediaStorage.StoredObject("/media/" + key, key, 10, Instant.now(), null);
         }
 
-        private MessageAttachment linked(String key, com.chat.talkMe.enums.MessageType type, String mime, String fileName) {
+        private MessageAttachment linked(String key, MessageType type, String mime, String fileName) {
             Chat c = chat(ChatType.PRIVATE);
             Message m = Message.builder().chat(c).sender(user("kfl")).messageType(type).build();
             m.setId(idSeq++); m.setUuid(UUID.randomUUID());
@@ -2464,7 +2486,7 @@ class AdminServiceImplTest {
             assertThat(res.getCounts().getVideo()).isEqualTo(1L);
             assertThat(res.getCounts().getImage()).isEqualTo(1L);
             assertThat(res.getItems()).extracting(
-                    com.chat.talkMe.dto.response.AdminStorageObjectView::getCategory).contains("other");
+                    AdminStorageObjectView::getCategory).contains("other");
         }
     }
 
@@ -2482,7 +2504,7 @@ class AdminServiceImplTest {
             u.setGoogleId("   ");    // blank → hasGoogleLinked false
             u.setRoles(null);
             u.setInterests(null);
-            when(userRepository.findByUuid(lookup)).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(lookup)).thenReturn(Optional.of(u));
 
             AdminUserView v = service.getUser(lookup.toString());
 
@@ -2498,13 +2520,13 @@ class AdminServiceImplTest {
             // The DTO defaults are non-null (messagingPrivacy=EVERYONE, lastSeenAt=now), so the
             // uncovered arms are the NULL branches: force both to null.
             User u = user("gf");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             UserSetting s = UserSetting.builder().user(u).theme("DARK").build();
             s.setMessagingPrivacy(null);
-            when(userSettingRepository.findByUser(u)).thenReturn(java.util.Optional.of(s));
+            when(userSettingRepository.findByUser(u)).thenReturn(Optional.of(s));
             UserPresence p = UserPresence.builder().user(u).status("ONLINE").build();
             p.setLastSeenAt(null);
-            when(userPresenceRepository.findByUser(u)).thenReturn(java.util.Optional.of(p));
+            when(userPresenceRepository.findByUser(u)).thenReturn(Optional.of(p));
 
             AdminUserFullView v = service.getUserFull(u.getUuid().toString());
 
@@ -2530,7 +2552,7 @@ class AdminServiceImplTest {
             m.setModerationStatus(null);
             m.setAttachments(null);
             m.setCreatedAt(Instant.now());
-            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(java.util.Optional.of(c));
+            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(Optional.of(c));
             when(messageRepository.findByChat(eq(c), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(m)));
             when(messageMapper.resolveMessageStatus(m)).thenReturn("SENT");
@@ -2556,7 +2578,7 @@ class AdminServiceImplTest {
         @Test
         @DisplayName("log without uuid uses id; admin whose uuid is null is dropped; unparseable/blank dates ignored")
         void nullUuidAndGarbageDates() {
-            com.chat.talkMe.domain.AdminAuditLog logRow = com.chat.talkMe.domain.AdminAuditLog.builder()
+            AdminAuditLog logRow = AdminAuditLog.builder()
                     .adminUsername("root").action("BAN_USER").targetType("USER").targetId("u1").build();
             logRow.setId(9L);        // no uuid → id fallback
             logRow.setCreatedAt(Instant.now());
@@ -2566,7 +2588,7 @@ class AdminServiceImplTest {
             admin.setUuid(null);     // → filtered out of the uuid map
             when(userRepository.findByUsernameIn(Set.of("root"))).thenReturn(List.of(admin));
 
-            PaginatedResponse<com.chat.talkMe.dto.response.AdminAuditView> res =
+            PaginatedResponse<AdminAuditView> res =
                     service.listAudit(null, null, null, "not-a-date", "   ", 0, 20);
 
             var item = res.getItems().get(0);
@@ -2617,9 +2639,9 @@ class AdminServiceImplTest {
             User mem2 = user("am2");
             Chat c = Chat.builder().chatType(null).name("Chat").build();
             c.setId(idSeq++);        // no uuid
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(mem1).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(mem2).build());
-            c.getMembers().add(com.chat.talkMe.domain.ChatMember.builder().chat(c).user(null).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(mem1).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(mem2).build());
+            c.getMembers().add(ChatMember.builder().chat(c).user(null).build());
             Message m = Message.builder().chat(c).sender(null).messageType(MessageType.IMAGE).build();
             m.setUuid(UUID.randomUUID());
             MessageAttachment a = MessageAttachment.builder().message(m).fileName("f.jpg").fileUrl("/u.jpg").build();
@@ -2631,7 +2653,7 @@ class AdminServiceImplTest {
             var item = service.getAttachments(null, "image", false, 0, 20, "root").getItems().get(0);
 
             assertThat(item.getSharedWith())
-                    .extracting(com.chat.talkMe.dto.response.AdminAttachmentView.SharedUser::getUsername)
+                    .extracting(AdminAttachmentView.SharedUser::getUsername)
                     .containsExactlyInAnyOrder("am1", "am2");
             assertThat(item.getChatId()).isNull();   // chat has no uuid
             assertThat(item.getChatType()).isNull(); // chatType null
@@ -2678,7 +2700,7 @@ class AdminServiceImplTest {
             User reported = user("erd");
             r.setReporter(reporter);
             r.setReported(reported);
-            com.chat.talkMe.domain.MatchSession s = com.chat.talkMe.domain.MatchSession.builder()
+            MatchSession s = MatchSession.builder()
                     .host(user("eh")).build(); // no uuid, no peer
             r.setSession(s);
             when(matchReportRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(r)));
@@ -2703,7 +2725,7 @@ class AdminServiceImplTest {
             User reporter = user("hrp");
             User reported = user("hrd");
             r.setReporter(reporter); r.setReported(reported);
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
 
             MatchReport h1 = new MatchReport();
             h1.setId(idSeq++); h1.setUuid(UUID.randomUUID());
@@ -2735,7 +2757,7 @@ class AdminServiceImplTest {
             User reporter = user("nrp");
             User reported = user("nrd");
             r.setReporter(reporter); r.setReported(reported);
-            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(java.util.Optional.of(r));
+            when(matchReportRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
             when(matchReportRepository.findByReportedId(eq(reported.getId()), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of()));
             when(chatRepository.findChatsByUser(reported)).thenReturn(List.of());
@@ -2876,22 +2898,22 @@ class AdminServiceImplTest {
             when(mediaAssetRepository.sumBytes()).thenReturn(1000L);
             when(mediaAssetRepository.countByOwnerIsNull()).thenReturn(2L);
             when(mediaAssetRepository.countDistinctOwners()).thenReturn(3L);
-            when(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.STRANGER)).thenReturn(4L);
-            when(mediaAssetRepository.sumBytesByContext(com.chat.talkMe.enums.MediaContext.STRANGER)).thenReturn(400L);
-            when(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.LOBBY)).thenReturn(1L);
-            when(mediaAssetRepository.countByContext(com.chat.talkMe.enums.MediaContext.CONVERSATION)).thenReturn(3L);
+            when(mediaAssetRepository.countByContext(MediaContext.STRANGER)).thenReturn(4L);
+            when(mediaAssetRepository.sumBytesByContext(MediaContext.STRANGER)).thenReturn(400L);
+            when(mediaAssetRepository.countByContext(MediaContext.LOBBY)).thenReturn(1L);
+            when(mediaAssetRepository.countByContext(MediaContext.CONVERSATION)).thenReturn(3L);
             when(mediaAssetRepository.aggregateByContext()).thenReturn(List.of(
-                    new Object[]{com.chat.talkMe.enums.MediaContext.STRANGER, 4L, 400L},
-                    new Object[]{com.chat.talkMe.enums.MediaContext.CONVERSATION, 3L, 300L}));
+                    new Object[]{MediaContext.STRANGER, 4L, 400L},
+                    new Object[]{MediaContext.CONVERSATION, 3L, 300L}));
             when(mediaAssetRepository.aggregateByType()).thenReturn(List.of(
                     new Object[]{"image", 6L, 600L},
                     new Object[]{"video", 4L, 400L}));
             when(mediaAssetRepository.topUploaders(
-                    eq(com.chat.talkMe.enums.MediaContext.STRANGER), any(Pageable.class)))
+                    eq(MediaContext.STRANGER), any(Pageable.class)))
                     .thenReturn(List.<Object[]>of(new Object[]{uploader.getId(), 7L, 700L, 2L}));
             when(userRepository.findAllById(List.of(uploader.getId()))).thenReturn(List.of(uploader));
             when(mediaAssetRepository.recentWithOwner(any(Pageable.class))).thenReturn(List.of(
-                    mediaAsset(uploader, com.chat.talkMe.enums.MediaContext.STRANGER, "strangers/a.jpg", "image", 100L)));
+                    mediaAsset(uploader, MediaContext.STRANGER, "strangers/a.jpg", "image", 100L)));
             when(mediaAssetRepository.findUploadTimesSince(any())).thenReturn(List.of(Instant.now()));
 
             var res = service.getMediaOwnership("30d", "root");
@@ -2904,10 +2926,10 @@ class AdminServiceImplTest {
             assertThat(res.getStrangerAssets()).isEqualTo(4L);
             assertThat(res.getStrangerBytes()).isEqualTo(400L);
             assertThat(res.getByContext()).extracting(
-                    com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket::getLabel)
+                    AdminMediaOwnershipResponse.Bucket::getLabel)
                     .contains("STRANGER", "CONVERSATION");
             assertThat(res.getByType()).extracting(
-                    com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket::getLabel)
+                    AdminMediaOwnershipResponse.Bucket::getLabel)
                     .contains("image", "video");
             assertThat(res.getTopUploaders()).hasSize(1);
             assertThat(res.getTopUploaders().get(0).getUsername()).isEqualTo("shutterbug");
@@ -2950,14 +2972,14 @@ class AdminServiceImplTest {
         @DisplayName("maps a user's uploads + per-context summary and audits VIEW_USER_MEDIA")
         void mapsUserMedia() {
             User u = user("mia");
-            when(userRepository.findByUuid(u.getUuid())).thenReturn(java.util.Optional.of(u));
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
             when(mediaAssetRepository.findByOwner_IdOrderByCreatedAtDesc(eq(u.getId()), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(
-                            mediaAsset(u, com.chat.talkMe.enums.MediaContext.STRANGER, "strangers/a.jpg", "image", 50L))));
+                            mediaAsset(u, MediaContext.STRANGER, "strangers/a.jpg", "image", 50L))));
             when(mediaAssetRepository.countByOwner_Id(u.getId())).thenReturn(1L);
             when(mediaAssetRepository.sumBytesByOwner(u.getId())).thenReturn(50L);
             when(mediaAssetRepository.aggregateByContextForOwner(u.getId())).thenReturn(List.<Object[]>of(
-                    new Object[]{com.chat.talkMe.enums.MediaContext.STRANGER, 1L, 50L}));
+                    new Object[]{MediaContext.STRANGER, 1L, 50L}));
 
             var res = service.getUserMedia(u.getUuid().toString(), 0, 24, "root");
 
@@ -2969,7 +2991,7 @@ class AdminServiceImplTest {
             assertThat(res.getTotal()).isEqualTo(1L);
             assertThat(res.getTotalBytes()).isEqualTo(50L);
             assertThat(res.getByContext()).extracting(
-                    com.chat.talkMe.dto.response.AdminMediaOwnershipResponse.Bucket::getLabel)
+                    AdminMediaOwnershipResponse.Bucket::getLabel)
                     .containsExactly("STRANGER");
             verify(auditLogger).write(eq("root"), eq("VIEW_USER_MEDIA"), eq("MEDIA"),
                     eq(u.getUuid().toString()), any());
@@ -2979,7 +3001,7 @@ class AdminServiceImplTest {
         @DisplayName("absent user → NotFoundException TM_064")
         void absentUser() {
             UUID id = UUID.randomUUID();
-            when(userRepository.findByUuid(id)).thenReturn(java.util.Optional.empty());
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getUserMedia(id.toString(), 0, 24, "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -2999,7 +3021,7 @@ class AdminServiceImplTest {
             User sender = user("ned");
             MessageAttachment a = attachment(
                     c, sender, MessageType.IMAGE, "image/jpeg", "pic.jpg", "conversations/c/pic.jpg");
-            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(java.util.Optional.of(c));
+            when(chatRepository.findByUuidWithMembers(c.getUuid())).thenReturn(Optional.of(c));
             when(attachmentRepository.findByChatForAdmin(eq(c.getId()), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(a)));
             when(attachmentRepository.countByChatForAdmin(c.getId())).thenReturn(1L);
@@ -3025,7 +3047,7 @@ class AdminServiceImplTest {
         @DisplayName("absent chat → NotFoundException TM_121")
         void absentChat() {
             UUID id = UUID.randomUUID();
-            when(chatRepository.findByUuidWithMembers(id)).thenReturn(java.util.Optional.empty());
+            when(chatRepository.findByUuidWithMembers(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getChatMedia(id.toString(), 0, 24, "root"))
                     .isInstanceOfSatisfying(NotFoundException.class,
@@ -3046,11 +3068,11 @@ class AdminServiceImplTest {
     @DisplayName("reconcileStorage — orphan owner attribution (media_assets + path + unrecorded)")
     class ReconcileStorageOrphanOwner {
 
-        private com.chat.talkMe.storage.MediaStorage.StoredObject obj(String key, String ct) {
-            return new com.chat.talkMe.storage.MediaStorage.StoredObject("/media/" + key, key, 10, Instant.now(), ct);
+        private MediaStorage.StoredObject obj(String key, String ct) {
+            return new MediaStorage.StoredObject("/media/" + key, key, 10, Instant.now(), ct);
         }
 
-        private com.chat.talkMe.dto.response.AdminStorageObjectView only() {
+        private AdminStorageObjectView only() {
             return service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root")
                     .getItems().get(0);
         }
@@ -3062,7 +3084,7 @@ class AdminServiceImplTest {
             when(attachmentRepository.findAll()).thenReturn(List.of());
             when(mediaStorage.list(null)).thenReturn(List.of(obj("strangers/x.jpg", "image/jpeg")));
             when(mediaAssetRepository.findByStorageKeyIn(any())).thenReturn(List.of(
-                    mediaAsset(uploader, com.chat.talkMe.enums.MediaContext.STRANGER, "strangers/x.jpg", "image", 10L)));
+                    mediaAsset(uploader, MediaContext.STRANGER, "strangers/x.jpg", "image", 10L)));
 
             var item = only();
             assertThat(item.isOrphan()).isTrue();
@@ -3079,7 +3101,7 @@ class AdminServiceImplTest {
             when(attachmentRepository.findAll()).thenReturn(List.of());
             when(mediaStorage.list(null)).thenReturn(List.of(obj(key, "video/mp4")));
             when(mediaAssetRepository.findByStorageKeyIn(any())).thenReturn(List.of());
-            when(userRepository.findByUuid(uploader.getUuid())).thenReturn(java.util.Optional.of(uploader));
+            when(userRepository.findByUuid(uploader.getUuid())).thenReturn(Optional.of(uploader));
 
             var item = only();
             assertThat(item.getOwnerSource()).isEqualTo("STORAGE_PATH");

@@ -1,7 +1,10 @@
 package com.chat.talkMe.domain;
 
+import com.chat.talkMe.enums.PostAudience;
+import com.chat.talkMe.enums.StoryKind;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 
 @Entity
@@ -31,9 +34,9 @@ public class Story extends BaseEntity {
     // existing rows to EVERYONE.
     @Enumerated(EnumType.STRING)
     @Column(name = "audience", length = 16, nullable = false)
-    @org.hibernate.annotations.ColumnDefault("'EVERYONE'")
+    @ColumnDefault("'EVERYONE'")
     @Builder.Default
-    private com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+    private PostAudience audience = PostAudience.EVERYONE;
 
     // Optional soundtrack.
     @Embedded
@@ -46,9 +49,9 @@ public class Story extends BaseEntity {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "kind", length = 12, nullable = false)
-    @org.hibernate.annotations.ColumnDefault("'VISUAL'")
+    @ColumnDefault("'VISUAL'")
     @Builder.Default
-    private com.chat.talkMe.enums.StoryKind kind = com.chat.talkMe.enums.StoryKind.VISUAL;
+    private StoryKind kind = StoryKind.VISUAL;
 
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);

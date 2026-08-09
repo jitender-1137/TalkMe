@@ -1,7 +1,9 @@
 package com.chat.talkMe.service;
 
+import com.chat.talkMe.crypto.MessageCryptoService;
 import com.chat.talkMe.domain.Message;
 import com.chat.talkMe.domain.User;
+import com.chat.talkMe.domain.UserSetting;
 import com.chat.talkMe.dto.EmailUnreadPreview;
 import com.chat.talkMe.repository.MessageRepository;
 import com.chat.talkMe.repository.UserRepository;
@@ -42,7 +44,7 @@ public class UnreadDigestService {
     private final UserRepository userRepository;
     private final UserSettingRepository userSettingRepository;
     private final EmailService emailService;
-    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
+    private final MessageCryptoService messageCryptoService;
 
     @Value("${app.mail.unread-digest.enabled:true}")
     private boolean enabled;
@@ -90,7 +92,7 @@ public class UnreadDigestService {
         }
         // Respect the per-user opt-out (defaults to on when no settings row exists yet).
         boolean allowed = userSettingRepository.findByUser(user)
-                .map(com.chat.talkMe.domain.UserSetting::isEmailUnreadMessages)
+                .map(UserSetting::isEmailUnreadMessages)
                 .orElse(true);
         if (!allowed) {
             return false;

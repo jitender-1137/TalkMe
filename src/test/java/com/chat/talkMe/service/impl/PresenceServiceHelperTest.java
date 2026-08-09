@@ -2,15 +2,17 @@ package com.chat.talkMe.service.impl;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserPresence;
+import com.chat.talkMe.repository.UserPresenceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
+import org.springframework.dao.DataIntegrityViolationException;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -30,7 +32,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("PresenceServiceHelper (unit)")
 class PresenceServiceHelperTest {
 
-    @Mock private com.chat.talkMe.repository.UserPresenceRepository userPresenceRepository;
+    @Mock private UserPresenceRepository userPresenceRepository;
 
     private PresenceServiceHelper helper;
 
@@ -73,7 +75,7 @@ class PresenceServiceHelperTest {
             when(userPresenceRepository.findByUser(u)).thenReturn(Optional.of(existing));
 
             assertThat(helper.getOrCreateUserPresence(u)).isSameAs(existing);
-            verify(userPresenceRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+            verify(userPresenceRepository, never()).saveAndFlush(ArgumentMatchers.any());
         }
 
         @Test
@@ -81,7 +83,7 @@ class PresenceServiceHelperTest {
         void createsDefault() {
             User u = user();
             when(userPresenceRepository.findByUser(u)).thenReturn(Optional.empty());
-            when(userPresenceRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(UserPresence.class)))
+            when(userPresenceRepository.saveAndFlush(ArgumentMatchers.any(UserPresence.class)))
                     .thenAnswer(inv -> inv.getArgument(0));
 
             UserPresence result = helper.getOrCreateUserPresence(u);
@@ -102,8 +104,8 @@ class PresenceServiceHelperTest {
             when(userPresenceRepository.findByUser(u))
                     .thenReturn(Optional.empty())
                     .thenReturn(Optional.of(committedByPeer));
-            when(userPresenceRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(UserPresence.class)))
-                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup key"));
+            when(userPresenceRepository.saveAndFlush(ArgumentMatchers.any(UserPresence.class)))
+                    .thenThrow(new DataIntegrityViolationException("dup key"));
 
             assertThat(helper.getOrCreateUserPresence(u)).isSameAs(committedByPeer);
         }
@@ -113,8 +115,8 @@ class PresenceServiceHelperTest {
         void unrecoverableFailureThrows() {
             User u = user();
             when(userPresenceRepository.findByUser(u)).thenReturn(Optional.empty());
-            when(userPresenceRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(UserPresence.class)))
-                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup key"));
+            when(userPresenceRepository.saveAndFlush(ArgumentMatchers.any(UserPresence.class)))
+                    .thenThrow(new DataIntegrityViolationException("dup key"));
 
             assertThatThrownBy(() -> helper.getOrCreateUserPresence(u))
                     .isInstanceOf(IllegalStateException.class)

@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.DiscoverProfileResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
+import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.GlobalExceptionHandler;
 import com.chat.talkMe.exception.NotFoundException;
@@ -241,7 +242,7 @@ class DiscoverControllerUnitTest {
 
         @Test
         void shouldReturn400WhenLikingSelf() throws Exception {
-            doThrow(new com.chat.talkMe.exception.BadRequestException("Cannot like yourself", "TM_DISCOVER_004"))
+            doThrow(new BadRequestException("Cannot like yourself", "TM_DISCOVER_004"))
                     .when(discoverService).likeProfile(any(), any());
             mockMvc.perform(post(BASE + "/self/like"))
                     .andExpect(status().isBadRequest())

@@ -15,7 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -156,7 +158,7 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         if (verdict.get()) {
             return ModerationResult.explicit(
                     isVideo ? ModerationResult.Category.NSFW_VIDEO : ModerationResult.Category.NSFW_IMAGE,
-                    1.0, java.util.List.of(isVideo ? "nsfw_video" : "nsfw_image"));
+                    1.0, List.of(isVideo ? "nsfw_video" : "nsfw_image"));
         }
         return ModerationResult.clean();
     }
@@ -174,11 +176,11 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         }
         // Classify the raw upload bytes via a short-lived temp file — avoids depending
         // on resolving a stored URL back to a path (which is brittle across envs).
-        java.nio.file.Path temp = null;
+        Path temp = null;
         try {
-            temp = java.nio.file.Files.createTempFile("mod-upload-", isVideo ? ".mp4" : ".img");
+            temp = Files.createTempFile("mod-upload-", isVideo ? ".mp4" : ".img");
             try (var in = file.getInputStream()) {
-                java.nio.file.Files.copy(in, temp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
             }
             return moderateMedia(temp, isVideo ? MessageType.VIDEO : MessageType.IMAGE);
         } catch (Exception e) {
@@ -187,7 +189,7 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         } finally {
             if (temp != null) {
                 try {
-                    java.nio.file.Files.deleteIfExists(temp);
+                    Files.deleteIfExists(temp);
                 } catch (Exception ignore) {
                     // best-effort temp cleanup
                 }

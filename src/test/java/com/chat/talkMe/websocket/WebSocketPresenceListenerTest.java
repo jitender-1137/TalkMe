@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -167,7 +168,7 @@ class WebSocketPresenceListenerTest {
         @DisplayName("a thrown cancelDisconnect is swallowed — ONLINE flip is already applied")
         void swallowsCancelFailure() {
             when(redisTemplate.opsForSet()).thenReturn(setOps);
-            org.mockito.Mockito.doThrow(new RuntimeException("match svc down"))
+            Mockito.doThrow(new RuntimeException("match svc down"))
                     .when(disconnectHandlerService).cancelDisconnect(USERNAME);
             SessionConnectedEvent event = connectEvent(authPrincipal(), stompMessage(StompCommand.CONNECTED, SESSION_ID));
 
@@ -281,7 +282,7 @@ class WebSocketPresenceListenerTest {
         @Test
         @DisplayName("a thrown scheduleDisconnect is swallowed — IDLE staging already applied")
         void swallowsScheduleFailure() {
-            org.mockito.Mockito.doThrow(new RuntimeException("match svc down"))
+            Mockito.doThrow(new RuntimeException("match svc down"))
                     .when(disconnectHandlerService).scheduleDisconnect(USERNAME);
             SessionDisconnectEvent event =
                     disconnectEvent(authPrincipal(), stompMessage(StompCommand.DISCONNECT, null));

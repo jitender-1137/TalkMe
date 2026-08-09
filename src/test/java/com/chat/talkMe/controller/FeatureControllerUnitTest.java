@@ -12,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
@@ -211,6 +212,6 @@ class FeatureControllerUnitTest {
 
     // Local matcher helper to avoid an extra import line at top for a single use.
     private static boolean anyBoolean() {
-        return org.mockito.ArgumentMatchers.anyBoolean();
+        return ArgumentMatchers.anyBoolean();
     }
 }

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -282,7 +284,7 @@ class NotificationServiceImplTest {
         void broadcastFailureSwallowed() {
             User me = user(1L, "alice");
             saveEchoesWithUuid();
-            org.mockito.Mockito.doThrow(new RuntimeException("broker down"))
+            Mockito.doThrow(new RuntimeException("broker down"))
                     .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
 
             // must not throw
@@ -327,7 +329,7 @@ class NotificationServiceImplTest {
             User deleted = user(4L, "gone");
             deleted.setDeleted(true);
             when(friendRepository.findFriendsByUser(actor))
-                    .thenReturn(java.util.Arrays.asList(null, eligible, self, guest, deleted));
+                    .thenReturn(Arrays.asList(null, eligible, self, guest, deleted));
             saveEchoesWithUuid();
 
             service.notifyFriends(actor, "New post", "check it", "POST", "ref-1", "http://img.png");
@@ -394,7 +396,7 @@ class NotificationServiceImplTest {
             User deleted = user(5L, "gone");
             deleted.setDeleted(true);
             when(userFollowRepository.findAcceptedFollowers(actor))
-                    .thenReturn(java.util.Arrays.asList(follower, actor, guest, null));
+                    .thenReturn(Arrays.asList(follower, actor, guest, null));
             when(userFollowRepository.findAcceptedFollowing(actor))
                     .thenReturn(List.of(follower, following, deleted));
             saveEchoesWithUuid();

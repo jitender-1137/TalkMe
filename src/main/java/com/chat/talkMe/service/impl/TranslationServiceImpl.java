@@ -263,7 +263,7 @@ public class TranslationServiceImpl implements TranslationService {
         SsrfGuard.assertSafe(url.toString());
 
         // Body is a JSON array: [{"Text": "<plaintext>"}]
-        String body = objectMapper.writeValueAsString(java.util.List.of(Map.of("Text", text)));
+        String body = objectMapper.writeValueAsString(List.of(Map.of("Text", text)));
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url.toString()))

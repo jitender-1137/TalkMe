@@ -19,6 +19,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -102,7 +106,7 @@ public class OciMediaStorage implements MediaStorage {
             tmp = Files.createTempFile("nch-oci-", extensionOf(key));
             GetObjectResponse resp = getObject(key);
             try (InputStream in = resp.getInputStream()) {
-                Files.copy(in, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
             }
             return Optional.of(new TempLocalFile(tmp));
         } catch (IOException | RuntimeException e) {
@@ -130,8 +134,8 @@ public class OciMediaStorage implements MediaStorage {
     }
 
     @Override
-    public java.util.List<StoredObject> list(String prefix) {
-        java.util.List<StoredObject> out = new java.util.ArrayList<>();
+    public List<StoredObject> list(String prefix) {
+        List<StoredObject> out = new ArrayList<>();
         String start = null;
         try {
             do {
@@ -149,7 +153,7 @@ public class OciMediaStorage implements MediaStorage {
                     String key = os.getName();
                     if (!MediaKeys.isSafeKey(key)) continue;
                     long size = os.getSize() != null ? os.getSize() : 0L;
-                    java.util.Date when = os.getTimeModified() != null ? os.getTimeModified() : os.getTimeCreated();
+                    Date when = os.getTimeModified() != null ? os.getTimeModified() : os.getTimeCreated();
                     out.add(new StoredObject(
                             props.getMediaRoot() + "/" + key,
                             key,

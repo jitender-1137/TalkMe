@@ -3,7 +3,7 @@ package com.chat.talkMe.domain;
 import com.chat.talkMe.enums.ConsentStatus;
 import jakarta.persistence.*;
 import lombok.*;
-
+import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 
 /**
@@ -59,7 +59,7 @@ public class ChatExplicitConsent extends BaseEntity {
      * (no 4th request, for either participant). Reset to 0 when consent is granted.
      */
     @Column(name = "decline_count", nullable = false)
-    @org.hibernate.annotations.ColumnDefault("0")
+    @ColumnDefault("0")
     @Builder.Default
     private int declineCount = 0;
 }

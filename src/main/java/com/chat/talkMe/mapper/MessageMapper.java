@@ -7,8 +7,11 @@ import com.chat.talkMe.dto.response.MessageAttachmentResponse;
 import com.chat.talkMe.dto.response.MessageReactionResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.dto.response.ParentMessageResponse;
+import java.util.Collections;
+import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring")
 public interface MessageMapper {
@@ -35,10 +38,10 @@ public interface MessageMapper {
 
     // Once the media is destroyed the attachment row is gone, but strip defensively so an
     // expired message never carries a media URL to the client.
-    @org.mapstruct.AfterMapping
-    default void stripExpiredSelfDestructMedia(Message message, @org.mapstruct.MappingTarget MessageResponse response) {
+    @AfterMapping
+    default void stripExpiredSelfDestructMedia(Message message, @MappingTarget MessageResponse response) {
         if (message.isSelfDestructExpired()) {
-            response.setAttachments(java.util.Collections.emptyList());
+            response.setAttachments(Collections.emptyList());
         }
         // Explicit (MapStruct doesn't auto-map the boolean is-prefixed field reliably).
         response.setForwarded(message.isForwarded());

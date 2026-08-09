@@ -1,5 +1,6 @@
 package com.chat.talkMe.controller;
 
+import com.chat.talkMe.dto.request.PollVoteRequest;
 import com.chat.talkMe.dto.request.PostCommentRequest;
 import com.chat.talkMe.dto.request.PostRequest;
 import com.chat.talkMe.dto.response.AuthUserResponse;
@@ -40,7 +41,7 @@ public class PostController {
     @PostMapping("/{id}/poll/vote")
     public ResponseEntity<ResponseDto<PostResponse>> votePoll(
             @PathVariable("id") String postUuid,
-            @Valid @RequestBody com.chat.talkMe.dto.request.PollVoteRequest request,
+            @Valid @RequestBody PollVoteRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         PostResponse response = postService.votePoll(postUuid, request.getOptionId(), userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Vote recorded", "TM_229"));

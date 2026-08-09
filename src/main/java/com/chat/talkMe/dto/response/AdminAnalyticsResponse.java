@@ -1,15 +1,15 @@
 package com.chat.talkMe.dto.response;
-
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
+import lombok.NoArgsConstructor;
 import java.util.List;
 
 /** Everything-in-one analytics payload for the SuperAdmin Reports page. */
 @Data
 @Builder
-@lombok.NoArgsConstructor
-@lombok.AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 public class AdminAnalyticsResponse {
     // Headline totals
     private long totalUsers;

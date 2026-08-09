@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,6 +23,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -255,7 +257,7 @@ class PresenceServiceImplTest {
             service.setStatus(u, PresenceStatus.ONLINE);
 
             // one presence putAll + one cold flag-cache putAll
-            verify(hashOps, org.mockito.Mockito.times(2)).putAll(eq(KEY_PREFIX + USERNAME), anyMap());
+            verify(hashOps, Mockito.times(2)).putAll(eq(KEY_PREFIX + USERNAME), anyMap());
             assertThat(captureBroadcast(USERNAME).getStatus()).isEqualTo("ONLINE");
         }
 
@@ -919,7 +921,7 @@ class PresenceServiceImplTest {
                     .thenReturn(hash("ghostModeEnabled", "false",
                             "invisibleModeEnabled", "false", "hideLastSeenEnabled", "false"));
 
-            java.util.List<User> users = new java.util.ArrayList<>();
+            List<User> users = new ArrayList<>();
             users.add(ghost);
             users.add(plain);
             users.add(null);

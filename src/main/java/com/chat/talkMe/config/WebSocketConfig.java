@@ -1,6 +1,7 @@
 package com.chat.talkMe.config;
 
 import com.chat.talkMe.security.WebSocketChannelInterceptor;
+import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +85,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         String[] origins = allowedOrigins != null ?
-                java.util.Arrays.stream(allowedOrigins.split(",")).map(String::trim).toArray(String[]::new) :
+                Arrays.stream(allowedOrigins.split(",")).map(String::trim).toArray(String[]::new) :
                 new String[]{"*"};
         registry.addEndpoint("/ws", "/api/v1/ws")
                 .setAllowedOriginPatterns(origins)

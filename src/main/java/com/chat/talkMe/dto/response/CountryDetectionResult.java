@@ -1,5 +1,7 @@
 package com.chat.talkMe.dto.response;
 
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,15 +32,15 @@ public class CountryDetectionResult {
      * The login location's {@link java.time.ZoneId}, or UTC when unknown/unparseable —
      * so security emails can show the time in the user's own local zone.
      */
-    public java.time.ZoneId getZoneId() {
+    public ZoneId getZoneId() {
         if (timezone != null && !timezone.isBlank()) {
             try {
-                return java.time.ZoneId.of(timezone.trim());
+                return ZoneId.of(timezone.trim());
             } catch (Exception ignored) {
                 // fall through to UTC
             }
         }
-        return java.time.ZoneOffset.UTC;
+        return ZoneOffset.UTC;
     }
 
     /**

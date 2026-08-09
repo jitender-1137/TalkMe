@@ -4,6 +4,8 @@ import org.springframework.core.io.Resource;
 
 import java.io.Closeable;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -51,14 +53,14 @@ public interface MediaStorage {
      * Used by the admin storage reconciler to surface objects that exist in the bucket
      * but have no DB row (orphans). Best-effort — returns an empty list on failure.
      */
-    java.util.List<StoredObject> list(String prefix);
+    List<StoredObject> list(String prefix);
 
     /** A readable media object plus the metadata needed to serve it. */
     record MediaContent(Resource resource, String contentType, long contentLength) {}
 
     /** A stored object's metadata (no bytes) — one row in a {@link #list(String)}. */
     record StoredObject(String reference, String key, long size,
-                        java.time.Instant lastModified, String contentType) {}
+                        Instant lastModified, String contentType) {}
 
     /** A local file handle whose {@link #close()} deletes it only if it is a temp copy. */
     interface LocalFile extends Closeable {

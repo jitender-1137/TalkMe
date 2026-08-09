@@ -1,7 +1,10 @@
 package com.chat.talkMe.domain;
 
+import com.chat.talkMe.enums.PostAudience;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,9 +69,9 @@ public class Post extends BaseEntity {
     // friends (enforced on the profile feed). @ColumnDefault backfills existing rows.
     @Enumerated(EnumType.STRING)
     @Column(name = "audience", length = 16, nullable = false)
-    @org.hibernate.annotations.ColumnDefault("'EVERYONE'")
+    @ColumnDefault("'EVERYONE'")
     @Builder.Default
-    private com.chat.talkMe.enums.PostAudience audience = com.chat.talkMe.enums.PostAudience.EVERYONE;
+    private PostAudience audience = PostAudience.EVERYONE;
 
     /**
      * Optional expiry for a temporary post (feature #22). {@code null} = permanent (the default
@@ -76,11 +79,11 @@ public class Post extends BaseEntity {
      * hard-deleted by {@code PostExpiryReaper}.
      */
     @Column(name = "expires_at")
-    private java.time.Instant expiresAt;
+    private Instant expiresAt;
 
     /** Whether this post has a TTL and that TTL has elapsed. */
     @Transient
     public boolean isExpired() {
-        return expiresAt != null && java.time.Instant.now().isAfter(expiresAt);
+        return expiresAt != null && Instant.now().isAfter(expiresAt);
     }
 }

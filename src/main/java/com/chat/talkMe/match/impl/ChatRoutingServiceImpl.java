@@ -6,6 +6,7 @@ import com.chat.talkMe.match.MatchConsentService;
 import com.chat.talkMe.match.MatchServerEvent;
 import com.chat.talkMe.match.MatchSession;
 import com.chat.talkMe.match.SessionService;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.NotificationDispatchService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
 
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final com.chat.talkMe.moderation.ContentModerationService moderationService;
+    private final ContentModerationService moderationService;
     private final MatchConsentService matchConsentService;
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;

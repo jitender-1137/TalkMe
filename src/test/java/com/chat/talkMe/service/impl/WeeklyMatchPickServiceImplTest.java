@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -330,7 +331,7 @@ class WeeklyMatchPickServiceImplTest {
         @DisplayName("more than PICK_COUNT candidates → only the top 10 persisted")
         void capsAtPickCount() {
             noBlocksAndNoExisting();
-            List<User> pool = new java.util.ArrayList<>();
+            List<User> pool = new ArrayList<>();
             for (int i = 0; i < 12; i++) {
                 User u = user(100L + i, "u" + i);
                 pool.add(u);

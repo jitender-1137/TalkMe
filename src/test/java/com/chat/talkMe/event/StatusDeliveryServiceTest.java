@@ -7,6 +7,7 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.NotificationDispatchService;
 import com.chat.talkMe.service.PresenceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -61,7 +62,7 @@ class StatusDeliveryServiceTest {
     private User actor(long id) {
         User u = User.builder().username("reader").build();
         u.setId(id);
-        u.setUuid(java.util.UUID.randomUUID());
+        u.setUuid(UUID.randomUUID());
         return u;
     }
 

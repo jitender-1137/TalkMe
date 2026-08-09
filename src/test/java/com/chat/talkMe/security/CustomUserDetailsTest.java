@@ -3,6 +3,7 @@ package com.chat.talkMe.security;
 import com.chat.talkMe.domain.Permission;
 import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
+import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CustomUserDetailsTest {
 
     private static Role roleWithPerms(String roleName, String... perms) {
-        Set<Permission> permissions = java.util.Arrays.stream(perms)
+        Set<Permission> permissions = Arrays.stream(perms)
                 .map(p -> Permission.builder().name(p).build())
                 .collect(Collectors.toSet());
         return Role.builder().name(roleName).permissions(permissions).build();

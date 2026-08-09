@@ -1,15 +1,15 @@
 package com.chat.talkMe.dto.response;
-
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-
+import lombok.NoArgsConstructor;
 import java.util.List;
 
 /** A single metric's time series with the resolved interval — for a per-graph query. */
 @Data
 @Builder
-@lombok.NoArgsConstructor
-@lombok.AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 public class AdminTimeseriesResult {
     private String metric;        // messages / signups / attachments
     private String granularity;   // "hour" | "day" — how to format the point labels

@@ -1,8 +1,16 @@
 package com.chat.talkMe.mapper;
 
+import com.chat.talkMe.domain.Role;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.UserResponse;
+import com.chat.talkMe.enums.Interest;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -49,26 +57,26 @@ public interface UserMapper {
     @Mapping(target = "lookingFor", expression = "java(mapEnumSet(user.getLookingFor()))")
     UserResponse toUserResponse(User user);
 
-    default java.util.List<String> mapRoleNames(User user) {
-        if (user.getRoles() == null) return java.util.Collections.emptyList();
+    default List<String> mapRoleNames(User user) {
+        if (user.getRoles() == null) return Collections.emptyList();
         return user.getRoles().stream()
-                .map(com.chat.talkMe.domain.Role::getName)
-                .collect(java.util.stream.Collectors.toList());
+                .map(Role::getName)
+                .collect(Collectors.toList());
     }
 
-    default java.util.Set<String> mapInterestsToStringSet(java.util.Set<com.chat.talkMe.enums.Interest> interests) {
-        if (interests == null) return java.util.Collections.emptySet();
-        java.util.Set<String> stringInterests = new java.util.HashSet<>();
-        for (com.chat.talkMe.enums.Interest interest : interests) {
+    default Set<String> mapInterestsToStringSet(Set<Interest> interests) {
+        if (interests == null) return Collections.emptySet();
+        Set<String> stringInterests = new HashSet<>();
+        for (Interest interest : interests) {
             stringInterests.add(interest.name());
         }
         return stringInterests;
     }
 
     /** Generic enum-set → name-set (languages, looking-for). */
-    default <E extends Enum<E>> java.util.Set<String> mapEnumSet(java.util.Set<E> values) {
-        if (values == null) return java.util.Collections.emptySet();
-        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+    default <E extends Enum<E>> Set<String> mapEnumSet(Set<E> values) {
+        if (values == null) return Collections.emptySet();
+        Set<String> out = new LinkedHashSet<>();
         for (E v : values) out.add(v.name());
         return out;
     }

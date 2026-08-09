@@ -1,6 +1,7 @@
 package com.chat.talkMe.storage;
 
 import com.chat.talkMe.exception.FileStorageException;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
@@ -12,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -87,15 +90,15 @@ public class LocalMediaStorage implements MediaStorage {
     }
 
     @Override
-    public java.util.List<StoredObject> list(String prefix) {
+    public List<StoredObject> list(String prefix) {
         Path base = root;
         if (prefix != null && !prefix.isBlank()) {
             Path p = root.resolve(prefix).normalize();
             if (p.startsWith(root)) base = p;
         }
-        if (!Files.isDirectory(base)) return java.util.List.of();
-        java.util.List<StoredObject> out = new java.util.ArrayList<>();
-        try (java.util.stream.Stream<Path> stream = Files.walk(base)) {
+        if (!Files.isDirectory(base)) return List.of();
+        List<StoredObject> out = new ArrayList<>();
+        try (Stream<Path> stream = Files.walk(base)) {
             stream.filter(Files::isRegularFile).forEach(f -> {
                 try {
                     String key = root.relativize(f).toString().replace('\\', '/');

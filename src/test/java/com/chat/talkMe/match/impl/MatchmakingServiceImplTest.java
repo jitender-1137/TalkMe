@@ -2,6 +2,7 @@ package com.chat.talkMe.match.impl;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.MatchStartRequest;
+import com.chat.talkMe.dto.response.AnonymousPartnerResponse;
 import com.chat.talkMe.dto.response.CompatibilityScore;
 import com.chat.talkMe.dto.response.MatchSessionResponse;
 import com.chat.talkMe.enums.ConversationEnergy;
@@ -349,7 +350,7 @@ class MatchmakingServiceImplTest {
             MatchServerEvent toMe = captureSentTo(ME);
             Map<String, Object> payload = payloadOf(toMe);
             assertThat(payload.get("mode")).isEqualTo("MASK");
-            var partner = (com.chat.talkMe.dto.response.AnonymousPartnerResponse) payload.get("partner");
+            var partner = (AnonymousPartnerResponse) payload.get("partner");
             assertThat(partner.getAlias()).isEqualTo(session.getAliasB());
             verify(matchTimerService, never()).arm(anyString(), anyInt());
         }

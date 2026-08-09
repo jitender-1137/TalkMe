@@ -1,5 +1,6 @@
 package com.chat.talkMe.dto.request;
 
+import java.util.List;
 import lombok.Data;
 
 /** SuperAdmin edit-profile payload. All fields optional — only non-null ones apply. */
@@ -18,6 +19,6 @@ public class AdminUpdateUserRequest {
     // Identity + account (super-admin only)
     private String email;
     private String username;
-    private java.util.List<String> interests; // Interest enum names; replaces the set when non-null
+    private List<String> interests; // Interest enum names; replaces the set when non-null
     private String newPassword;                // when set, re-hashes the account password
 }

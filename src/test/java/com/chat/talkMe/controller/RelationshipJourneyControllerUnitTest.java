@@ -13,6 +13,7 @@ import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.exception.ServiceException;
 import com.chat.talkMe.security.CustomUserDetails;
 import com.chat.talkMe.service.RelationshipJourneyService;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.StaticMessageSource;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -192,7 +194,7 @@ class RelationshipJourneyControllerUnitTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.otherUserUuid").value(OTHER_UUID))
                     // Default Jackson (Include.ALWAYS) keeps the key present with a null value.
-                    .andExpect(jsonPath("$.data.milestones").value(org.hamcrest.Matchers.nullValue()));
+                    .andExpect(jsonPath("$.data.milestones").value(Matchers.nullValue()));
         }
 
         @Test
@@ -271,7 +273,7 @@ class RelationshipJourneyControllerUnitTest {
         @DisplayName("Spring AccessDeniedException -> 403/TM_005")
         void shouldReturn403TM005ForAccessDenied() throws Exception {
             when(relationshipJourneyService.getJourney(any(), anyString()))
-                    .thenThrow(new org.springframework.security.access.AccessDeniedException("denied"));
+                    .thenThrow(new AccessDeniedException("denied"));
 
             mockMvc.perform(get(BASE + "/" + OTHER_UUID))
                     .andExpect(status().isForbidden())

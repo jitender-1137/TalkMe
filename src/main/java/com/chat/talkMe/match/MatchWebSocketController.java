@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
+import com.chat.talkMe.dto.request.MatchStartRequest;
+import com.chat.talkMe.enums.RevealChannel;
+import com.chat.talkMe.match.impl.MatchMessageBufferService;
 import java.security.Principal;
 import java.util.Map;
 
@@ -17,13 +20,13 @@ public class MatchWebSocketController {
     private final ChatRoutingService chatRoutingService;
     private final ImagePermissionService imagePermissionService;
     private final MatchConsentService matchConsentService;
-    private final com.chat.talkMe.match.impl.MatchMessageBufferService matchMessageBuffer;
+    private final MatchMessageBufferService matchMessageBuffer;
     private final RevealService revealService;
     private final MatchTimerService matchTimerService;
 
     @MessageMapping("/match/start")
     public void startMatching(
-            @Payload(required = false) com.chat.talkMe.dto.request.MatchStartRequest filters,
+            @Payload(required = false) MatchStartRequest filters,
             Principal principal) {
         if (principal == null) return;
         // No body → legacy blind quick-match; a body → preference-aware match.
@@ -124,9 +127,9 @@ public class MatchWebSocketController {
         revealService.declineReveal(principal.getName(), parseChannel(payload));
     }
 
-    private com.chat.talkMe.enums.RevealChannel parseChannel(Map<String, Object> payload) {
+    private RevealChannel parseChannel(Map<String, Object> payload) {
         Object c = payload.get("channel");
-        return com.chat.talkMe.enums.RevealChannel.valueOf(String.valueOf(c).trim().toUpperCase());
+        return RevealChannel.valueOf(String.valueOf(c).trim().toUpperCase());
     }
 
     // ── Coffee/Chemistry post-timer actions (features #7/#14) ──
@@ -140,7 +143,7 @@ public class MatchWebSocketController {
             case "REMATCH" -> matchmakingService.handleNewChat(name);
             // Exchanging profiles / adding a friend is a consent-gated PROFILE reveal.
             case "EXCHANGE_PROFILES", "ADD_FRIEND" ->
-                    revealService.requestReveal(name, com.chat.talkMe.enums.RevealChannel.PROFILE);
+                    revealService.requestReveal(name, RevealChannel.PROFILE);
             case "CONTINUE" -> matchTimerService.continueRequest(name);
             default -> { /* ignore unknown */ }
         }

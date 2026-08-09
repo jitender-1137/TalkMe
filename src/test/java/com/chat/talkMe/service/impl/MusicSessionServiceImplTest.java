@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -326,7 +327,7 @@ class MusicSessionServiceImplTest {
             asMember();
             withValueOps();
             when(valueOps.get(KEY)).thenReturn(null);
-            org.mockito.Mockito.doThrow(new RuntimeException("ws down"))
+            Mockito.doThrow(new RuntimeException("ws down"))
                     .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
             MusicPlayRequest req = new MusicPlayRequest();
             req.setUrl("https://cdn/track.mp3");

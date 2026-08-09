@@ -20,6 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -72,7 +73,7 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     public Set<String> effectiveWireNames(User user) {
         return cache.getOrCompute(user.getId(), () -> effectiveKeys(user).stream()
                 .map(FeatureKey::wireName)
-                .collect(Collectors.toCollection(java.util.LinkedHashSet::new)));
+                .collect(Collectors.toCollection(LinkedHashSet::new)));
     }
 
     @Override

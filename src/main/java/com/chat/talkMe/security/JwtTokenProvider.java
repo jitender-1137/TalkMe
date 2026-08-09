@@ -1,6 +1,7 @@
 package com.chat.talkMe.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -71,7 +72,7 @@ public class JwtTokenProvider {
                 return false;
             }
             return true;
-        } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+        } catch (ExpiredJwtException ex) {
             // An expired access token is a NORMAL, expected condition — the client
             // refreshes via its refresh-token cookie. Log at DEBUG so routine expiry
             // (e.g. a long-open tab whose 15-min token lapsed) doesn't flood ERROR logs.

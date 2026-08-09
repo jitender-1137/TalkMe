@@ -1,10 +1,19 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.cache.BlockCache;
+import com.chat.talkMe.cache.MemberCountCache;
+import com.chat.talkMe.cache.UserSettingsCache;
+import com.chat.talkMe.crypto.ChatKeyService;
+import com.chat.talkMe.crypto.MessageCryptoService;
 import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.request.CreateChatRequest;
+import com.chat.talkMe.dto.response.ChatKeyResponse;
 import com.chat.talkMe.dto.response.ChatResponse;
+import com.chat.talkMe.dto.response.GroupInfoResponse;
 import com.chat.talkMe.dto.response.MessageResponse;
+import com.chat.talkMe.enums.MemberRole;
 import com.chat.talkMe.event.StatusUpdateEvent;
+import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.ChatMapper;
@@ -13,9 +22,12 @@ import com.chat.talkMe.mapper.UserMapper;
 import com.chat.talkMe.repository.*;
 import com.chat.talkMe.service.ChatService;
 import com.chat.talkMe.service.PresenceService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,9 +43,9 @@ public class ChatServiceImpl implements ChatService {
 
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
-    private final com.chat.talkMe.cache.MemberCountCache memberCountCache;
-    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
-    private final com.chat.talkMe.cache.BlockCache blockCache;
+    private final MemberCountCache memberCountCache;
+    private final UserSettingsCache userSettingsCache;
+    private final BlockCache blockCache;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final MessageReadReceiptRepository readReceiptRepository;
@@ -43,11 +55,11 @@ public class ChatServiceImpl implements ChatService {
     private final PresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
     private final FriendRepository friendRepository;
-    private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private final ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
-    private final com.chat.talkMe.crypto.ChatKeyService chatKeyService;
-    private final com.chat.talkMe.crypto.MessageCryptoService messageCryptoService;
+    private final ChatKeyService chatKeyService;
+    private final MessageCryptoService messageCryptoService;
 
     private User ensureManagedUser(User user) {
         if (user == null) {
@@ -165,7 +177,7 @@ public class ChatServiceImpl implements ChatService {
                     .user(managedUser)
                     .joinedAt(Instant.now())
                     .build();
-            adminMember.setRole(com.chat.talkMe.enums.MemberRole.OWNER);
+            adminMember.setRole(MemberRole.OWNER);
             chatMemberRepository.save(adminMember);
             chat.getMembers().add(adminMember);
 
@@ -178,7 +190,7 @@ public class ChatServiceImpl implements ChatService {
                                 .user(user)
                                 .joinedAt(Instant.now())
                                 .build();
-                        groupMember.setRole(com.chat.talkMe.enums.MemberRole.MEMBER);
+                        groupMember.setRole(MemberRole.MEMBER);
                         chatMemberRepository.save(groupMember);
                         chat.getMembers().add(groupMember);
                     }
@@ -195,7 +207,7 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         List<Chat> chats = chatRepository.findChatsByUser(managedUser);
         
-        java.util.Map<Long, ChatResponse> privateChatMap = new java.util.HashMap<>();
+        Map<Long, ChatResponse> privateChatMap = new HashMap<>();
         List<ChatResponse> uniqueChats = new ArrayList<>();
 
         for (Chat chat : chats) {
@@ -262,7 +274,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
-    public com.chat.talkMe.dto.response.ChatKeyResponse getChatKey(String uuid, User currentUser) {
+    public ChatKeyResponse getChatKey(String uuid, User currentUser) {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
@@ -271,9 +283,9 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
         if (!messageCryptoService.isEnabled()) {
-            return com.chat.talkMe.dto.response.ChatKeyResponse.builder().enabled(false).build();
+            return ChatKeyResponse.builder().enabled(false).build();
         }
-        return com.chat.talkMe.dto.response.ChatKeyResponse.builder()
+        return ChatKeyResponse.builder()
                 .enabled(true)
                 .key(chatKeyService.getRawKeyBase64(chat.getId()))
                 .algo("AES-256-GCM")
@@ -347,8 +359,8 @@ public class ChatServiceImpl implements ChatService {
 
         // For a group/channel/room, deleting removes it for EVERYONE — only the
         // owner may do that. (1:1 chats keep the existing per-user delete behavior.)
-        if (chat.isMultiParty() && member.getRole() != com.chat.talkMe.enums.MemberRole.OWNER) {
-            throw new com.chat.talkMe.exception.ForbiddenException(
+        if (chat.isMultiParty() && member.getRole() != MemberRole.OWNER) {
+            throw new ForbiddenException(
                     "Only the group owner can delete the group", "TM_291");
         }
 
@@ -568,16 +580,16 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /** Ids of this chat's members (other than the viewer) who are in Ghost mode. */
-    private java.util.Set<Long> ghostMemberIds(Chat chat, User viewer) {
-        java.util.List<User> others = chat.getMembers().stream()
+    private Set<Long> ghostMemberIds(Chat chat, User viewer) {
+        List<User> others = chat.getMembers().stream()
                 .map(ChatMember::getUser)
                 .filter(u -> u != null && !u.getId().equals(viewer.getId()))
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
         return presenceService.getGhostUserIds(others);
     }
 
     /** Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT). */
-    private String resolveStatusExcludingGhosts(Message m, java.util.Set<Long> ghostIds) {
+    private String resolveStatusExcludingGhosts(Message m, Set<Long> ghostIds) {
         if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
         boolean delivered = false;
         for (var rec : m.getReadReceipts()) {
@@ -607,10 +619,10 @@ public class ChatServiceImpl implements ChatService {
         // Last Message — capped to the viewer's visible window: after clearedAt (if the
         // chat was cleared) AND at/before leftAt (a former member must keep seeing the
         // last message from BEFORE they left, never messages sent after their exit).
-        java.time.Instant previewClearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
-        java.time.Instant previewLeftAt = memberSelf != null ? memberSelf.getLeftAt() : null;
-        java.util.List<Message> lastList = messageRepository.findLastVisibleMessage(
-                chat, previewClearedAt, previewLeftAt, org.springframework.data.domain.PageRequest.of(0, 1));
+        Instant previewClearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+        Instant previewLeftAt = memberSelf != null ? memberSelf.getLeftAt() : null;
+        List<Message> lastList = messageRepository.findLastVisibleMessage(
+                chat, previewClearedAt, previewLeftAt, PageRequest.of(0, 1));
         Message lastMessage = lastList.isEmpty() ? null : lastList.getFirst();
 
         if (lastMessage != null) {
@@ -620,7 +632,7 @@ public class ChatServiceImpl implements ChatService {
             // the status ignoring receipts from any ghost member (caps at SENT).
             if (presenceService != null
                     && lastMessage.getSender().getId().equals(currentUser.getId())) {
-                java.util.Set<Long> ghostIds = ghostMemberIds(chat, currentUser);
+                Set<Long> ghostIds = ghostMemberIds(chat, currentUser);
                 if (!ghostIds.isEmpty()) {
                     lastMessageDto.setStatus(resolveStatusExcludingGhosts(lastMessage, ghostIds));
                 }
@@ -645,7 +657,7 @@ public class ChatServiceImpl implements ChatService {
                     // Apparent last-seen: null for Invisible / Hide-last-seen (privacy
                     // rule centralized in PresenceService) so the conversation list never
                     // leaks a hidden last-seen.
-                    java.time.Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
+                    Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
                     otherUserDto.setLastSeen(lastSeen != null ? lastSeen.toString() : null);
                 }
                 otherUserDto.setMessagingFriendsOnly(userSettingsCache.isMessagingFriendsOnly(otherUser));
@@ -706,7 +718,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /** Builds the group/channel/room metadata block for a multi-party chat. */
-    private com.chat.talkMe.dto.response.GroupInfoResponse buildGroupInfo(Chat chat, ChatMember memberSelf) {
+    private GroupInfoResponse buildGroupInfo(Chat chat, ChatMember memberSelf) {
         ChatSettings s = chat.getSettings() != null ? chat.getSettings() : ChatSettings.builder().build();
 
         String ownerUuid = null;
@@ -720,7 +732,7 @@ public class ChatServiceImpl implements ChatService {
                 .map(m -> m.getUuid().toString())
                 .orElse(null);
 
-        return com.chat.talkMe.dto.response.GroupInfoResponse.builder()
+        return GroupInfoResponse.builder()
                 .subtype(chat.getChatType().name().toLowerCase())
                 .visibility(chat.getVisibility().name())
                 .joinPolicy(chat.getJoinPolicy().name())
@@ -732,7 +744,7 @@ public class ChatServiceImpl implements ChatService {
                 .imageUrl(chat.getImageUrl())
                 .publicUsername(chat.getSlug())
                 .category(chat.getCategory())
-                .tags(chat.getTags() == null ? java.util.List.of()
+                .tags(chat.getTags() == null ? List.of()
                         : chat.getTags().stream().map(Enum::name).collect(Collectors.toList()))
                 .ownerId(ownerUuid)
                 .myRole(memberSelf != null ? memberSelf.getRole().name() : null)

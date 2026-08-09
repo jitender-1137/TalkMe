@@ -96,7 +96,7 @@ public class ChatMember extends BaseEntity {
      */
     @Column(name = "manually_unread", nullable = false)
     @ColumnDefault("false")
-    @lombok.Builder.Default
+    @Builder.Default
     private boolean manuallyUnread = false;
 
     /**

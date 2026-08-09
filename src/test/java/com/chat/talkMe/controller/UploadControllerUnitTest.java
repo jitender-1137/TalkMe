@@ -10,8 +10,12 @@ import com.chat.talkMe.moderation.ModerationResult;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.security.CustomUserDetails;
+import com.chat.talkMe.service.MediaAssetService;
 import com.chat.talkMe.service.StorageService;
 import com.chat.talkMe.storage.MediaStorage;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +35,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-
+import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -92,7 +96,7 @@ class UploadControllerUnitTest {
     @Mock
     private ContentModerationService moderationService;
     @Mock
-    private com.chat.talkMe.service.MediaAssetService mediaAssetService;
+    private MediaAssetService mediaAssetService;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -260,8 +264,8 @@ class UploadControllerUnitTest {
                     // stored file does not exist on disk → falls back to the multipart size (64 bytes).
                     .andExpect(jsonPath("$.data.fileSize").value(64));
 
-            ArgumentCaptor<org.springframework.web.multipart.MultipartFile> fileCap =
-                    ArgumentCaptor.forClass(org.springframework.web.multipart.MultipartFile.class);
+            ArgumentCaptor<MultipartFile> fileCap =
+                    ArgumentCaptor.forClass(MultipartFile.class);
             ArgumentCaptor<String> typeCap = ArgumentCaptor.forClass(String.class);
             ArgumentCaptor<String> subdirCap = ArgumentCaptor.forClass(String.class);
             verify(storageService).storeFile(fileCap.capture(), typeCap.capture(), subdirCap.capture());
@@ -287,8 +291,8 @@ class UploadControllerUnitTest {
             authenticate();
             // storeFile returns a path to a REAL file → Files.exists(stored) is true (line 81) and
             // the reported size comes from Files.size(stored) (line 82), NOT the 64-byte multipart.
-            java.nio.file.Path stored = java.nio.file.Files.createTempFile("upload-unit-", ".png");
-            java.nio.file.Files.write(stored, new byte[10]);
+            Path stored = Files.createTempFile("upload-unit-", ".png");
+            Files.write(stored, new byte[10]);
             try {
                 when(storageService.storeFile(any(), any(), any())).thenReturn(stored.toString());
 
@@ -296,7 +300,7 @@ class UploadControllerUnitTest {
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.fileSize").value(10));
             } finally {
-                java.nio.file.Files.deleteIfExists(stored);
+                Files.deleteIfExists(stored);
             }
         }
 
@@ -553,7 +557,7 @@ class UploadControllerUnitTest {
         void shouldReturn415WhenSvgContainsScript() throws Exception {
             authenticate();
             byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>"
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    .getBytes(StandardCharsets.UTF_8);
             MockMultipartFile file = new MockMultipartFile("file", "x.svg", "image/svg+xml", svg);
 
             mockMvc.perform(multipart(BASE).file(file).param("type", "image"))
@@ -568,7 +572,7 @@ class UploadControllerUnitTest {
             authenticate();
             when(storageService.storeFile(any(), any(), any())).thenReturn("others/x.svg");
             byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"1\" height=\"1\"/></svg>"
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    .getBytes(StandardCharsets.UTF_8);
             MockMultipartFile file = new MockMultipartFile("file", "clean.svg", "image/svg+xml", svg);
 
             mockMvc.perform(multipart(BASE).file(file).param("type", "image"))
@@ -622,7 +626,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldSandboxScriptableSvg() throws Exception {
-            byte[] body = "<svg/>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] body = "<svg/>".getBytes(StandardCharsets.UTF_8);
             when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "image/svg+xml", body.length)));
 
@@ -678,7 +682,7 @@ class UploadControllerUnitTest {
         @Test
         void shouldSandboxScriptableHtml() throws Exception {
             // contentType contains "html" → the scriptable-types guard adds attachment + sandbox CSP.
-            byte[] body = "<h1>x</h1>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] body = "<h1>x</h1>".getBytes(StandardCharsets.UTF_8);
             when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "text/html", body.length)));
 
@@ -691,7 +695,7 @@ class UploadControllerUnitTest {
         @Test
         void shouldSandboxScriptableXml() throws Exception {
             // contentType contains "xml" → scriptable-types guard fires (svg/html both false first).
-            byte[] body = "<root/>".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] body = "<root/>".getBytes(StandardCharsets.UTF_8);
             when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "application/xml", body.length)));
 

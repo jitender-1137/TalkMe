@@ -8,8 +8,12 @@ import com.chat.talkMe.dto.response.StoryViewerResponse;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
+import com.chat.talkMe.moderation.ContentModerationService;
 import com.chat.talkMe.repository.StoryRepository;
 import com.chat.talkMe.repository.StoryViewRepository;
+import com.chat.talkMe.repository.UserFollowRepository;
+import com.chat.talkMe.repository.UserSettingRepository;
+import com.chat.talkMe.service.impl.PhotoMusicMuxer;
 import com.chat.talkMe.service.impl.StoryServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,12 +52,12 @@ class StoryServiceImplViewTest {
     @Mock private StoryRepository storyRepository;
     @Mock private StoryViewRepository storyViewRepository;
     @Mock private UserMapper userMapper;
-    @Mock private com.chat.talkMe.moderation.ContentModerationService moderationService;
-    @Mock private com.chat.talkMe.repository.UserSettingRepository userSettingRepository;
-    @Mock private com.chat.talkMe.service.impl.PhotoMusicMuxer photoMusicMuxer;
-    @Mock private com.chat.talkMe.repository.UserFollowRepository userFollowRepository;
-    @Mock private com.chat.talkMe.service.NotificationService notificationService;
-    @Mock private com.chat.talkMe.service.FeatureAccessService featureAccessService;
+    @Mock private ContentModerationService moderationService;
+    @Mock private UserSettingRepository userSettingRepository;
+    @Mock private PhotoMusicMuxer photoMusicMuxer;
+    @Mock private UserFollowRepository userFollowRepository;
+    @Mock private NotificationService notificationService;
+    @Mock private FeatureAccessService featureAccessService;
 
     @InjectMocks
     private StoryServiceImpl storyService;

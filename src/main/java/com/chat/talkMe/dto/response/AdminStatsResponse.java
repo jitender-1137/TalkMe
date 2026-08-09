@@ -1,13 +1,15 @@
 package com.chat.talkMe.dto.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /** Platform overview metrics for the SuperAdmin dashboard. */
 @Data
 @Builder
-@lombok.NoArgsConstructor
-@lombok.AllArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 public class AdminStatsResponse {
     private long totalUsers;      // all accounts (active + soft-deleted)
     private long activeUsers;     // not soft-deleted

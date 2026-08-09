@@ -1,5 +1,6 @@
 package com.chat.talkMe.dto.request;
 
+import com.chat.talkMe.dto.response.AudioTrackDto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,7 +20,7 @@ public class StoryRequest {
     private String audience;
 
     // Optional soundtrack.
-    private com.chat.talkMe.dto.response.AudioTrackDto audio;
+    private AudioTrackDto audio;
 
     // Story medium (feature #21): "VISUAL" (default) or "VOICE". For VOICE, mediaUrl is a
     // validated voice clip and the feature must be entitled (VOICE_STATUS).

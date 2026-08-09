@@ -2,8 +2,14 @@ package com.chat.talkMe.domain;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.HashMap;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import com.chat.talkMe.enums.Language;
+import com.chat.talkMe.enums.LookingForTag;
+import com.chat.talkMe.enums.Mood;
+import com.chat.talkMe.enums.PersonalityTrait;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -15,14 +21,18 @@ import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.OneToOne;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.Formula;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import com.chat.talkMe.enums.ConversationEnergy;
+import com.chat.talkMe.enums.InstallationType;
 import com.chat.talkMe.enums.Interest;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @Entity
@@ -68,7 +78,7 @@ public class User extends BaseEntity {
      * no client change. @ColumnDefault gives a real DB DEFAULT so ddl-auto can add this
      * NOT NULL column to the existing, non-empty users table (Postgres backfills rows).
      */
-    @org.hibernate.annotations.ColumnDefault("false")
+    @ColumnDefault("false")
     @Column(name = "ads_free", nullable = false)
     @Builder.Default
     private boolean adsFree = false;
@@ -108,7 +118,7 @@ public class User extends BaseEntity {
     private String lastLocation;
 
     @Column(name = "last_location_at")
-    private java.time.Instant lastLocationAt;
+    private Instant lastLocationAt;
 
     @Column(name = "mobile_number", length = 30)
     private String mobileNumber;
@@ -159,7 +169,7 @@ public class User extends BaseEntity {
     @Column(name = "interest", nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default
-    private Set<com.chat.talkMe.enums.Interest> interests = new java.util.HashSet<>();
+    private Set<Interest> interests = new HashSet<>();
 
     // ── Late-Night Social profile attributes ────────────────────────────────────
     // All nullable objects (never primitives) so "not set" is distinguishable — the
@@ -168,15 +178,15 @@ public class User extends BaseEntity {
     /** Current mood / intent (feature #4), updatable any time. */
     @Enumerated(EnumType.STRING)
     @Column(name = "mood", length = 30)
-    private com.chat.talkMe.enums.Mood mood;
+    private Mood mood;
 
     @Column(name = "mood_updated_at")
-    private java.time.Instant moodUpdatedAt;
+    private Instant moodUpdatedAt;
 
     /** Conversation vibe (feature #5). */
     @Enumerated(EnumType.STRING)
     @Column(name = "conversation_energy", length = 20)
-    private com.chat.talkMe.enums.ConversationEnergy conversationEnergy;
+    private ConversationEnergy conversationEnergy;
 
     /** Languages spoken (feature #3 filter + compatibility). */
     @ElementCollection(fetch = FetchType.EAGER)
@@ -184,7 +194,7 @@ public class User extends BaseEntity {
     @Column(name = "language")
     @Enumerated(EnumType.STRING)
     @Builder.Default
-    private Set<com.chat.talkMe.enums.Language> languages = new java.util.HashSet<>();
+    private Set<Language> languages = new HashSet<>();
 
     /** What the user is looking for (feature #29). */
     @ElementCollection(fetch = FetchType.EAGER)
@@ -192,7 +202,7 @@ public class User extends BaseEntity {
     @Column(name = "tag")
     @Enumerated(EnumType.STRING)
     @Builder.Default
-    private Set<com.chat.talkMe.enums.LookingForTag> lookingFor = new java.util.HashSet<>();
+    private Set<LookingForTag> lookingFor = new HashSet<>();
 
     /** Compact personality trait scores (0–100) for cosine compatibility. Lazy — off the hot path. */
     @ElementCollection(fetch = FetchType.LAZY)
@@ -201,7 +211,7 @@ public class User extends BaseEntity {
     @MapKeyEnumerated(EnumType.STRING)
     @Column(name = "score")
     @Builder.Default
-    private java.util.Map<com.chat.talkMe.enums.PersonalityTrait, Integer> personality = new java.util.HashMap<>();
+    private Map<PersonalityTrait, Integer> personality = new HashMap<>();
 
     /** Async voice introduction (feature #16) — 15–30s clip stored via MediaStorage. */
     @Column(name = "voice_intro_url", length = 512)
@@ -212,7 +222,7 @@ public class User extends BaseEntity {
 
     /** Cached profile-completion percentage (0–100), recomputed on profile writes. Feeds gamification. */
     @Column(name = "profile_completion", nullable = false)
-    @org.hibernate.annotations.ColumnDefault("0")
+    @ColumnDefault("0")
     @Builder.Default
     private int profileCompletion = 0;
 
@@ -238,13 +248,13 @@ public class User extends BaseEntity {
      * {@link #onlineSortWeight}.) NULL when the user has no presence row yet.
      */
     @Formula("(SELECT p.last_seen_at FROM user_presences p WHERE p.user_id = id)")
-    private java.time.Instant presenceLastSeenAt;
+    private Instant presenceLastSeenAt;
 
     /** How the user most recently accessed the app — drives push vs WS-only delivery. */
     @Enumerated(EnumType.STRING)
     @Column(name = "installation_type", length = 20)
     @Builder.Default
-    private com.chat.talkMe.enums.InstallationType installationType = com.chat.talkMe.enums.InstallationType.BROWSER;
+    private InstallationType installationType = InstallationType.BROWSER;
 
     /** Server-driven total unread message count, used for the app badge. */
     @Column(name = "total_unread_count", nullable = false, columnDefinition = "integer default 0")
@@ -258,7 +268,7 @@ public class User extends BaseEntity {
      * Null when the account is active (or already purged).
      */
     @Column(name = "deletion_requested_at")
-    private java.time.Instant deletionRequestedAt;
+    private Instant deletionRequestedAt;
 
     /**
      * Admin-imposed suspension (distinct from the user-initiated soft-delete above).
@@ -273,7 +283,7 @@ public class User extends BaseEntity {
      * Who invited this user (set at signup from the referrer's /@username link). Attribution only —
      * there is intentionally NO reward payout. Nullable: organic signups have no referrer.
      */
-    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "referred_by_id")
     private User referredBy;
 }

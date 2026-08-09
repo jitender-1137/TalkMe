@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -76,7 +77,7 @@ class ReputationRecorderImplTest {
         void nullUserIdNoPublish() {
             recorder.record(null, ReputationEventType.POST_QUALITY, "post-1");
 
-            verify(publisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
+            verify(publisher, never()).publishEvent(ArgumentMatchers.any());
         }
 
         @Test
@@ -84,7 +85,7 @@ class ReputationRecorderImplTest {
         void nullTypeNoPublish() {
             recorder.record(42L, null, "post-1");
 
-            verify(publisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
+            verify(publisher, never()).publishEvent(ArgumentMatchers.any());
         }
     }
 }

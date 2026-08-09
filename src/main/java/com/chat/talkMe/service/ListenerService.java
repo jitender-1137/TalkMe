@@ -2,7 +2,7 @@ package com.chat.talkMe.service;
 
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.ListenerShiftResponse;
-
+import com.chat.talkMe.enums.ListenerReason;
 import java.util.List;
 
 /**
@@ -26,7 +26,7 @@ public interface ListenerService {
      * room, and place the requester in it. The optional {@code reason} shapes the room title so
      * the volunteer has light context before joining. Returns the matched shift.
      */
-    ListenerShiftResponse requestListener(User requester, com.chat.talkMe.enums.ListenerReason reason);
+    ListenerShiftResponse requestListener(User requester, ListenerReason reason);
 
     /**
      * Credit a listener for helping one person: increment peopleHelped, trend toward the Great

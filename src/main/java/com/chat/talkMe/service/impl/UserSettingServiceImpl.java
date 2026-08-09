@@ -1,10 +1,13 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.cache.UserSettingsCache;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.domain.UserSetting;
 import com.chat.talkMe.dto.request.UpdateSettingRequest;
 import com.chat.talkMe.dto.response.UserSettingResponse;
+import com.chat.talkMe.enums.GroupAddPrivacy;
 import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.enums.NightOwlMode;
 import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.UserSettingService;
@@ -19,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserSettingServiceImpl implements UserSettingService {
 
     private final UserSettingRepository userSettingRepository;
-    private final com.chat.talkMe.cache.UserSettingsCache userSettingsCache;
+    private final UserSettingsCache userSettingsCache;
 
     @Override
     @Transactional
@@ -127,18 +130,18 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
     }
 
-    private com.chat.talkMe.enums.GroupAddPrivacy parseGroupAddPrivacy(String value) {
+    private GroupAddPrivacy parseGroupAddPrivacy(String value) {
         try {
-            return com.chat.talkMe.enums.GroupAddPrivacy.valueOf(value.trim().toUpperCase());
+            return GroupAddPrivacy.valueOf(value.trim().toUpperCase());
         } catch (Exception e) {
             throw new BadRequestException(
                     "groupAddPrivacy must be EVERYONE, FRIENDS_ONLY or NOBODY", "TM_068");
         }
     }
 
-    private com.chat.talkMe.enums.NightOwlMode parseNightOwlMode(String value) {
+    private NightOwlMode parseNightOwlMode(String value) {
         try {
-            return com.chat.talkMe.enums.NightOwlMode.valueOf(value.trim().toUpperCase());
+            return NightOwlMode.valueOf(value.trim().toUpperCase());
         } catch (Exception e) {
             throw new BadRequestException("nightOwlMode must be AUTO, ON or OFF", "TM_067");
         }
@@ -158,7 +161,7 @@ public class UserSettingServiceImpl implements UserSettingService {
                 .safeModeEnabled(true)
                 .soundEnabled(true)
                 .messagingPrivacy(MessagingPrivacy.EVERYONE)
-                .groupAddPrivacy(com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE)
+                .groupAddPrivacy(GroupAddPrivacy.EVERYONE)
                 .emailLoginAlerts(true)
                 .emailUnreadMessages(true)
                 .emailAnnouncements(true)
@@ -179,13 +182,13 @@ public class UserSettingServiceImpl implements UserSettingService {
                         : MessagingPrivacy.EVERYONE.name())
                 .groupAddPrivacy(setting.getGroupAddPrivacy() != null
                         ? setting.getGroupAddPrivacy().name()
-                        : com.chat.talkMe.enums.GroupAddPrivacy.EVERYONE.name())
+                        : GroupAddPrivacy.EVERYONE.name())
                 .emailLoginAlerts(setting.isEmailLoginAlerts())
                 .emailUnreadMessages(setting.isEmailUnreadMessages())
                 .emailAnnouncements(setting.isEmailAnnouncements())
                 .nightOwlMode(setting.getNightOwlMode() != null
                         ? setting.getNightOwlMode().name()
-                        : com.chat.talkMe.enums.NightOwlMode.AUTO.name())
+                        : NightOwlMode.AUTO.name())
                 .nightStartHour(setting.getNightStartHour())
                 .nightEndHour(setting.getNightEndHour())
                 .nightAmbientSound(setting.getNightAmbientSound())

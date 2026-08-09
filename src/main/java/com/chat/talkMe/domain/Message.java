@@ -1,8 +1,11 @@
 package com.chat.talkMe.domain;
 
 import com.chat.talkMe.enums.MessageType;
+import com.chat.talkMe.enums.ModerationStatus;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -60,7 +63,7 @@ public class Message extends BaseEntity {
     @JoinColumn(name = "parent_message_id")
     private Message parentMessage;
 
-    @org.hibernate.annotations.ColumnDefault("false")
+    @ColumnDefault("false")
     @Column(name = "is_forwarded", nullable = false)
     @Builder.Default
     private boolean isForwarded = false;
@@ -79,10 +82,10 @@ public class Message extends BaseEntity {
     // columnDefinition, it isn't injected into a "SET DATA TYPE" clause on later runs,
     // so it won't generate invalid ALTER statements once the column exists.
     @Enumerated(EnumType.STRING)
-    @org.hibernate.annotations.ColumnDefault("'CLEAN'")
+    @ColumnDefault("'CLEAN'")
     @Column(name = "moderation_status", nullable = false, length = 32)
     @Builder.Default
-    private com.chat.talkMe.enums.ModerationStatus moderationStatus = com.chat.talkMe.enums.ModerationStatus.CLEAN;
+    private ModerationStatus moderationStatus = ModerationStatus.CLEAN;
 
     @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -123,12 +126,12 @@ public class Message extends BaseEntity {
     // thing that arms the timer. null until then. Deadline = armedAt + (seconds>0 ?
     // seconds : VIEW_ONCE_GRACE).
     @Column(name = "self_destruct_armed_at")
-    private java.time.Instant selfDestructArmedAt;
+    private Instant selfDestructArmedAt;
 
     // Once the media has been destroyed (file + attachment removed) the message row is
     // kept as a greyed "expired" note. @ColumnDefault lets ddl-auto add the NOT-NULL
     // column to the existing table.
-    @org.hibernate.annotations.ColumnDefault("false")
+    @ColumnDefault("false")
     @Column(name = "self_destruct_expired", nullable = false)
     @Builder.Default
     private boolean selfDestructExpired = false;
@@ -137,19 +140,19 @@ public class Message extends BaseEntity {
     // false (default) = the receiver may NOT download/save this media; only the
     // sender opting in per-message allows the receiver's viewer to expose a
     // Download/Save action. @ColumnDefault lets ddl-auto add the NOT-NULL column.
-    @org.hibernate.annotations.ColumnDefault("false")
+    @ColumnDefault("false")
     @Column(name = "allow_download", nullable = false)
     @Builder.Default
     private boolean allowDownload = false;
 
     // ── Group message pinning ──────────────────────────────────────────────────
-    @org.hibernate.annotations.ColumnDefault("false")
+    @ColumnDefault("false")
     @Column(name = "pinned", nullable = false)
     @Builder.Default
     private boolean pinned = false;
 
     @Column(name = "pinned_at")
-    private java.time.Instant pinnedAt;
+    private Instant pinnedAt;
 
     @Column(name = "pinned_by")
     private Long pinnedBy;

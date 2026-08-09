@@ -7,6 +7,7 @@ import com.chat.talkMe.security.RateLimitingFilter;
 import com.chat.talkMe.security.oauth.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.chat.talkMe.security.oauth.OAuth2LoginFailureHandler;
 import com.chat.talkMe.security.oauth.OAuth2LoginSuccessHandler;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -50,7 +51,7 @@ public class SecurityConfig {
      * loader script and creative frames are allowed; {@code img-src}/{@code connect-src}
      * already permit {@code https:}, so no widening is needed there.
      */
-    static String buildContentSecurityPolicy(java.util.List<String> adDomains) {
+    static String buildContentSecurityPolicy(List<String> adDomains) {
         StringBuilder ad = new StringBuilder();
         if (adDomains != null) {
             for (String d : adDomains) {

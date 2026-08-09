@@ -5,13 +5,20 @@ import com.chat.talkMe.domain.BlockUser;
 import com.chat.talkMe.domain.MatchReport;
 import com.chat.talkMe.dto.request.UpdateProfileRequest;
 import com.chat.talkMe.dto.response.BlockedUserResponse;
+import com.chat.talkMe.dto.response.CompatibilityScore;
 import com.chat.talkMe.dto.response.MutualFriendsResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
+import com.chat.talkMe.dto.response.PublicProfileResponse;
+import com.chat.talkMe.dto.response.ReputationResponse;
+import com.chat.talkMe.dto.response.SmartProfileCardResponse;
 import com.chat.talkMe.dto.response.UserResponse;
 import com.chat.talkMe.domain.UserSetting;
 import com.chat.talkMe.enums.MessagingPrivacy;
+import com.chat.talkMe.enums.Mood;
 import com.chat.talkMe.enums.PresenceStatus;
+import com.chat.talkMe.enums.ReputationEventType;
 import com.chat.talkMe.exception.BadRequestException;
+import com.chat.talkMe.exception.ConflictException;
 import com.chat.talkMe.exception.ContentModerationException;
 import com.chat.talkMe.exception.NotFoundException;
 import com.chat.talkMe.mapper.UserMapper;
@@ -21,10 +28,17 @@ import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.MatchReportRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.UserSettingRepository;
+import com.chat.talkMe.service.CompatibilityService;
+import com.chat.talkMe.service.NotificationService;
 import com.chat.talkMe.repository.UserFollowRepository;
 import com.chat.talkMe.repository.PostRepository;
+import com.chat.talkMe.service.StreakService;
 import com.chat.talkMe.service.UserService;
+import com.chat.talkMe.util.ProfileCompletion;
+import jakarta.persistence.criteria.Predicate;
 import com.chat.talkMe.service.PresenceService;
+import com.chat.talkMe.service.ReputationRecorder;
+import com.chat.talkMe.service.ReputationService;
 import com.chat.talkMe.service.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,11 +52,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -63,11 +80,11 @@ public class UserServiceImpl implements UserService {
     private final UserFollowRepository userFollowRepository;
     private final PostRepository postRepository;
     private final ContentModerationService moderationService;
-    private final com.chat.talkMe.service.NotificationService notificationService;
-    private final com.chat.talkMe.service.ReputationRecorder reputationRecorder;
-    private final com.chat.talkMe.service.ReputationService reputationService;
-    private final com.chat.talkMe.service.CompatibilityService compatibilityService;
-    private final com.chat.talkMe.service.StreakService streakService;
+    private final NotificationService notificationService;
+    private final ReputationRecorder reputationRecorder;
+    private final ReputationService reputationService;
+    private final CompatibilityService compatibilityService;
+    private final StreakService streakService;
 
     @Override
     @Transactional(readOnly = true)
@@ -171,12 +188,12 @@ public class UserServiceImpl implements UserService {
         if (request.getVoiceIntroDurationMs() != null) {
             user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());
         }
-        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
+        user.setProfileCompletion(ProfileCompletion.compute(user));
 
         user = userRepository.save(user);
         if (user.getProfileCompletion() >= 100) {
             reputationRecorder.record(user.getId(),
-                    com.chat.talkMe.enums.ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
+                    ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
         }
 
         UserResponse response = userMapper.toUserResponse(user);
@@ -191,8 +208,8 @@ public class UserServiceImpl implements UserService {
         return (s == null || s.isBlank()) ? null : s.trim();
     }
 
-    private static final java.util.regex.Pattern USERNAME_PATTERN =
-            java.util.regex.Pattern.compile("^[a-zA-Z0-9_]{3,30}$");
+    private static final Pattern USERNAME_PATTERN =
+            Pattern.compile("^[a-zA-Z0-9_]{3,30}$");
 
     @Override
     @Transactional
@@ -210,7 +227,7 @@ public class UserServiceImpl implements UserService {
         // "reserve pending-deletion, free fully-deleted" rule. No-op if unchanged.
         if (!next.equalsIgnoreCase(user.getUsername())
                 && userRepository.existsByUsernameIgnoreCase(next)) {
-            throw new com.chat.talkMe.exception.ConflictException(
+            throw new ConflictException(
                     "This username is already taken.", "TM_048");
         }
         user.setUsername(next);
@@ -235,9 +252,9 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse updateMood(String moodValue, User currentUser) {
-        com.chat.talkMe.enums.Mood mood;
+        Mood mood;
         try {
-            mood = com.chat.talkMe.enums.Mood.valueOf(moodValue.trim().toUpperCase());
+            mood = Mood.valueOf(moodValue.trim().toUpperCase());
         } catch (Exception e) {
             throw new BadRequestException("Invalid mood value: " + moodValue, "TM_002");
         }
@@ -245,7 +262,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
         user.setMood(mood);
         user.setMoodUpdatedAt(Instant.now());
-        user.setProfileCompletion(com.chat.talkMe.util.ProfileCompletion.compute(user));
+        user.setProfileCompletion(ProfileCompletion.compute(user));
         user = userRepository.save(user);
         return userMapper.toUserResponse(user);
     }
@@ -324,7 +341,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.PublicProfileResponse getPublicProfileByUsername(String username) {
+    public PublicProfileResponse getPublicProfileByUsername(String username) {
         if (username == null || username.isBlank()) {
             throw new NotFoundException("Profile not found", "TM_USER_NOT_FOUND");
         }
@@ -339,8 +356,8 @@ public class UserServiceImpl implements UserService {
         // Reuse the mapper for the correctly-derived avatar/createdAt, then copy ONLY the safe
         // subset into the trimmed DTO (never the phone/roles/age on UserResponse).
         UserResponse base = userMapper.toUserResponse(u);
-        com.chat.talkMe.dto.response.PublicProfileResponse resp =
-                com.chat.talkMe.dto.response.PublicProfileResponse.builder()
+        PublicProfileResponse resp =
+                PublicProfileResponse.builder()
                         .id(base.getId())
                         .name(base.getName())
                         .username(base.getUsername())
@@ -357,7 +374,7 @@ public class UserServiceImpl implements UserService {
         // Cosmetic reputation summary — fail-open (decoration only; a link must still render
         // if the reputation lookup hiccups).
         try {
-            com.chat.talkMe.dto.response.ReputationResponse rep =
+            ReputationResponse rep =
                     reputationService.getFor(u.getUuid().toString());
             resp.setLevel(rep.getLevel());
             resp.setStarRank(rep.getStarRank());
@@ -370,7 +387,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.chat.talkMe.dto.response.SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser) {
+    public SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser) {
         User target = userRepository.findByUuid(UUID.fromString(userId))
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
         // Reuse the fully-mapped UserResponse (presence, lastSeen, all string sets) as the base.
@@ -379,7 +396,7 @@ public class UserServiceImpl implements UserService {
         // Re-load the viewer as a MANAGED entity within this readOnly tx — the security
         // principal is detached, so scoring against it would hit a LazyInit on personality.
         User viewer = userRepository.findById(currentUser.getId()).orElse(currentUser);
-        com.chat.talkMe.dto.response.CompatibilityScore compat =
+        CompatibilityScore compat =
                 compatibilityService.score(viewer, target);
 
         // Best-effort, fail-open enrichments (P3.5) — the card must render even if either lookup
@@ -395,8 +412,8 @@ public class UserServiceImpl implements UserService {
         }
         Integer recentPublicPosts = null;
         try {
-            java.time.Instant since = java.time.Instant.now()
-                    .minus(30, java.time.temporal.ChronoUnit.DAYS);
+            Instant since = Instant.now()
+                    .minus(30, ChronoUnit.DAYS);
             long c = postRepository.countRecentPublicByUser(target, since);
             if (c > 0) {
                 recentPublicPosts = (int) c;
@@ -405,7 +422,7 @@ public class UserServiceImpl implements UserService {
             log.debug("Smart card recent-posts count failed for {}: {}", userId, e.getMessage());
         }
 
-        return com.chat.talkMe.dto.response.SmartProfileCardResponse.builder()
+        return SmartProfileCardResponse.builder()
                 .id(ur.getId())
                 .name(ur.getName())
                 .username(ur.getUsername())
@@ -450,7 +467,7 @@ public class UserServiceImpl implements UserService {
 
         Specification<User> spec = (root, q, cb) -> {
             String pattern = "%" + query.toLowerCase() + "%";
-            List<jakarta.persistence.criteria.Predicate> preds = new java.util.ArrayList<>();
+            List<Predicate> preds = new ArrayList<>();
             preds.add(cb.notEqual(root.get("id"), currentUser.getId()));
             // Never surface soft-deleted / deletion-requested accounts (both carry
             // isDeleted=true) or guest sessions in people search / discover.
@@ -460,7 +477,7 @@ public class UserServiceImpl implements UserService {
                     cb.like(cb.lower(root.get("username")), pattern),
                     cb.like(cb.lower(root.get("name")), pattern),
                     cb.like(cb.lower(root.get("email")), pattern)));
-            return cb.and(preds.toArray(new jakarta.persistence.criteria.Predicate[0]));
+            return cb.and(preds.toArray(new Predicate[0]));
         };
 
         Page<User> userPage = userRepository.findAll(spec, pageable);
@@ -521,7 +538,7 @@ public class UserServiceImpl implements UserService {
         // report again if the behaviour recurs.
         if (matchReportRepository.existsByReporterIdAndReportedIdAndStatus(
                 currentUser.getId(), targetUser.getId(), "PENDING")) {
-            throw new com.chat.talkMe.exception.ConflictException(
+            throw new ConflictException(
                     "You've already reported this user — it's under review.", "TM_182");
         }
 
@@ -596,13 +613,13 @@ public class UserServiceImpl implements UserService {
 
         if (currentUser != null && currentUser.getId().equals(targetUser.getId())) {
             // Owner sees their own real last-seen.
-            java.time.Instant own = presenceService.getLastSeen(targetUser);
+            Instant own = presenceService.getLastSeen(targetUser);
             response.setLastSeen(own != null ? own.toString() : null);
         } else {
             // Others: apparent last-seen, nulled for Invisible / Hide-last-seen
             // (single privacy rule in PresenceService — previously this missed
             // hide-last-seen, leaking the timestamp).
-            java.time.Instant apparent = presenceService.getApparentLastSeen(targetUser);
+            Instant apparent = presenceService.getApparentLastSeen(targetUser);
             response.setLastSeen(apparent != null ? apparent.toString() : null);
         }
     }

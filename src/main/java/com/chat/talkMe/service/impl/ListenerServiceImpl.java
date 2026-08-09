@@ -6,6 +6,9 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.CreateGroupRequest;
 import com.chat.talkMe.dto.response.ChatResponse;
 import com.chat.talkMe.dto.response.ListenerShiftResponse;
+import com.chat.talkMe.enums.ChatVisibility;
+import com.chat.talkMe.enums.JoinPolicy;
+import com.chat.talkMe.enums.ListenerReason;
 import com.chat.talkMe.enums.ReputationEventType;
 import com.chat.talkMe.enums.RoomMode;
 import com.chat.talkMe.enums.ShiftStatus;
@@ -105,10 +108,10 @@ public class ListenerServiceImpl implements ListenerService {
 
     @Override
     @Transactional
-    public ListenerShiftResponse requestListener(User requester, com.chat.talkMe.enums.ListenerReason reason) {
+    public ListenerShiftResponse requestListener(User requester, ListenerReason reason) {
         User seeker = userRepository.findById(requester.getId()).orElse(requester);
-        com.chat.talkMe.enums.ListenerReason ctx =
-                reason == null ? com.chat.talkMe.enums.ListenerReason.NEED_TO_TALK : reason;
+        ListenerReason ctx =
+                reason == null ? ListenerReason.NEED_TO_TALK : reason;
 
         ListenerShift shift = shiftRepository
                 .findFirstByStatusAndListenerNotOrderByStartedAtAsc(ShiftStatus.AVAILABLE, seeker)
@@ -137,8 +140,8 @@ public class ListenerServiceImpl implements ListenerService {
         Chat chat = chatRepository.findByUuid(UUID.fromString(room.getId()))
                 .orElseThrow(() -> new NotFoundException("Room not found", "TM_998"));
         chat.setRoomMode(RoomMode.LISTENING);
-        chat.setVisibility(com.chat.talkMe.enums.ChatVisibility.PRIVATE);
-        chat.setJoinPolicy(com.chat.talkMe.enums.JoinPolicy.INVITE_ONLY);
+        chat.setVisibility(ChatVisibility.PRIVATE);
+        chat.setJoinPolicy(JoinPolicy.INVITE_ONLY);
         chatRepository.save(chat);
 
         // Bind the shift to the room and mark it engaged.

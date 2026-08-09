@@ -2,6 +2,7 @@ package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.Post;
 import com.chat.talkMe.domain.User;
+import java.time.Instant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,8 +17,8 @@ import java.util.UUID;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Long> {
-    @org.springframework.data.jpa.repository.Query("SELECT p.createdAt FROM Post p WHERE p.createdAt >= :since")
-    java.util.List<java.time.Instant> findTimesSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
+    @Query("SELECT p.createdAt FROM Post p WHERE p.createdAt >= :since")
+    List<Instant> findTimesSince(@Param("since") Instant since);
     Optional<Post> findByUuid(UUID uuid);
     Optional<Post> findByShortCode(String shortCode);
     boolean existsByShortCode(String shortCode);
@@ -39,7 +40,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
            "AND p.audience = com.chat.talkMe.enums.PostAudience.EVERYONE " +
            "AND (p.expiresAt IS NULL OR p.expiresAt > CURRENT_TIMESTAMP) " +
            "AND p.createdAt >= :since")
-    long countRecentPublicByUser(@Param("user") User user, @Param("since") java.time.Instant since);
+    long countRecentPublicByUser(@Param("user") User user, @Param("since") Instant since);
     
     @Query("SELECT p FROM Post p WHERE p.isDeleted = false AND (p.expiresAt IS NULL OR p.expiresAt > CURRENT_TIMESTAMP) AND (p.user = :currentUser OR p.user IN (SELECT f.following FROM UserFollow f WHERE f.follower = :currentUser AND f.status = 'ACCEPTED' AND f.isDeleted = false))")
     Page<Post> findFeedForUser(@Param("currentUser") User currentUser, Pageable pageable);
@@ -49,7 +50,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
      * Bounded via {@code Pageable} so a backlog is drained in chunks (mirrors OutboxPublisherJob).
      */
     @Query("SELECT p FROM Post p WHERE p.isDeleted = false AND p.expiresAt IS NOT NULL AND p.expiresAt <= :now ORDER BY p.expiresAt ASC")
-    List<Post> findExpiredActive(@Param("now") java.time.Instant now, Pageable pageable);
+    List<Post> findExpiredActive(@Param("now") Instant now, Pageable pageable);
 
     /**
      * The public/explore feed as seen by {@code viewer}: EVERYONE posts always show;

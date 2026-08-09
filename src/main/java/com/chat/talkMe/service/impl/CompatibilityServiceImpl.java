@@ -9,6 +9,7 @@ import com.chat.talkMe.enums.Mood;
 import com.chat.talkMe.enums.PersonalityTrait;
 import com.chat.talkMe.service.CompatibilityService;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -148,7 +149,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
         // User entities are detached (no OSIV / tx), so touching an uninitialized map would
         // throw LazyInitializationException. Treat uninitialized/absent as "unknown → neutral".
         if (a == null || b == null
-                || !org.hibernate.Hibernate.isInitialized(a) || !org.hibernate.Hibernate.isInitialized(b)
+                || !Hibernate.isInitialized(a) || !Hibernate.isInitialized(b)
                 || a.isEmpty() || b.isEmpty()) return 0.5;
         double dot = 0, na = 0, nb = 0;
         for (PersonalityTrait t : PersonalityTrait.values()) {

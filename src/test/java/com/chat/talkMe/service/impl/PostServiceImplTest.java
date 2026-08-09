@@ -31,7 +31,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
 import org.springframework.data.domain.Page;
@@ -41,6 +43,8 @@ import org.springframework.data.domain.Pageable;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -329,7 +333,7 @@ class PostServiceImplTest {
         @DisplayName("single image + soundtrack → muxed into a VIDEO media item")
         void photoMusicMux() {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest("http://img/still.jpg", "IMAGE", null, null, null, null, null))));
             r.setAudio(AudioTrackDto.builder().audioUrl("http://audio/song.mp3")
                     .audioStartSec(3).audioClipSeconds(20).build());
@@ -349,7 +353,7 @@ class PostServiceImplTest {
         @DisplayName("photo+music source image is NSFW → ContentModerationException TM_490, no mux")
         void photoMusicSourceBlocked() {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest("http://img/nsfw.jpg", "IMAGE", null, null, null, null, null))));
             r.setAudio(AudioTrackDto.builder().audioUrl("http://audio/song.mp3").build());
             MediaStorage.LocalFile local = mock(MediaStorage.LocalFile.class);
@@ -360,8 +364,8 @@ class PostServiceImplTest {
             assertThatThrownBy(() -> service.createPost(r, currentUser))
                     .isInstanceOfSatisfying(ContentModerationException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_490"));
-            verify(photoMusicMuxer, never()).muxPhotoWithMusic(any(), any(), org.mockito.ArgumentMatchers.anyInt(),
-                    org.mockito.ArgumentMatchers.anyInt());
+            verify(photoMusicMuxer, never()).muxPhotoWithMusic(any(), any(), ArgumentMatchers.anyInt(),
+                    ArgumentMatchers.anyInt());
         }
 
         @Test
@@ -381,7 +385,7 @@ class PostServiceImplTest {
         @DisplayName("poll with fewer than 2 valid options → BadRequestException TM_225")
         void pollTooFewOptions() {
             PostRequest r = new PostRequest();
-            r.setPoll(new PollRequest("One?", java.util.Arrays.asList("Only", " ", null)));
+            r.setPoll(new PollRequest("One?", Arrays.asList("Only", " ", null)));
 
             assertThatThrownBy(() -> service.createPost(r, currentUser))
                     .isInstanceOfSatisfying(BadRequestException.class,
@@ -412,7 +416,7 @@ class PostServiceImplTest {
 
             assertThat(res).isNotNull();
             ArgumentCaptor<Post> saved = ArgumentCaptor.forClass(Post.class);
-            verify(postRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+            verify(postRepository, Mockito.atLeastOnce()).save(saved.capture());
             assertThat(saved.getValue().getAudio()).isNotNull();
             assertThat(saved.getValue().getAudio().getAudioUrl()).isEqualTo("http://audio/track.mp3");
         }
@@ -1525,7 +1529,7 @@ class PostServiceImplTest {
         @DisplayName("media non-null but empty list → hasMedia false (text carries the post)")
         void mediaEmptyListNotCounted() {
             PostRequest r = textRequest("just text");
-            r.setMedia(new java.util.ArrayList<>());
+            r.setMedia(new ArrayList<>());
 
             service.createPost(r, currentUser);
 
@@ -1592,7 +1596,7 @@ class PostServiceImplTest {
 
             service.createPost(textRequest("retry"), currentUser);
 
-            verify(postRepository, org.mockito.Mockito.atLeast(2)).existsByShortCode(any());
+            verify(postRepository, Mockito.atLeast(2)).existsByShortCode(any());
         }
     }
 
@@ -1603,7 +1607,7 @@ class PostServiceImplTest {
         private PostRequest imageWithAudio(String imageUrl, String audioUrl,
                                            Integer startSec, Integer clipSec) {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest(imageUrl, "IMAGE", null, null, null, null, null))));
             r.setAudio(AudioTrackDto.builder().audioUrl(audioUrl)
                     .audioStartSec(startSec).audioClipSeconds(clipSec).build());
@@ -1614,14 +1618,14 @@ class PostServiceImplTest {
         @DisplayName("audio present but audioUrl null → mux skipped and no AudioTrack stored")
         void audioWithoutUrlSkipsMuxAndTrack() {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest("http://img/1.jpg", "IMAGE", null, null, null, null, null))));
             r.setAudio(AudioTrackDto.builder().build()); // audioUrl == null
 
             service.createPost(r, currentUser);
 
             verify(photoMusicMuxer, never()).muxPhotoWithMusic(any(), any(),
-                    org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+                    ArgumentMatchers.anyInt(), ArgumentMatchers.anyInt());
             // toEntity() returns null when audioUrl is blank → only the initial save happens.
             verify(postRepository, times(1)).save(any(Post.class));
         }
@@ -1630,7 +1634,7 @@ class PostServiceImplTest {
         @DisplayName("audio + more than one media item → single-image mux path skipped")
         void audioWithTwoMediaSkipsMux() {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest("http://img/1.jpg", "IMAGE", null, null, null, null, null),
                     new PostMediaRequest("http://img/2.jpg", "IMAGE", null, null, null, null, null))));
             r.setAudio(AudioTrackDto.builder().audioUrl("http://audio/song.mp3").build());
@@ -1638,7 +1642,7 @@ class PostServiceImplTest {
             service.createPost(r, currentUser);
 
             verify(photoMusicMuxer, never()).muxPhotoWithMusic(any(), any(),
-                    org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+                    ArgumentMatchers.anyInt(), ArgumentMatchers.anyInt());
             verify(postMediaRepository, times(2)).save(any(PostMedia.class));
         }
 
@@ -1646,14 +1650,14 @@ class PostServiceImplTest {
         @DisplayName("single VIDEO + audio → not an image, mux path skipped")
         void singleVideoWithAudioSkipsMux() {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest("http://vid/clip.mp4", "VIDEO", null, null, null, null, null))));
             r.setAudio(AudioTrackDto.builder().audioUrl("http://audio/song.mp3").build());
 
             service.createPost(r, currentUser);
 
             verify(photoMusicMuxer, never()).muxPhotoWithMusic(any(), any(),
-                    org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
+                    ArgumentMatchers.anyInt(), ArgumentMatchers.anyInt());
         }
 
         @Test
@@ -1702,7 +1706,7 @@ class PostServiceImplTest {
         void mediaWithNullUrlSaved() {
             PostRequest r = new PostRequest();
             r.setContent("has media");
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest(null, "IMAGE", null, null, null, null, null))));
 
             service.createPost(r, currentUser);
@@ -1715,7 +1719,7 @@ class PostServiceImplTest {
         @DisplayName("resolvable VIDEO media that is clean → moderated as VIDEO and saved")
         void videoMediaModeratedCleanSaved() {
             PostRequest r = new PostRequest();
-            r.setMedia(new java.util.ArrayList<>(List.of(
+            r.setMedia(new ArrayList<>(List.of(
                     new PostMediaRequest("http://vid/clip.mp4", "VIDEO", null, null, null, null, null))));
             MediaStorage.LocalFile local = mock(MediaStorage.LocalFile.class);
             when(local.path()).thenReturn(Path.of("/tmp/clip.mp4"));

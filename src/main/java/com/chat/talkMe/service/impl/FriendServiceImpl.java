@@ -1,5 +1,6 @@
 package com.chat.talkMe.service.impl;
 
+import com.chat.talkMe.cache.BlockCache;
 import com.chat.talkMe.domain.*;
 import com.chat.talkMe.dto.response.AuthUserResponse;
 import com.chat.talkMe.dto.response.FriendRequestResponse;
@@ -10,12 +11,23 @@ import com.chat.talkMe.mapper.UserMapper;
 import com.chat.talkMe.repository.*;
 import com.chat.talkMe.service.FriendService;
 import com.chat.talkMe.service.PresenceService;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -28,13 +40,13 @@ public class FriendServiceImpl implements FriendService {
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final BlockUserRepository blockUserRepository;
-    private final com.chat.talkMe.cache.BlockCache blockCache;
+    private final BlockCache blockCache;
     private final UserSettingRepository userSettingRepository;
     private final FriendRequestMapper friendRequestMapper;
     private final UserMapper userMapper;
     private final PresenceService presenceService;
-    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
-    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     /** Max NEW friend requests one user may originate per day (anti-spam). */
     private static final int FRIEND_REQUEST_DAILY_CAP = 50;
@@ -42,10 +54,10 @@ public class FriendServiceImpl implements FriendService {
     /** Redis daily counter; throws 429 past the cap. Fail-open on Redis errors. */
     private void enforceFriendRequestQuota(User sender) {
         try {
-            String key = "friendreq:" + sender.getId() + ":" + java.time.LocalDate.now();
+            String key = "friendreq:" + sender.getId() + ":" + LocalDate.now();
             Long count = redisTemplate.opsForValue().increment(key);
             if (count != null && count == 1L) {
-                redisTemplate.expire(key, java.time.Duration.ofDays(1));
+                redisTemplate.expire(key, Duration.ofDays(1));
             }
             if (count != null && count > FRIEND_REQUEST_DAILY_CAP) {
                 throw new TooManyRequestsException(
@@ -60,7 +72,7 @@ public class FriendServiceImpl implements FriendService {
 
     private void broadcastFriendEvent(User user, String eventType) {
         try {
-            java.util.Map<String, String> payload = new java.util.HashMap<>();
+            Map<String, String> payload = new HashMap<>();
             payload.put("event", eventType);
             messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/friends", payload);
         } catch (Exception e) {
@@ -90,7 +102,7 @@ public class FriendServiceImpl implements FriendService {
         }
 
         // Check existing requests
-        java.util.Optional<FriendRequest> existingRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, receiver);
+        Optional<FriendRequest> existingRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, receiver);
         if (existingRequestOpt.isPresent()) {
             FriendRequest existingRequest = existingRequestOpt.get();
             if (existingRequest.getStatus() == FriendRequestStatus.ACCEPTED) {
@@ -112,7 +124,7 @@ public class FriendServiceImpl implements FriendService {
         }
 
         // Check if the other user already sent a request to the current user
-        java.util.Optional<FriendRequest> reverseRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(receiver, currentUser);
+        Optional<FriendRequest> reverseRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(receiver, currentUser);
         if (reverseRequestOpt.isPresent() && reverseRequestOpt.get().getStatus() == FriendRequestStatus.PENDING) {
             // Auto-accept if the other user already sent one
             acceptFriendRequest(reverseRequestOpt.get().getUuid().toString(), currentUser);
@@ -134,7 +146,7 @@ public class FriendServiceImpl implements FriendService {
             // saveAndFlush so the unique (sender_id, receiver_id) constraint is enforced
             // here, letting us catch a concurrent-duplicate race instead of 500ing.
             request = friendRequestRepository.saveAndFlush(request);
-        } catch (org.springframework.dao.DataIntegrityViolationException dup) {
+        } catch (DataIntegrityViolationException dup) {
             // A concurrent request created the row first — reuse it (set PENDING) rather
             // than inserting a duplicate.
             request = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, receiver)
@@ -215,8 +227,8 @@ public class FriendServiceImpl implements FriendService {
     @Transactional(readOnly = true)
     public List<AuthUserResponse> getFriends(User currentUser) {
         List<User> friends = friendRepository.findFriendsByUser(currentUser);
-        java.util.Set<Long> friendsOnlyIds = friends.isEmpty()
-                ? java.util.Collections.emptySet()
+        Set<Long> friendsOnlyIds = friends.isEmpty()
+                ? Collections.emptySet()
                 : userSettingRepository.findFriendsOnlyUserIds(
                         friends.stream().map(User::getId).collect(Collectors.toList()));
         return friends.stream()
@@ -226,7 +238,7 @@ public class FriendServiceImpl implements FriendService {
                         response.setPresence(presenceService.getStatus(friend).name().toLowerCase());
                         // Apparent last-seen: null for Invisible / Hide-last-seen
                         // (privacy rule centralized in PresenceService).
-                        java.time.Instant lastSeen = presenceService.getApparentLastSeen(friend);
+                        Instant lastSeen = presenceService.getApparentLastSeen(friend);
                         if (lastSeen != null) {
                             response.setLastSeen(lastSeen.toString());
                         }

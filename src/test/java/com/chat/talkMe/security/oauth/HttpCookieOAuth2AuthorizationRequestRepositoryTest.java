@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
@@ -167,7 +169,7 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
             assertThat(removed.getState()).isEqualTo("state-xyz");
             // second addHeader on the same response is the expiry cookie (Max-Age=0)
             ArgumentCaptor<String> cap = ArgumentCaptor.forClass(String.class);
-            verify(response, org.mockito.Mockito.atLeastOnce())
+            verify(response, Mockito.atLeastOnce())
                     .addHeader(eq(HttpHeaders.SET_COOKIE), cap.capture());
             assertThat(cap.getAllValues()).anyMatch(h -> h.contains("Max-Age=0"));
         }
@@ -180,7 +182,7 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
             OAuth2AuthorizationRequest removed = repo.removeAuthorizationRequest(request, response);
 
             assertThat(removed).isNull();
-            verify(response, never()).addHeader(eq(HttpHeaders.SET_COOKIE), org.mockito.ArgumentMatchers.anyString());
+            verify(response, never()).addHeader(eq(HttpHeaders.SET_COOKIE), ArgumentMatchers.anyString());
         }
     }
 

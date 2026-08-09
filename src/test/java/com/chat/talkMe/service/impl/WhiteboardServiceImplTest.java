@@ -10,6 +10,7 @@ import com.chat.talkMe.exception.BadRequestException;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -573,7 +575,7 @@ class WhiteboardServiceImplTest {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.increment(anyString())).thenReturn(3L);
             when(objectMapper.writeValueAsString(any()))
-                    .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {});
+                    .thenThrow(new JsonProcessingException("boom") {});
 
             WhiteboardOp op = service.addStroke(me, simpleStroke());
 
@@ -591,7 +593,7 @@ class WhiteboardServiceImplTest {
             when(valueOps.increment(anyString())).thenReturn(4L);
             when(redis.opsForList()).thenReturn(listOps);
             when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-            org.mockito.Mockito.doThrow(new RuntimeException("stomp down"))
+            Mockito.doThrow(new RuntimeException("stomp down"))
                     .when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
 
             // The broadcast throwing is swallowed — addStroke still returns the stamped op.

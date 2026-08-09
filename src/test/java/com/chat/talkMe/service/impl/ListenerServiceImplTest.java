@@ -19,6 +19,7 @@ import com.chat.talkMe.repository.ListenerShiftRepository;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.GroupService;
 import com.chat.talkMe.service.ReputationRecorder;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -101,7 +103,7 @@ class ListenerServiceImplTest {
     private ListenerShift shift(User listener, ShiftStatus status) {
         ListenerShift s = ListenerShift.builder()
                 .listener(listener).status(status)
-                .startedAt(java.time.Instant.now()).peopleHelped(0)
+                .startedAt(Instant.now()).peopleHelped(0)
                 .build();
         s.setUuid(UUID.randomUUID());
         return s;
@@ -268,7 +270,7 @@ class ListenerServiceImplTest {
             s.setPeopleHelped(2);
             when(shiftRepository.findFirstByListenerAndStatusNotOrderByStartedAtDesc(listener, ShiftStatus.ENDED))
                     .thenReturn(Optional.of(s));
-            org.mockito.Mockito.doThrow(new RuntimeException("ledger down"))
+            Mockito.doThrow(new RuntimeException("ledger down"))
                     .when(reputationRecorder).record(any(), any(), any());
 
             service.endShift(listener);
