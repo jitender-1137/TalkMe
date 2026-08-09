@@ -5,6 +5,10 @@ import com.chat.talkMe.dto.response.NotificationResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+/**
+ * In-app notifications: persistence, read-state, and real-time WebSocket fan-out
+ * to a user, their friends, or their follow graph.
+ */
 public interface NotificationService {
     Page<NotificationResponse> getNotifications(Pageable pageable, User currentUser);
 

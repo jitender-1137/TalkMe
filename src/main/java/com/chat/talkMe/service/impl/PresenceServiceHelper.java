@@ -13,6 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.Optional;
 
+/**
+ * Transaction-boundary helper for {@link PresenceServiceImpl}: performs the durable presence DB
+ * writes in their own transactions (a separate bean so Spring's proxy applies the propagation).
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,12 +34,25 @@ public class PresenceServiceHelper {
      * user goes OFFLINE, so "last seen" survives a Redis eviction or restart. Live
      * ONLINE/IDLE state lives only in Redis (no DB write). A no-op (0 rows) for a user
      * who never created a presence row — their last-seen stays in Redis until TTL.
+     *
+     * @param userId   id of the user going offline
+     * @param status   status name to persist (OFFLINE)
+     * @param lastSeen last-active timestamp to persist
      */
     @Transactional
     public void persistOffline(Long userId, String status, Instant lastSeen) {
         userPresenceRepository.updateStatus(userId, status, lastSeen);
     }
 
+    /**
+     * Returns the user's presence row, creating a default OFFLINE one if none exists. Runs in a
+     * REQUIRES_NEW transaction so the row is committed and its locks released before returning,
+     * avoiding cross-thread races; a concurrent-insert failure is recovered by re-reading the row.
+     *
+     * @param user the user whose presence row is fetched/created
+     * @return the existing or newly-created {@link UserPresence}
+     * @throws java.lang.IllegalStateException if the row can neither be created nor re-read
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public UserPresence getOrCreateUserPresence(User user) {
         Optional<UserPresence> existing = userPresenceRepository.findByUser(user);

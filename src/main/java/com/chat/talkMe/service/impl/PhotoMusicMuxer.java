@@ -51,6 +51,9 @@ public class PhotoMusicMuxer {
     }
 
     /**
+     * Mux a still image with a trimmed audio clip into an MP4 stored beside the source image;
+     * validates the window against the probed audio duration and returns null on any failure.
+     *
      * @param imageRef the stored image (storage reference)
      * @param audioRef the soundtrack (internal storage reference OR external preview URL)
      * @param startSec offset into the audio to start from

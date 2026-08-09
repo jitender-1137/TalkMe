@@ -61,6 +61,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Instagram-style feed posts: create/read/update/delete, likes, comments (with replies),
+ * bookmarks, polls, temporary (TTL) posts, and photo+music muxing.
+ *
+ * <p>Enforces public-feed content moderation (explicit text/media hard-blocked), FRIENDS-only
+ * audience visibility, and fans out best-effort notifications on new posts/likes/comments/votes.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -95,6 +102,17 @@ public class PostServiceImpl implements PostService {
      */
     private static final int EXPIRY_REAP_BATCH = 200;
 
+    /**
+     * Create a post (text, media, and/or poll), moderating all public content and optionally
+     * muxing a single photo + soundtrack into an MP4; fans out a new-post notification.
+     *
+     * @param request     post fields (content, media, poll, audio, audience, TTL)
+     * @param currentUser the author
+     * @return the created post as a response
+     * @throws com.chat.talkMe.exception.BadRequestException         empty post, or a poll with fewer than 2 options
+     * @throws com.chat.talkMe.exception.ContentModerationException   explicit text/caption/media/poll content
+     * @throws com.chat.talkMe.exception.FeatureLockedException       temporary-post TTL requested without access
+     */
     @Override
     @Transactional
     public PostResponse createPost(PostRequest request, User currentUser) {
@@ -277,6 +295,17 @@ public class PostServiceImpl implements PostService {
         return mapToPostResponse(post, currentUser);
     }
 
+    /**
+     * Cast, switch, or retract (toggle off) the caller's vote on a poll; notifies the owner on a
+     * genuinely new vote (not on switch/retract, not for self-votes).
+     *
+     * @param postUuid    the poll post's UUID
+     * @param optionUuid  the chosen option's UUID
+     * @param currentUser the voter
+     * @return the post with refreshed poll tallies
+     * @throws com.chat.talkMe.exception.NotFoundException    post or option not found
+     * @throws com.chat.talkMe.exception.BadRequestException  post is not a poll, or option belongs to another poll
+     */
     @Override
     @Transactional
     public PostResponse votePoll(String postUuid, String optionUuid, User currentUser) {
@@ -326,6 +355,14 @@ public class PostServiceImpl implements PostService {
         return mapToPostResponse(post, currentUser);
     }
 
+    /**
+     * Fetch a single post by UUID, 404-ing for deleted/expired posts or ones the caller can't see.
+     *
+     * @param postUuid    the post's UUID
+     * @param currentUser the viewer (drives FRIENDS-only visibility)
+     * @return the post as a response
+     * @throws com.chat.talkMe.exception.NotFoundException  post missing, deleted, expired, or not visible
+     */
     @Override
     @Transactional(readOnly = true)
     public PostResponse getPost(String postUuid, User currentUser) {
@@ -337,6 +374,14 @@ public class PostServiceImpl implements PostService {
         return mapToPostResponse(post, currentUser);
     }
 
+    /**
+     * Fetch a single post by its share short-code, 404-ing for deleted/expired/not-visible posts.
+     *
+     * @param shortCode   the post's short share code
+     * @param currentUser the viewer (drives FRIENDS-only visibility)
+     * @return the post as a response
+     * @throws com.chat.talkMe.exception.NotFoundException  post missing, deleted, expired, or not visible
+     */
     @Override
     @Transactional(readOnly = true)
     public PostResponse getPostByShortCode(String shortCode, User currentUser) {
@@ -367,6 +412,14 @@ public class PostServiceImpl implements PostService {
                 : m.getMediaUrl();
     }
 
+    /**
+     * Whether a viewer may see a post: EVERYONE posts are public; FRIENDS-only posts are visible
+     * to the author or an accepted follow in either direction.
+     *
+     * @param post   the post
+     * @param viewer the viewer (may be null)
+     * @return true if the viewer is allowed to see the post
+     */
     private boolean canViewPost(Post post, User viewer) {
         if (post.getAudience() != PostAudience.FRIENDS) return true;
         if (viewer == null) return false;
@@ -375,6 +428,17 @@ public class PostServiceImpl implements PostService {
                 || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(post.getUser(), viewer, "ACCEPTED");
     }
 
+    /**
+     * Edit a post's caption/content (only the fields the client sent), re-moderating any changed text.
+     *
+     * @param postUuid    the post's UUID
+     * @param request     fields to update (content and/or caption)
+     * @param currentUser the caller (must be the author)
+     * @return the updated post
+     * @throws com.chat.talkMe.exception.NotFoundException          post not found
+     * @throws com.chat.talkMe.exception.ForbiddenException         caller is not the author
+     * @throws com.chat.talkMe.exception.ContentModerationException edited text is explicit
+     */
     @Override
     @Transactional
     public PostResponse updatePost(String postUuid, PostRequest request, User currentUser) {
@@ -408,6 +472,13 @@ public class PostServiceImpl implements PostService {
         return mapToPostResponse(post, currentUser);
     }
 
+    /**
+     * The global explore feed, excluding FRIENDS-only posts the caller isn't entitled to see.
+     *
+     * @param pageable    paging/sort
+     * @param currentUser the viewer
+     * @return a page of visible posts
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<PostResponse> getFeed(Pageable pageable, User currentUser) {
@@ -418,6 +489,16 @@ public class PostServiceImpl implements PostService {
         return posts.map(post -> mapToPostResponse(post, currentUser));
     }
 
+    /**
+     * A user's profile feed ({@code "me"} resolves to the caller), hiding that user's FRIENDS-only
+     * posts from viewers who aren't the author or an accepted friend.
+     *
+     * @param userUuid    the target user's UUID, or {@code "me"}
+     * @param pageable    paging/sort
+     * @param currentUser the viewer
+     * @return a page of the target's visible posts
+     * @throws com.chat.talkMe.exception.NotFoundException  target user not found
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<PostResponse> getProfileFeed(String userUuid, Pageable pageable, User currentUser) {
@@ -435,6 +516,14 @@ public class PostServiceImpl implements PostService {
         return posts.map(post -> mapToPostResponse(post, currentUser));
     }
 
+    /**
+     * Soft-delete a post (author only).
+     *
+     * @param postUuid    the post's UUID
+     * @param currentUser the caller (must be the author)
+     * @throws com.chat.talkMe.exception.NotFoundException   post not found
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the author
+     */
     @Override
     @Transactional
     public void deletePost(String postUuid, User currentUser) {
@@ -449,6 +538,12 @@ public class PostServiceImpl implements PostService {
         postRepository.save(post);
     }
 
+    /**
+     * Soft-delete a bounded batch of expired temporary posts; a backlog drains over successive runs.
+     *
+     * @param now the current instant used to select expired posts
+     * @return the number of posts reaped this tick
+     */
     @Override
     @Transactional
     public int reapExpiredPosts(Instant now) {
@@ -466,6 +561,13 @@ public class PostServiceImpl implements PostService {
         return expired.size();
     }
 
+    /**
+     * Like a post (idempotent); notifies the author unless it's a self-like.
+     *
+     * @param postUuid    the post's UUID
+     * @param currentUser the liker
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     */
     @Override
     @Transactional
     public void likePost(String postUuid, User currentUser) {
@@ -492,6 +594,13 @@ public class PostServiceImpl implements PostService {
         }
     }
 
+    /**
+     * Remove the caller's like from a post (no-op if not liked).
+     *
+     * @param postUuid    the post's UUID
+     * @param currentUser the caller
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     */
     @Override
     @Transactional
     public void unlikePost(String postUuid, User currentUser) {
@@ -502,6 +611,15 @@ public class PostServiceImpl implements PostService {
                 .ifPresent(postLikeRepository::delete);
     }
 
+    /**
+     * Paginated list of users who liked a post (each carrying their friends-only messaging flag).
+     *
+     * @param postUuid    the post's UUID
+     * @param pageable    paging/sort
+     * @param currentUser the caller
+     * @return a page of likers
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<AuthUserResponse> getPostLikes(String postUuid, Pageable pageable, User currentUser) {
@@ -515,6 +633,17 @@ public class PostServiceImpl implements PostService {
                 });
     }
 
+    /**
+     * Add a comment (or reply) to a post, moderating its text; notifies the post owner and, for a
+     * reply, the parent comment's author (skipping self and duplicate targets).
+     *
+     * @param postUuid    the post's UUID
+     * @param request     the comment content and optional parent id
+     * @param currentUser the commenter
+     * @return the created comment as a response
+     * @throws com.chat.talkMe.exception.ContentModerationException  explicit comment text
+     * @throws com.chat.talkMe.exception.NotFoundException           post not found
+     */
     @Override
     @Transactional
     public PostCommentResponse addComment(String postUuid, PostCommentRequest request, User currentUser) {
@@ -577,6 +706,15 @@ public class PostServiceImpl implements PostService {
         return mapToCommentResponse(comment, currentUser);
     }
 
+    /**
+     * Soft-delete a comment (author only).
+     *
+     * @param postUuid    the owning post's UUID (unused for lookup; comment resolved by its own UUID)
+     * @param commentUuid the comment's UUID
+     * @param currentUser the caller (must be the comment author)
+     * @throws com.chat.talkMe.exception.NotFoundException   comment not found
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the comment author
+     */
     @Override
     @Transactional
     public void deleteComment(String postUuid, String commentUuid, User currentUser) {
@@ -591,6 +729,14 @@ public class PostServiceImpl implements PostService {
         postCommentRepository.save(comment);
     }
 
+    /**
+     * Like a comment (idempotent); notifies the comment author unless it's a self-like.
+     *
+     * @param postUuid    the owning post's UUID (unused for lookup)
+     * @param commentUuid the comment's UUID
+     * @param currentUser the liker
+     * @throws com.chat.talkMe.exception.NotFoundException  comment not found
+     */
     @Override
     @Transactional
     public void likeComment(String postUuid, String commentUuid, User currentUser) {
@@ -617,6 +763,14 @@ public class PostServiceImpl implements PostService {
         }
     }
 
+    /**
+     * Remove the caller's like from a comment (no-op if not liked).
+     *
+     * @param postUuid    the owning post's UUID (unused for lookup)
+     * @param commentUuid the comment's UUID
+     * @param currentUser the caller
+     * @throws com.chat.talkMe.exception.NotFoundException  comment not found
+     */
     @Override
     @Transactional
     public void unlikeComment(String postUuid, String commentUuid, User currentUser) {
@@ -627,6 +781,17 @@ public class PostServiceImpl implements PostService {
                 .ifPresent(postCommentLikeRepository::delete);
     }
 
+    /**
+     * Edit a comment's content (author only).
+     *
+     * @param postUuid    the owning post's UUID (unused for lookup)
+     * @param commentUuid the comment's UUID
+     * @param request     the new content
+     * @param currentUser the caller (must be the comment author)
+     * @return the updated comment as a response
+     * @throws com.chat.talkMe.exception.NotFoundException   comment not found
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the comment author
+     */
     @Override
     @Transactional
     public PostCommentResponse editComment(String postUuid, String commentUuid, PostCommentRequest request, User currentUser) {
@@ -642,6 +807,13 @@ public class PostServiceImpl implements PostService {
         return mapToCommentResponse(comment, currentUser);
     }
 
+    /**
+     * Bookmark a post for the caller (idempotent).
+     *
+     * @param postUuid    the post's UUID
+     * @param currentUser the caller
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     */
     @Override
     @Transactional
     public void bookmarkPost(String postUuid, User currentUser) {
@@ -656,6 +828,13 @@ public class PostServiceImpl implements PostService {
         postBookmarkRepository.save(bookmark);
     }
 
+    /**
+     * Remove the caller's bookmark from a post (no-op if not bookmarked).
+     *
+     * @param postUuid    the post's UUID
+     * @param currentUser the caller
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     */
     @Override
     @Transactional
     public void unbookmarkPost(String postUuid, User currentUser) {
@@ -675,6 +854,14 @@ public class PostServiceImpl implements PostService {
                 .orElse(false);
     }
 
+    /**
+     * Assemble the full post response: media, top-level comments, like/bookmark flags for the
+     * caller, author, poll tallies, audio, audience, and expiry.
+     *
+     * @param post        the post entity
+     * @param currentUser the viewer (drives liked/bookmarked flags)
+     * @return the mapped response
+     */
     private PostResponse mapToPostResponse(Post post, User currentUser) {
         List<PostMediaResponse> mediaRes = post.getMedia().stream()
                 .map(m -> PostMediaResponse.builder()
@@ -749,6 +936,15 @@ public class PostServiceImpl implements PostService {
                 .build();
     }
 
+    /**
+     * Paginated top-level (non-reply) comments for a post.
+     *
+     * @param postUuid    the post's UUID
+     * @param pageable    paging/sort
+     * @param currentUser the viewer (drives per-comment liked flags)
+     * @return a page of comments
+     * @throws com.chat.talkMe.exception.NotFoundException  post not found
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<PostCommentResponse> getComments(String postUuid, Pageable pageable, User currentUser) {
@@ -759,6 +955,16 @@ public class PostServiceImpl implements PostService {
                 .map(c -> mapToCommentResponse(c, currentUser));
     }
 
+    /**
+     * Paginated replies under a parent comment.
+     *
+     * @param postUuid    the owning post's UUID (unused for lookup)
+     * @param commentUuid the parent comment's UUID
+     * @param pageable    paging/sort
+     * @param currentUser the viewer (drives per-comment liked flags)
+     * @return a page of replies
+     * @throws com.chat.talkMe.exception.NotFoundException  parent comment not found
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<PostCommentResponse> getReplies(String postUuid, String commentUuid, Pageable pageable, User currentUser) {
@@ -769,6 +975,14 @@ public class PostServiceImpl implements PostService {
                 .map(c -> mapToCommentResponse(c, currentUser));
     }
 
+    /**
+     * Map a comment to its response, resolving like count, the caller's liked flag, parent id,
+     * and reply count.
+     *
+     * @param c           the comment entity
+     * @param currentUser the viewer (may be null; drives the liked flag)
+     * @return the mapped comment response
+     */
     private PostCommentResponse mapToCommentResponse(PostComment c, User currentUser) {
         return PostCommentResponse.builder()
                 .id(c.getUuid().toString())

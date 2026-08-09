@@ -1,5 +1,6 @@
 package com.chat.talkMe.service;
 
+/** Brute-force guard for login: tracks and gates failed attempts per username and per IP. */
 public interface LoginAttemptService {
 
     /**

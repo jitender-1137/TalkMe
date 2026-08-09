@@ -24,6 +24,13 @@ public class AgeVerificationServiceImpl implements AgeVerificationService {
 
     private final ConsentAcceptanceService consentAcceptanceService;
 
+    /**
+     * True only when the account has an age on file ≥ 18 AND has accepted the current
+     * {@link com.chat.talkMe.enums.ConsentType#AGE_18_PLUS} consent version.
+     *
+     * @param user the account to check; a null user (or null age) is treated as not verified
+     * @return true if the user meets the age minimum and has an explicit current 18+ consent
+     */
     @Override
     public boolean isAgeVerified(User user) {
         return user != null

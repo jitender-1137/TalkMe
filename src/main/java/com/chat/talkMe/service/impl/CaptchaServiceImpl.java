@@ -16,6 +16,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
+/**
+ * Verifies Cloudflare Turnstile CAPTCHA tokens by calling the Turnstile siteverify API.
+ * Fails closed (denies) on any error, and short-circuits to {@code true} when CAPTCHA is disabled.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,14 @@ public class CaptchaServiceImpl implements CaptchaService {
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
+    /**
+     * Verifies a Turnstile response token against Cloudflare's siteverify endpoint.
+     *
+     * @param token    the Turnstile response token from the client; blank/null yields false
+     * @param remoteIp the caller's IP, forwarded to Cloudflare when present (optional)
+     * @return true if CAPTCHA is disabled, or Cloudflare reports {@code success=true}; false on
+     *         a blank token, a failed verification, or any I/O/parse error (fail-closed)
+     */
     @Override
     public boolean verify(String token, String remoteIp) {
         if (!properties.isEnabled()) return true;

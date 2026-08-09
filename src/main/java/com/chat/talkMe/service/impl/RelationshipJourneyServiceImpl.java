@@ -34,6 +34,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Materializes and reads the relationship-milestone timeline between two users. Milestones are
+ * derived from persistent signals (friendship dates, message/photo counts, games played) and are
+ * idempotently upserted — guarded by an exists-check plus a DB unique constraint — so the nightly
+ * job and lazy on-read materialize can safely race. Class-level {@code @Transactional}; the lazy
+ * materialize is invoked through the bean's own proxy so it runs in its own REQUIRES_NEW tx.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -63,6 +70,20 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
      */
     private final ObjectProvider<RelationshipJourneyService> selfProvider;
 
+    /**
+     * Returns the milestone timeline (plus best-effort aggregate stats) between the viewer and the
+     * user identified by {@code otherUserUuid}. Viewing one's own returns an empty timeline; access
+     * requires an active friendship. Lazily materializes milestones through the proxy (own tx) so
+     * the timeline is fresh before the nightly job; materialize and stat failures degrade instead
+     * of failing the read. Read-only.
+     *
+     * @param viewer        the requesting user
+     * @param otherUserUuid UUID string of the other user
+     * @return the journey response (milestones + stats)
+     * @throws com.chat.talkMe.exception.ForbiddenException if the viewer is not an active friend (TM_821)
+     * @throws com.chat.talkMe.exception.BadRequestException if the UUID is malformed (TM_820)
+     * @throws com.chat.talkMe.exception.NotFoundException   if the other user does not exist (TM_822)
+     */
     @Override
     @Transactional(readOnly = true)
     public RelationshipJourneyResponse getJourney(User viewer, String otherUserUuid) {
@@ -115,6 +136,16 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
                 .build();
     }
 
+    /**
+     * Computes read-only aggregate stats for the pair (messages, photos, games, first-message time,
+     * friends-since and days-known) from their shared chat; zeros when no shared chat exists.
+     *
+     * @param viewer one user of the pair
+     * @param other  the other user of the pair
+     * @param low    lower of the two user ids
+     * @param high   higher of the two user ids
+     * @return the populated stats response
+     */
     private RelationshipStatsResponse computeStats(User viewer, User other, long low, long high) {
         Chat chat = resolveSharedChat(low, high);
         long messages = chat != null ? messageRepository.countVisibleByChat(chat) : 0L;
@@ -134,6 +165,15 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
                 .build();
     }
 
+    /**
+     * Idempotently derives and upserts every milestone for the pair: friendship (and one-month)
+     * milestones from the active-friendship date, plus message/photo/game milestones from their
+     * shared chat (each source isolated so one failing query never drops the others). No-op for a
+     * null/transient/self pair or when they are not currently friends. Runs in a REQUIRES_NEW tx.
+     *
+     * @param userA one user of the pair
+     * @param userB the other user of the pair
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void materializeFor(User userA, User userB) {
@@ -182,6 +222,10 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
 
     /**
      * The earliest non-deleted PRIVATE/STRANGER chat the pair share (stable first-message anchor).
+     *
+     * @param low  lower user id
+     * @param high higher user id
+     * @return the earliest shared chat, or null if none
      */
     private Chat resolveSharedChat(long low, long high) {
         return chatRepository.findPrivateChatBetweenUsers(low, high).stream()
@@ -190,6 +234,14 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
                 .orElse(null);
     }
 
+    /**
+     * Upserts message-count milestones (first message, 50, 500) for the pair based on the visible
+     * message count in their shared chat.
+     *
+     * @param low  lower user id
+     * @param high higher user id
+     * @param chat the pair's shared chat
+     */
     private void materializeMessageMilestones(long low, long high, Chat chat) {
         long n = messageRepository.countVisibleByChat(chat);
         if (n >= 1) {
@@ -204,6 +256,14 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
         }
     }
 
+    /**
+     * Upserts the first-photo-shared milestone for the pair when their shared chat has at least one
+     * image attachment.
+     *
+     * @param low  lower user id
+     * @param high higher user id
+     * @param chat the pair's shared chat
+     */
     private void materializePhotoMilestones(long low, long high, Chat chat) {
         if (messageAttachmentRepository.countImagesByChat(chat) >= 1) {
             upsert(low, high, MilestoneType.FIRST_PHOTO_SHARED,
@@ -212,6 +272,14 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
         }
     }
 
+    /**
+     * Upserts the games-played milestone for the pair when at least one game session exists in their
+     * shared chat; the detail carries the current game count.
+     *
+     * @param low  lower user id
+     * @param high higher user id
+     * @param chat the pair's shared chat
+     */
     private void materializeGameMilestones(long low, long high, Chat chat) {
         String chatId = chat.getUuid().toString();
         long g = gameSessionRepository.countByChatId(chatId);
@@ -221,6 +289,14 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
         }
     }
 
+    /**
+     * The timestamp of the n-th visible message in the chat (1-based), falling back to now if it
+     * cannot be resolved.
+     *
+     * @param chat the chat
+     * @param n    1-based message ordinal
+     * @return the n-th message's timestamp, or now as a fallback
+     */
     private Instant nthMessageTime(Chat chat, int n) {
         return messageRepository.findVisibleMessageTimes(chat, PageRequest.of(n - 1, 1))
                 .stream().findFirst().orElse(Instant.now());
@@ -231,11 +307,29 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
      * constraint make this idempotent even under a race between the nightly job and a lazy
      * read on the same pair — a losing writer's constraint violation is swallowed (this method
      * runs in its own REQUIRES_NEW transaction, so the violation cannot taint a caller's tx).
+     *
+     * @param userAId    lower user id
+     * @param userBId    higher user id
+     * @param type       milestone type
+     * @param achievedAt when the milestone was achieved
+     * @param detail     human-readable detail label
      */
     private void upsert(long userAId, long userBId, MilestoneType type, Instant achievedAt, String detail) {
         upsert(userAId, userBId, type, achievedAt, detail, REF_FRIENDSHIP);
     }
 
+    /**
+     * Inserts the milestone (for the given ref source) unless one already exists for the
+     * pair/type/ref key; a losing race's {@link DataIntegrityViolationException} is swallowed
+     * (the unique constraint guarantees idempotency).
+     *
+     * @param userAId    lower user id
+     * @param userBId    higher user id
+     * @param type       milestone type
+     * @param achievedAt when achieved (defaults to now when null)
+     * @param detail     human-readable detail label
+     * @param ref        milestone source ref (part of the unique key with type)
+     */
     private void upsert(long userAId, long userBId, MilestoneType type, Instant achievedAt, String detail, String ref) {
         if (milestoneRepository.existsByUserAIdAndUserBIdAndTypeAndRef(userAId, userBId, type, ref)) {
             return;
@@ -259,6 +353,10 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
      * The formation time of the active friendship between the pair (either direction), or
      * {@code null} if they are not currently friends. Uses the earliest of the two directional
      * rows when both exist.
+     *
+     * @param a one user
+     * @param b the other user
+     * @return the friendship formation instant, or null if not currently friends
      */
     private Instant activeFriendshipFormedAt(User a, User b) {
         Instant formedAt = activeCreatedAt(friendRepository.findByUserAndFriend(a, b).orElse(null));
@@ -269,14 +367,33 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
         return formedAt;
     }
 
+    /**
+     * The creation time of a friend row when it exists and is not soft-deleted, else null.
+     *
+     * @param friend the directional friend row (may be null)
+     * @return the created-at instant, or null when absent/deleted
+     */
     private Instant activeCreatedAt(Friend friend) {
         return (friend != null && !friend.isDeleted()) ? friend.getCreatedAt() : null;
     }
 
+    /**
+     * @param a one user
+     * @param b the other user
+     * @return true if the two are currently active friends
+     */
     private boolean isActiveFriend(User a, User b) {
         return activeFriendshipFormedAt(a, b) != null;
     }
 
+    /**
+     * Resolves a user by UUID string.
+     *
+     * @param userUuid the user UUID string
+     * @return the matching user
+     * @throws com.chat.talkMe.exception.BadRequestException if the UUID is malformed (TM_820)
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches (TM_822)
+     */
     private User resolveUser(String userUuid) {
         UUID uuid;
         try {

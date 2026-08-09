@@ -21,6 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Persists in-app notifications and pushes them in real time over STOMP (per-user
+ * {@code /queue/notifications}), with fan-out helpers to a user's friends or follow graph.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,6 +35,13 @@ public class NotificationServiceImpl implements NotificationService {
     private final UserFollowRepository userFollowRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * A page of the current user's notifications, newest as ordered by the repository. Read-only.
+     *
+     * @param pageable    paging/sort request
+     * @param currentUser the owner of the notifications
+     * @return the mapped page of {@link NotificationResponse}
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<NotificationResponse> getNotifications(Pageable pageable, User currentUser) {
@@ -39,6 +50,13 @@ public class NotificationServiceImpl implements NotificationService {
                 .map(this::mapToResponse);
     }
 
+    /**
+     * Marks a single notification (owned by the user) as read. Transactional.
+     *
+     * @param notificationUuid UUID string of the notification
+     * @param currentUser      the owner
+     * @throws com.chat.talkMe.exception.NotFoundException if no such notification exists for the user (TM_002)
+     */
     @Override
     @Transactional
     public void markAsRead(String notificationUuid, User currentUser) {
@@ -50,6 +68,11 @@ public class NotificationServiceImpl implements NotificationService {
         notificationRepository.save(notification);
     }
 
+    /**
+     * Marks all of the user's notifications as read in a single bulk update. Transactional.
+     *
+     * @param currentUser the owner
+     */
     @Override
     @Transactional
     public void markAllAsRead(User currentUser) {
@@ -57,12 +80,35 @@ public class NotificationServiceImpl implements NotificationService {
         notificationRepository.markAllAsRead(currentUser);
     }
 
+    /**
+     * Creates a basic notification (no actor/thumbnail); delegates to the rich overload.
+     * Transactional.
+     *
+     * @param user        recipient
+     * @param title       notification title
+     * @param content     notification body
+     * @param type        notification type discriminator
+     * @param referenceId id of the referenced entity (post/chat/etc.)
+     */
     @Override
     @Transactional
     public void createNotification(User user, String title, String content, String type, String referenceId) {
         createNotification(user, title, content, type, referenceId, null, null);
     }
 
+    /**
+     * Persists a rich notification (actor avatar/name + optional thumbnail) and best-effort pushes
+     * it to the recipient over STOMP; a WebSocket failure is logged but does not fail the save.
+     * Transactional.
+     *
+     * @param user        recipient
+     * @param title       notification title
+     * @param content     notification body
+     * @param type        notification type discriminator
+     * @param referenceId id of the referenced entity
+     * @param actor       user who triggered it (avatar/name shown in the row; may be null)
+     * @param imageUrl    optional thumbnail of the target post/story
+     */
     @Override
     @Transactional
     public void createNotification(User user, String title, String content, String type,
@@ -93,6 +139,18 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    /**
+     * Notifies each of the actor's friends of an activity, skipping the actor themselves and any
+     * guest/deleted friend. Per-friend and friend-load failures are logged and skipped so one bad
+     * recipient never aborts the fan-out. No-op when actor is null. Transactional.
+     *
+     * @param actor       the user performing the activity
+     * @param title       notification title
+     * @param content     notification body
+     * @param type        notification type discriminator
+     * @param referenceId id of the referenced entity
+     * @param imageUrl    optional thumbnail
+     */
     @Override
     @Transactional
     public void notifyFriends(User actor, String title, String content, String type, String referenceId, String imageUrl) {
@@ -118,6 +176,18 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    /**
+     * Notifies the union of the actor's accepted followers and following (de-duplicated by user id,
+     * actor excluded, guests/deleted skipped). Follow-graph load and per-recipient failures are
+     * logged and skipped. No-op when actor is null. Transactional.
+     *
+     * @param actor       the user performing the activity
+     * @param title       notification title
+     * @param content     notification body
+     * @param type        notification type discriminator
+     * @param referenceId id of the referenced entity
+     * @param imageUrl    optional thumbnail
+     */
     @Override
     @Transactional
     public void notifyFollowersAndFollowing(User actor, String title, String content, String type,
@@ -150,6 +220,12 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    /**
+     * Maps a {@link Notification} entity to its API response DTO.
+     *
+     * @param notification the entity
+     * @return the response DTO
+     */
     private NotificationResponse mapToResponse(Notification notification) {
         return NotificationResponse.builder()
                 .id(notification.getUuid().toString())

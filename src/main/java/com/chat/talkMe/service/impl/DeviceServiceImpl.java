@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+/**
+ * Default {@link DeviceService}: persists and removes push-notification device tokens, keyed by token so a
+ * token moving between users has its ownership reassigned rather than duplicated.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,6 +25,13 @@ public class DeviceServiceImpl implements DeviceService {
 
     private final DeviceRepository deviceRepository;
 
+    /**
+     * Registers a device token for the user, or reassigns ownership and updates type/OS when the token
+     * already exists (e.g. the same device now signed in as a different user).
+     *
+     * @param request     the device token plus device type and OS version
+     * @param currentUser the authenticated owner
+     */
     @Override
     @Transactional
     public void registerDevice(RegisterDeviceRequest request, User currentUser) {
@@ -48,6 +59,14 @@ public class DeviceServiceImpl implements DeviceService {
         }
     }
 
+    /**
+     * Removes a device token, but only when it belongs to the caller.
+     *
+     * @param deviceToken the token to unregister
+     * @param currentUser the authenticated owner
+     * @throws com.chat.talkMe.exception.NotFoundException  TM_002 when the token does not exist
+     * @throws com.chat.talkMe.exception.ForbiddenException TM_029 when the token belongs to another user
+     */
     @Override
     @Transactional
     public void unregisterDevice(String deviceToken, User currentUser) {

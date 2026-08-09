@@ -37,6 +37,16 @@ public class SleepRoomServiceImpl implements SleepRoomService {
     private final ChatRepository chatRepository;
     private final SleepRoomChatRepository sleepRoomChatRepository;
 
+    /**
+     * Creates a public ROOM via {@link GroupService#createGroup} and flips it into
+     * {@link RoomMode#SLEEP_COMPANION}. A blank/null name falls back to the default name.
+     * Transactional.
+     *
+     * @param user the owner/creator
+     * @param name optional room name; blank/null ⇒ {@value #DEFAULT_NAME}
+     * @return the created sleep room
+     * @throws com.chat.talkMe.exception.NotFoundException if the just-created room cannot be reloaded
+     */
     @Override
     @Transactional
     public SleepRoomResponse createSleepRoom(User user, String name) {
@@ -58,6 +68,11 @@ public class SleepRoomServiceImpl implements SleepRoomService {
         return toResponse(chat);
     }
 
+    /**
+     * Lists all active SLEEP_COMPANION rooms. Read-only transaction.
+     *
+     * @return the active sleep rooms
+     */
     @Override
     @Transactional(readOnly = true)
     public List<SleepRoomResponse> listSleepRooms() {

@@ -27,6 +27,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Default {@link DailyCompanionService}: curates one companion per user per day by scoring a pool of the
+ * most-recent real accounts with {@link CompatibilityService}, excluding self, recently-paired peers and
+ * blocked users in either direction, and picking the highest-compatibility candidate.
+ * <p>
+ * Class-level {@code @Transactional}. Pairings expire after 24h unless the user acts (stay-friends /
+ * continue / end); the reaper flips still-ACTIVE expired pairings to EXPIRED.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -53,6 +61,12 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
     private final NotificationService notificationService;
     private final ReputationRecorder reputationRecorder;
 
+    /**
+     * Returns the user's companion pairing for today, or an empty card when none is assigned yet.
+     *
+     * @param user the requesting user
+     * @return today's companion response (empty when unassigned)
+     */
     @Override
     @Transactional(readOnly = true)
     public DailyCompanionResponse getToday(User user) {
@@ -61,6 +75,17 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
                 .orElseGet(DailyCompanionServiceImpl::empty);
     }
 
+    /**
+     * Applies the user's decision to today's pairing: {@code STAY_FRIENDS} marks it converted (no reputation
+     * awarded here), {@code CONTINUE} keeps it active and pushes expiry out 7 days, {@code END} ends it.
+     *
+     * @param user   the requesting user
+     * @param action one of STAY_FRIENDS, CONTINUE, END (case-insensitive)
+     * @return the updated companion response
+     * @throws com.chat.talkMe.exception.BadRequestException TM_400 when the action is blank/invalid, no
+     *                                                       companion is assigned today, or the decision is
+     *                                                       already final
+     */
     @Override
     public DailyCompanionResponse act(User user, String action) {
         if (action == null || action.isBlank()) {
@@ -95,6 +120,15 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
         return toResponse(pairing);
     }
 
+    /**
+     * Assigns today's companion for the user if not already assigned (idempotent per user+day). Skips
+     * guests/banned/deleted users, scores an eligible candidate pool, persists the best match as an ACTIVE
+     * pairing with a 24h TTL, and best-effort sends a notification.
+     *
+     * @param user the user to assign a companion to
+     * @return the created (or existing) pairing, or {@code null} when the user is ineligible or no
+     *         eligible candidate exists
+     */
     @Override
     public DailyCompanion assignFor(User user) {
         LocalDate today = LocalDate.now();
@@ -170,6 +204,12 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
         return pairing;
     }
 
+    /**
+     * Flips all ACTIVE pairings whose {@code expiresAt} is before {@code now} to EXPIRED.
+     *
+     * @param now the cutoff instant
+     * @return the number of pairings expired
+     */
     @Override
     public int reapExpired(Instant now) {
         List<DailyCompanion> due =
@@ -185,6 +225,13 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
 
     // ── Mapping ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Maps a pairing to its response DTO, including the companion's public fields and a freshly-computed
+     * compatibility score (best-effort — omitted if scoring fails).
+     *
+     * @param p the pairing entity
+     * @return the response DTO
+     */
     private DailyCompanionResponse toResponse(DailyCompanion p) {
         User c = p.getCompanion();
         CompatibilityScore compat = null;

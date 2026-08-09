@@ -60,6 +60,14 @@ public class ListenerServiceImpl implements ListenerService {
     private final StringRedisTemplate redis;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Put the user on duty: create a new AVAILABLE shift or re-arm an existing live one, and add them
+     * to the {@code listeners:available} Redis mirror (fail-open).
+     *
+     * @param user the volunteer listener
+     * @return the current shift as a response DTO
+     * @throws com.chat.talkMe.exception.ForbiddenException if the user is a guest
+     */
     @Override
     @Transactional
     public ListenerShiftResponse goAvailable(User user) {
@@ -89,6 +97,12 @@ public class ListenerServiceImpl implements ListenerService {
         return toResponse(shift);
     }
 
+    /**
+     * Clock the user off duty (idempotent): remove them from the availability mirror and, if a live
+     * shift exists, credit any in-progress help before marking it ENDED.
+     *
+     * @param user the volunteer listener
+     */
     @Override
     @Transactional
     public void endShift(User user) {
@@ -108,6 +122,19 @@ public class ListenerServiceImpl implements ListenerService {
         shiftRepository.save(shift);
     }
 
+    /**
+     * Match a requester to the oldest available listener and spin up a private, non-recorded
+     * LISTENING room for the two of them (created open, seeker admitted, then locked to
+     * PRIVATE/INVITE_ONLY within this transaction so it is never discoverable). Binds the shift to
+     * the room, marks it ENGAGED, removes the listener from the availability mirror, and nudges the
+     * listener over WebSocket that they have been matched.
+     *
+     * @param requester the user seeking a listener
+     * @param reason     the context/reason (defaults to NEED_TO_TALK if null)
+     * @return the engaged shift as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException if no listener is available, or the created
+     *                                                     room cannot be found
+     */
     @Override
     @Transactional
     public ListenerShiftResponse requestListener(User requester, ListenerReason reason) {
@@ -160,6 +187,15 @@ public class ListenerServiceImpl implements ListenerService {
         return toResponse(shift);
     }
 
+    /**
+     * Complete the current help session: credit the helped person only if the shift is genuinely
+     * ENGAGED with a bound room (anti-farming), then return the listener to AVAILABLE for the next
+     * requester and re-add them to the availability mirror.
+     *
+     * @param listener the volunteer listener
+     * @return the re-armed shift as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException if the listener has no active shift
+     */
     @Override
     @Transactional
     public ListenerShiftResponse completeShift(User listener) {
@@ -181,6 +217,11 @@ public class ListenerServiceImpl implements ListenerService {
         return toResponse(shift);
     }
 
+    /**
+     * List all currently AVAILABLE listener shifts, oldest first (DB is the source of truth).
+     *
+     * @return available shifts as response DTOs
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ListenerShiftResponse> listAvailable() {

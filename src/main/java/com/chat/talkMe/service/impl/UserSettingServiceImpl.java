@@ -16,6 +16,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Per-user settings store. Lazily creates a default {@link UserSetting} row on first access,
+ * applies partial (null-means-unchanged) updates, and evicts the {@link UserSettingsCache}
+ * on every write so cached reads stay fresh.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -24,6 +29,13 @@ public class UserSettingServiceImpl implements UserSettingService {
     private final UserSettingRepository userSettingRepository;
     private final UserSettingsCache userSettingsCache;
 
+    /**
+     * Return the caller's settings, lazily creating and persisting the default row on first read.
+     * Not {@code readOnly} because that first read performs an INSERT.
+     *
+     * @param currentUser the caller whose settings are fetched
+     * @return the settings snapshot
+     */
     @Override
     @Transactional
     public UserSettingResponse getSettings(User currentUser) {
@@ -35,6 +47,15 @@ public class UserSettingServiceImpl implements UserSettingService {
         return mapToResponse(settings);
     }
 
+    /**
+     * Apply a partial settings update (only non-null request fields change), persist, and evict
+     * the settings cache. Creates the default row first if none exists.
+     *
+     * @param request     the fields to update (null fields are left unchanged)
+     * @param currentUser the caller whose settings are updated
+     * @return the updated settings snapshot
+     * @throws com.chat.talkMe.exception.BadRequestException on an invalid privacy or night-mode value
+     */
     @Override
     @Transactional
     public UserSettingResponse updateSettings(UpdateSettingRequest request, User currentUser) {
@@ -95,6 +116,14 @@ public class UserSettingServiceImpl implements UserSettingService {
         return mapToResponse(settings);
     }
 
+    /**
+     * Set only the "who can message me" preference, persist, and evict the settings cache.
+     *
+     * @param value       the privacy value (EVERYONE or FRIENDS_ONLY, case-insensitive)
+     * @param currentUser the caller whose setting is updated
+     * @return the updated settings snapshot
+     * @throws com.chat.talkMe.exception.BadRequestException when {@code value} is not a valid option
+     */
     @Override
     @Transactional
     public UserSettingResponse updateMessagingPrivacy(String value, User currentUser) {
@@ -108,6 +137,14 @@ public class UserSettingServiceImpl implements UserSettingService {
         return mapToResponse(settings);
     }
 
+    /**
+     * Set only the "who can add me to groups" preference, persist, and evict the settings cache.
+     *
+     * @param value       the privacy value (EVERYONE, FRIENDS_ONLY or NOBODY, case-insensitive)
+     * @param currentUser the caller whose setting is updated
+     * @return the updated settings snapshot
+     * @throws com.chat.talkMe.exception.BadRequestException when {@code value} is not a valid option
+     */
     @Override
     @Transactional
     public UserSettingResponse updateGroupAddPrivacy(String value, User currentUser) {
@@ -121,6 +158,13 @@ public class UserSettingServiceImpl implements UserSettingService {
         return mapToResponse(settings);
     }
 
+    /**
+     * Parse a messaging-privacy string into the enum (trimmed, upper-cased).
+     *
+     * @param value the raw value
+     * @return the parsed {@link MessagingPrivacy}
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_067) on an unrecognized value
+     */
     private MessagingPrivacy parsePrivacy(String value) {
         try {
             return MessagingPrivacy.valueOf(value.trim().toUpperCase());
@@ -130,6 +174,13 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
     }
 
+    /**
+     * Parse a group-add-privacy string into the enum (trimmed, upper-cased).
+     *
+     * @param value the raw value
+     * @return the parsed {@link GroupAddPrivacy}
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_068) on an unrecognized value
+     */
     private GroupAddPrivacy parseGroupAddPrivacy(String value) {
         try {
             return GroupAddPrivacy.valueOf(value.trim().toUpperCase());
@@ -139,6 +190,13 @@ public class UserSettingServiceImpl implements UserSettingService {
         }
     }
 
+    /**
+     * Parse a Night Owl mode string into the enum (trimmed, upper-cased).
+     *
+     * @param value the raw value
+     * @return the parsed {@link NightOwlMode}
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_067) on an unrecognized value
+     */
     private NightOwlMode parseNightOwlMode(String value) {
         try {
             return NightOwlMode.valueOf(value.trim().toUpperCase());
@@ -154,6 +212,13 @@ public class UserSettingServiceImpl implements UserSettingService {
         return Math.max(0, Math.min(23, hour));
     }
 
+    /**
+     * Build and persist a default settings row for the user (theme SYSTEM, English, notifications
+     * and safe-mode on, EVERYONE privacy, email alerts on).
+     *
+     * @param user the owner of the new settings row
+     * @return the saved default {@link UserSetting}
+     */
     private UserSetting createDefaultSettings(User user) {
         UserSetting defaultSettings = UserSetting.builder()
                 .user(user)

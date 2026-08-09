@@ -58,6 +58,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Default {@link GroupService} implementation for group/channel/room management: creation,
+ * membership, roles, discovery, invites and reporting. A group IS a chat, so messaging reuses
+ * {@link MessageService}; member counts and add-privacy are cache-backed and every mutation
+ * broadcasts a WebSocket group event to {@code /topic/chat/&lt;uuid&gt;/messages}.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -84,6 +90,14 @@ public class GroupServiceImpl implements GroupService {
      */
     private final ObjectProvider<EventService> eventServiceProvider;
 
+    /**
+     * Create a GROUP/CHANNEL/ROOM (per {@code subtype}), seed the creator as OWNER, apply
+     * visibility/join/send policies, add allowed initial members and evict the member-count cache.
+     *
+     * @param request     group spec (name, subtype, visibility, tags, member ids, flags)
+     * @param currentUser the creator, who becomes OWNER
+     * @return the created chat as seen by the creator
+     */
     @Override
     @Transactional
     public ChatResponse createGroup(CreateGroupRequest request, User currentUser) {
@@ -155,6 +169,15 @@ public class GroupServiceImpl implements GroupService {
         return chatService.getChatByUuid(chat.getUuid().toString(), creator);
     }
 
+    /**
+     * Apply partial edits to a group's info and settings, then broadcast a {@code group_updated} event.
+     *
+     * @param chatUuid    target group uuid
+     * @param request     partial update (only non-null fields are applied)
+     * @param currentUser the editor
+     * @return the updated chat as seen by the editor
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller's role is below whoCanEditInfo (TM_291)
+     */
     @Override
     @Transactional
     public ChatResponse updateGroup(String chatUuid, UpdateGroupRequest request, User currentUser) {
@@ -185,6 +208,14 @@ public class GroupServiceImpl implements GroupService {
         return chatService.getChatByUuid(chatUuid, currentUser);
     }
 
+    /**
+     * List the group's active members (former members excluded), enriched with live presence.
+     *
+     * @param chatUuid    target group uuid
+     * @param currentUser the caller (must be a member)
+     * @return active members with role, join time, presence, ban and mute state
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a member
+     */
     @Override
     @Transactional(readOnly = true)
     public List<GroupMemberResponse> getMembers(String chatUuid, User currentUser) {
@@ -210,6 +241,19 @@ public class GroupServiceImpl implements GroupService {
         return out;
     }
 
+    /**
+     * Add members (re-activating former members), enforcing the friends-only policy and each
+     * target's add-privacy — sending a group invite instead of a direct add where required —
+     * then emit system messages, WS join events and best-effort notifications.
+     *
+     * @param chatUuid    target group uuid
+     * @param memberUuids user uuids to add (invalid/unknown ids skipped)
+     * @param currentUser the adder
+     * @return the group as seen by the adder
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller can't add members (TM_291) or
+     *                                                        friends-only violation (TM_306)
+     * @throws com.chat.talkMe.exception.BadRequestException member limit reached (TM_297)
+     */
     @Override
     @Transactional
     public ChatResponse addMembers(String chatUuid, List<String> memberUuids, User currentUser) {
@@ -280,6 +324,17 @@ public class GroupServiceImpl implements GroupService {
         return chatService.getChatByUuid(chatUuid, currentUser);
     }
 
+    /**
+     * Remove a member (WhatsApp-style: marked as former, history retained), then emit a system
+     * message and WS event. Admins may not remove the owner or other admins (owner-only).
+     *
+     * @param chatUuid    target group uuid
+     * @param memberUuid  uuid of the member to remove
+     * @param currentUser the remover (must be ADMIN or above)
+     * @throws com.chat.talkMe.exception.NotFoundException  user or member row not found (TM_064 / TM_141)
+     * @throws com.chat.talkMe.exception.ForbiddenException removing the owner (TM_303) or an admin
+     *                                                       when not owner (TM_304)
+     */
     @Override
     @Transactional
     public void removeMember(String chatUuid, String memberUuid, User currentUser) {
@@ -308,6 +363,18 @@ public class GroupServiceImpl implements GroupService {
         memberCountCache.evict(chatUuid);
     }
 
+    /**
+     * Promote/demote a member to the given role (owner-only), then emit a system message and
+     * {@code role_changed} WS event. OWNER cannot be assigned here (use transfer-ownership).
+     *
+     * @param chatUuid    target group uuid
+     * @param memberUuid  uuid of the member whose role changes
+     * @param role        the new role (must not be OWNER)
+     * @param currentUser the caller (must be OWNER)
+     * @throws com.chat.talkMe.exception.BadRequestException assigning OWNER here (TM_301)
+     * @throws com.chat.talkMe.exception.NotFoundException   user or member row not found (TM_064 / TM_141)
+     * @throws com.chat.talkMe.exception.ForbiddenException  changing the owner's role (TM_305)
+     */
     @Override
     @Transactional
     public void setRole(String chatUuid, String memberUuid, MemberRole role, User currentUser) {
@@ -333,6 +400,14 @@ public class GroupServiceImpl implements GroupService {
         broadcastGroupEvent(chatUuid, "role_changed", payload);
     }
 
+    /**
+     * Leave a group (WhatsApp-style: marked as former, history retained), emit a system message
+     * and WS event. The owner must transfer ownership or delete the group first.
+     *
+     * @param chatUuid    target group uuid
+     * @param currentUser the leaving member
+     * @throws com.chat.talkMe.exception.BadRequestException if the caller is the OWNER (TM_298)
+     */
     @Override
     @Transactional
     public void leaveGroup(String chatUuid, User currentUser) {
@@ -350,6 +425,16 @@ public class GroupServiceImpl implements GroupService {
         memberCountCache.evict(chatUuid);
     }
 
+    /**
+     * Transfer ownership to another member: the old owner is demoted to ADMIN, the new owner
+     * promoted to OWNER, the chat's ownerId updated, then a system message + WS event emitted.
+     *
+     * @param chatUuid     target group uuid
+     * @param newOwnerUuid uuid of the member to make owner
+     * @param currentUser  the current owner
+     * @throws com.chat.talkMe.exception.NotFoundException new owner user or member row not found
+     *                                                     (TM_064 / TM_141)
+     */
     @Override
     @Transactional
     public void transferOwnership(String chatUuid, String newOwnerUuid, User currentUser) {
@@ -372,6 +457,16 @@ public class GroupServiceImpl implements GroupService {
         broadcastGroupEvent(chatUuid, "group_updated", Map.of("chatId", chatUuid));
     }
 
+    /**
+     * Discover public channels/rooms (up to 50) by type, text and tag, returned as
+     * membership-free cards so non-members don't trip the member-required guard.
+     *
+     * @param type        "channel", "room", or anything else for both
+     * @param query       optional case-insensitive name filter
+     * @param tag         optional {@link Interest} tag filter (unknown values ignored)
+     * @param currentUser the viewer, used to fill in own membership state on each card
+     * @return discovery cards for matching public chats
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ChatResponse> discover(String type, String query, String tag, User currentUser) {
@@ -445,6 +540,16 @@ public class GroupServiceImpl implements GroupService {
                 .build();
     }
 
+    /**
+     * Join a public, open chat (re-activating a former membership), broadcast a join event, and
+     * best-effort credit Midnight-Event attendance if the room hosts an event.
+     *
+     * @param chatUuid    target chat uuid
+     * @param currentUser the joining user
+     * @return the chat as seen by the joiner
+     * @throws com.chat.talkMe.exception.ForbiddenException  chat is not open to join (TM_293)
+     * @throws com.chat.talkMe.exception.BadRequestException room is full (TM_297)
+     */
     @Override
     @Transactional
     public ChatResponse joinChat(String chatUuid, User currentUser) {
@@ -486,6 +591,14 @@ public class GroupServiceImpl implements GroupService {
         return chatService.getChatByUuid(chatUuid, me);
     }
 
+    /**
+     * Record a {@code chat.report} audit-log entry against the chat for moderation review.
+     *
+     * @param chatUuid    reported chat uuid
+     * @param reason      report reason (defaults to "other" when null)
+     * @param details     optional free-text detail
+     * @param currentUser the reporter (recorded as actor)
+     */
     @Override
     @Transactional
     public void reportChat(String chatUuid, String reason, String details, User currentUser) {
@@ -503,6 +616,14 @@ public class GroupServiceImpl implements GroupService {
 
     // ── helpers ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Load a multi-party chat by uuid, rejecting 1:1 chats.
+     *
+     * @param chatUuid chat uuid
+     * @return the group chat with members loaded
+     * @throws com.chat.talkMe.exception.NotFoundException   group not found (TM_121)
+     * @throws com.chat.talkMe.exception.BadRequestException the chat is not a group (TM_299)
+     */
     private Chat loadGroup(String chatUuid) {
         Chat chat = chatRepository.findByUuidWithMembers(safeUuid(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Group not found", "TM_121"));
@@ -512,6 +633,12 @@ public class GroupServiceImpl implements GroupService {
         return chat;
     }
 
+    /**
+     * Persist a fresh MEMBER-role membership row and attach it to the chat's member set.
+     *
+     * @param chat the group
+     * @param u    the user to add as a plain member
+     */
     private void addMemberInternal(Chat chat, User u) {
         ChatMember m = ChatMember.builder().chat(chat).user(u).joinedAt(Instant.now()).build();
         m.setRole(MemberRole.MEMBER);
@@ -603,6 +730,16 @@ public class GroupServiceImpl implements GroupService {
         }
     }
 
+    /**
+     * Accept a pending group invite: add/re-activate the caller's membership, mark the invite
+     * ACCEPTED, emit a system message + join event, and notify the inviter (best-effort).
+     *
+     * @param chatUuid    target group uuid
+     * @param currentUser the invitee accepting
+     * @return the group as seen by the invitee
+     * @throws com.chat.talkMe.exception.NotFoundException   no pending invite for this group (TM_307)
+     * @throws com.chat.talkMe.exception.BadRequestException group is full (TM_297)
+     */
     @Override
     @Transactional
     public ChatResponse acceptGroupInvite(String chatUuid, User currentUser) {
@@ -650,6 +787,12 @@ public class GroupServiceImpl implements GroupService {
         return chatService.getChatByUuid(chatUuid, me);
     }
 
+    /**
+     * Decline a pending group invite by marking it DECLINED (no-op if none pending).
+     *
+     * @param chatUuid    target group uuid
+     * @param currentUser the invitee declining
+     */
     @Override
     @Transactional
     public void declineGroupInvite(String chatUuid, User currentUser) {
@@ -662,6 +805,15 @@ public class GroupServiceImpl implements GroupService {
                 });
     }
 
+    /**
+     * Emit a JSON-encoded system message describing a membership event (best-effort; logged on failure).
+     *
+     * @param chatUuid    the chat to post into
+     * @param currentUser fallback sender when {@code actor} is null
+     * @param kind        event kind (e.g. member_added, member_removed, role_changed)
+     * @param actor       the acting user (recorded and preferred sender)
+     * @param target      the affected user
+     */
     private void systemMessage(String chatUuid, User currentUser, String kind, User actor, User target) {
         try {
             Map<String, Object> event = new HashMap<>();
@@ -681,6 +833,13 @@ public class GroupServiceImpl implements GroupService {
         }
     }
 
+    /**
+     * Build the {chatId, userId, name} payload map used for member-related WS events.
+     *
+     * @param chatUuid the chat uuid
+     * @param u        the member the event is about
+     * @return a mutable payload map
+     */
     private Map<String, Object> memberEventPayload(String chatUuid, User u) {
         Map<String, Object> p = new HashMap<>();
         p.put("chatId", chatUuid);
@@ -689,6 +848,13 @@ public class GroupServiceImpl implements GroupService {
         return p;
     }
 
+    /**
+     * Broadcast an {event, payload} wrapper to the chat's WS topic (best-effort; logged on failure).
+     *
+     * @param chatUuid the chat uuid whose topic receives the event
+     * @param event    the event name
+     * @param payload  the event payload
+     */
     private void broadcastGroupEvent(String chatUuid, String event, Map<String, Object> payload) {
         try {
             Map<String, Object> wrapper = new HashMap<>();
@@ -700,6 +866,13 @@ public class GroupServiceImpl implements GroupService {
         }
     }
 
+    /**
+     * Strict uuid parse for required ids.
+     *
+     * @param s the candidate uuid string
+     * @return the parsed UUID
+     * @throws com.chat.talkMe.exception.BadRequestException if {@code s} is not a valid uuid (TM_300)
+     */
     private UUID safeUuid(String s) {
         try {
             return UUID.fromString(s);

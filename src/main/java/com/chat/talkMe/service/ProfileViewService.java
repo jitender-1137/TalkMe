@@ -7,6 +7,9 @@ import com.chat.talkMe.enums.ProfileViewType;
 
 import java.util.List;
 
+/**
+ * "Who viewed my profile": records profile/photo views and exposes viewer lists, counts, and seen state.
+ */
 public interface ProfileViewService {
 
     /**

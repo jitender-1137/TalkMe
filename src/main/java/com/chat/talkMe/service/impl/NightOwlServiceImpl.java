@@ -42,6 +42,13 @@ public class NightOwlServiceImpl implements NightOwlService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
 
+    /**
+     * Build the Night Owl dashboard: online count, a capped sample of online (non-guest, non-banned)
+     * users, recent real joins, and trending interests across that crowd. Reads Redis presence.
+     *
+     * @param currentUser the caller (excluded from the samples)
+     * @return the assembled dashboard
+     */
     @Override
     @Transactional(readOnly = true)
     public NightOwlDashboardResponse getDashboard(User currentUser) {
@@ -84,6 +91,12 @@ public class NightOwlServiceImpl implements NightOwlService {
                 .build();
     }
 
+    /**
+     * Trending/curated interest rooms as light cards; the limit is clamped to 1..{@value #TRENDING_ROOMS_MAX}.
+     *
+     * @param limit desired room count (clamped)
+     * @return the trending room cards
+     */
     @Override
     @Transactional(readOnly = true)
     public List<TrendingRoomCard> trendingRooms(int limit) {
@@ -92,6 +105,12 @@ public class NightOwlServiceImpl implements NightOwlService {
         return rooms.stream().map(this::toRoomCard).collect(Collectors.toList());
     }
 
+    /**
+     * Map a room chat to its card, resolving tag names, active member count, and city slug.
+     *
+     * @param c the room chat
+     * @return the room card
+     */
     private TrendingRoomCard toRoomCard(Chat c) {
         return TrendingRoomCard.builder()
                 .id(c.getUuid().toString())
@@ -107,6 +126,13 @@ public class NightOwlServiceImpl implements NightOwlService {
                 .build();
     }
 
+    /**
+     * Map a user to a light night card with an optional presence label.
+     *
+     * @param u        the user
+     * @param presence presence label (e.g. "online"), or null
+     * @return the user card
+     */
     private NightUserCard toCard(User u, String presence) {
         return NightUserCard.builder()
                 .id(u.getUuid().toString())
@@ -119,6 +145,13 @@ public class NightOwlServiceImpl implements NightOwlService {
                 .build();
     }
 
+    /**
+     * Compute the top {@value #TRENDING_LIMIT} interests (by frequency) across two user lists.
+     *
+     * @param a first user list
+     * @param b second user list
+     * @return the most common interest names, most-frequent first
+     */
     private List<String> trending(List<User> a, List<User> b) {
         Map<Interest, Integer> counts = new EnumMap<>(Interest.class);
         for (User u : a) tally(counts, u);
@@ -130,6 +163,12 @@ public class NightOwlServiceImpl implements NightOwlService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Add a user's interests into the running frequency map.
+     *
+     * @param counts the accumulator (mutated)
+     * @param u      the user whose interests are tallied
+     */
     private void tally(Map<Interest, Integer> counts, User u) {
         if (u.getInterests() == null) return;
         for (Interest i : u.getInterests()) counts.merge(i, 1, Integer::sum);

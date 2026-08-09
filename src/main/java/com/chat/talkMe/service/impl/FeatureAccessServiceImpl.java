@@ -47,6 +47,13 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     private final FeatureAccessCache cache;
     private final AgeVerificationService ageVerificationService;
 
+    /**
+     * True when the user may use the feature right now (via the cached wire-name set).
+     *
+     * @param user the user (null → false)
+     * @param key  the feature key (null → false)
+     * @return whether access is currently granted
+     */
     @Override
     @Transactional(readOnly = true)
     public boolean hasAccess(User user, FeatureKey key) {
@@ -54,6 +61,12 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         return effectiveWireNames(user).contains(key.wireName());
     }
 
+    /**
+     * Resolve the full set of feature keys the user may use (uncached; evaluates every key).
+     *
+     * @param user the user
+     * @return the accessible feature keys
+     */
     @Override
     @Transactional(readOnly = true)
     public Set<FeatureKey> effectiveKeys(User user) {
@@ -68,6 +81,12 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         return result;
     }
 
+    /**
+     * Cache-backed wire names of all accessible features (computes {@link #effectiveKeys} on a miss).
+     *
+     * @param user the user
+     * @return the ordered set of accessible feature wire names
+     */
     @Override
     @Transactional(readOnly = true)
     public Set<String> effectiveWireNames(User user) {
@@ -76,6 +95,14 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
     }
 
+    /**
+     * Apply the user's own opt-in/opt-out: enabling clears any SELF DENY grant, disabling upserts
+     * a SELF DENY grant. Evicts the user's access cache after commit.
+     *
+     * @param user    the user setting their own preference
+     * @param key     the feature key
+     * @param enabled true to opt in (remove opt-out), false to opt out
+     */
     @Override
     @Transactional
     public void setSelfPreference(User user, FeatureKey key, boolean enabled) {
@@ -101,6 +128,17 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         evictAfterCommit(user.getId());
     }
 
+    /**
+     * Upsert an admin/cohort feature grant for a user, then evict their access cache after commit.
+     *
+     * @param target    the user the grant applies to
+     * @param key       the feature key
+     * @param decision  ALLOW or DENY
+     * @param scope     the grant scope (e.g. ADMIN, COHORT, SELF)
+     * @param cohort    optional cohort tag
+     * @param expiresAt optional expiry instant (null = never)
+     * @param note      optional audit note
+     */
     @Override
     @Transactional
     public void grant(User target, FeatureKey key, GrantDecision decision, GrantScope scope,
@@ -118,6 +156,13 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
                 target.getId(), key, decision, scope);
     }
 
+    /**
+     * Clear a user's ADMIN and COHORT grants for a feature (their SELF opt-out is preserved), then
+     * evict their access cache after commit.
+     *
+     * @param target the user whose grants are cleared
+     * @param key    the feature key
+     */
     @Override
     @Transactional
     public void revoke(User target, FeatureKey key) {
@@ -148,6 +193,16 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
 
     // ── resolution internals ───────────────────────────────────────────────
 
+    /**
+     * Resolve access for one (user, key) applying the documented precedence: global kill-switch,
+     * ad-free hard exemption, parent roll-up, ADMIN DENY, rule/ALLOW entitlement, then SELF DENY.
+     *
+     * @param user   the user
+     * @param key    the feature key
+     * @param grants the user's grants (pre-fetched)
+     * @param now    evaluation instant (for grant activeness/expiry)
+     * @return whether access is granted
+     */
     private boolean resolve(User user, FeatureKey key, List<UserFeatureGrant> grants, Instant now) {
         if (!featureFlags.isGloballyEnabled(key)) return false;
         // Per-user ad exemption: an ad-free user (the seam a future Premium tier flips)
@@ -174,6 +229,14 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         return !selfDeny;
     }
 
+    /**
+     * Rule-based entitlement: min-role, email-verified (unless bypassed) and age-verified gates,
+     * falling through to the key's default-entitled flag.
+     *
+     * @param user the user
+     * @param key  the feature key
+     * @return whether the user is entitled by rules alone (before grants)
+     */
     private boolean ruleEntitled(User user, FeatureKey key) {
         if (key.getMinRole() != null && !hasRole(user, key.getMinRole())) return false;
         if (key.isRequiresVerified() && !user.isVerified() && !verifiedGateBypassed(key)) return false;
@@ -190,6 +253,13 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         return key == FeatureKey.FLIRT_MODE && featureFlags.isAllowNonVerifiedFlirtMode();
     }
 
+    /**
+     * True if the user holds a role with the given name.
+     *
+     * @param user     the user
+     * @param roleName the role name to look for
+     * @return whether the role is present
+     */
     private static boolean hasRole(User user, String roleName) {
         if (user.getRoles() == null) return false;
         for (Role r : user.getRoles()) {
@@ -198,6 +268,15 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         return false;
     }
 
+    /**
+     * True if any active grant for the given key at {@code now} matches the predicate.
+     *
+     * @param grants the user's grants
+     * @param key    the feature key to match
+     * @param now    activeness/expiry evaluation instant
+     * @param pred   additional scope/decision predicate
+     * @return whether a matching active grant exists
+     */
     private static boolean anyGrant(List<UserFeatureGrant> grants, FeatureKey key, Instant now,
                                     Predicate<UserFeatureGrant> pred) {
         for (UserFeatureGrant g : grants) {

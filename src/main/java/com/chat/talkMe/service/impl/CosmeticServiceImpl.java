@@ -46,6 +46,14 @@ public class CosmeticServiceImpl implements CosmeticService {
 
     // ---- read paths ----------------------------------------------------------------
 
+    /**
+     * Returns the full (non-retired) cosmetic catalog, each mapped to the caller's owned/locked/
+     * equipped state derived from their reputation snapshot. Sorted by unlock threshold then code.
+     * Read-only.
+     *
+     * @param user the requesting user
+     * @return catalog entries with per-user state
+     */
     @Override
     @Transactional(readOnly = true)
     public List<CosmeticResponse> catalog(User user) {
@@ -61,6 +69,13 @@ public class CosmeticServiceImpl implements CosmeticService {
                 .toList();
     }
 
+    /**
+     * Returns only the cosmetics the user owns — those whose unlock condition is currently
+     * satisfied or that have an explicit owned row — with their equipped state. Read-only.
+     *
+     * @param user the requesting user
+     * @return the user's owned cosmetics
+     */
     @Override
     @Transactional(readOnly = true)
     public List<CosmeticResponse> myCosmetics(User user) {
@@ -79,6 +94,17 @@ public class CosmeticServiceImpl implements CosmeticService {
 
     // ---- write paths ---------------------------------------------------------------
 
+    /**
+     * Equips a cosmetic the user owns, unequipping any other cosmetic in the same slot and
+     * creating an owned row on first equip. Runs in the class-level write transaction.
+     *
+     * @param user the user
+     * @param code the cosmetic code
+     * @return the user's refreshed owned cosmetics
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_930) blank code, or (TM_932)
+     *         the cosmetic is not yet unlocked
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_931) unknown or retired cosmetic
+     */
     @Override
     public List<CosmeticResponse> equip(User user, String code) {
         if (code == null || code.isBlank()) {
@@ -125,6 +151,15 @@ public class CosmeticServiceImpl implements CosmeticService {
         return myCosmetics(user);
     }
 
+    /**
+     * Unequips whatever cosmetic the user has equipped in the given slot. Runs in the
+     * class-level write transaction.
+     *
+     * @param user the user
+     * @param slot the cosmetic slot to clear
+     * @return the user's refreshed owned cosmetics
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_933) if the slot is null
+     */
     @Override
     public List<CosmeticResponse> unequip(User user, CosmeticType slot) {
         if (slot == null) {
@@ -141,6 +176,12 @@ public class CosmeticServiceImpl implements CosmeticService {
 
     // ---- helpers -------------------------------------------------------------------
 
+    /**
+     * The user's non-deleted explicit cosmetic rows, keyed by cosmetic code.
+     *
+     * @param user the user
+     * @return map of code → owned cosmetic
+     */
     private Map<String, UserCosmetic> ownedByCode(User user) {
         Map<String, UserCosmetic> map = new HashMap<>();
         for (UserCosmetic uc : userCosmeticRepo.findByUser(user)) {
@@ -162,6 +203,13 @@ public class CosmeticServiceImpl implements CosmeticService {
     /**
      * Whether the user currently satisfies a cosmetic's unlock condition.
      */
+    /**
+     * @param c the cosmetic
+     * @param rep the user's reputation snapshot (null → level 1 / no prestige / bronze)
+     * @param ownedBadgeCodes badge codes owned by the user (for BADGE unlocks)
+     * @return true when the user meets the cosmetic's unlock condition (LEVEL/STAR/PRESTIGE/
+     *         BADGE); SEASONAL is never auto-unlocked
+     */
     private boolean isUnlocked(UnlockableCosmetic c, UserReputation rep, Set<String> ownedBadgeCodes) {
         int level = rep != null ? rep.getLevel() : 1;
         int prestige = rep != null ? rep.getPrestigeCount() : 0;
@@ -179,6 +227,16 @@ public class CosmeticServiceImpl implements CosmeticService {
         };
     }
 
+    /**
+     * Maps a catalog cosmetic to a response DTO, computing owned (explicit row or unlocked),
+     * equipped and locked flags for the user.
+     *
+     * @param c the cosmetic
+     * @param rep the user's reputation snapshot (nullable)
+     * @param owned the user's explicit owned rows by code
+     * @param ownedBadgeCodes badge codes owned by the user
+     * @return the response DTO
+     */
     private CosmeticResponse toResponse(UnlockableCosmetic c, UserReputation rep,
                                         Map<String, UserCosmetic> owned, Set<String> ownedBadgeCodes) {
         UserCosmetic uc = owned.get(c.getCode());

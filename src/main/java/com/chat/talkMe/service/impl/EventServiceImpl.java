@@ -28,6 +28,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Default {@link EventService} implementation for Midnight Events (feature #24): scheduling,
+ * RSVPs, cancellation, attendance-crediting and the orchestrator start/end hooks. Class-level
+ * {@code @Transactional}; state transitions are delegated to {@link EventTransitionWorker} so each
+ * runs in its own REQUIRES_NEW transaction. Attendance grants cosmetic reputation exactly once.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -42,6 +48,15 @@ public class EventServiceImpl implements EventService {
     private final ReputationRecorder reputationRecorder;
     private final EventTransitionWorker transitionWorker;
 
+    /**
+     * Validate timing/capacity and persist a new SCHEDULED event owned by {@code host}.
+     *
+     * @param request event spec (title, description, start/end, category, maxAttendees)
+     * @param host    the creating host
+     * @return the created event as seen by the host
+     * @throws com.chat.talkMe.exception.BadRequestException start not in the future, end not after
+     *                                                       start, or negative maxAttendees (TM_957)
+     */
     @Override
     public EventResponse createEvent(CreateEventRequest request, User host) {
         Instant startAt = request.getStartAt();
@@ -71,6 +86,12 @@ public class EventServiceImpl implements EventService {
         return toResponse(event, me);
     }
 
+    /**
+     * List not-yet-started SCHEDULED events soonest-first, enriched with the viewer's RSVP + counts.
+     *
+     * @param viewer the requesting user (used to compute per-event RSVP state)
+     * @return upcoming events
+     */
     @Override
     @Transactional(readOnly = true)
     public List<EventResponse> listUpcoming(User viewer) {
@@ -81,12 +102,31 @@ public class EventServiceImpl implements EventService {
                 .toList();
     }
 
+    /**
+     * Fetch a single event, enriched with the viewer's RSVP + counts.
+     *
+     * @param eventUuid the event uuid
+     * @param viewer    the requesting user
+     * @return the event response
+     * @throws com.chat.talkMe.exception.NotFoundException if no such event (TM_955)
+     */
     @Override
     @Transactional(readOnly = true)
     public EventResponse getEvent(String eventUuid, User viewer) {
         return toResponse(loadEvent(eventUuid), viewer);
     }
 
+    /**
+     * Upsert the caller's RSVP, enforcing the seat cap only when newly taking a GOING seat.
+     *
+     * @param user      the RSVPing user
+     * @param eventUuid the event uuid
+     * @param status    one of GOING | INTERESTED | DECLINED
+     * @return the event as seen by the caller after the change
+     * @throws com.chat.talkMe.exception.NotFoundException   event not found (TM_955)
+     * @throws com.chat.talkMe.exception.BadRequestException invalid status (TM_960), event
+     *                                                       cancelled/ended (TM_958), or full (TM_959)
+     */
     @Override
     public EventResponse rsvp(User user, String eventUuid, String status) {
         RsvpStatus target = parseStatus(status);
@@ -124,6 +164,16 @@ public class EventServiceImpl implements EventService {
         return toResponse(event, me);
     }
 
+    /**
+     * Cancel an event (host-only), setting its status to CANCELLED.
+     *
+     * @param eventUuid the event uuid
+     * @param host      the caller (must be the event host)
+     * @return the cancelled event
+     * @throws com.chat.talkMe.exception.NotFoundException   event not found (TM_955)
+     * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the host (TM_956)
+     * @throws com.chat.talkMe.exception.BadRequestException already ended/cancelled (TM_961)
+     */
     @Override
     public EventResponse cancelEvent(String eventUuid, User host) {
         ScheduledEvent event = loadEvent(eventUuid);
@@ -138,6 +188,16 @@ public class EventServiceImpl implements EventService {
         return toResponse(event, host);
     }
 
+    /**
+     * Credit attendance for a user who is in the event's room (recording walk-ins as GOING),
+     * awarding cosmetic reputation exactly once on first attendance (best-effort). No-op when the
+     * room isn't created yet or the user isn't a room member.
+     *
+     * @param eventUuid the event uuid
+     * @param user      the attendee
+     * @return the event as seen by the user
+     * @throws com.chat.talkMe.exception.NotFoundException if no such event (TM_955)
+     */
     @Override
     public EventResponse markAttended(String eventUuid, User user) {
         ScheduledEvent event = loadEvent(eventUuid);
@@ -187,6 +247,14 @@ public class EventServiceImpl implements EventService {
         return toResponse(event, me);
     }
 
+    /**
+     * Credit attendance by resolving the event that owns the given room, then delegating to
+     * {@link #markAttended(String, User)}. Returns null when the room is blank or hosts no event.
+     *
+     * @param roomChatUuid the room chat uuid
+     * @param user         the attendee
+     * @return the event response, or null if no matching event
+     */
     @Override
     public EventResponse markAttendedByRoom(String roomChatUuid, User user) {
         if (roomChatUuid == null || roomChatUuid.isBlank()) {
@@ -199,6 +267,12 @@ public class EventServiceImpl implements EventService {
         return markAttended(event.getUuid().toString(), user);
     }
 
+    /**
+     * Orchestrator hook: find SCHEDULED events whose start time has passed and start each via
+     * {@link EventTransitionWorker#startEvent(Long)} (per-event isolated tx; failures logged, not fatal).
+     *
+     * @return the number of events actually started this tick
+     */
     @Override
     @Transactional(readOnly = true)
     public int startDueEvents() {
@@ -217,6 +291,12 @@ public class EventServiceImpl implements EventService {
         return started;
     }
 
+    /**
+     * Orchestrator hook: find LIVE events whose end time has passed and end each via
+     * {@link EventTransitionWorker#endEvent(Long)} (per-event isolated tx; failures logged, not fatal).
+     *
+     * @return the number of events actually ended this tick
+     */
     @Override
     @Transactional(readOnly = true)
     public int endDueEvents() {
@@ -237,6 +317,13 @@ public class EventServiceImpl implements EventService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Parse the uuid and load the event.
+     *
+     * @param eventUuid the event uuid string
+     * @return the event entity
+     * @throws com.chat.talkMe.exception.NotFoundException malformed uuid or no such event (TM_955)
+     */
     private ScheduledEvent loadEvent(String eventUuid) {
         UUID uuid;
         try {
@@ -248,6 +335,13 @@ public class EventServiceImpl implements EventService {
                 .orElseThrow(() -> new NotFoundException("Event not found", "TM_955"));
     }
 
+    /**
+     * Parse a case-insensitive RSVP status string.
+     *
+     * @param status the raw status
+     * @return the parsed {@link RsvpStatus}
+     * @throws com.chat.talkMe.exception.BadRequestException if blank or not a valid status (TM_960)
+     */
     private RsvpStatus parseStatus(String status) {
         if (status == null || status.isBlank()) {
             throw new BadRequestException("status must be GOING, INTERESTED or DECLINED", "TM_960");
@@ -259,6 +353,13 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /**
+     * Best-effort check that {@code user} is a member of the event's room (fail-closed on error).
+     *
+     * @param roomChatUuid the room chat uuid
+     * @param user         the user to check
+     * @return true if the room exists and the user is a member
+     */
     private boolean isRoomMember(String roomChatUuid, User user) {
         try {
             Chat room = chatRepository.findByUuid(UUID.fromString(roomChatUuid)).orElse(null);
@@ -273,6 +374,13 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /**
+     * Map an event to its DTO, computing going/interested counts and the viewer's RSVP/attendance.
+     *
+     * @param event  the event entity
+     * @param viewer the viewer (nullable; null → no myRsvp/attended/hostedByMe)
+     * @return the enriched event response
+     */
     private EventResponse toResponse(ScheduledEvent event, User viewer) {
         long goingCount = eventRsvpRepository.countByEventAndStatus(event, RsvpStatus.GOING);
         long interestedCount = eventRsvpRepository.countByEventAndStatus(event, RsvpStatus.INTERESTED);

@@ -44,6 +44,15 @@ public class ReputationEventRecorder {
     // REQUIRES_NEW so a fresh transaction is opened even when the executor's
     // CallerRunsPolicy runs this synchronously on the just-committed producer thread
     // (otherwise the insert would join an already-committed tx and be discarded).
+    /**
+     * Handles one {@link ReputationSignal} AFTER_COMMIT: dedupes by key, applies diminishing
+     * returns and per-type/per-source/global daily caps, then inserts a ledger row with the
+     * capped award (marked counted when > 0). Runs async in its own REQUIRES_NEW transaction; a
+     * concurrent duplicate insert is caught via the unique constraint and any other error is
+     * swallowed so reputation never breaks the originating flow.
+     *
+     * @param signal the reputation signal (user, type, optional source ref, occurrence time)
+     */
     @Async("broadcastExecutor")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)

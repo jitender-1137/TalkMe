@@ -42,6 +42,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Friend requests, mutual friendships and blocking. Requests are reused across re-sends and
+ * auto-accepted when a reverse pending request exists; new outbound requests are rate-limited per
+ * day via a Redis counter (fail-open). Friend lifecycle events are pushed to each party over
+ * WebSocket ({@code /user/queue/friends}). Blocking evicts the {@link BlockCache} and removes any
+ * existing friendship.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -65,7 +72,11 @@ public class FriendServiceImpl implements FriendService {
     private static final int FRIEND_REQUEST_DAILY_CAP = 50;
 
     /**
-     * Redis daily counter; throws 429 past the cap. Fail-open on Redis errors.
+     * Enforce the per-user daily new-request cap via a Redis counter; throws 429 past the cap and
+     * fails open on Redis errors.
+     *
+     * @param sender the user originating the request
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the daily cap is exceeded
      */
     private void enforceFriendRequestQuota(User sender) {
         try {
@@ -85,6 +96,12 @@ public class FriendServiceImpl implements FriendService {
         }
     }
 
+    /**
+     * Best-effort push a friend lifecycle event to a user's personal WebSocket queue.
+     *
+     * @param user      the recipient
+     * @param eventType the event name (e.g. friend_request_received)
+     */
     private void broadcastFriendEvent(User user, String eventType) {
         try {
             Map<String, String> payload = new HashMap<>();
@@ -95,6 +112,21 @@ public class FriendServiceImpl implements FriendService {
         }
     }
 
+    /**
+     * Send (or re-send) a friend request. Reuses any existing request row, auto-accepts when the
+     * receiver already has a pending request to the caller, applies the daily quota only to
+     * brand-new requests, and notifies the receiver over WebSocket. Guards against a concurrent
+     * duplicate via a unique constraint.
+     *
+     * @param receiverUuid uuid of the user to befriend
+     * @param currentUser  the sender
+     * @return the resulting friend-request DTO
+     * @throws com.chat.talkMe.exception.NotFoundException        if the receiver is missing
+     * @throws com.chat.talkMe.exception.BadRequestException      if sending to self
+     * @throws com.chat.talkMe.exception.ForbiddenException       if either party has blocked the other
+     * @throws com.chat.talkMe.exception.ConflictException        if already friends
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the daily request cap is exceeded
+     */
     @Override
     @Transactional
     public FriendRequestResponse sendFriendRequest(String receiverUuid, User currentUser) {
@@ -175,6 +207,16 @@ public class FriendServiceImpl implements FriendService {
         return friendRequestMapper.toResponse(request);
     }
 
+    /**
+     * Accept a pending friend request addressed to the caller: mark it ACCEPTED, create the mutual
+     * friendship rows, and notify both parties.
+     *
+     * @param requestUuid uuid of the friend request
+     * @param currentUser the receiver accepting it
+     * @throws com.chat.talkMe.exception.NotFoundException  if the request is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not the receiver
+     * @throws com.chat.talkMe.exception.ConflictException  if the request is not PENDING
+     */
     @Override
     @Transactional
     public void acceptFriendRequest(String requestUuid, User currentUser) {
@@ -204,6 +246,15 @@ public class FriendServiceImpl implements FriendService {
         log.info("Friend request accepted between {} and {}", request.getSender().getUsername(), request.getReceiver().getUsername());
     }
 
+    /**
+     * Reject a pending friend request addressed to the caller and notify both parties.
+     *
+     * @param requestUuid uuid of the friend request
+     * @param currentUser the receiver rejecting it
+     * @throws com.chat.talkMe.exception.NotFoundException  if the request is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not the receiver
+     * @throws com.chat.talkMe.exception.ConflictException  if the request is not PENDING
+     */
     @Override
     @Transactional
     public void rejectFriendRequest(String requestUuid, User currentUser) {
@@ -224,6 +275,14 @@ public class FriendServiceImpl implements FriendService {
         broadcastFriendEvent(request.getReceiver(), "friend_request_rejected");
     }
 
+    /**
+     * Cancel a friend request the caller sent, deleting the row and notifying the receiver.
+     *
+     * @param requestUuid uuid of the friend request
+     * @param currentUser the sender cancelling it
+     * @throws com.chat.talkMe.exception.NotFoundException  if the request is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not the sender
+     */
     @Override
     @Transactional
     public void cancelFriendRequest(String requestUuid, User currentUser) {
@@ -238,6 +297,13 @@ public class FriendServiceImpl implements FriendService {
         broadcastFriendEvent(request.getReceiver(), "friend_request_cancelled");
     }
 
+    /**
+     * List the caller's friends, enriched with live presence, privacy-aware last-seen, and a
+     * friends-only messaging flag (resolved in one batched settings query).
+     *
+     * @param currentUser the authenticated caller
+     * @return the caller's friends as response DTOs
+     */
     @Override
     @Transactional(readOnly = true)
     public List<AuthUserResponse> getFriends(User currentUser) {
@@ -264,6 +330,12 @@ public class FriendServiceImpl implements FriendService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * List the caller's incoming pending friend requests, newest first.
+     *
+     * @param currentUser the authenticated caller (receiver)
+     * @return pending friend requests as response DTOs
+     */
     @Override
     @Transactional(readOnly = true)
     public List<FriendRequestResponse> getFriendRequests(User currentUser) {
@@ -272,6 +344,14 @@ public class FriendServiceImpl implements FriendService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Remove a friendship in both directions and delete any friend-request rows between the two
+     * users (so they can cleanly re-add later), then notify both parties.
+     *
+     * @param friendUuid  uuid of the friend to remove
+     * @param currentUser the authenticated caller
+     * @throws com.chat.talkMe.exception.NotFoundException if the friend user is missing
+     */
     @Override
     @Transactional
     public void removeFriend(String friendUuid, User currentUser) {
@@ -292,6 +372,15 @@ public class FriendServiceImpl implements FriendService {
         broadcastFriendEvent(friendUser, "friend_removed");
     }
 
+    /**
+     * Block a user (idempotent): persist the block, evict the caller's {@link BlockCache} entry, and
+     * remove any existing friendship between them.
+     *
+     * @param userUuid    uuid of the user to block
+     * @param currentUser the authenticated caller
+     * @throws com.chat.talkMe.exception.NotFoundException   if the target user is missing
+     * @throws com.chat.talkMe.exception.BadRequestException if blocking self
+     */
     @Override
     @Transactional
     public void blockUser(String userUuid, User currentUser) {
@@ -317,6 +406,13 @@ public class FriendServiceImpl implements FriendService {
         removeFriend(userUuid, currentUser);
     }
 
+    /**
+     * Unblock a user (no-op if not blocked) and evict the caller's {@link BlockCache} entry.
+     *
+     * @param userUuid    uuid of the user to unblock
+     * @param currentUser the authenticated caller
+     * @throws com.chat.talkMe.exception.NotFoundException if the target user is missing
+     */
     @Override
     @Transactional
     public void unblockUser(String userUuid, User currentUser) {

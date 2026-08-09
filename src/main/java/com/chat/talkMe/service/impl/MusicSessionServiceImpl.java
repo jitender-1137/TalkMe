@@ -63,6 +63,16 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         }
     }
 
+    /**
+     * Return the chat's current session with a fresh server clock, or a not-playing shell when
+     * none is live. Reads Redis (fails open).
+     *
+     * @param user   the caller (must be a chat member)
+     * @param chatId the chat UUID
+     * @return the live or shell session state, never null
+     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id
+     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     */
     @Override
     public MusicSessionState getSession(User user, String chatId) {
         requireChatMember(user, chatId);
@@ -81,6 +91,18 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         return state;
     }
 
+    /**
+     * Start/resume playback of a track, persisting to Redis and broadcasting {@code music_play}.
+     * The start position is the explicit request value, else the resumed playhead for the same
+     * track, else 0.
+     *
+     * @param user    the caller (becomes the host; must be a chat member)
+     * @param chatId  the chat UUID
+     * @param request the track to play (url required)
+     * @return the new session state
+     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id or missing track url
+     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     */
     @Override
     public MusicSessionState play(User user, String chatId, MusicPlayRequest request) {
         requireChatMember(user, chatId);
@@ -119,6 +141,17 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         return state;
     }
 
+    /**
+     * Pause the live session (optionally recording the playhead), persist, and broadcast
+     * {@code music_pause}.
+     *
+     * @param user        the caller (becomes the host; must be a chat member)
+     * @param chatId      the chat UUID
+     * @param positionSec optional playhead to record (clamped to >= 0)
+     * @return the updated session state
+     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id or no active session
+     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     */
     @Override
     public MusicSessionState pause(User user, String chatId, Double positionSec) {
         requireChatMember(user, chatId);
@@ -136,6 +169,17 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         return state;
     }
 
+    /**
+     * Move the live session's playhead, persist, and broadcast {@code music_seek}.
+     *
+     * @param user        the caller (becomes the host; must be a chat member)
+     * @param chatId      the chat UUID
+     * @param positionSec the new playhead in seconds (required, >= 0)
+     * @return the updated session state
+     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id, missing/negative
+     *                                                        position, or no active session
+     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     */
     @Override
     public MusicSessionState seek(User user, String chatId, Double positionSec) {
         requireChatMember(user, chatId);
@@ -153,6 +197,18 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         return state;
     }
 
+    /**
+     * Broadcast an emoji reaction ({@code music_react}) over the live session without changing
+     * playback; refreshes the session TTL. The emoji is trimmed to {@value #MAX_EMOJI_LEN} chars.
+     *
+     * @param user   the reactor (must be a chat member)
+     * @param chatId the chat UUID
+     * @param emoji  the reaction (required, non-blank)
+     * @return the current session state
+     * @throws com.chat.talkMe.exception.BadRequestException  malformed chat id, blank emoji, or no
+     *                                                        active session
+     * @throws com.chat.talkMe.exception.ForbiddenException   caller is not a chat member
+     */
     @Override
     public MusicSessionState react(User user, String chatId, String emoji) {
         requireChatMember(user, chatId);
@@ -180,6 +236,13 @@ public class MusicSessionServiceImpl implements MusicSessionService {
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
+    /**
+     * Load the live session or fail if none exists.
+     *
+     * @param chatId the chat UUID
+     * @return the live session state
+     * @throws com.chat.talkMe.exception.BadRequestException  no active session
+     */
     private MusicSessionState requireLiveSession(String chatId) {
         MusicSessionState state = readState(chatId);
         if (state == null) {
@@ -188,6 +251,12 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         return state;
     }
 
+    /**
+     * Read + deserialize the session JSON from Redis; fails open (returns null) on any error.
+     *
+     * @param chatId the chat UUID
+     * @return the stored session, or null if absent/unreadable
+     */
     private MusicSessionState readState(String chatId) {
         try {
             String cached = redis.opsForValue().get(key(chatId));
@@ -200,6 +269,12 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         return null;
     }
 
+    /**
+     * Serialize + store the session JSON in Redis with the session TTL; fails open on any error.
+     *
+     * @param chatId the chat UUID
+     * @param state  the session to persist
+     */
     private void writeState(String chatId, MusicSessionState state) {
         try {
             redis.opsForValue().set(key(chatId), objectMapper.writeValueAsString(state), TTL);
@@ -208,6 +283,14 @@ public class MusicSessionServiceImpl implements MusicSessionService {
         }
     }
 
+    /**
+     * Publish an {@code {event, payload}} envelope to {@code /topic/chat/{chatId}/music} over WS;
+     * fails open on any error.
+     *
+     * @param chatId  the chat UUID
+     * @param event   the event name (e.g. music_play)
+     * @param payload the event payload
+     */
     private void broadcast(String chatId, String event, Object payload) {
         try {
             messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/music",

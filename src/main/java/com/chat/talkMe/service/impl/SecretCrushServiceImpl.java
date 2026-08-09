@@ -56,6 +56,21 @@ public class SecretCrushServiceImpl implements SecretCrushService {
     private final SimpMessagingTemplate messagingTemplate;
     private final BlockUserRepository blockUserRepository;
 
+    /**
+     * Adds (or re-activates) the caller's crush on the target and probes for reciprocity. On a
+     * mutual crush both rows flip to MATCHED, both users get a notification + WS push, both earn a
+     * reputation credit, and a matched response (with compatibility) is returned; otherwise a bare
+     * non-matched response revealing nothing about the target's inbound crushes. Blocks (either
+     * direction) and self-crushes are refused. Class is {@code @Transactional}.
+     *
+     * @param crusher    the caller adding the crush
+     * @param targetUuid the target user's UUID string
+     * @return a matched response on mutual crush, else a non-matched response
+     * @throws com.chat.talkMe.exception.BadRequestException      on self-crush, guest/banned target,
+     *                                                            or invalid UUID
+     * @throws com.chat.talkMe.exception.NotFoundException        if no user matches {@code targetUuid}
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the active-crush cap is reached
+     */
     @Override
     public SecretCrushMatchResponse addCrush(User crusher, String targetUuid) {
         User target = resolveTarget(targetUuid);
@@ -127,6 +142,16 @@ public class SecretCrushServiceImpl implements SecretCrushService {
         return matchedResponse(crusher, target);
     }
 
+    /**
+     * Withdraws the caller's crush on the target (WITHDRAWN); a no-op if none exists. If it was a
+     * mutual match, the partner's side is demoted back to one-sided ACTIVE and an "UNMATCHED" WS
+     * event is pushed to them. Class is {@code @Transactional}.
+     *
+     * @param crusher    the caller withdrawing the crush
+     * @param targetUuid the target user's UUID string
+     * @throws com.chat.talkMe.exception.BadRequestException if {@code targetUuid} is not a valid UUID
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches {@code targetUuid}
+     */
     @Override
     public void withdrawCrush(User crusher, String targetUuid) {
         User target = resolveTarget(targetUuid);
@@ -154,6 +179,14 @@ public class SecretCrushServiceImpl implements SecretCrushService {
         });
     }
 
+    /**
+     * Lists the caller's crushes: still one-sided ACTIVE crushes (target card only, no reciprocity
+     * revealed) and confirmed MATCHED crushes (partner identity + compatibility disclosed).
+     * Read-only transaction.
+     *
+     * @param user the caller
+     * @return the caller's active and matched crush entries
+     */
     @Override
     @Transactional(readOnly = true)
     public List<SecretCrushMatchResponse> listMine(User user) {
@@ -172,6 +205,12 @@ public class SecretCrushServiceImpl implements SecretCrushService {
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Resolves a target-user UUID string to the {@link User} entity.
+     *
+     * @throws com.chat.talkMe.exception.BadRequestException if the string is not a valid UUID
+     * @throws com.chat.talkMe.exception.NotFoundException   if no user matches it
+     */
     private User resolveTarget(String targetUuid) {
         UUID uuid;
         try {
@@ -190,6 +229,9 @@ public class SecretCrushServiceImpl implements SecretCrushService {
         return entry(partner, true, safeScore(self, partner));
     }
 
+    /**
+     * Computes the compatibility score for a pair, returning null if scoring throws.
+     */
     private CompatibilityScore safeScore(User self, User partner) {
         try {
             // Both sides are loaded within this transaction; scoring is pure.
@@ -213,6 +255,11 @@ public class SecretCrushServiceImpl implements SecretCrushService {
                 .build();
     }
 
+    /**
+     * Notifies one side of a mutual match: persists a SECRET_CRUSH_MATCHED notification and pushes a
+     * "MATCHED" WS event to the recipient's {@code /queue/secret-crush}. Both steps are best-effort
+     * (failures logged, not thrown).
+     */
     private void notifyMatch(User recipient, User partner, UUID crushUuid) {
         try {
             notificationService.createNotification(
@@ -238,6 +285,9 @@ public class SecretCrushServiceImpl implements SecretCrushService {
         }
     }
 
+    /**
+     * Best-effort reputation credit (CONVERSATION_STARTED) for a new match; swallows any failure.
+     */
     private void safeRecord(Long userId, UUID sourceRef) {
         try {
             reputationRecorder.record(userId, ReputationEventType.CONVERSATION_STARTED, sourceRef.toString());

@@ -57,6 +57,16 @@ public class WhiteboardServiceImpl implements WhiteboardService {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
+    /**
+     * Replay the current op-log (in stored order) for the chat, skipping any unparseable entries.
+     * IDOR-guards the caller first; the Redis read is fail-open (returns what it has).
+     *
+     * @param me       the caller (must be an active chat member)
+     * @param chatUuid the chat's UUID
+     * @return the current whiteboard ops (possibly empty)
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when {@code chatUuid} is malformed
+     */
     @Override
     public List<WhiteboardOp> getBoard(User me, String chatUuid) {
         requireChatMember(me, chatUuid);
@@ -78,6 +88,18 @@ public class WhiteboardServiceImpl implements WhiteboardService {
         return ops;
     }
 
+    /**
+     * Validate and append a stroke op (server-stamped seq/ts), store it in the capped op-log, and
+     * broadcast it live on the chat topic. IDOR-guards the caller; enforces point-count and
+     * [x, y]-shape caps to prevent memory/bandwidth amplification.
+     *
+     * @param me  the caller (must be an active chat member)
+     * @param req the stroke (chat UUID, points, color, size, tool)
+     * @return the server-stamped stroke op
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_821) on too many / malformed points
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when the chat id is malformed
+     */
     @Override
     public WhiteboardOp addStroke(User me, WhiteboardStrokeRequest req) {
         requireChatMember(me, req.getChatUuid());
@@ -114,6 +136,15 @@ public class WhiteboardServiceImpl implements WhiteboardService {
         return op;
     }
 
+    /**
+     * Wipe the board: drop the stored op-log, seed it with a fresh "clear" marker, and broadcast
+     * it so late joiners replay an empty board. IDOR-guards the caller; Redis calls are fail-open.
+     *
+     * @param me       the caller (must be an active chat member)
+     * @param chatUuid the chat's UUID
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when {@code chatUuid} is malformed
+     */
     @Override
     public void clear(User me, String chatUuid) {
         requireChatMember(me, chatUuid);
@@ -136,6 +167,16 @@ public class WhiteboardServiceImpl implements WhiteboardService {
         broadcast(chatUuid, "whiteboard_clear", op);
     }
 
+    /**
+     * Append an "undo" marker op and broadcast it; clients reconcile by removing the author's last
+     * stroke. IDOR-guards the caller; Redis calls are fail-open.
+     *
+     * @param me       the caller (must be an active chat member)
+     * @param chatUuid the chat's UUID
+     * @return the server-stamped undo op
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) when the caller is not a member
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_400) when {@code chatUuid} is malformed
+     */
     @Override
     public WhiteboardOp undo(User me, String chatUuid) {
         requireChatMember(me, chatUuid);

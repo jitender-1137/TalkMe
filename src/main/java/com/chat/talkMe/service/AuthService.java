@@ -17,6 +17,10 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
+/**
+ * Authentication and account lifecycle: password/guest/OAuth login, signup, token refresh,
+ * session management, email verification, password reset, profile updates and account deletion.
+ */
 public interface AuthService {
     LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest);
 

@@ -11,6 +11,9 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 
+/**
+ * Feed posts: create/read/update/delete, likes, comments/replies, bookmarks, polls, and expiry.
+ */
 public interface PostService {
     PostResponse createPost(PostRequest request, User currentUser);
 

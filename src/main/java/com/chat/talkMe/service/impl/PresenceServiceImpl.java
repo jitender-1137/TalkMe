@@ -25,6 +25,22 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Redis-backed presence engine. Redis is the source of truth for live status and last-seen;
+ * the DB is written only when a user goes OFFLINE so last-seen survives a Redis eviction/restart.
+ *
+ * <p>Three sorted sets drive the state machine: a heartbeat ZSET (liveness watchdog input),
+ * an idle-deadline ZSET (scheduled IDLE → OFFLINE flips), and an away-deadline ZSET
+ * (scheduled ONLINE → IDLE flips for backgrounded tabs). Presence hashes carry a 1-day TTL.</p>
+ *
+ * <p>Timeline: a dropped heartbeat gives a {@code DISCONNECTED_IDLE_GRACE} (5m) window as IDLE
+ * before OFFLINE; an intentional background is staged ONLINE (5m) → IDLE (5m) → OFFLINE (10m
+ * total) with last-seen frozen at background time. Reapers claim entries atomically via ZREM so
+ * multiple app instances never double-broadcast.</p>
+ *
+ * <p>Privacy: Invisible masks status to OFFLINE and hides last-seen; Hide-last-seen suppresses
+ * only the timestamp; Ghost does NOT affect presence (it only suppresses message receipts).</p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -59,6 +75,13 @@ public class PresenceServiceImpl implements PresenceService {
     private static final Duration BACKGROUND_ONLINE_GRACE = Duration.ofMinutes(5);
     private static final Duration BACKGROUND_IDLE_GRACE = Duration.ofMinutes(5);
 
+    /**
+     * Re-loads the user from the DB by id so callers work with a managed entity; returns the
+     * argument unchanged when it is null or transient (no id).
+     *
+     * @param user possibly-detached user (e.g. the security principal)
+     * @return the managed instance, or the original when it can't be re-loaded
+     */
     private User ensureManagedUser(User user) {
         if (user == null) {
             return null;
@@ -69,6 +92,15 @@ public class PresenceServiceImpl implements PresenceService {
         return userRepository.findById(user.getId()).orElse(user);
     }
 
+    /**
+     * Sets live status and last-seen in Redis and broadcasts it. ONLINE seeds the heartbeat set
+     * and clears pending idle/away deadlines; OFFLINE removes all ZSET entries and durably
+     * persists last-seen to the DB (the only DB write on the presence hot path); IDLE/AWAY leave
+     * the heartbeat untouched. The DB persist is best-effort (logged, never thrown).
+     *
+     * @param user   the user whose presence changes
+     * @param status new presence status to apply and broadcast
+     */
     @Override
     public void setStatus(User user, PresenceStatus status) {
         String username = user.getUsername();
@@ -111,6 +143,14 @@ public class PresenceServiceImpl implements PresenceService {
         broadcastPresence(user, readFlags(user), status, lastSeen);
     }
 
+    /**
+     * Marks the user IDLE in Redis (never persisted) and schedules the automatic OFFLINE flip via
+     * the idle-deadline ZSET using {@code addIfAbsent}, so the first idle trigger owns the deadline
+     * and later triggers can't push it back. Broadcasts the IDLE status.
+     *
+     * @param user         the user going idle
+     * @param offlineAfter grace duration after which the idle reaper flips them OFFLINE
+     */
     @Override
     public void markIdle(User user, Duration offlineAfter) {
         String username = user.getUsername();
@@ -139,6 +179,13 @@ public class PresenceServiceImpl implements PresenceService {
         broadcastPresence(user, readFlags(user), PresenceStatus.IDLE, lastSeen);
     }
 
+    /**
+     * Handles a tab being backgrounded: keeps the user ONLINE but freezes last-seen to now (the
+     * true last-active time), then schedules the ONLINE → IDLE flip in the away-deadline ZSET via
+     * {@code addIfAbsent}. Clears any stale idle deadline. Status is unchanged, so no broadcast.
+     *
+     * @param user the user whose tab went to the background
+     */
     @Override
     public void markBackgrounded(User user) {
         String username = user.getUsername();
@@ -166,6 +213,15 @@ public class PresenceServiceImpl implements PresenceService {
         redisTemplate.opsForZSet().remove(IDLE_DEADLINE_ZSET, username);
     }
 
+    /**
+     * Handles an ungraceful socket drop. If the user is already in a staged background transition
+     * (away or idle deadline present), the drop is treated as the OS suspending the backgrounded
+     * tab and is ignored to preserve the staged timeline and frozen last-seen; otherwise it falls
+     * through to {@link #markIdle} with the disconnect grace.
+     *
+     * @param user      the disconnected user
+     * @param idleGrace grace duration applied when this is a genuine active disconnect
+     */
     @Override
     public void markDisconnected(User user, Duration idleGrace) {
         String username = user.getUsername();
@@ -185,6 +241,9 @@ public class PresenceServiceImpl implements PresenceService {
      * Flip ONLINE → IDLE for a backgrounded user whose online grace elapsed, WITHOUT
      * touching last-seen (it was frozen at background time), and schedule the
      * IDLE → OFFLINE deadline. Mirrors {@link #markIdle} but preserves the timestamp.
+     *
+     * @param user         the backgrounded user being flipped to idle
+     * @param offlineAfter grace after which the idle reaper flips them OFFLINE
      */
     private void markIdlePreservingLastSeen(User user, Duration offlineAfter) {
         String username = user.getUsername();
@@ -205,6 +264,8 @@ public class PresenceServiceImpl implements PresenceService {
     /**
      * Flip to OFFLINE preserving the existing last-seen (the real last-active time),
      * rather than stamping "now". Mirrors the OFFLINE branch of {@link #setStatus}.
+     *
+     * @param user the user being flipped to offline
      */
     private void markOfflinePreservingLastSeen(User user) {
         String username = user.getUsername();
@@ -230,6 +291,9 @@ public class PresenceServiceImpl implements PresenceService {
 
     /**
      * Raw persisted status from the Redis cache (no privacy/invisible masking).
+     *
+     * @param username the user's username
+     * @return the cached status, or null if absent/unparseable
      */
     private PresenceStatus rawStatus(String username) {
         Object s = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "status");
@@ -243,6 +307,13 @@ public class PresenceServiceImpl implements PresenceService {
         }
     }
 
+    /**
+     * Refreshes the user's liveness score in the heartbeat ZSET. No DB write and best-effort — a
+     * Redis failure is logged and swallowed so it never bubbles into the WS message handler.
+     * No-op when the user or username is null.
+     *
+     * @param user the heartbeating user
+     */
     @Override
     public void recordHeartbeat(User user) {
         if (user == null || user.getUsername() == null) {
@@ -258,6 +329,15 @@ public class PresenceServiceImpl implements PresenceService {
         }
     }
 
+    /**
+     * Liveness watchdog: for each user whose heartbeat is older than {@code timeout}, atomically
+     * claims the stale entry (ZREM) and marks them IDLE with the disconnect grace — skipping users
+     * already OFFLINE or in a staged background transition (those are deadline-driven). Also clears
+     * stale WebSocket session ids. Transactional.
+     *
+     * @param timeout max age of a heartbeat before the user is considered disconnected
+     * @return number of users reaped to IDLE by this instance
+     */
     @Override
     @Transactional
     public int reapTimedOutUsers(Duration timeout) {
@@ -305,6 +385,13 @@ public class PresenceServiceImpl implements PresenceService {
         return reaped;
     }
 
+    /**
+     * Idle reaper: for each user whose idle deadline has passed, atomically claims it (ZREM) and
+     * flips them OFFLINE preserving the real (frozen) last-seen. Clears stale session ids.
+     * Transactional.
+     *
+     * @return number of users flipped OFFLINE by this instance
+     */
     @Override
     @Transactional
     public int reapExpiredIdleUsers() {
@@ -334,6 +421,13 @@ public class PresenceServiceImpl implements PresenceService {
         return reaped;
     }
 
+    /**
+     * Background-away reaper: for each user whose ONLINE grace deadline has passed, atomically
+     * claims it (ZREM) and flips them ONLINE → IDLE preserving the frozen last-seen — skipping any
+     * who have since returned to the foreground or already gone OFFLINE. Transactional.
+     *
+     * @return number of users flipped to IDLE by this instance
+     */
     @Override
     @Transactional
     public int reapBackgroundedAwayUsers() {
@@ -366,6 +460,15 @@ public class PresenceServiceImpl implements PresenceService {
         return reaped;
     }
 
+    /**
+     * Resolves a user's apparent status, Redis-first (zero DB on a cache hit). Invisible mode is
+     * masked to OFFLINE. On a cache miss it loads (or creates) the DB row, warms the cache with all
+     * privacy flags (best-effort — a Redis write failure still returns the DB value), and returns
+     * the DB-derived status.
+     *
+     * @param user the user to inspect
+     * @return the apparent presence status (OFFLINE when Invisible)
+     */
     @Override
     public PresenceStatus getStatus(User user) {
         String username = user.getUsername();
@@ -418,11 +521,17 @@ public class PresenceServiceImpl implements PresenceService {
         return PresenceStatus.valueOf(userPresence.getStatus());
     }
 
+    /**
+     * @return usernames currently ONLINE (Invisible users excluded)
+     */
     @Override
     public Set<String> getOnlineUsernames() {
         return liveUsernamesWithStatus(EnumSet.of(PresenceStatus.ONLINE));
     }
 
+    /**
+     * @return usernames currently "Away" (IDLE/AWAY status; Invisible users excluded)
+     */
     @Override
     public Set<String> getAwayUsernames() {
         // "Away" = IDLE. (AWAY is included defensively, though only IDLE is written
@@ -434,6 +543,9 @@ public class PresenceServiceImpl implements PresenceService {
      * Usernames among the live heartbeat set whose apparent status is one of
      * {@code wanted} (Invisible mode masked to OFFLINE, so excluded). Backs both
      * {@link #getOnlineUsernames()} and {@link #getAwayUsernames()}.
+     *
+     * @param wanted statuses to include
+     * @return matching usernames, empty when the heartbeat set is empty
      */
     private Set<String> liveUsernamesWithStatus(Set<PresenceStatus> wanted) {
         // Candidate live users (ONLINE seeds the heartbeat set; IDLE stays in it;
@@ -463,6 +575,12 @@ public class PresenceServiceImpl implements PresenceService {
         return result;
     }
 
+    /**
+     * The owner's own true status (NOT masked by Invisible mode), Redis-first with a DB fallback.
+     *
+     * @param user the owner
+     * @return the true status, OFFLINE if unresolvable
+     */
     @Override
     public PresenceStatus getRawStatus(User user) {
         // Owner's own view: the true status, NOT masked by Invisible mode.
@@ -480,6 +598,12 @@ public class PresenceServiceImpl implements PresenceService {
         }
     }
 
+    /**
+     * The user's last-seen timestamp, Redis-first with a cold DB fallback. No privacy masking.
+     *
+     * @param user the user
+     * @return the last-seen instant
+     */
     @Override
     public Instant getLastSeen(User user) {
         Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + user.getUsername(), "lastSeenAt");
@@ -493,6 +617,13 @@ public class PresenceServiceImpl implements PresenceService {
         return up.getLastSeenAt();
     }
 
+    /**
+     * The last-seen visible to OTHER users: null when Invisible or Hide-last-seen is enabled
+     * (Ghost does not hide presence), otherwise the real last-seen.
+     *
+     * @param user the observed user
+     * @return the last-seen instant, or null when hidden
+     */
     @Override
     public Instant getApparentLastSeen(User user) {
         // Invisible or Hide-last-seen hides the timestamp from others. Ghost does NOT
@@ -504,11 +635,21 @@ public class PresenceServiceImpl implements PresenceService {
         return getLastSeen(user);
     }
 
+    /**
+     * @param user the user
+     * @return true if the user has Ghost mode enabled (receipts suppressed)
+     */
     @Override
     public boolean isGhost(User user) {
         return readFlags(user).ghost();
     }
 
+    /**
+     * Filters the given users down to the ids of those in Ghost mode.
+     *
+     * @param users users to inspect (null/empty → empty set)
+     * @return ids of the ghost users
+     */
     @Override
     public Set<Long> getGhostUserIds(Collection<User> users) {
         if (users == null || users.isEmpty()) return Collections.emptySet();
@@ -519,6 +660,14 @@ public class PresenceServiceImpl implements PresenceService {
         return ghosts;
     }
 
+    /**
+     * Persists the Ghost-mode flag, mirrors the full flag set to Redis, and re-broadcasts the
+     * user's REAL current status (Ghost does not change presence — it only suppresses receipts).
+     * Transactional.
+     *
+     * @param user    the user
+     * @param enabled new Ghost-mode value
+     */
     @Override
     @Transactional
     public void toggleGhostMode(User user, boolean enabled) {
@@ -545,6 +694,9 @@ public class PresenceServiceImpl implements PresenceService {
      * Re-broadcast a user's live status/last-seen through {@link #broadcastPresence}
      * so the Invisible / Hide-last-seen filters are applied consistently. Shared by
      * all three privacy toggles.
+     *
+     * @param managedUser  the managed user entity
+     * @param userPresence the user's persisted presence row (flags + fallback status/last-seen)
      */
     private void broadcastCurrent(User managedUser, UserPresence userPresence) {
         String username = managedUser.getUsername();
@@ -561,6 +713,14 @@ public class PresenceServiceImpl implements PresenceService {
         broadcastPresence(managedUser, flags, current, liveLastSeen(username, userPresence.getLastSeenAt()));
     }
 
+    /**
+     * Persists the Invisible-mode flag, mirrors the flag set to Redis, and re-broadcasts so
+     * Invisible (status → OFFLINE) and any concurrent Hide-last-seen (timestamp → null) are both
+     * applied. Transactional.
+     *
+     * @param user    the user
+     * @param enabled new Invisible-mode value
+     */
     @Override
     @Transactional
     public void toggleInvisibleMode(User user, boolean enabled) {
@@ -582,6 +742,13 @@ public class PresenceServiceImpl implements PresenceService {
         broadcastCurrent(managedUser, userPresence);
     }
 
+    /**
+     * Persists the Hide-last-seen flag, mirrors the flag set to Redis, and re-broadcasts so
+     * subscribers immediately see the timestamp hidden/revealed (status unchanged). Transactional.
+     *
+     * @param user    the user
+     * @param enabled new Hide-last-seen value
+     */
     @Override
     @Transactional
     public void toggleHideLastSeen(User user, boolean enabled) {
@@ -602,6 +769,12 @@ public class PresenceServiceImpl implements PresenceService {
         broadcastCurrent(managedUser, userPresence);
     }
 
+    /**
+     * Forces the user OFFLINE in the DB (atomic reset), deletes the Redis presence key, and
+     * broadcasts the offline update. Used on the disconnect hot path. Transactional.
+     *
+     * @param user the user to reset
+     */
     @Override
     @Transactional
     public void resetPresence(User user) {
@@ -623,12 +796,22 @@ public class PresenceServiceImpl implements PresenceService {
         sendWebSocketUpdate(managedUser, PresenceStatus.OFFLINE.name(), now.toString());
     }
 
+    /**
+     * @param user the user
+     * @return true if the user's (Redis-first) apparent status is ONLINE
+     */
     @Override
     public boolean isUserOnline(User user) {
         // getStatus is Redis-first and resolves the user itself only on a cache miss.
         return PresenceStatus.ONLINE.equals(getStatus(user));
     }
 
+    /**
+     * Returns the user's persisted presence row, creating a default one if absent. Transactional.
+     *
+     * @param user the user
+     * @return the managed {@link UserPresence} entity
+     */
     @Override
     @Transactional
     public UserPresence getUserPresence(User user) {
@@ -646,6 +829,10 @@ public class PresenceServiceImpl implements PresenceService {
      * Current live status from Redis (the source of truth). Falls back to the supplied
      * DB value only on a cache miss. Toggles MUST use this instead of the DB status,
      * which is now only written on OFFLINE and is otherwise stale.
+     *
+     * @param username   the user's username
+     * @param dbFallback DB status used only on a cache miss (defaults to OFFLINE when null)
+     * @return the live status name
      */
     private String liveStatus(String username, String dbFallback) {
         Object s = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "status");
@@ -657,6 +844,11 @@ public class PresenceServiceImpl implements PresenceService {
      * Writes the COMPLETE privacy-flag set to the Redis presence hash (and refreshes
      * the TTL). Always writing all three keeps the hash consistent so {@link #readFlags}
      * never sees a partially-populated set after a single toggle.
+     *
+     * @param username  the user's username
+     * @param ghost     Ghost-mode flag
+     * @param invisible Invisible-mode flag
+     * @param hide      Hide-last-seen flag
      */
     private void cacheFlags(String username, boolean ghost, boolean invisible, boolean hide) {
         String redisKey = REDIS_KEY_PREFIX + username;
@@ -670,6 +862,10 @@ public class PresenceServiceImpl implements PresenceService {
 
     /**
      * Current live last-seen from Redis (source of truth), with a DB-value fallback.
+     *
+     * @param username   the user's username
+     * @param dbFallback fallback used on a cache miss (defaults to now when null)
+     * @return the live last-seen instant
      */
     private Instant liveLastSeen(String username, Instant dbFallback) {
         Object ls = redisTemplate.opsForHash().get(REDIS_KEY_PREFIX + username, "lastSeenAt");
@@ -685,6 +881,9 @@ public class PresenceServiceImpl implements PresenceService {
      * Reads the user's privacy flags from the Redis presence hash. On a cache miss
      * (cold Redis) it loads them from the DB ONCE and caches them, so subsequent
      * presence events — including reconnect flapping — never hit the DB for flags.
+     *
+     * @param user the user
+     * @return the resolved privacy flags
      */
     private PresenceFlags readFlags(User user) {
         String redisKey = REDIS_KEY_PREFIX + user.getUsername();
@@ -709,6 +908,16 @@ public class PresenceServiceImpl implements PresenceService {
         return new PresenceFlags(ghost, invisible, hide);
     }
 
+    /**
+     * Applies privacy filters and pushes the presence update over STOMP: Invisible forces the
+     * broadcast status to OFFLINE, Hide-last-seen nulls the timestamp, Ghost is intentionally
+     * ignored (it only affects message receipts, not presence).
+     *
+     * @param user     the user whose presence is broadcast
+     * @param flags    the user's privacy flags
+     * @param status   the resolved status before masking
+     * @param lastSeen the last-seen instant before masking (may be null)
+     */
     private void broadcastPresence(User user, PresenceFlags flags, PresenceStatus status, Instant lastSeen) {
         String statusToBroadcast = status.name();
 
@@ -725,6 +934,15 @@ public class PresenceServiceImpl implements PresenceService {
         sendWebSocketUpdate(user, statusToBroadcast, lastSeenToBroadcast);
     }
 
+    /**
+     * Sends a {@link PresenceNotification} to the user's presence topic. Best-effort: a
+     * {@link org.springframework.messaging.MessagingException} (e.g. broker down) is logged and
+     * swallowed so presence never breaks the WS connect/disconnect lifecycle.
+     *
+     * @param user     the subject of the update
+     * @param status   already-masked status string to broadcast
+     * @param lastSeen already-masked last-seen string (may be null)
+     */
     private void sendWebSocketUpdate(User user, String status, String lastSeen) {
         PresenceNotification notification = PresenceNotification.builder()
                 .userId(user.getUuid().toString())

@@ -35,6 +35,11 @@ public class DisposableEmailDomains {
     @Value("${app.mail.disposable-domains:}")
     private String extraCsv;
 
+    /**
+     * Loads the blocklist at startup from the bundled resource (skipping blanks and {@code #} comments) and
+     * merges any comma-separated domains from {@code app.mail.disposable-domains}. Failures are logged, not
+     * thrown — a missing resource just yields an empty blocklist.
+     */
     @PostConstruct
     void load() {
         try (InputStream in = getClass().getClassLoader().getResourceAsStream(RESOURCE)) {

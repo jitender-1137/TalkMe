@@ -13,6 +13,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * User profile, identity and discovery operations (fetch/update profile, username, avatar,
+ * search, blocked list, reporting, mutual friends, public profile and smart-card views).
+ */
 public interface UserService {
     UserResponse getCurrentUser(User currentUser);
 

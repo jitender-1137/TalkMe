@@ -25,6 +25,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Web Push (VAPID) subscription store and dispatcher.
+ *
+ * <p>Persists per-device {@link PushSubscription} rows (SSRF-guarded endpoints) and delivers
+ * encrypted payloads to every subscription of a user. Dispatch runs asynchronously behind a
+ * "webpush" circuit breaker, prunes endpoints reported gone (HTTP 404/410), and is a no-op when
+ * the feature is disabled.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -35,6 +43,14 @@ public class WebPushServiceImpl implements WebPushService {
     private final WebPushProperties properties;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
 
+    /**
+     * Create or update (upsert by endpoint) a push subscription for the user. The endpoint is
+     * SSRF-guarded (must be a public https push-service host) before it is stored.
+     *
+     * @param user    the owner of the subscription
+     * @param request the subscription (endpoint, p256dh, auth, installation type)
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_PUSH_ENDPOINT) on an unsafe endpoint
+     */
     @Override
     @Transactional
     public void saveSubscription(User user, SavePushSubscriptionRequest request) {
@@ -60,12 +76,23 @@ public class WebPushServiceImpl implements WebPushService {
         log.debug("[WebPush] Saved subscription for user {} ({} total)", user.getId(), request.getEndpoint());
     }
 
+    /**
+     * Delete the subscription with the given endpoint (e.g. on logout / unsubscribe).
+     *
+     * @param endpoint the push endpoint to remove
+     */
     @Override
     @Transactional
     public void removeSubscription(String endpoint) {
         subscriptionRepository.deleteByEndpoint(endpoint);
     }
 
+    /**
+     * Delete all push subscriptions for a user (single-device login sweep) so a superseded
+     * device stops receiving pushes.
+     *
+     * @param userId the user whose subscriptions are cleared
+     */
     @Override
     @Transactional
     public void removeAllSubscriptionsForUser(Long userId) {
@@ -75,6 +102,14 @@ public class WebPushServiceImpl implements WebPushService {
         }
     }
 
+    /**
+     * Asynchronously deliver a payload to every subscription of the user. No-op when the feature
+     * is disabled or the user has no subscriptions; prunes endpoints returning 404/410 and logs
+     * (never rethrows) per-subscription send failures.
+     *
+     * @param userId      the recipient user
+     * @param payloadJson the JSON push payload
+     */
     @Async
     @Override
     @Transactional
@@ -105,7 +140,14 @@ public class WebPushServiceImpl implements WebPushService {
     }
 
     /**
-     * Build and send a single Web Push; returns the push service HTTP status.
+     * Build and send a single Web Push (HIGH urgency, 24h TTL) through the "webpush" circuit
+     * breaker so failing/slow relays fail fast instead of tying up async threads.
+     *
+     * @param sub     the target subscription
+     * @param payload the encrypted push payload bytes
+     * @return the push service HTTP status code
+     * @throws Exception on send failure or when the breaker is open
+     *                   ({@code io.github.resilience4j.circuitbreaker.CallNotPermittedException})
      */
     private int sendOne(PushSubscription sub, byte[] payload) throws Exception {
         Notification notification = Notification.builder()

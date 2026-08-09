@@ -28,6 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Explicit-content mutual-consent handshake for 1:1 chats. Drives a per-chat
+ * {@link ChatExplicitConsent} state machine (NONE → PENDING → GRANTED/DECLINED) with a
+ * consecutive-decline cap, releases or drops pre-consent held messages, and broadcasts each
+ * transition over WebSocket to the chat topic. All operations are membership-gated and
+ * restricted to 1:1 chats.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -46,6 +53,16 @@ public class ChatConsentServiceImpl implements ChatConsentService {
     private final SimpMessagingTemplate messagingTemplate;
     private final MessageService messageService;
 
+    /**
+     * Returns the viewer-relative consent state for a chat (status, can-request/revoke flags,
+     * requester/awaiting-accept flags, held-message count, decline count).
+     *
+     * @param chatUuid target chat UUID
+     * @param currentUser the requesting member
+     * @return the consent state DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) if the caller is not a member
+     */
     @Override
     @Transactional(readOnly = true)
     public ConsentStateResponse getState(String chatUuid, User currentUser) {
@@ -54,6 +71,18 @@ public class ChatConsentServiceImpl implements ChatConsentService {
         return toResponse(chatUuid, consent, currentUser, chat);
     }
 
+    /**
+     * Opens a consent request, moving NONE/DECLINED to PENDING and broadcasting
+     * {@code consent_requested}. Idempotent while PENDING/GRANTED, and refused once the
+     * consecutive-decline cap ({@value #MAX_DECLINES}) is reached. Transactional.
+     *
+     * @param chatUuid target chat UUID
+     * @param currentUser the requesting member
+     * @return the updated consent state DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member,
+     *         or (TM_494) if the chat is not 1:1
+     */
     @Override
     @Transactional
     public ConsentStateResponse requestConsent(String chatUuid, User currentUser) {
@@ -86,6 +115,18 @@ public class ChatConsentServiceImpl implements ChatConsentService {
         return toResponse(chatUuid, consent, currentUser, chat);
     }
 
+    /**
+     * Revokes a previously GRANTED consent back to NONE, recording who revoked it (so only the
+     * other party may immediately re-request) and broadcasting {@code consent_revoked}. No-op
+     * when not currently granted. Transactional.
+     *
+     * @param chatUuid target chat UUID
+     * @param currentUser the revoking member
+     * @return the updated consent state DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member,
+     *         or (TM_494) if the chat is not 1:1
+     */
     @Override
     @Transactional
     public ConsentStateResponse revokeConsent(String chatUuid, User currentUser) {
@@ -115,6 +156,20 @@ public class ChatConsentServiceImpl implements ChatConsentService {
         return toResponse(chatUuid, consent, currentUser, chat);
     }
 
+    /**
+     * Accepts a PENDING request (only the non-requesting party may accept), moving to GRANTED,
+     * clearing the decline count, releasing the held pre-consent messages via
+     * {@link MessageService#releaseHeldMessages}, and broadcasting {@code consent_granted}.
+     * Idempotent when already GRANTED. Transactional.
+     *
+     * @param chatUuid target chat UUID
+     * @param currentUser the accepting member
+     * @return the updated consent state DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) chat missing, or (TM_491)
+     *         if there is no consent request to accept
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member, (TM_494) not 1:1,
+     *         (TM_492) no pending request, or (TM_493) attempting to accept one's own request
+     */
     @Override
     @Transactional
     public ConsentStateResponse acceptConsent(String chatUuid, User currentUser) {
@@ -155,6 +210,19 @@ public class ChatConsentServiceImpl implements ChatConsentService {
         return toResponse(chatUuid, consent, currentUser, chat);
     }
 
+    /**
+     * Declines a PENDING request (only the non-requesting party may decline), moving to DECLINED,
+     * incrementing the consecutive-decline count, deleting the held undelivered messages, and
+     * broadcasting {@code consent_declined}. Idempotent when already DECLINED. Transactional.
+     *
+     * @param chatUuid target chat UUID
+     * @param currentUser the declining member
+     * @return the updated consent state DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) chat missing, or (TM_491)
+     *         if there is no consent request to decline
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) not a member, (TM_494) not 1:1,
+     *         (TM_492) no pending request, or (TM_493) attempting to decline one's own request
+     */
     @Override
     @Transactional
     public ConsentStateResponse declineConsent(String chatUuid, User currentUser) {
@@ -195,6 +263,15 @@ public class ChatConsentServiceImpl implements ChatConsentService {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Loads a chat by UUID and asserts the caller is a member of it (IDOR guard).
+     *
+     * @param chatUuid target chat UUID
+     * @param currentUser the caller
+     * @return the chat
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_121) if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_141) if the caller is not a member
+     */
     private Chat loadMemberChat(String chatUuid, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
@@ -203,12 +280,29 @@ public class ChatConsentServiceImpl implements ChatConsentService {
         return chat;
     }
 
+    /**
+     * Asserts the chat is a 1:1 (not a GROUP), since consent applies only to 1:1 chats.
+     *
+     * @param chat the chat
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_494) if the chat is a group
+     */
     private void require1to1(Chat chat) {
         if (chat.getChatType() == ChatType.GROUP) {
             throw new ForbiddenException("Consent is only available in 1:1 chats", "TM_494");
         }
     }
 
+    /**
+     * Assembles the viewer-relative {@link ConsentStateResponse} from the (possibly null)
+     * consent entity, including the count of held messages sent by the caller and the derived
+     * can-request/can-revoke/awaiting-accept flags.
+     *
+     * @param chatUuid target chat UUID
+     * @param consent the current consent entity, or null when none exists
+     * @param currentUser the requesting member
+     * @param chat the chat (for held-message counting)
+     * @return the assembled DTO
+     */
     private ConsentStateResponse toResponse(String chatUuid, ChatExplicitConsent consent, User currentUser, Chat chat) {
         ConsentStatus status = consent != null ? consent.getStatus() : ConsentStatus.NONE;
         boolean isRequester = consent != null && consent.getRequestedBy() != null
@@ -237,6 +331,14 @@ public class ChatConsentServiceImpl implements ChatConsentService {
                 .build();
     }
 
+    /**
+     * Best-effort WebSocket broadcast of a consent event to the chat's message topic; logs and
+     * swallows any failure.
+     *
+     * @param chatUuid target chat UUID
+     * @param event event name
+     * @param payload event payload
+     */
     private void broadcastConsent(String chatUuid, String event, Map<String, Object> payload) {
         try {
             Map<String, Object> wrapper = new HashMap<>();

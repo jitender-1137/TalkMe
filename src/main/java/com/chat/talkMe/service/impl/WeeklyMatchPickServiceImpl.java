@@ -49,6 +49,14 @@ public class WeeklyMatchPickServiceImpl implements WeeklyMatchPickService {
     private final CompatibilityService compatibilityService;
     private final BlockUserRepository blockUserRepository;
 
+    /**
+     * Return the current ISO-week's persisted picks for the user, re-filtering blocks (both
+     * directions) and dropping deactivated/banned targets, and recomputing each compatibility
+     * breakdown live. Read-only.
+     *
+     * @param user the caller whose picks are returned
+     * @return the surviving picks in rank order (empty if none generated yet)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<WeeklyMatchPickResponse> getCurrent(User user) {
@@ -91,6 +99,14 @@ public class WeeklyMatchPickServiceImpl implements WeeklyMatchPickService {
         return out;
     }
 
+    /**
+     * (Re)generate and persist this week's top {@value #PICK_COUNT} picks for the user: scores a
+     * bounded candidate pool (up to {@value #CANDIDATE_POOL}) via {@link CompatibilityService},
+     * excluding self and blocks in both directions. Idempotent — clears any existing picks for the
+     * user/week first. No-op for null/guest/banned/deleted users. Runs in the write transaction.
+     *
+     * @param user the caller to generate picks for
+     */
     @Override
     public void generateFor(User user) {
         if (user == null || user.isGuest() || user.isBanned() || user.isDeleted()) {
@@ -151,6 +167,12 @@ public class WeeklyMatchPickServiceImpl implements WeeklyMatchPickService {
                 toSave.size(), user.getId(), weekStart);
     }
 
+    /**
+     * Delete all picks whose week starts before {@code weekStart} (retention cleanup). Runs in
+     * the write transaction.
+     *
+     * @param weekStart the exclusive lower bound; rows for earlier weeks are removed
+     */
     @Override
     public void pruneOlderThan(LocalDate weekStart) {
         weeklyMatchPickRepository.deleteByWeekStartBefore(weekStart);

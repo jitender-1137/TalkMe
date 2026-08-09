@@ -22,6 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Conversation "Together games" engine. Serves prompts from the static {@link GamePromptBank} and
+ * drives one live {@link GameSession} per chat over REST (start/next/end/active). Every operation
+ * is authorized against chat membership (IDOR guard). Class-level {@code @Transactional}; reads are
+ * overridden read-only. Starting a game records a CONVERSATION_STARTED reputation event.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -34,6 +40,14 @@ public class GameServiceImpl implements GameService {
 
     /**
      * IDOR guard: the caller must be a member of the chat the game runs in.
+     */
+    /**
+     * IDOR guard: assert the caller is a member of the chat the game runs in.
+     *
+     * @param user   the caller
+     * @param chatId uuid string of the chat
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId is not a valid uuid
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member
      */
     private void requireChatMember(User user, String chatId) {
         boolean member;
@@ -49,6 +63,18 @@ public class GameServiceImpl implements GameService {
         }
     }
 
+    /**
+     * Start a new game in a chat: retire any existing live session, create an IN_PROGRESS session at
+     * the first prompt, and record a CONVERSATION_STARTED reputation event keyed on the chat.
+     *
+     * @param user     the caller (must be a chat member)
+     * @param chatId   uuid string of the chat
+     * @param gameType the game to start
+     * @return the new game session as a response DTO
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId/gameType are missing/invalid or
+     *                                                       the game has no prompts
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @Override
     public GameSessionResponse start(User user, String chatId, GameType gameType) {
         if (chatId == null || chatId.isBlank()) {
@@ -85,6 +111,17 @@ public class GameServiceImpl implements GameService {
         return GameSessionResponse.from(session);
     }
 
+    /**
+     * Advance a live game to the next prompt, ending the session once the prompt bank is exhausted.
+     *
+     * @param user            the caller (must be a chat member)
+     * @param gameSessionUuid uuid string of the session
+     * @return the updated game session as a response DTO
+     * @throws com.chat.talkMe.exception.BadRequestException if the id is invalid or the game is not
+     *                                                       in progress
+     * @throws com.chat.talkMe.exception.NotFoundException   if the session does not exist
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @Override
     public GameSessionResponse next(User user, String gameSessionUuid) {
         GameSession session = load(gameSessionUuid);
@@ -105,6 +142,16 @@ public class GameServiceImpl implements GameService {
         return GameSessionResponse.from(session);
     }
 
+    /**
+     * End a game session (mark it ENDED).
+     *
+     * @param user            the caller (must be a chat member)
+     * @param gameSessionUuid uuid string of the session
+     * @return the ended game session as a response DTO
+     * @throws com.chat.talkMe.exception.BadRequestException if the id is invalid
+     * @throws com.chat.talkMe.exception.NotFoundException   if the session does not exist
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @Override
     public GameSessionResponse end(User user, String gameSessionUuid) {
         GameSession session = load(gameSessionUuid);
@@ -114,6 +161,15 @@ public class GameServiceImpl implements GameService {
         return GameSessionResponse.from(session);
     }
 
+    /**
+     * Return the chat's current live (non-ended) game session, or null if none.
+     *
+     * @param user   the caller (must be a chat member)
+     * @param chatId uuid string of the chat
+     * @return the active game session as a response DTO, or null
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId is missing/invalid
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @Override
     @Transactional(readOnly = true)
     public GameSessionResponse active(User user, String chatId) {
@@ -126,6 +182,14 @@ public class GameServiceImpl implements GameService {
         return session.map(GameSessionResponse::from).orElse(null);
     }
 
+    /**
+     * Load a game session by uuid string.
+     *
+     * @param gameSessionUuid uuid string of the session
+     * @return the session entity
+     * @throws com.chat.talkMe.exception.BadRequestException if the id is not a valid uuid
+     * @throws com.chat.talkMe.exception.NotFoundException   if no such session exists
+     */
     private GameSession load(String gameSessionUuid) {
         UUID uuid;
         try {

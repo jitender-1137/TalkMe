@@ -24,6 +24,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * "Who viewed my profile" tracking: records profile/photo views (skipping self and anonymous),
+ * exposes the recent-viewers list and total/unseen counts, and clears the seen badge.
+ *
+ * <p>On each recorded view it pushes a real-time nudge (refreshed counts + the viewer) to the
+ * viewed user over WebSocket at {@code /user/queue/profile-views}.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -39,6 +46,15 @@ public class ProfileViewServiceImpl implements ProfileViewService {
      */
     private static final int MAX_VIEWERS = 100;
 
+    /**
+     * Record (or increment) a view of the target user by the viewer, then push a real-time nudge
+     * over WebSocket. No-ops on null args, unknown/malformed target, or self-view; recovers from a
+     * concurrent-insert race by incrementing the existing row. Notification failures are swallowed.
+     *
+     * @param viewer     the viewing user (null is ignored)
+     * @param viewedUuid the viewed user's UUID (null/unknown/malformed is ignored)
+     * @param type       the view type (profile vs. photo)
+     */
     @Override
     @Transactional
     public void recordView(User viewer, String viewedUuid, ProfileViewType type) {
@@ -91,6 +107,12 @@ public class ProfileViewServiceImpl implements ProfileViewService {
         }
     }
 
+    /**
+     * Increment an existing view row: bump count, refresh timestamp/type, and re-mark unseen.
+     *
+     * @param pv   the existing view row (mutated)
+     * @param type the latest view type
+     */
     private static void bump(ProfileView pv, ProfileViewType type) {
         pv.setViewCount(pv.getViewCount() + 1);
         pv.setLastViewedAt(Instant.now());
@@ -98,6 +120,12 @@ public class ProfileViewServiceImpl implements ProfileViewService {
         pv.setSeen(false); // a fresh view re-surfaces in the badge
     }
 
+    /**
+     * Most-recent viewers of the caller's profile, capped at {@value #MAX_VIEWERS}.
+     *
+     * @param currentUser the viewed user
+     * @return recent viewer entries (viewer, last-viewed time, count, type, seen flag)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ProfileViewResponse> getViewers(User currentUser) {
@@ -112,6 +140,12 @@ public class ProfileViewServiceImpl implements ProfileViewService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Total and unseen viewer counts for the caller (drives the badge).
+     *
+     * @param currentUser the viewed user
+     * @return the total + unseen counts
+     */
     @Override
     @Transactional(readOnly = true)
     public ProfileViewCountResponse getCounts(User currentUser) {
@@ -121,6 +155,11 @@ public class ProfileViewServiceImpl implements ProfileViewService {
                 .build();
     }
 
+    /**
+     * Mark all of the caller's viewer rows as seen (clears the badge).
+     *
+     * @param currentUser the viewed user
+     */
     @Override
     @Transactional
     public void markAllSeen(User currentUser) {

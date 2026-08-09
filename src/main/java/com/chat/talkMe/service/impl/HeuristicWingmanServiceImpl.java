@@ -71,6 +71,15 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
 
     // ── Icebreakers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Produce up to {@code max} de-duplicated opening lines for two users, layering compatibility
+     * highlights, concrete shared-signal templates, then generic fallbacks. Deterministic; never null.
+     *
+     * @param a   one user
+     * @param b   the other user
+     * @param max maximum openers to return
+     * @return ordered, de-duplicated icebreakers (empty if max &lt;= 0 or either user is null)
+     */
     @Override
     public List<String> icebreakers(User a, User b, int max) {
         if (max <= 0 || a == null || b == null) return List.of();
@@ -153,6 +162,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
         return out;
     }
 
+    /**
+     * First enum constant present in both sets (insertion order of {@code a}), or null.
+     */
     private static <E extends Enum<E>> String firstShared(Set<E> a, Set<E> b) {
         if (a == null || b == null) return null;
         for (E e : a) {
@@ -168,6 +180,14 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
 
     // ── Reply suggestions ────────────────────────────────────────────────────────
 
+    /**
+     * Suggest up to {@code max} reply lines by classifying the last message (empty/greeting → opener,
+     * question → answer-style, otherwise → follow-up) and returning that template bank.
+     *
+     * @param lastMessageText the other person's last message (may be null)
+     * @param max             maximum suggestions to return
+     * @return reply suggestions (empty if max &lt;= 0)
+     */
     @Override
     public List<String> replySuggestions(String lastMessageText, int max) {
         if (max <= 0) return List.of();
@@ -200,6 +220,15 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
             "warm", new String[]{"", " — really glad we're talking."},
             "playful", new String[]{"Okay so… ", " 😄"});
 
+    /**
+     * Rewrite a draft into up to {@code max} tone variants: the requested tone first, then a
+     * reply-inviting variant, a tidied variant, and other tone templates as backfill. Deduplicated.
+     *
+     * @param draft the user's draft message (may be null)
+     * @param tone  requested tone key (defaults to "friendly"; unknown tones are ignored)
+     * @param max   maximum variants to return
+     * @return rewrite variants (empty if max &lt;= 0 or the draft is blank)
+     */
     @Override
     public List<String> rewrite(String draft, String tone, int max) {
         if (max <= 0) return List.of();
@@ -242,6 +271,10 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
         return t;
     }
 
+    /**
+     * Apply a (prefix, suffix) tone template to the core text, capitalizing when no prefix and
+     * appending the suffix unless the text already ends in punctuation (emoji/clause suffix is kept).
+     */
     private static String applyTone(String core, String[] template) {
         String body = template[0].isEmpty() ? capitalize(core) : core;
         String result = template[0] + body;
@@ -265,6 +298,9 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
+    /**
+     * Whether the text reads as a short message or a greeting (so it warrants an opener-style reply).
+     */
     private static boolean isShortOrGreeting(String text) {
         String lower = text.toLowerCase(Locale.ROOT);
         // Very short messages read as openers rather than substantive turns.

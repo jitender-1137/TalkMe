@@ -114,6 +114,16 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * SuperAdmin dashboard backend: user/chat/message administration, moderation mutations,
+ * audit logging, analytics/timeseries aggregation, and storage/media-ownership reconciliation.
+ *
+ * <p>All callers are assumed to be ROLE_SUPER_ADMIN (enforced upstream). Expensive analytics
+ * aggregates are served through a Redis read-through cache with short TTLs and a generation
+ * counter for wholesale invalidation; every mutating action bumps that generation. Read paths
+ * that record VIEW_* audit rows delegate the insert to {@link AdminAuditLogger} so the write
+ * runs in its own transaction and cannot poison a read-only caller.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -180,6 +190,17 @@ public class AdminServiceImpl implements AdminService {
         }
     }
 
+    /**
+     * Redis read-through cache: return the deserialized value at {@code key} if present, else
+     * run {@code loader}, store its JSON under {@code key} for {@code ttlSeconds}, and return it.
+     * Any Redis read/write failure is swallowed and falls back to the live loader value.
+     *
+     * @param key        the (generation-namespaced) cache key
+     * @param ttlSeconds time-to-live for a freshly stored value
+     * @param type       the value's class, used to deserialize the cached JSON
+     * @param loader     supplies the value on a miss
+     * @return the cached or freshly computed value
+     */
     private <T> T cached(String key, long ttlSeconds, Class<T> type, Supplier<T> loader) {
         try {
             String hit = redisTemplate.opsForValue().get(key);
@@ -203,12 +224,21 @@ public class AdminServiceImpl implements AdminService {
     private static final Set<String> ASSIGNABLE_ROLES =
             Set.of("ROLE_SUPER_ADMIN", "ROLE_MODERATOR", "ROLE_USER");
 
+    /**
+     * Headline dashboard counters (users/chats/messages plus recent-signup and online totals),
+     * served from the Redis cache with a 15s TTL.
+     *
+     * @return the stats snapshot
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminStatsResponse getStats() {
         return cached(genKey("stats"), 15, AdminStatsResponse.class, this::computeStats);
     }
 
+    /**
+     * Compute the headline counters live from the repositories and presence service.
+     */
     private AdminStatsResponse computeStats() {
         Instant now = Instant.now();
         return AdminStatsResponse.builder()
@@ -225,6 +255,16 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Paginated user directory with filtering (query, flags, gender, country, age, date ranges,
+     * role) and whitelisted sorting. Online/idle presence is overlaid from the presence service;
+     * page size is clamped to 100.
+     *
+     * @param filter the filter DTO (null treated as an empty filter)
+     * @param page   zero-based page index (clamped to ≥ 0)
+     * @param size   page size (clamped to 1..100)
+     * @return a page of user views with pagination metadata
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminUserView> listUsers(AdminUserFilter filter, int page, int size) {
@@ -351,6 +391,13 @@ public class AdminServiceImpl implements AdminService {
         return null;
     }
 
+    /**
+     * Detailed view of a single user, enriched with their chat and sent-message counts.
+     *
+     * @param uuid the user's uuid
+     * @return the detail view
+     * @throws com.chat.talkMe.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminUserView getUser(String uuid) {
@@ -362,6 +409,14 @@ public class AdminServiceImpl implements AdminService {
         return view;
     }
 
+    /**
+     * Full account dump for a user — account fields, settings, and presence rows assembled
+     * into ordered maps (with placeholder notes when the settings/presence row is absent).
+     *
+     * @param uuid the user's uuid
+     * @return the full view (account/settings/presence sections)
+     * @throws com.chat.talkMe.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminUserFullView getUserFull(String uuid) {
@@ -430,6 +485,13 @@ public class AdminServiceImpl implements AdminService {
                 .account(account).settings(settings).presence(presence).build();
     }
 
+    /**
+     * All chats a user belongs to, including soft-deleted ones (flagged in the DTO).
+     *
+     * @param uuid the user's uuid
+     * @return the user's chat views
+     * @throws com.chat.talkMe.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<AdminChatView> getUserChats(String uuid) {
@@ -440,6 +502,18 @@ public class AdminServiceImpl implements AdminService {
                 .map(this::toChatView).collect(Collectors.toList());
     }
 
+    /**
+     * Paginated chat directory filtered by optional name query and chat type, ordered by most
+     * recently updated. Records a VIEW_CHATS audit entry. Unknown type values are ignored.
+     *
+     * @param query          optional case-insensitive name substring
+     * @param type           chat type name, or "all"/blank for no type filter
+     * @param includeDeleted whether soft-deleted chats are included
+     * @param page           zero-based page index (clamped to ≥ 0)
+     * @param size           page size (clamped to 1..100)
+     * @param adminUsername  acting admin, recorded in the audit log
+     * @return a page of chat views with pagination metadata
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminChatView> listChats(
@@ -476,6 +550,18 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Paginated, fully DECRYPTED message history of a chat (deleted messages included and
+     * flagged), newest first. Records a VIEW_MESSAGES audit entry and logs the access; page
+     * size is clamped to 200. Runs read-write because it persists the audit row.
+     *
+     * @param chatUuid      the chat's uuid
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..200)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return a page of decrypted message views with pagination metadata
+     * @throws com.chat.talkMe.exception.NotFoundException if the uuid is malformed or unknown (TM_121)
+     */
     @Override
     @Transactional // NOT readOnly: this writes an admin audit row (auditRepository.save)
     public PaginatedResponse<AdminMessageView> getChatMessages(String chatUuid, int page, int size, String adminUsername) {
@@ -528,6 +614,15 @@ public class AdminServiceImpl implements AdminService {
 
     // ── Phase 2: moderation mutations (audited) ───────────────────────────────
 
+    /**
+     * Ban or unban a user; audited (BAN_USER/UNBAN_USER) and cache-invalidating.
+     *
+     * @param uuid          target user uuid
+     * @param banned        true to ban, false to unban
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional
     public AdminUserView setBanned(String uuid, boolean banned, String adminUsername) {
@@ -538,6 +633,15 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Set or clear a user's verified flag; audited (VERIFY_USER/UNVERIFY_USER).
+     *
+     * @param uuid          target user uuid
+     * @param verified      true to mark verified, false to clear
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional
     public AdminUserView setVerified(String uuid, boolean verified, String adminUsername) {
@@ -548,6 +652,16 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Soft-delete or restore a user, stamping (or clearing) the deletion-requested time;
+     * audited (SOFT_DELETE_USER/RESTORE_USER).
+     *
+     * @param uuid          target user uuid
+     * @param deleted       true to soft-delete, false to restore
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional
     public AdminUserView setSoftDeleted(String uuid, boolean deleted, String adminUsername) {
@@ -559,6 +673,17 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Grant a role to a user, creating the Role row if absent; no-op (not re-audited) if the
+     * user already has it. Audited (GRANT_ROLE) when actually added.
+     *
+     * @param uuid          target user uuid
+     * @param roleName      role name (normalized to ROLE_*; must be assignable)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.chat.talkMe.exception.BadRequestException if the role is not assignable (TM_071)
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional
     public AdminUserView grantRole(String uuid, String roleName, String adminUsername) {
@@ -575,6 +700,17 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Revoke a role from a user; no-op (not re-audited) if the user did not have it. Audited
+     * (REVOKE_ROLE) when actually removed.
+     *
+     * @param uuid          target user uuid
+     * @param roleName      role name (normalized to ROLE_*; must be assignable)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.chat.talkMe.exception.BadRequestException if the role is not assignable (TM_071)
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional
     public AdminUserView revokeRole(String uuid, String roleName, String adminUsername) {
@@ -588,6 +724,19 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Paginated audit-log query filtered by action, target type, acting-admin substring, and a
+     * created-at date range, newest first. Batch-resolves each row's admin uuid for cross-linking.
+     *
+     * @param action     exact action code filter, or blank for any
+     * @param targetType target type filter (upper-cased), or blank for any
+     * @param admin      case-insensitive admin-username substring, or blank for any
+     * @param from       inclusive lower bound (date or ISO instant), or blank
+     * @param to         inclusive upper bound (date pushed to end-of-day, or ISO instant), or blank
+     * @param page       zero-based page index (clamped to ≥ 0)
+     * @param size       page size (clamped to 1..100)
+     * @return a page of audit views with pagination metadata
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminAuditView> listAudit(
@@ -660,6 +809,11 @@ public class AdminServiceImpl implements AdminService {
         }
     }
 
+    /**
+     * Load a user by uuid string, or throw a clean 404.
+     *
+     * @throws com.chat.talkMe.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
     private User requireUser(String uuid) {
         return userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
@@ -680,6 +834,11 @@ public class AdminServiceImpl implements AdminService {
         return userRepository.findByUsernameIgnoreCase(username).map(AdminServiceImpl::uuidOf).orElse(null);
     }
 
+    /**
+     * Normalize a role name to its {@code ROLE_*} form and assert it is dashboard-assignable.
+     *
+     * @throws com.chat.talkMe.exception.BadRequestException if the role is not assignable (TM_071)
+     */
     private String normalizeRole(String roleName) {
         String r = roleName == null ? "" : roleName.trim().toUpperCase();
         if (!r.startsWith("ROLE_")) r = "ROLE_" + r;
@@ -689,6 +848,9 @@ public class AdminServiceImpl implements AdminService {
         return r;
     }
 
+    /**
+     * Build a detail user view enriched with chat and sent-message counts.
+     */
     private AdminUserView detailView(User u) {
         AdminUserView v = toView(u, presenceService.getOnlineUsernames(), presenceService.getAwayUsernames(), true);
         v.setChatCount((long) chatRepository.findChatsByUser(u).size());
@@ -696,6 +858,10 @@ public class AdminServiceImpl implements AdminService {
         return v;
     }
 
+    /**
+     * Write an audit row via {@link AdminAuditLogger} (own transaction; failures swallowed and
+     * logged) and, for any non-VIEW action, bump the cache generation to invalidate aggregates.
+     */
     private void audit(String admin, String action, String targetType, String targetId, String detail) {
         try {
             // Written in a SEPARATE (REQUIRES_NEW) transaction so a VIEW_* audit INSERT
@@ -713,6 +879,16 @@ public class AdminServiceImpl implements AdminService {
 
     // ── Phase 3: create / edit / delete + charts ──────────────────────────────
 
+    /**
+     * Create a pre-verified, non-guest user with ROLE_USER (email lower-cased; password hashed).
+     * Audited (CREATE_USER).
+     *
+     * @param req           the new-user request (name/email/username/password + optional profile)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the created user's detail view
+     * @throws com.chat.talkMe.exception.ConflictException if the email (TM_047) or username
+     *         (TM_048) already exists
+     */
     @Override
     @Transactional
     public AdminUserView createUser(AdminCreateUserRequest req, String adminUsername) {
@@ -742,6 +918,19 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Partial update of a user — only non-null request fields are applied (email/username are
+     * unique-checked; interests are parsed leniently, dropping unknown values; a non-blank new
+     * password is re-hashed). Audited (EDIT_USER, noting password resets).
+     *
+     * @param uuid          target user uuid
+     * @param req           the sparse update request
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     * @throws com.chat.talkMe.exception.ConflictException if a changed email (TM_047) or
+     *         username (TM_048) collides with another account
+     */
     @Override
     @Transactional
     public AdminUserView updateUser(String uuid, AdminUpdateUserRequest req, String adminUsername) {
@@ -792,6 +981,13 @@ public class AdminServiceImpl implements AdminService {
         return detailView(u);
     }
 
+    /**
+     * Soft-delete a message (sets its deleted flag); audited (DELETE_MESSAGE).
+     *
+     * @param messageUuid   target message uuid
+     * @param adminUsername acting admin, recorded in the audit log
+     * @throws com.chat.talkMe.exception.NotFoundException if the message is unknown (TM_150)
+     */
     @Override
     @Transactional
     public void deleteMessage(String messageUuid, String adminUsername) {
@@ -803,6 +999,13 @@ public class AdminServiceImpl implements AdminService {
                 "chat=" + (m.getChat() != null && m.getChat().getUuid() != null ? m.getChat().getUuid() : "?"));
     }
 
+    /**
+     * Soft-delete a chat (sets its deleted flag); audited (DELETE_CHAT).
+     *
+     * @param chatUuid      target chat uuid
+     * @param adminUsername acting admin, recorded in the audit log
+     * @throws com.chat.talkMe.exception.NotFoundException if the chat is unknown (TM_121)
+     */
     @Override
     @Transactional
     public void deleteChat(String chatUuid, String adminUsername) {
@@ -813,6 +1016,12 @@ public class AdminServiceImpl implements AdminService {
         audit(adminUsername, "DELETE_CHAT", "CHAT", chatUuid, c.getName());
     }
 
+    /**
+     * Daily signup counts over the last {@code days} days (UTC), zero-filled and oldest-first.
+     *
+     * @param days number of days back (clamped to 1..365)
+     * @return one point per day, each with an ISO date label and its signup count
+     */
     @Override
     @Transactional(readOnly = true)
     public List<AdminTimeseriesPoint> getSignupTimeseries(int days) {
@@ -839,6 +1048,10 @@ public class AdminServiceImpl implements AdminService {
 
     private static final long MIN = 60_000L, HOUR = 3_600_000L, DAY = 86_400_000L;
 
+    /**
+     * Map a preset range key (e.g. "1h", "24h", "7d", "30d", "1y") to a {@link RangeSpec} with
+     * an appropriate bucket size and count; unknown keys default to 30 daily buckets.
+     */
     private RangeSpec resolveRange(String range) {
         Instant now = Instant.now();
         String r = range == null ? "30d" : range.trim().toLowerCase();
@@ -855,6 +1068,9 @@ public class AdminServiceImpl implements AdminService {
         };
     }
 
+    /**
+     * Build a {@link RangeSpec} whose window starts {@code bucketMillis * buckets} before now.
+     */
     private RangeSpec spec(Instant now, long bucketMillis, int buckets, String gran) {
         Instant since = now.minusMillis(bucketMillis * (long) buckets);
         return new RangeSpec(since, bucketMillis, buckets, gran);
@@ -879,6 +1095,9 @@ public class AdminServiceImpl implements AdminService {
         return out;
     }
 
+    /**
+     * Millisecond span for an interval key (e.g. "5m", "1h", "1d", "1w"); 0 for unknown keys.
+     */
     private long intervalMillis(String key) {
         return switch (key == null ? "" : key.trim().toLowerCase()) {
             case "5m" -> 5 * MIN;
@@ -914,6 +1133,9 @@ public class AdminServiceImpl implements AdminService {
         return "1w";
     }
 
+    /**
+     * Parse an ISO instant, returning {@code fallback} on blank/null/invalid input.
+     */
     private Instant parseInstant(String iso, Instant fallback) {
         if (iso == null || iso.isBlank()) return fallback;
         try {
@@ -923,6 +1145,12 @@ public class AdminServiceImpl implements AdminService {
         }
     }
 
+    /**
+     * Resolve the effective time window and bucket size. A non-blank {@code fromIso} selects a
+     * custom from/to window (bucket = explicit interval, else snapped to ~40 buckets); otherwise
+     * a preset {@code range} is used, with an optional {@code interval} override. Bucket count is
+     * capped at 500.
+     */
     private RangeSpec resolveWindow(String range, String interval, String fromIso, String toIso) {
         boolean custom = (fromIso != null && !fromIso.isBlank());
         Instant now = Instant.now();
@@ -948,6 +1176,18 @@ public class AdminServiceImpl implements AdminService {
         return new RangeSpec(from, bucket, buckets, gran);
     }
 
+    /**
+     * Bucketed timeseries for a chosen metric. Preset-range results are cached (30s TTL); custom
+     * from/to windows are computed live (unbounded key space is not cached).
+     *
+     * @param metric   the series (e.g. signups, messages, attachments, posts, reports); unknown
+     *                 falls back to messages
+     * @param range    preset range key when no custom window is given
+     * @param interval optional bucket-size override
+     * @param fromIso  custom window start (ISO); non-blank selects the custom, uncached path
+     * @param toIso    custom window end (ISO); defaults to now
+     * @return the metric, granularity, bucket size, total, and points
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminTimeseriesResult getTimeseries(
@@ -962,6 +1202,10 @@ public class AdminServiceImpl implements AdminService {
                 () -> computeTimeseries(metric, range, interval, fromIso, toIso));
     }
 
+    /**
+     * Resolve the window, query the matching repository for event timestamps since the window
+     * start, bucketize them, and assemble the result (total = sum of bucket counts).
+     */
     private AdminTimeseriesResult computeTimeseries(
             String metric, String range, String interval, String fromIso, String toIso) {
         RangeSpec spec = resolveWindow(range, interval, fromIso, toIso);
@@ -991,6 +1235,14 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * The full analytics payload for a range (headline totals, presence + social-graph
+     * breakdowns, top connectors, pending-deletion list, and signup/message series), served
+     * from the Redis cache with a 20s TTL.
+     *
+     * @param range preset range key (null defaults to "30d")
+     * @return the analytics snapshot
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminAnalyticsResponse getAnalytics(String range) {
@@ -999,6 +1251,11 @@ public class AdminServiceImpl implements AdminService {
                 () -> computeAnalytics(range));
     }
 
+    /**
+     * Compute the analytics payload live: a best-effort Redis lobby-size snapshot, a presence
+     * status breakdown, capped pending-deletion list, entity counts and GROUP BY breakdowns, the
+     * friends/social-graph hierarchy, and signup/message timeseries for the range.
+     */
     private AdminAnalyticsResponse computeAnalytics(String range) {
         RangeSpec spec = resolveRange(range);
         Instant now = Instant.now();
@@ -1139,6 +1396,13 @@ public class AdminServiceImpl implements AdminService {
 
     // ── News / feed ───────────────────────────────────────────────────────────
 
+    /**
+     * Paginated feed of ALL posts, newest first, including soft-deleted ones (flagged in the DTO).
+     *
+     * @param page zero-based page index (clamped to ≥ 0)
+     * @param size page size (clamped to 1..100)
+     * @return a page of post views with pagination metadata
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminPostView> listPosts(int page, int size) {
@@ -1151,6 +1415,15 @@ public class AdminServiceImpl implements AdminService {
         return page(items, result, page);
     }
 
+    /**
+     * Paginated list of the users who liked a post, newest first.
+     *
+     * @param postUuid the post's uuid
+     * @param page     zero-based page index (clamped to ≥ 0)
+     * @param size     page size (clamped to 1..100)
+     * @return a page of like views with pagination metadata
+     * @throws com.chat.talkMe.exception.NotFoundException if the post is unknown (TM_180)
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminPostLikeView> getPostLikes(String postUuid, int page, int size) {
@@ -1173,6 +1446,15 @@ public class AdminServiceImpl implements AdminService {
         return page(items, result, page);
     }
 
+    /**
+     * Paginated list of a post's comments (including replies, with parent references).
+     *
+     * @param postUuid the post's uuid
+     * @param page     zero-based page index (clamped to ≥ 0)
+     * @param size     page size (clamped to 1..100)
+     * @return a page of comment views with pagination metadata
+     * @throws com.chat.talkMe.exception.NotFoundException if the post is unknown (TM_180)
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminPostCommentView> getPostComments(String postUuid, int page, int size) {
@@ -1196,6 +1478,9 @@ public class AdminServiceImpl implements AdminService {
         return page(items, result, page);
     }
 
+    /**
+     * Map a post to its admin view, including author, media, like/comment counts, and flags.
+     */
     private AdminPostView toPostView(Post p) {
         User a = p.getUser();
         List<AdminPostView.Media> media = p.getMedia() == null ? List.of()
@@ -1224,6 +1509,14 @@ public class AdminServiceImpl implements AdminService {
 
     // ── Moderation report review portal ───────────────────────────────────────
 
+    /**
+     * Paginated moderation reports, newest first, optionally filtered by status.
+     *
+     * @param status status filter; blank or "ALL" returns every report
+     * @param page   zero-based page index (clamped to ≥ 0)
+     * @param size   page size (clamped to 1..100)
+     * @return a page of report views (with per-party counts) and pagination metadata
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminReportView> listReports(String status, int page, int size) {
@@ -1239,6 +1532,14 @@ public class AdminServiceImpl implements AdminService {
         return page(items, result, page);
     }
 
+    /**
+     * A single report enriched for review: the reported user's summary + recent report history
+     * (last 25), and the related private chat between the two parties as evidence, if one exists.
+     *
+     * @param reportUuid the report's uuid
+     * @return the enriched report view
+     * @throws com.chat.talkMe.exception.NotFoundException if the report is unknown (TM_181)
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminReportView getReport(String reportUuid) {
@@ -1283,6 +1584,18 @@ public class AdminServiceImpl implements AdminService {
         return view;
     }
 
+    /**
+     * Resolve a report by applying a review action: DISMISS (no action), RESOLVE (reviewed),
+     * or BAN_REPORTED (bans the reported user). Stamps reviewer/time/note; audited (REVIEW_REPORT).
+     *
+     * @param reportUuid    the report's uuid
+     * @param action        one of DISMISS, RESOLVE, BAN_REPORTED (case-insensitive)
+     * @param note          optional resolution note
+     * @param adminUsername acting admin, recorded on the report and in the audit log
+     * @return the updated report view
+     * @throws com.chat.talkMe.exception.NotFoundException if the report is unknown (TM_181)
+     * @throws com.chat.talkMe.exception.BadRequestException if the action is unrecognized (TM_071)
+     */
     @Override
     @Transactional
     public AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername) {
@@ -1320,6 +1633,15 @@ public class AdminServiceImpl implements AdminService {
 
     // ── User feedback ─────────────────────────────────────────────────────────
 
+    /**
+     * Paginated user feedback, newest first, optionally filtered by type and/or status.
+     *
+     * @param type   feedback type filter; blank/"ALL"/unknown means no type filter
+     * @param status feedback status filter; blank/"ALL"/unknown means no status filter
+     * @param page   zero-based page index (clamped to ≥ 0)
+     * @param size   page size (clamped to 1..100)
+     * @return a page of feedback views with pagination metadata
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminFeedbackView> listFeedback(String type, String status, int page, int size) {
@@ -1344,6 +1666,16 @@ public class AdminServiceImpl implements AdminService {
         return page(items, result, page);
     }
 
+    /**
+     * Update a feedback row's status; audited (UPDATE_FEEDBACK_STATUS).
+     *
+     * @param feedbackUuid  the feedback uuid
+     * @param status        the new status name (case-insensitive)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated feedback view
+     * @throws com.chat.talkMe.exception.NotFoundException if the feedback is unknown (TM_312)
+     * @throws com.chat.talkMe.exception.BadRequestException if the status is unrecognized (TM_071)
+     */
     @Override
     @Transactional
     public AdminFeedbackView updateFeedbackStatus(String feedbackUuid, String status, String adminUsername) {
@@ -1411,6 +1743,11 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Map a report to its admin view, including both parties and the match session.
+     *
+     * @param withCounts when true, also populate the reports-against/-by and duplicate counts
+     */
     private AdminReportView toReportView(MatchReport r, boolean withCounts) {
         User reporter = r.getReporter();
         User reported = r.getReported();
@@ -1478,6 +1815,13 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * A user's friends, each with their own friend count, ordered most-connected first.
+     *
+     * @param userUuid the user's uuid
+     * @return the friend connector views
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<AdminConnectorView> getUserFriends(String userUuid) {
@@ -1488,6 +1832,20 @@ public class AdminServiceImpl implements AdminService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Paginated message attachments (file names/URLs decrypted per chat), optionally scoped to a
+     * sender and message type. Records a VIEW_ATTACHMENTS audit entry; runs read-write for the
+     * audit row and decryption. Unknown type values are ignored.
+     *
+     * @param userUuid       optional sender uuid to scope to; blank/null means all senders
+     * @param type           optional message-type filter; unknown values are ignored
+     * @param includeDeleted whether deleted attachments are included
+     * @param page           zero-based page index (clamped to ≥ 0)
+     * @param size           page size (clamped to 1..100)
+     * @param adminUsername  acting admin, recorded in the audit log
+     * @return a page of attachment views with pagination metadata
+     * @throws com.chat.talkMe.exception.NotFoundException if a given userUuid is unknown (TM_064)
+     */
     @Override
     @Transactional // NOT readOnly: writes an admin audit row + decrypts URLs
     public PaginatedResponse<AdminAttachmentView> getAttachments(
@@ -1526,6 +1884,10 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Map an attachment to its admin view (file name/URL/thumbnail decrypted per chat), listing
+     * the chat's other members as recipients. Guards every deref for orphaned attachments.
+     */
     private AdminAttachmentView toAttachmentView(MessageAttachment a) {
         // An attachment can be orphaned (its message row gone) — guard every deref of m.
         Message m = a.getMessage();
@@ -1584,6 +1946,23 @@ public class AdminServiceImpl implements AdminService {
             new ConcurrentHashMap<>();
     private static final long STORAGE_CACHE_TTL_MS = 60_000L;
 
+    /**
+     * Storage-truth attachments gallery: reconcile stored objects (TTL-cached) against the DB,
+     * apply category/orphan/search filters, compute kind-independent counts over that base, then
+     * apply the kind filter, sort, and paginate. Records a VIEW_STORAGE audit entry; page size is
+     * clamped to 200.
+     *
+     * @param prefix        storage prefix to list, or null for all
+     * @param category      category filter (conversations/lobby/…), or "all"/blank
+     * @param kind          media-kind filter (image/video/voice/audio/file), or "all"/blank
+     * @param onlyOrphans   restrict to objects with no linked chat attachment
+     * @param search        case-insensitive substring over key/name/sender/chat, or blank
+     * @param sort          one of newest/oldest/largest/smallest/name (default newest)
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..200)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the page of storage objects plus base-set counts and pagination flags
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminStorageListResponse getStorageObjects(
@@ -1667,6 +2046,14 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Delete a stored object by key (validated against path traversal), clear the reconcile
+     * cache, and record a DELETE_STORAGE_OBJECT audit entry.
+     *
+     * @param key           the storage key (must pass {@link MediaKeys#isSafeKey})
+     * @param adminUsername acting admin, recorded in the audit log
+     * @throws com.chat.talkMe.exception.BadRequestException if the key is null or unsafe (TM_071)
+     */
     @Override
     @Transactional
     public void deleteStorageObject(String key, String adminUsername) {
@@ -1681,6 +2068,15 @@ public class AdminServiceImpl implements AdminService {
 
     // ── Media-ownership analytics (media_assets ledger) ───────────────────────
 
+    /**
+     * Media-ownership analytics over the {@code media_assets} ledger (totals, attribution,
+     * per-context/type buckets, top uploaders, recent uploads, and an uploads series). Records a
+     * VIEW_MEDIA_STATS audit entry; served from the Redis cache with a 20s TTL.
+     *
+     * @param range         preset range key (null defaults to "30d")
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the media-ownership snapshot
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminMediaOwnershipResponse getMediaOwnership(
@@ -1691,6 +2087,11 @@ public class AdminServiceImpl implements AdminService {
                 () -> computeMediaOwnership(range));
     }
 
+    /**
+     * Compute media-ownership analytics live: SQL aggregates by context/type, top stranger-media
+     * uploaders (grouped in SQL then batch-loaded for names/avatars), recent uploads, and the
+     * range's uploads timeseries.
+     */
     private AdminMediaOwnershipResponse computeMediaOwnership(String range) {
         long total = mediaAssetRepository.count();
         long unattributed = mediaAssetRepository.countByOwnerIsNull();
@@ -1756,6 +2157,17 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Paginated media uploaded by a user (from the {@code media_assets} ledger), newest first,
+     * with per-context buckets and byte totals. Records a VIEW_USER_MEDIA audit entry.
+     *
+     * @param userUuid      the owner's uuid
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..100)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the media list with totals, buckets, and pagination flags
+     * @throws com.chat.talkMe.exception.NotFoundException if the user is unknown (TM_064)
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminMediaListResponse getUserMedia(
@@ -1781,6 +2193,18 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Paginated media of a chat, sourced from {@link MessageAttachment} (authoritative for a
+     * persisted conversation, unlike the newer ledger) with file refs decrypted per chat. Records
+     * a VIEW_CHAT_MEDIA audit entry; runs read-write for decryption and the audit row.
+     *
+     * @param chatUuid      the chat's uuid
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..100)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the media list with totals, byte sum, and pagination flags
+     * @throws com.chat.talkMe.exception.NotFoundException if the chat is unknown (TM_121)
+     */
     @Override
     @Transactional // NOT readOnly: decrypts file refs + writes a VIEW audit row
     public AdminMediaListResponse getChatMedia(
@@ -2136,6 +2560,10 @@ public class AdminServiceImpl implements AdminService {
         return index >= 0 && index < parts.length ? parts[index] : null;
     }
 
+    /**
+     * Decrypt a chat-scoped value, falling back to the raw value on any decryption failure
+     * (so a legacy plaintext or un-decryptable field never breaks the admin view).
+     */
     private String safeDecrypt(Long chatId, String value) {
         try {
             return messageCryptoService.decrypt(chatId, value);
@@ -2148,6 +2576,9 @@ public class AdminServiceImpl implements AdminService {
         return haystack != null && haystack.toLowerCase().contains(needleLower);
     }
 
+    /**
+     * The top-level storage category (first path segment) of a key, or "other" if unrecognized.
+     */
     private static String categoryOf(String key) {
         int slash = key.indexOf('/');
         String top = slash > 0 ? key.substring(0, slash) : key;
@@ -2157,6 +2588,9 @@ public class AdminServiceImpl implements AdminService {
         };
     }
 
+    /**
+     * Coarse media kind (image/video/audio/file) inferred from content type, then key extension.
+     */
     private static String kindOf(String key, String contentType) {
         String ct = contentType != null ? contentType.toLowerCase() : "";
         if (ct.startsWith("image/")) return "image";
@@ -2193,6 +2627,11 @@ public class AdminServiceImpl implements AdminService {
 
     // ── mappers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Map a user to the admin list/detail view, resolving presence from the online/idle sets.
+     *
+     * @param detail when true, include the heavier profile fields (bio/occupation/education/interests)
+     */
     private AdminUserView toView(User u, Set<String> online, Set<String> away, boolean detail) {
         String presence = online.contains(u.getUsername()) ? "online"
                 : away.contains(u.getUsername()) ? "idle" : "offline";
@@ -2229,6 +2668,10 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
+    /**
+     * Map a chat to its admin view: members, a derived name from member names when unnamed, and a
+     * short decrypted preview of the latest non-deleted message (media messages labelled by type).
+     */
     private AdminChatView toChatView(Chat chat) {
         List<AdminChatView.Member> members = chat.getMembers() == null ? List.of()
                 : chat.getMembers().stream()

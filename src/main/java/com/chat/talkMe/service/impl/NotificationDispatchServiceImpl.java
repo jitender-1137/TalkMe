@@ -22,6 +22,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Dispatches message-arrival signals to a recipient: maintains the server-driven total-unread
+ * count, broadcasts it over STOMP ({@code /queue/unread}), and sends Web Push notifications for
+ * background delivery (persistent messages carry a signed delivery-ack token; ephemeral ones don't
+ * touch the unread count). All WebSocket/push sends are best-effort.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,6 +43,17 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
     private final ObjectMapper objectMapper;
     private final JwtTokenProvider jwtTokenProvider;
 
+    /**
+     * Handles a newly-persisted message for a recipient: atomically increments and broadcasts the
+     * total-unread count, then (when Web Push is enabled) sends a background push carrying a signed
+     * delivery-ack token. Transactional.
+     *
+     * @param recipient    the message recipient
+     * @param chatUuid     UUID of the chat the message belongs to
+     * @param message      the message payload (content may be ciphertext)
+     * @param senderName   display name shown as the push title
+     * @param senderAvatar avatar URL shown as the push icon
+     */
     @Override
     @Transactional
     public void onNewMessage(User recipient, String chatUuid, MessageResponse message,
@@ -60,6 +77,16 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         }
     }
 
+    /**
+     * Sends a Web Push for an ephemeral, non-persisted message (stranger match / lobby chat) with a
+     * random per-push message id so successive alerts each surface. Does NOT touch the unread count.
+     * No-op when push is disabled or the user id is null; build failures are logged and swallowed.
+     *
+     * @param recipientUserId id of the recipient (no-op if null)
+     * @param title           push title (defaults to "New message" when blank)
+     * @param body            push body
+     * @param url             app-relative deep link the notification opens
+     */
     @Override
     public void onEphemeralMessage(Long recipientUserId, String title, String body, String url) {
         if (!webPushProperties.isEnabled() || recipientUserId == null) {
@@ -81,6 +108,14 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         }
     }
 
+    /**
+     * Recomputes the user's total unread count from scratch, persists it via an atomic column
+     * update (avoiding optimistic-lock failures from a stale detached principal), and broadcasts it.
+     * Transactional.
+     *
+     * @param user the user whose unread count is recomputed
+     * @return the freshly-computed unread count
+     */
     @Override
     @Transactional
     public int recomputeUnread(User user) {
@@ -92,6 +127,13 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         return count;
     }
 
+    /**
+     * Best-effort STOMP broadcast of a user's total unread count to {@code /queue/unread}; failures
+     * are logged and swallowed.
+     *
+     * @param username the recipient's username
+     * @param count    the total unread count to send
+     */
     private void broadcastUnread(String username, int count) {
         try {
             messagingTemplate.convertAndSendToUser(username, "/queue/unread", Map.of("totalUnread", count));
@@ -100,6 +142,19 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         }
     }
 
+    /**
+     * Builds the JSON Web Push payload for a persistent message, including the decrypted preview,
+     * badge count, message-id tag (for de-dup), and a signed delivery-ack token + endpoint the
+     * service worker posts back on receipt. Returns null on serialization failure (logged).
+     *
+     * @param recipient    the recipient (token is scoped to their username + chat)
+     * @param chatUuid     UUID of the chat
+     * @param m            the message payload
+     * @param senderName   push title (defaults to "New message" when blank)
+     * @param senderAvatar push icon URL
+     * @param badge        unread badge count
+     * @return the serialized JSON payload, or null on failure
+     */
     private String buildPayload(User recipient, String chatUuid, MessageResponse m, String senderName,
                                 String senderAvatar, int badge) {
         try {
@@ -125,6 +180,14 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         }
     }
 
+    /**
+     * Produces the human-readable push preview: decrypts ciphertext content (the push leaves the
+     * app with no client to decrypt), falls back to "📎 Attachment" when empty or still encrypted,
+     * and truncates to 120 chars with an ellipsis.
+     *
+     * @param m the message payload
+     * @return the preview string for the push body
+     */
     private String preview(MessageResponse m) {
         // Wire payloads are ciphertext; a push body leaves the app (no client to
         // decrypt), so decrypt here. m.getChatId() is the chat UUID → resolve to id.

@@ -53,6 +53,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Default {@link ChatService} implementation: creates/lists/fetches conversations, manages per-member
+ * state (archive/mute/pin/clear/delete, manual unread), and drives read/delivered receipts.
+ * <p>
+ * Receipt changes are broadcast over the transactional outbox (persist-then-publish, re-driven by the
+ * outbox poller) and honour Ghost-mode privacy (a ghost recipient's receipts stay invisible to senders).
+ * Uses {@link MemberCountCache}/{@link UserSettingsCache}/{@link BlockCache} to avoid N+1 reads and
+ * {@link SimpMessagingTemplate} for WebSocket chat events.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -78,6 +87,13 @@ public class ChatServiceImpl implements ChatService {
     private final ChatKeyService chatKeyService;
     private final MessageCryptoService messageCryptoService;
 
+    /**
+     * Re-loads the user as a JPA-managed entity so lazy associations are reachable; returns the
+     * argument unchanged when it is null or not yet persisted (no id).
+     *
+     * @param user the (possibly detached) user
+     * @return the managed entity, or the original when it can't be loaded
+     */
     private User ensureManagedUser(User user) {
         if (user == null) {
             return null;
@@ -88,6 +104,16 @@ public class ChatServiceImpl implements ChatService {
         return userRepository.findById(user.getId()).orElse(user);
     }
 
+    /**
+     * Creates a chat. With a recipientId, creates (or reuses/reopens) a 1:1 PRIVATE chat and notifies the
+     * recipient via WebSocket; otherwise creates a legacy GROUP chat with the caller as owner. Reusing an
+     * existing active 1:1 leaves the caller's pin/archive/cleared state untouched.
+     *
+     * @param request     recipientId for 1:1, or name + memberIds for a group
+     * @param currentUser the authenticated creator
+     * @return the created or reused chat as seen by the creator
+     * @throws com.chat.talkMe.exception.NotFoundException TM_064 when the recipient user does not exist
+     */
     @Override
     @Transactional
     public ChatResponse createChat(CreateChatRequest request, User currentUser) {
@@ -218,6 +244,13 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * Lists the user's conversations, hiding empty 1:1 chats, de-duplicating multiple 1:1 rows to the same
+     * peer (keeping the one with the newest last message), and sorting pinned-first then by recency.
+     *
+     * @param currentUser the authenticated viewer
+     * @return the viewer's visible chats, ordered for the chat list
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ChatResponse> getChats(User currentUser) {
@@ -276,6 +309,15 @@ public class ChatServiceImpl implements ChatService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Fetches a single chat by UUID, enforcing that the caller is a participant.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated viewer
+     * @return the chat as seen by the viewer
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional(readOnly = true)
     public ChatResponse getChatByUuid(String uuid, User currentUser) {
@@ -289,6 +331,16 @@ public class ChatServiceImpl implements ChatService {
         return mapToChatResponse(chat, managedUser);
     }
 
+    /**
+     * Returns the per-chat AES-256-GCM key for an authorized participant, or a disabled response when
+     * message encryption is not active.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated viewer
+     * @return the base64 key (with algo/version) when enabled, else {@code enabled=false}
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public ChatKeyResponse getChatKey(String uuid, User currentUser) {
@@ -310,6 +362,15 @@ public class ChatServiceImpl implements ChatService {
                 .build();
     }
 
+    /**
+     * Sets the archived flag on the caller's membership of the chat (per-user state).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @param archive     true to archive, false to unarchive
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public void archiveChat(String uuid, User currentUser, boolean archive) {
@@ -323,6 +384,15 @@ public class ChatServiceImpl implements ChatService {
         chatMemberRepository.save(member);
     }
 
+    /**
+     * Sets the muted flag on the caller's membership of the chat (per-user state).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @param mute        true to mute, false to unmute
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public void muteChat(String uuid, User currentUser, boolean mute) {
@@ -336,6 +406,15 @@ public class ChatServiceImpl implements ChatService {
         chatMemberRepository.save(member);
     }
 
+    /**
+     * Sets the pinned flag on the caller's membership of the chat (per-user state).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @param pin         true to pin, false to unpin
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public void pinChat(String uuid, User currentUser, boolean pin) {
@@ -349,6 +428,15 @@ public class ChatServiceImpl implements ChatService {
         chatMemberRepository.save(member);
     }
 
+    /**
+     * Clears the chat for the caller only by stamping their membership {@code clearedAt = now}, so older
+     * messages no longer surface for them (other members are unaffected).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public void clearChat(String uuid, User currentUser) {
@@ -365,6 +453,17 @@ public class ChatServiceImpl implements ChatService {
         log.info("Clear chat requested for chat: {}", uuid);
     }
 
+    /**
+     * Deletes the chat. Physically removes all messages (cascading to receipts/reactions/attachments), then
+     * soft-deletes the chat and every membership and broadcasts a {@code chat_deleted} WebSocket event. For
+     * a multi-party chat this deletes it for everyone, so only the owner may do it.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.chat.talkMe.exception.NotFoundException  TM_121 when the chat is missing,
+     *                                                      TM_141 when the caller is not a member
+     * @throws com.chat.talkMe.exception.ForbiddenException TM_291 when a non-owner tries to delete a group
+     */
     @Override
     @Transactional
     public void deleteChat(String uuid, User currentUser) {
@@ -425,6 +524,15 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * Forces the caller's "manually unread" flag on, so the chat shows an unread badge even with no
+     * genuinely-unread messages (cleared when they next read the chat).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public void markUnread(String uuid, User currentUser) {
@@ -439,6 +547,16 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * Marks the chat read for the caller: clears any manual-unread flag, then for multi-party chats advances
+     * the member's forward-only read watermark, or for 1:1 chats bulk-updates/inserts READ receipts and
+     * publishes a READ status event via the transactional outbox (broadcast after commit).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Transactional
     public void markRead(String uuid, User currentUser) {
         User managedUser = ensureManagedUser(currentUser);
@@ -497,6 +615,16 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * Marks the chat delivered for the caller: bulk-updates SENT receipts to DELIVERED (never downgrading
+     * READ), inserts DELIVERED receipts for messages lacking one, and publishes a DELIVERED status event via
+     * the transactional outbox. Ghost recipients are handled downstream by the delivery handler.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.chat.talkMe.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
     @Override
     @Transactional
     public void markDelivered(String uuid, User currentUser) {
@@ -557,6 +685,13 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * Marks every one of the caller's chats delivered (used on connect/reconnect): per chat, bulk-updates
+     * SENT receipts to DELIVERED and inserts missing ones. A Ghost caller still records delivery but the
+     * outbound {@code messages_delivered} broadcast is suppressed so senders never learn of it.
+     *
+     * @param currentUser the authenticated recipient
+     */
     @Override
     @Transactional
     public void markAllChatsDelivered(User currentUser) {
@@ -623,6 +758,16 @@ public class ChatServiceImpl implements ChatService {
         return delivered ? "DELIVERED" : "SENT";
     }
 
+    /**
+     * Maps a chat to its viewer-relative DTO: per-member flags, the last visible message (respecting the
+     * viewer's clearedAt/leftAt window and Ghost status caps), 1:1 peer info (presence, last-seen, friend
+     * and block state, with masking when the peer blocked the viewer) or group metadata, and the unread
+     * count (watermark model for multi-party, receipt scan for 1:1, plus the manual-unread override).
+     *
+     * @param chat        the chat entity (with members loaded)
+     * @param currentUser the viewer
+     * @return the assembled chat response
+     */
     private ChatResponse mapToChatResponse(Chat chat, User currentUser) {
         ChatMember memberSelf = chat.getMembers().stream()
                 .filter(m -> m.getUser().getId().equals(currentUser.getId()))

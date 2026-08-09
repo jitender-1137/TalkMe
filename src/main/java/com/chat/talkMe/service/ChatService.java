@@ -7,6 +7,10 @@ import com.chat.talkMe.dto.response.ChatResponse;
 
 import java.util.List;
 
+/**
+ * Chat lifecycle and per-member state: create/list/fetch conversations, archive/mute/pin/clear/delete,
+ * read/delivered receipts, and per-chat encryption keys.
+ */
 public interface ChatService {
     ChatResponse createChat(CreateChatRequest request, User currentUser);
 

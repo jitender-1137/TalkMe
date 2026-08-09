@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import java.time.Instant;
 import java.util.List;
 
+/** Chat message lifecycle: send, edit, delete, pin/star, react, search, and self-destruct media. */
 public interface MessageService {
     MessageResponse sendMessage(String chatUuid, SendMessageRequest request, User currentUser);
 

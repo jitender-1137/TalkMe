@@ -58,6 +58,20 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
     private final ContentModerationService moderationService;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Creates an anonymous compliment and pushes the (sender-less) inbox view to the recipient.
+     *
+     * @param sender  the authenticated author of the compliment
+     * @param request holds the recipient uuid and the compliment message
+     * @return the sender's own "sent" view of the persisted compliment (fromMe=true)
+     * @throws com.chat.talkMe.exception.BadRequestException on self-send (TM_962), a
+     *         guest/banned recipient or a block in either direction (TM_963), or empty
+     *         message (TM_964); {@link com.chat.talkMe.exception.NotFoundException} (TM_404)
+     *         if the recipient uuid does not resolve
+     * @throws com.chat.talkMe.exception.ContentModerationException if the text is explicit
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the sender exceeded the
+     *         rolling 24h cap of {@link #DAILY_CAP} (TM_965)
+     */
     @Override
     public ComplimentResponse send(User sender, SendComplimentRequest request) {
         User recipient = resolveUser(request.getRecipientUuid());
@@ -107,6 +121,13 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
         return toResponse(compliment, true);
     }
 
+    /**
+     * The caller's inbox — non-deleted compliments addressed to them, newest first.
+     * Sender identity is populated only for rows that are {@link ComplimentStatus#REVEALED}.
+     *
+     * @param me the authenticated recipient
+     * @return recipient-perspective views (fromMe=false)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ComplimentResponse> inbox(User me) {
@@ -118,6 +139,12 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
         return out;
     }
 
+    /**
+     * The caller's own outgoing compliments, newest first (recipient shown, not secret).
+     *
+     * @param me the authenticated sender
+     * @return sender-perspective views (fromMe=true)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ComplimentResponse> sent(User me) {
@@ -129,6 +156,18 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
         return out;
     }
 
+    /**
+     * Recipient asks the sender to reveal their identity, moving SENT → REVEAL_REQUESTED and
+     * notifying the sender over WS. Idempotent when already REVEAL_REQUESTED.
+     *
+     * @param me            the authenticated recipient (only the recipient may request)
+     * @param complimentUuid uuid of the compliment
+     * @return the recipient's own view (sender still hidden unless already REVEALED)
+     * @throws com.chat.talkMe.exception.NotFoundException if the compliment is missing or the
+     *         caller is not its recipient (IDOR-guarded, TM_966)
+     * @throws com.chat.talkMe.exception.BadRequestException if it was already REVEALED or
+     *         DECLINED (TM_967)
+     */
     @Override
     public ComplimentResponse requestReveal(User me, String complimentUuid) {
         AnonymousCompliment compliment = resolveCompliment(complimentUuid);
@@ -156,6 +195,20 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
         return toResponse(compliment, false);
     }
 
+    /**
+     * Sender answers a pending reveal request. On accept the row becomes REVEALED (recipient
+     * learns the sender — the one point identity is exposed); on decline it becomes DECLINED.
+     * The recipient is notified over WS either way.
+     *
+     * @param me            the authenticated sender (only the sender may respond)
+     * @param complimentUuid uuid of the compliment
+     * @param accept        true to reveal identity, false to stay anonymous
+     * @return the sender's own "sent" view of the resolved compliment
+     * @throws com.chat.talkMe.exception.NotFoundException if the compliment is missing or the
+     *         caller is not its sender (IDOR-guarded, TM_966)
+     * @throws com.chat.talkMe.exception.BadRequestException if there is no pending reveal
+     *         request (status != REVEAL_REQUESTED, TM_968)
+     */
     @Override
     public ComplimentResponse respondReveal(User me, String complimentUuid, boolean accept) {
         AnonymousCompliment compliment = resolveCompliment(complimentUuid);
@@ -185,16 +238,33 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Resolve a user by uuid.
+     *
+     * @throws com.chat.talkMe.exception.NotFoundException if no such user (TM_404)
+     * @throws com.chat.talkMe.exception.BadRequestException if the uuid is malformed (TM_961)
+     */
     private User resolveUser(String uuid) {
         return userRepository.findByUuid(parseUuid(uuid))
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_404"));
     }
 
+    /**
+     * Resolve a compliment by uuid.
+     *
+     * @throws com.chat.talkMe.exception.NotFoundException if no such compliment (TM_966)
+     * @throws com.chat.talkMe.exception.BadRequestException if the uuid is malformed (TM_961)
+     */
     private AnonymousCompliment resolveCompliment(String uuid) {
         return complimentRepository.findByUuid(parseUuid(uuid))
                 .orElseThrow(() -> new NotFoundException("Compliment not found", "TM_966"));
     }
 
+    /**
+     * Parse a uuid string, mapping malformed/null input to a clean 400.
+     *
+     * @throws com.chat.talkMe.exception.BadRequestException on invalid/null input (TM_961)
+     */
     private UUID parseUuid(String uuid) {
         try {
             return UUID.fromString(uuid);
@@ -233,6 +303,9 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
         return b.build();
     }
 
+    /**
+     * Best-effort WS push to the user's {@code /queue/compliments}; swallows any send failure.
+     */
     private void push(User user, String event, Object payload) {
         try {
             messagingTemplate.convertAndSendToUser(

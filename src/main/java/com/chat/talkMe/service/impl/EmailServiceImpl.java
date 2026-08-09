@@ -130,6 +130,16 @@ public class EmailServiceImpl implements EmailService {
         this.disposableDomains = disposableDomains;
     }
 
+    /**
+     * Asynchronously sends the password-reset email (PASSWORD_RESET — delivered even to unverified
+     * addresses). When mail is disabled/unconfigured the flow never fails: the recipient is masked at WARN
+     * and the live link is emitted only at DEBUG.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param resetLink     fully-qualified reset URL (token embedded)
+     * @param expiryMinutes minutes the link stays valid (shown to the user)
+     */
     @Async
     @Override
     public void sendPasswordResetEmail(String toEmail, String recipientName, String resetLink, long expiryMinutes) {
@@ -146,6 +156,14 @@ public class EmailServiceImpl implements EmailService {
                 templates.passwordReset(recipientName, resetLink, expiryMinutes), MailCategory.PASSWORD_RESET);
     }
 
+    /**
+     * Asynchronously sends the onboarding welcome email (WELCOME category); no-op when mail is
+     * disabled/unconfigured.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param openLink      deep link into the app
+     */
     @Async
     @Override
     public void sendWelcomeEmail(String toEmail, String recipientName, String openLink) {
@@ -157,6 +175,15 @@ public class EmailServiceImpl implements EmailService {
                 templates.welcome(recipientName, openLink), MailCategory.WELCOME);
     }
 
+    /**
+     * Asynchronously sends the email-verification message (VERIFICATION — must reach unverified users).
+     * When mail is disabled/unconfigured the link is logged at DEBUG rather than sent.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param verifyLink    fully-qualified verification URL
+     * @param expiryMinutes minutes the link stays valid
+     */
     @Async
     @Override
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyLink, long expiryMinutes) {
@@ -170,6 +197,16 @@ public class EmailServiceImpl implements EmailService {
                 templates.verifyEmail(recipientName, verifyLink, expiryMinutes), MailCategory.VERIFICATION);
     }
 
+    /**
+     * Asynchronously sends the unread-messages digest (TRANSACTIONAL — verified recipients only). Subject
+     * is singular/plural by {@code totalUnread}; no-op when mail is disabled/unconfigured.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param previews      per-conversation preview rows
+     * @param totalUnread   total unread count (drives subject/heading)
+     * @param openLink      deep link into the app
+     */
     @Async
     @Override
     public void sendUnreadMessagesEmail(String toEmail, String recipientName,
@@ -185,6 +222,13 @@ public class EmailServiceImpl implements EmailService {
                 templates.unreadMessages(recipientName, previews, totalUnread, openLink), MailCategory.TRANSACTIONAL);
     }
 
+    /**
+     * Asynchronously sends the password-changed security notice (TRANSACTIONAL — verified recipients only);
+     * no-op when mail is disabled/unconfigured.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     */
     @Async
     @Override
     public void sendPasswordChangedEmail(String toEmail, String recipientName) {
@@ -196,6 +240,18 @@ public class EmailServiceImpl implements EmailService {
                 templates.passwordChanged(recipientName), MailCategory.TRANSACTIONAL);
     }
 
+    /**
+     * Asynchronously sends the new-sign-in alert (TRANSACTIONAL — verified recipients only); no-op when
+     * mail is disabled/unconfigured. Device/location/when may be blank and are shown only when present.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param device        the signing-in device description
+     * @param location      the approximate location
+     * @param ip            the source IP
+     * @param when          the sign-in time (human-readable)
+     * @param secureLink    link to secure the account
+     */
     @Async
     @Override
     public void sendLoginAlertEmail(String toEmail, String recipientName, String device,
@@ -208,6 +264,15 @@ public class EmailServiceImpl implements EmailService {
                 templates.loginAlert(recipientName, device, location, ip, when, secureLink), MailCategory.TRANSACTIONAL);
     }
 
+    /**
+     * Asynchronously sends the support-request acknowledgement (TRANSACTIONAL — verified recipients only);
+     * no-op when mail is disabled/unconfigured. Subject includes the ticket reference when present.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param ticketId      the support ticket reference (optional)
+     * @param subjectLine   the user's original subject line
+     */
     @Async
     @Override
     public void sendSupportReceivedEmail(String toEmail, String recipientName, String ticketId, String subjectLine) {
@@ -222,6 +287,17 @@ public class EmailServiceImpl implements EmailService {
                 templates.supportReceived(recipientName, ticketId, subjectLine), MailCategory.TRANSACTIONAL);
     }
 
+    /**
+     * Asynchronously sends a product announcement (ANNOUNCEMENT — exempt from the verification gate); no-op
+     * when mail is disabled/unconfigured. CTA button is omitted when label/link are blank.
+     *
+     * @param toEmail       recipient address
+     * @param recipientName display name for the greeting
+     * @param heading       the announcement heading (also the subject)
+     * @param bodyHtml      caller-built HTML body
+     * @param ctaLabel      optional call-to-action label
+     * @param ctaLink       optional call-to-action URL
+     */
     @Async
     @Override
     public void sendAnnouncementEmail(String toEmail, String recipientName, String heading,
@@ -234,6 +310,15 @@ public class EmailServiceImpl implements EmailService {
                 templates.announcement(recipientName, heading, bodyHtml, ctaLabel, ctaLink), MailCategory.ANNOUNCEMENT);
     }
 
+    /**
+     * Asynchronously sends an arbitrary pre-rendered HTML email (TRANSACTIONAL — verified recipients only);
+     * no-op when mail is disabled/unconfigured.
+     *
+     * @param toEmail recipient address
+     * @param toName  recipient display name
+     * @param subject the email subject
+     * @param html    the full HTML body
+     */
     @Async
     @Override
     public void sendHtmlEmail(String toEmail, String toName, String subject, String html) {
@@ -257,6 +342,12 @@ public class EmailServiceImpl implements EmailService {
         return head + "***" + domain;
     }
 
+    /**
+     * Whether real delivery is possible: mail enabled and at least one provider (Resend, Brevo or SMTP)
+     * available.
+     *
+     * @return true when mail can actually be sent
+     */
     private boolean deliveryConfigured() {
         if (!mailEnabled) {
             return false;
@@ -264,6 +355,11 @@ public class EmailServiceImpl implements EmailService {
         return hasText(resendApiKey) || hasText(brevoApiKey) || smtpAvailable();
     }
 
+    /**
+     * Whether SMTP is enabled and a {@link JavaMailSender} bean is present.
+     *
+     * @return true when the SMTP fallback can be used
+     */
     private boolean smtpAvailable() {
         return smtpEnabled && mailSenderProvider.getIfAvailable() != null;
     }
@@ -359,6 +455,15 @@ public class EmailServiceImpl implements EmailService {
 
     // ── HTTP providers ───────────────────────────────────────────────────────
 
+    /**
+     * Sends one email through the Resend HTTP API.
+     *
+     * @param toEmail recipient address
+     * @param subject the subject
+     * @param html    the HTML body
+     * @return the raw HTTP response
+     * @throws Exception on transport failure or interruption
+     */
     private HttpResponse<String> sendViaResend(String toEmail, String subject, String html) throws Exception {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("from", from);
@@ -375,6 +480,17 @@ public class EmailServiceImpl implements EmailService {
         return http.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * Sends one email through the Brevo HTTP API, parsing the configured {@code from} into sender
+     * name/email.
+     *
+     * @param toEmail recipient address
+     * @param toName  recipient display name (optional)
+     * @param subject the subject
+     * @param html    the HTML body
+     * @return the raw HTTP response
+     * @throws Exception on transport failure or interruption
+     */
     private HttpResponse<String> sendViaBrevo(String toEmail, String toName, String subject, String html)
             throws Exception {
         ObjectNode body = objectMapper.createObjectNode();
@@ -409,6 +525,15 @@ public class EmailServiceImpl implements EmailService {
 
     // ── SMTP fallback ──────────────────────────────────────────────────────────
 
+    /**
+     * Last-resort SMTP send via {@link JavaMailSender}; returns false (logged, swallowed) when SMTP is
+     * unavailable or the send fails.
+     *
+     * @param toEmail recipient address
+     * @param subject the subject
+     * @param html    the HTML body
+     * @return true when the message was handed to the mail sender successfully
+     */
     private boolean attemptSmtp(String toEmail, String subject, String html) {
         JavaMailSender mailSender = smtpEnabled ? mailSenderProvider.getIfAvailable() : null;
         if (mailSender == null) {
@@ -454,6 +579,12 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
+    /**
+     * Returns a previously-reserved daily quota slot after a failed send; a transient Redis error losing
+     * one slot is acceptable and ignored.
+     *
+     * @param provider the provider whose slot to release
+     */
     private void releaseQuotaSlot(String provider) {
         StringRedisTemplate redis = redisProvider.getIfAvailable();
         if (redis == null) {

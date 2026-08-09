@@ -39,6 +39,19 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
     private final MessageRepository messageRepository;
     private final MessageAttachmentRepository messageAttachmentRepository;
 
+    /**
+     * Builds the "Our Story" summary for a 1:1 chat from the caller's perspective: total/mine/
+     * theirs message counts, photos shared, active days, first-message date, days known, shared
+     * interests, the other party's public identity and a generated headline. Read-only.
+     *
+     * @param me the requesting user
+     * @param chatUuid target chat UUID
+     * @return the assembled summary DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) if the UUID is malformed or the
+     *         chat is missing/deleted
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_026) if the caller is not an active
+     *         member, or the chat is a group/room rather than 1:1
+     */
     @Override
     @Transactional(readOnly = true)
     public ConversationSummaryResponse summarize(User me, String chatUuid) {
@@ -97,6 +110,13 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    /**
+     * Finds the other participant of a 1:1 chat, or null when none can be resolved.
+     *
+     * @param chat the chat
+     * @param me the caller
+     * @return the other user, or null
+     */
     private User resolveOther(Chat chat, User me) {
         for (ChatMember m : chatMemberRepository.findByChat(chat)) {
             User u = m.getUser();
@@ -107,6 +127,12 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         return null;
     }
 
+    /**
+     * Evaluates a count supplier, returning 0 on any failure.
+     *
+     * @param supplier the count source
+     * @return the count, or 0 on failure
+     */
     private static long safeCount(LongSupplier supplier) {
         try {
             return supplier.getAsLong();
@@ -115,6 +141,13 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         }
     }
 
+    /**
+     * Up to six prettified interests present for both users, in the caller's iteration order.
+     *
+     * @param me the caller
+     * @param other the other user (nullable)
+     * @return shared interest labels (empty when none)
+     */
     private static List<String> sharedInterests(User me, User other) {
         if (me == null || other == null) return List.of();
         Set<Interest> mine = me.getInterests();
@@ -130,6 +163,17 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         return new ArrayList<>(out);
     }
 
+    /**
+     * Composes the natural-language headline from the summary metrics (or a "just getting
+     * started" line when there are no messages yet).
+     *
+     * @param total total message count
+     * @param daysKnown days since first message
+     * @param photos photos shared
+     * @param shared shared interest labels
+     * @param other the other user (nullable)
+     * @return the headline sentence
+     */
     private static String buildHeadline(long total, long daysKnown, long photos,
                                         List<String> shared, User other) {
         String who = other != null && other.getName() != null ? other.getName() : "them";
@@ -153,6 +197,12 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         return sb.toString();
     }
 
+    /**
+     * Joins items with commas and a trailing "and" (e.g. "A, B and C").
+     *
+     * @param items items to join
+     * @return the joined phrase ("" when empty)
+     */
     private static String humanJoin(List<String> items) {
         if (items.isEmpty()) return "";
         if (items.size() == 1) return items.get(0);
@@ -160,6 +210,12 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.get(items.size() - 1);
     }
 
+    /**
+     * Turns an ENUM_NAME into a "Enum name" title-ish label.
+     *
+     * @param enumName raw enum constant name
+     * @return prettified label
+     */
     private static String prettify(String enumName) {
         String lower = enumName.toLowerCase(Locale.ROOT).replace('_', ' ');
         return lower.substring(0, 1).toUpperCase(Locale.ROOT) + lower.substring(1);

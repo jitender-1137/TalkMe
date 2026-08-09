@@ -26,6 +26,13 @@ public class FfmpegSupport {
 
     private volatile String resolved;
 
+    /**
+     * Resolves the ffmpeg executable path, caching the result (double-checked locking). An operator-set
+     * {@code media.ffmpeg-path} wins; otherwise the Bytedeco-bundled binary is loaded, falling back to
+     * "ffmpeg" on PATH if that fails.
+     *
+     * @return the ffmpeg executable path or command to invoke
+     */
     public String path() {
         String cached = resolved;
         if (cached != null) return cached;

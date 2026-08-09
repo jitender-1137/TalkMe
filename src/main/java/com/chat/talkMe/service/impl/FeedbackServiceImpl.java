@@ -14,6 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+/**
+ * Default {@link FeedbackService} implementation: validates and persists user-submitted feedback
+ * (rating clamped 0–5, blank fields normalised to null) and maps it to a response DTO.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,6 +25,15 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     private final FeedbackRepository feedbackRepository;
 
+    /**
+     * Validate and persist feedback from {@code currentUser} (rating clamped to 0–5), rejecting an
+     * entirely empty submission.
+     *
+     * @param request     the feedback (rating, reason, comment, type, contextRef, platform)
+     * @param currentUser the author
+     * @return the persisted feedback as a response DTO
+     * @throws com.chat.talkMe.exception.BadRequestException if no rating, reason or comment given (TM_312)
+     */
     @Override
     @Transactional
     public FeedbackResponse submit(FeedbackRequest request, User currentUser) {
@@ -48,6 +61,12 @@ public class FeedbackServiceImpl implements FeedbackService {
         return toResponse(feedback);
     }
 
+    /**
+     * Parse a feedback type, defaulting to MANUAL when blank and OTHER when unrecognised.
+     *
+     * @param raw the raw type string
+     * @return the resolved {@link FeedbackType}
+     */
     private static FeedbackType parseType(String raw) {
         if (!StringUtils.hasText(raw)) return FeedbackType.MANUAL;
         try {

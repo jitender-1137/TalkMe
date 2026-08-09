@@ -142,7 +142,10 @@ public class MailTheme {
     }
 
     /**
-     * Pick a stable avatar colour for a name.
+     * Pick a stable avatar colour for a seed by hashing it into the configured palette.
+     *
+     * @param seed the value to derive a colour from (e.g. a name); null maps to the first colour
+     * @return a hex colour string from the palette
      */
     public String avatarColor(String seed) {
         String[] colors = avatarColors();

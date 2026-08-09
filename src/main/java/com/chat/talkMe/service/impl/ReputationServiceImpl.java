@@ -108,11 +108,28 @@ public class ReputationServiceImpl implements ReputationService {
 
     // ---------------------------------------------------------------------------------------
 
+    /**
+     * Cache-through cosmetic snapshot for the caller; on a miss runs a fail-open incremental
+     * recompute (each in its own transaction) and caches the result.
+     *
+     * @param user the caller
+     * @return the caller's cosmetic reputation card
+     */
     @Override
     public ReputationResponse getMine(User user) {
         return reputationCache.getOrCompute(user.getId(), () -> toResponse(recomputeSafely(user), user));
     }
 
+    /**
+     * Strictly read-only cosmetic snapshot for a third party — never writes their row, evicts
+     * their cache, or pushes WS. Serves the last persisted snapshot (or a default level-1 card).
+     * Read-only transaction; result is cached.
+     *
+     * @param userUuid the target user's UUID string
+     * @return the target's cosmetic reputation card
+     * @throws com.chat.talkMe.exception.BadRequestException if {@code userUuid} is not a valid UUID
+     * @throws com.chat.talkMe.exception.NotFoundException    if no user matches {@code userUuid}
+     */
     @Override
     @Transactional(readOnly = true)
     public ReputationResponse getFor(String userUuid) {
@@ -132,6 +149,14 @@ public class ReputationServiceImpl implements ReputationService {
                 .orElseGet(() -> defaultResponse(t)));
     }
 
+    /**
+     * Builds the opaque "why" explainer: the stored contributor breakdown parsed into label +
+     * coarse magnitude bucket rows (never raw points/weights). Runs a fail-open recompute first;
+     * a parse failure yields an empty contributor list rather than an error.
+     *
+     * @param user the caller
+     * @return the explainer with a (possibly empty) list of labelled contributors
+     */
     @Override
     public ReputationWhyResponse why(User user) {
         UserReputation rep = recomputeSafely(user);
@@ -157,6 +182,15 @@ public class ReputationServiceImpl implements ReputationService {
         return ReputationWhyResponse.builder().contributors(contributors).build();
     }
 
+    /**
+     * Prestiges the caller: folds in pending ledger rows, then (only at level 100) increments the
+     * prestige count and resets current-cycle progression to level 1 / BRONZE while preserving
+     * all-time totals. Persists, evicts the cache, and pushes a "prestige" WS event. Transactional.
+     *
+     * @param user the caller
+     * @return the reset cosmetic reputation card
+     * @throws com.chat.talkMe.exception.BadRequestException if the caller has not reached level 100
+     */
     @Override
     @Transactional
     public ReputationResponse prestige(User user) {
@@ -187,6 +221,14 @@ public class ReputationServiceImpl implements ReputationService {
         return toResponse(rep, user);
     }
 
+    /**
+     * Incremental idempotent recompute in its own transaction, pushing a level-up WS event when the
+     * level rises. Invoked through the proxy by read paths so a lost write-race rolls back in
+     * isolation. Transactional.
+     *
+     * @param user the user whose snapshot to refresh
+     * @return the (possibly updated) reputation snapshot
+     */
     @Override
     @Transactional
     public UserReputation recomputeFor(User user) {
@@ -274,6 +316,9 @@ public class ReputationServiceImpl implements ReputationService {
 
     // ---- helpers --------------------------------------------------------------------------
 
+    /**
+     * Persists and returns a fresh level-1 / BRONZE reputation row for a user who has none yet.
+     */
     private UserReputation create(User user) {
         UserReputation rep = UserReputation.builder()
                 .user(user)
@@ -331,6 +376,9 @@ public class ReputationServiceImpl implements ReputationService {
         };
     }
 
+    /**
+     * Maps a persisted snapshot to the cosmetic response DTO, defaulting a null star rank to BRONZE.
+     */
     private ReputationResponse toResponse(UserReputation rep, User user) {
         return ReputationResponse.builder()
                 .level(rep.getLevel())
@@ -385,6 +433,10 @@ public class ReputationServiceImpl implements ReputationService {
                 : null;
     }
 
+    /**
+     * Best-effort STOMP push of a reputation event to the user's {@code /queue/reputation}; any
+     * failure is swallowed (logged at debug) so it never breaks the calling flow.
+     */
     private void pushEvent(User user, String event, Map<String, Object> payload) {
         try {
             messagingTemplate.convertAndSendToUser(

@@ -33,6 +33,14 @@ public class MusicServiceImpl implements MusicService {
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
+    /**
+     * Query the iTunes Search API and map playable-preview songs to our track shape; the limit is
+     * clamped to 1..50 and any failure (blank query, non-200, exception) yields an empty list.
+     *
+     * @param query the search term
+     * @param limit desired result count (clamped to 1..50)
+     * @return matching tracks that have a preview URL, or an empty list on any failure
+     */
     @Override
     public List<MusicTrackResponse> search(String query, int limit) {
         if (query == null || query.isBlank()) {

@@ -64,6 +64,17 @@ public class TranslationServiceImpl implements TranslationService {
             .connectTimeout(HTTP_TIMEOUT)
             .build();
 
+    /**
+     * Translate {@code req.text} into {@code req.target}. Checks the Redis result cache first
+     * (cache hits are free and don't touch the daily cap); a real provider call consumes one
+     * cap unit, tries Azure then falls back to MyMemory, and fails open by echoing the input
+     * when both providers fail. No-op echo when disabled or text/target is blank.
+     *
+     * @param user the caller (used for the per-user daily cap)
+     * @param req  the plaintext plus target/source language (may be null)
+     * @return the translation, or the echoed input on fail-open
+     * @throws com.chat.talkMe.exception.TooManyRequestsException when the daily cap is exceeded
+     */
     @Override
     public TranslateResponse translate(User user, TranslateRequest req) {
         String text = req == null ? null : req.getText();
@@ -130,6 +141,17 @@ public class TranslationServiceImpl implements TranslationService {
                 .build();
     }
 
+    /**
+     * Translate many items into one target in a single pass. Serves cache hits for free, then
+     * translates only the uncached remainder in ONE Azure array call (falling back to MyMemory
+     * per item on failure), caching successes; the whole batch costs at most one daily-cap unit.
+     * Echoes every item when disabled or the batch/target is empty.
+     *
+     * @param user the caller (the whole batch consumes at most one daily-cap unit)
+     * @param req  the items (id + text), shared target and optional source (may be null)
+     * @return per-item results in input order, with the resolved provider label
+     * @throws com.chat.talkMe.exception.TooManyRequestsException when the daily cap is exceeded
+     */
     @Override
     public TranslateBatchResponse translateBatch(User user, TranslateBatchRequest req) {
         List<TranslateBatchRequest.Item> items = req == null ? null : req.getItems();
@@ -223,6 +245,13 @@ public class TranslationServiceImpl implements TranslationService {
 
     // ---- daily cap -------------------------------------------------------
 
+    /**
+     * Increment and check the caller's per-day Redis counter (TTL-expiring). Fails open (allows
+     * the translation) on any Redis error; only a genuine over-cap throws.
+     *
+     * @param user the caller whose daily quota is charged (no-op when null / no id)
+     * @throws com.chat.talkMe.exception.TooManyRequestsException when the daily cap is exceeded
+     */
     private void enforceDailyCap(User user) {
         if (user == null || user.getId() == null) {
             return;

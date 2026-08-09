@@ -9,6 +9,10 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Set;
 
+/**
+ * Live user presence (online/idle/offline, last-seen) and its privacy toggles
+ * (Ghost / Invisible / Hide-last-seen), backed by Redis with a DB fallback.
+ */
 public interface PresenceService {
     void setStatus(User user, PresenceStatus status);
 

@@ -71,6 +71,18 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Core chat-message engine: send/edit/delete, pin/star, reactions, paged history and search,
+ * plus consent-held release and self-destruct/view-once media.
+ *
+ * <p>Sends persist inside a {@code @Transactional} boundary and fan out via the transactional
+ * outbox pattern (durable {@link OutboxEvent} row committed atomically with the message, then an
+ * after-commit Spring event → RabbitMQ) so no message is lost or duplicated. Text and media
+ * references are encrypted at rest via {@link MessageCryptoService}; content moderation runs on
+ * the decrypted plaintext (hard-block in groups, mutual-consent hold in 1:1). Ephemeral-room
+ * messages are broadcast live over WebSocket but never persisted. Ghost-mode receipts are
+ * suppressed from the sender's view on read.</p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -99,6 +111,23 @@ public class MessageServiceImpl implements MessageService {
     private final MessageCryptoService messageCryptoService;
     private final MediaStorage mediaStorage;
 
+    /**
+     * Persist and fan out a chat message, enforcing membership, block/messaging-privacy, group
+     * send-authz (ban/mute/read-only/slow-mode), moderation and consent, then delivering via the
+     * transactional outbox + after-commit broadcast. Idempotent on {@code request.clientId}.
+     * Ephemeral rooms are handled by a non-persisting branch; blocked or consent-held messages are
+     * saved but not broadcast.
+     *
+     * @param chatUuid    uuid of the target chat
+     * @param request     send payload (content, type, attachment, clientId, mentions, flags)
+     * @param currentUser the authenticated sender
+     * @return the persisted (or transient, for ephemeral rooms) message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException          if the chat is missing/deleted
+     * @throws com.chat.talkMe.exception.ForbiddenException         if not a member, left, blocked,
+     *                                                              or messaging-privacy/authz denies
+     * @throws com.chat.talkMe.exception.TooManyRequestsException   if slow mode gate is hit
+     * @throws com.chat.talkMe.moderation.ContentModerationException if explicit content is hard-blocked
+     */
     @Override
     @Transactional
     public MessageResponse sendMessage(String chatUuid, SendMessageRequest request, User currentUser) {
@@ -439,6 +468,17 @@ public class MessageServiceImpl implements MessageService {
         return response;
     }
 
+    /**
+     * Persist a SYSTEM message (JSON content) authored by {@code actor} and best-effort broadcast it
+     * via outbox + after-commit event to all current members except {@code currentUser}.
+     *
+     * @param chatUuid    uuid of the target chat
+     * @param actor       the user the system event is attributed to
+     * @param contentJson pre-serialized system-event JSON stored as the message content
+     * @param currentUser the triggering user to exclude from recipients (may be null)
+     * @return the persisted system message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException if the chat is missing
+     */
     @Override
     @Transactional
     public MessageResponse sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser) {
@@ -480,6 +520,18 @@ public class MessageServiceImpl implements MessageService {
         return response;
     }
 
+    /**
+     * Pin or unpin a message and broadcast the change over WebSocket so the pinned banner updates
+     * live. In multi-party chats the caller's role must meet the chat's {@code whoCanPin} setting.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message to (un)pin
+     * @param pinned      true to pin, false to unpin
+     * @param currentUser the authenticated caller
+     * @return the updated message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member or lacks pin permission
+     */
     @Override
     @Transactional
     public MessageResponse setMessagePinned(String chatUuid, String messageUuid, boolean pinned, User currentUser) {
@@ -511,6 +563,16 @@ public class MessageServiceImpl implements MessageService {
         return messageMapper.toMessageResponse(message);
     }
 
+    /**
+     * Star or unstar a message for the current user only (private bookmark; idempotent).
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message
+     * @param starred     true to add a star, false to remove it
+     * @param currentUser the authenticated caller
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member of the chat
+     */
     @Override
     @Transactional
     public void setMessageStarred(String chatUuid, String messageUuid, boolean starred, User currentUser) {
@@ -525,6 +587,13 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
+    /**
+     * List the current user's starred messages, newest first, capped at 200 (default 100).
+     *
+     * @param currentUser the authenticated caller
+     * @param limit       requested page size; clamped to (0,200]
+     * @return starred messages as response DTOs with {@code starred=true}
+     */
     @Override
     @Transactional(readOnly = true)
     public List<MessageResponse> getStarredMessages(User currentUser, int limit) {
@@ -551,6 +620,18 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
+    /**
+     * Fetch one older page of messages (DESC, newest first) before {@code cursor}, honouring the
+     * member's cleared-at / left-at boundaries, with ghost-aware status and starred flags applied.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param cursor      sequence-number cursor; null for the newest page
+     * @param limit       requested page size; clamped to (0,100], default 30
+     * @param currentUser the authenticated caller
+     * @return a page of messages plus the next (older) cursor and a hasMore flag
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member of the chat
+     */
     @Override
     @Transactional(readOnly = true)
     public MessagePageResponse getMessages(String chatUuid, Long cursor, int limit, User currentUser) {
@@ -584,6 +665,17 @@ public class MessageServiceImpl implements MessageService {
                 .build();
     }
 
+    /**
+     * Fetch messages newer than {@code afterSequence} (catch-up after reconnect), ghost-aware with
+     * starred flags applied.
+     *
+     * @param chatUuid      uuid of the chat
+     * @param afterSequence exclusive lower-bound sequence number
+     * @param currentUser   the authenticated caller
+     * @return newer messages as response DTOs
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member of the chat
+     */
     @Override
     @Transactional(readOnly = true)
     public List<MessageResponse> getMessagesAfter(String chatUuid, Long afterSequence, User currentUser) {
@@ -599,6 +691,18 @@ public class MessageServiceImpl implements MessageService {
         return out;
     }
 
+    /**
+     * Full-text search within a chat's history the caller can see (honouring cleared-at), returning a
+     * ghost-aware page.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param query       search text
+     * @param pageable    paging/sorting
+     * @param currentUser the authenticated caller
+     * @return a page of matching messages as response DTOs
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member of the chat
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<MessageResponse> searchMessages(String chatUuid, String query, Pageable pageable, User currentUser) {
@@ -618,6 +722,9 @@ public class MessageServiceImpl implements MessageService {
     // a fetch/reload the sender-visible status caps at SENT. (The live WS path is
     // suppressed in StatusDeliveryService.) Zero overhead when no participant is ghost.
 
+    /**
+     * Map messages to responses, capping sender-visible status where a recipient is in Ghost mode.
+     */
     private List<MessageResponse> toResponsesGhostAware(List<Message> rows, User viewer) {
         Set<Long> ghostIds = ghostReceiptUserIds(rows, viewer);
         return rows.stream()
@@ -625,6 +732,9 @@ public class MessageServiceImpl implements MessageService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Map one message to a response, overriding its status to exclude Ghost recipients when needed.
+     */
     private MessageResponse toResponseGhostAware(Message m, Set<Long> ghostIds) {
         MessageResponse r = messageMapper.toMessageResponse(m);
         if (!ghostIds.isEmpty()) {
@@ -665,6 +775,18 @@ public class MessageServiceImpl implements MessageService {
         return delivered ? "DELIVERED" : "SENT";
     }
 
+    /**
+     * Delete a message. The sender (or a group/channel admin) tombstones it for everyone and
+     * broadcasts a delete event; offline recipients get it fully hidden rather than a tombstone.
+     * Any other member deletes it for themselves only (no broadcast).
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message to delete
+     * @param currentUser the authenticated caller
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member, or the message is in
+     *                                                      another chat
+     */
     @Override
     @Transactional
     public void deleteMessage(String chatUuid, String messageUuid, User currentUser) {
@@ -738,6 +860,17 @@ public class MessageServiceImpl implements MessageService {
     // they can linger if the client never reports back, so they still self-destruct.
     private static final long VIEW_ONCE_GRACE_SECONDS = 120;
 
+    /**
+     * Arm a self-destruct/view-once message's timer on first open by the receiver (sender is sealed).
+     * Idempotent once armed or expired.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message
+     * @param currentUser the receiver opening the message
+     * @return the (possibly newly armed) message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member, or the sender tries to open
+     */
     @Override
     @Transactional
     public MessageResponse revealSelfDestruct(String chatUuid, String messageUuid, User currentUser) {
@@ -755,6 +888,16 @@ public class MessageServiceImpl implements MessageService {
         return messageMapper.toMessageResponse(message);
     }
 
+    /**
+     * Consume a self-destruct message when the receiver finishes viewing it, destroying the media
+     * immediately. No-op for the sender or already-expired/non-self-destruct messages.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message
+     * @param currentUser the receiver consuming the message
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member of the chat
+     */
     @Override
     @Transactional
     public void consumeSelfDestruct(String chatUuid, String messageUuid, User currentUser) {
@@ -765,6 +908,13 @@ public class MessageServiceImpl implements MessageService {
         expireSelfDestruct(message);
     }
 
+    /**
+     * Sweep armed self-destruct messages whose countdown (or view-once grace) has elapsed and destroy
+     * their media. Invoked by the scheduled reaper.
+     *
+     * @param now the reference instant to compare deadlines against
+     * @return the number of messages destroyed in this pass
+     */
     @Override
     @Transactional
     public int reapExpiredSelfDestruct(Instant now) {
@@ -782,7 +932,18 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * Load a message and verify the caller is a member of the chat it belongs to.
+     * Edit a text message's content (sender-only). Re-moderates the new text, stores it (as received,
+     * i.e. encrypted for encrypted chats), sets the edited flag and broadcasts a live update.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message to edit
+     * @param content     new content (ciphertext for encrypted chats, else plaintext)
+     * @param currentUser the authenticated caller (must be the sender)
+     * @return the updated message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException          if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException         if not a member or not the sender
+     * @throws com.chat.talkMe.exception.BadRequestException        if deleted, non-text, or empty
+     * @throws com.chat.talkMe.moderation.ContentModerationException if the new text is disallowed explicit
      */
     @Override
     @Transactional
@@ -836,6 +997,9 @@ public class MessageServiceImpl implements MessageService {
         return messageMapper.toMessageResponse(message);
     }
 
+    /**
+     * Load a message and verify the caller is a member of the chat it belongs to.
+     */
     private Message loadChatMessage(String chatUuid, String messageUuid, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
@@ -899,6 +1063,13 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
+    /**
+     * Look up a message attachment by its uuid (used by the media-serve endpoint).
+     *
+     * @param attachmentUuid uuid of the attachment
+     * @return the attachment entity
+     * @throws com.chat.talkMe.exception.NotFoundException if no such attachment exists
+     */
     @Override
     @Transactional(readOnly = true)
     public MessageAttachment getAttachment(String attachmentUuid) {
@@ -906,6 +1077,18 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new NotFoundException("Attachment not found", "TM_169"));
     }
 
+    /**
+     * Add the caller's emoji reaction to a message (idempotent per user+emoji) and broadcast the
+     * updated reaction set over WebSocket.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message
+     * @param request     carries the emoji to react with
+     * @param currentUser the authenticated caller
+     * @return the updated message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member, or message in another chat
+     */
     @Override
     @Transactional
     public MessageResponse reactToMessage(String chatUuid, String messageUuid, ReactToMessageRequest request, User currentUser) {
@@ -943,6 +1126,18 @@ public class MessageServiceImpl implements MessageService {
         return response;
     }
 
+    /**
+     * Remove the caller's emoji reaction from a message (no-op if absent) and broadcast the updated
+     * reaction set over WebSocket.
+     *
+     * @param chatUuid    uuid of the chat
+     * @param messageUuid uuid of the message
+     * @param emoji       the emoji reaction to remove
+     * @param currentUser the authenticated caller
+     * @return the updated message as a response DTO
+     * @throws com.chat.talkMe.exception.NotFoundException  if the chat/message is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException if not a member, or message in another chat
+     */
     @Override
     @Transactional
     public MessageResponse removeReaction(String chatUuid, String messageUuid, String emoji, User currentUser) {
@@ -976,9 +1171,11 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * Writes the transactional outbox row for a send message. Runs inside the caller's
-     * {@code @Transactional,} so the row commits atomically with the message — there is no
-     * window where a message exists without a durable delivery record.
+     * Release all messages held pending explicit-content consent in a chat: flip them to RELEASED so
+     * both parties can now see them, and deliver each through the normal durable pipeline (outbox row
+     * + after-commit broadcast to recipients). Called once consent is granted.
+     *
+     * @param chat the chat whose held messages should be released
      */
     @Override
     @Transactional
@@ -1021,6 +1218,12 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
+    /**
+     * Write the durable transactional-outbox row for a message send, atomically with the caller's
+     * transaction; a failure here fails the whole send so the client retries.
+     *
+     * @throws IllegalStateException if the event cannot be serialized/persisted
+     */
     private void persistOutbox(String messageId, MessageSentEvent event) {
         try {
             String payload = objectMapper.writeValueAsString(event);

@@ -63,6 +63,16 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * User profile, identity and discovery service.
+ *
+ * <p>Handles fetching/updating the current user, username changes (case-insensitive uniqueness),
+ * mood, avatar upload/removal (NSFW-moderated), user lookups (by id/username), the trimmed public
+ * profile, the enriched smart profile card, people search, blocked-user and mutual-friend lists,
+ * user reports, and the Redis-backed lobby list. Display name and avatar pass content moderation;
+ * presence/last-seen/block flags are resolved live (Redis) with privacy masking, and enrichments
+ * (reputation, streak, recent posts) are best-effort fail-open decoration.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -86,6 +96,14 @@ public class UserServiceImpl implements UserService {
     private final CompatibilityService compatibilityService;
     private final StreakService streakService;
 
+    /**
+     * Load the caller's own profile with presence forced to online, current last-seen, and
+     * follower/following/post counts populated. Read-only.
+     *
+     * @param currentUser the caller
+     * @return the caller's user response
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     */
     @Override
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(User currentUser) {
@@ -98,6 +116,18 @@ public class UserServiceImpl implements UserService {
         return response;
     }
 
+    /**
+     * Apply a partial profile update (only non-null request fields change; blank "About me"
+     * dropdowns clear their column). Moderates the display name, rejects country changes,
+     * recomputes profile completion, and records a PROFILE_COMPLETED reputation event at 100%.
+     *
+     * @param request     the fields to update
+     * @param currentUser the caller
+     * @return the updated user response (presence online, counts populated)
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.ContentModerationException when the display name is explicit
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_099) on an attempted country change
+     */
     @Override
     @Transactional
     public UserResponse updateProfile(UpdateProfileRequest request, User currentUser) {
@@ -213,6 +243,17 @@ public class UserServiceImpl implements UserService {
     private static final Pattern USERNAME_PATTERN =
             Pattern.compile("^[a-zA-Z0-9_]{3,30}$");
 
+    /**
+     * Change the caller's username after format validation and case-insensitive uniqueness check
+     * (soft-deleted names stay reserved; purged names are free). No-op rename when unchanged.
+     *
+     * @param newUsername the requested username (trimmed)
+     * @param currentUser the caller
+     * @return the updated user response
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_002) on an invalid username format
+     * @throws com.chat.talkMe.exception.ConflictException (TM_048) when the username is taken
+     */
     @Override
     @Transactional
     public UserResponse changeUsername(String newUsername, User currentUser) {
@@ -242,6 +283,14 @@ public class UserServiceImpl implements UserService {
         return response;
     }
 
+    /**
+     * Whether {@code username} is free for the caller to take: valid format and either unchanged
+     * from their current name or not already used (case-insensitive).
+     *
+     * @param username    the candidate username
+     * @param currentUser the caller
+     * @return true if the candidate is available to this user
+     */
     @Override
     public boolean isUsernameAvailable(String username, User currentUser) {
         String candidate = username == null ? "" : username.trim();
@@ -251,6 +300,16 @@ public class UserServiceImpl implements UserService {
         return !userRepository.existsByUsernameIgnoreCase(candidate);
     }
 
+    /**
+     * Set the caller's mood (parsed to the {@link Mood} enum), stamp the update time, and
+     * recompute profile completion.
+     *
+     * @param moodValue   the mood value (case-insensitive enum name)
+     * @param currentUser the caller
+     * @return the updated user response
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_002) on an invalid mood value
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     */
     @Override
     @Transactional
     public UserResponse updateMood(String moodValue, User currentUser) {
@@ -269,6 +328,16 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserResponse(user);
     }
 
+    /**
+     * Moderate (NSFW) and store a new avatar under {@code profiles/<userUuid>}, update the user,
+     * and best-effort notify friends of the photo change (real accounts only; never blocks upload).
+     *
+     * @param file        the uploaded image
+     * @param currentUser the caller
+     * @return a single-entry map {@code {"avatarUrl": <url>}}
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     * @throws com.chat.talkMe.exception.ContentModerationException when the photo is explicit
+     */
     @Override
     @Transactional
     public Map<String, String> uploadAvatar(MultipartFile file, User currentUser) {
@@ -307,6 +376,12 @@ public class UserServiceImpl implements UserService {
         return Map.of("avatarUrl", avatarUrl);
     }
 
+    /**
+     * Clear the caller's profile image (sends no notification, unlike upload).
+     *
+     * @param currentUser the caller
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the user no longer exists
+     */
     @Override
     @Transactional
     public void removeAvatar(User currentUser) {
@@ -317,6 +392,15 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
     }
 
+    /**
+     * Fetch a user by UUID (or the literal "me"), populated with presence/block status, counts,
+     * and a friendship flag relative to the caller. Read-only.
+     *
+     * @param userId      the target UUID string, or "me"
+     * @param currentUser the caller (may be null in some flows)
+     * @return the target user response
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_USER_NOT_FOUND) when the target is missing
+     */
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUserById(String userId, User currentUser) {
@@ -341,6 +425,16 @@ public class UserServiceImpl implements UserService {
         return response;
     }
 
+    /**
+     * Build the PII-free public profile for a shareable {@code /@username} link. Only real, active
+     * accounts are reachable (guests/banned/soft-deleted 404). Includes live presence and follower/
+     * following/post counts, plus a fail-open cosmetic reputation summary. Read-only.
+     *
+     * @param username the target username (case-insensitive)
+     * @return the trimmed public profile
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_USER_NOT_FOUND) when blank, missing,
+     *                                                     or not a shareable account
+     */
     @Override
     @Transactional(readOnly = true)
     public PublicProfileResponse getPublicProfileByUsername(String username) {
@@ -387,6 +481,16 @@ public class UserServiceImpl implements UserService {
         return resp;
     }
 
+    /**
+     * Build the enriched smart profile card for a target: reuses the mapped user response, mutual-
+     * friend count, and a compatibility score (viewer re-loaded as a managed entity to avoid a
+     * LazyInit), plus fail-open online-streak and recent-public-post enrichments. Read-only.
+     *
+     * @param userId      the target UUID string
+     * @param currentUser the viewer
+     * @return the assembled smart profile card
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) when the target is missing
+     */
     @Override
     @Transactional(readOnly = true)
     public SmartProfileCardResponse getSmartProfileCard(String userId, User currentUser) {
@@ -449,6 +553,18 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * Page-cursor search over username/name/email (case-insensitive LIKE), excluding self and any
+     * guest or soft-deleted accounts, sorted by name. Each hit is enriched with presence/block
+     * status and counts. The cursor is the next page index. Read-only.
+     *
+     * @param query       the search term (>= 2 chars)
+     * @param limit       page size
+     * @param cursor      the page index as a string (null/blank = first page)
+     * @param currentUser the caller (excluded from results)
+     * @return a paginated page of matching users
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_070) when the query is too short
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<UserResponse> searchUsers(String query, int limit, String cursor, User currentUser) {
@@ -504,6 +620,12 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * List the users the caller has blocked (single, non-paginated page). Read-only.
+     *
+     * @param currentUser the caller
+     * @return the blocked users wrapped as a paginated response
+     */
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<BlockedUserResponse> getBlockedUsers(User currentUser) {
@@ -529,6 +651,17 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * File a moderation report against a target user, deduping to one PENDING report per
+     * reporter/target pair.
+     *
+     * @param userId      the reported user's UUID string
+     * @param reason      the report reason (defaults to "other" when null)
+     * @param description free-text details
+     * @param currentUser the reporter
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_USER_NOT_FOUND) when the target is missing
+     * @throws com.chat.talkMe.exception.ConflictException (TM_182) when a pending report already exists
+     */
     @Override
     @Transactional
     public void reportUser(String userId, String reason, String description, User currentUser) {
@@ -554,6 +687,15 @@ public class UserServiceImpl implements UserService {
         matchReportRepository.save(report);
     }
 
+    /**
+     * Compute the mutual friends between the caller and a target user (intersection of both
+     * friend lists), each enriched with presence/block status. Read-only.
+     *
+     * @param userId      the target user's UUID string
+     * @param currentUser the caller
+     * @return the mutual friends and their count
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_USER_NOT_FOUND) when the target is missing
+     */
     @Override
     @Transactional(readOnly = true)
     public MutualFriendsResponse getMutualFriends(String userId, User currentUser) {
@@ -582,6 +724,15 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * Fill in block status, messaging-privacy flags (friends-only + whether the viewer can
+     * message), and live presence/last-seen (Redis) with Invisible/Hide-last-seen masking; the
+     * owner sees their own real last-seen.
+     *
+     * @param response    the response to mutate
+     * @param currentUser the viewer (may be null)
+     * @param targetUser  the user being described
+     */
     private void populatePresenceAndBlockStatus(UserResponse response, User currentUser, User targetUser) {
         boolean isBlocked = false;
         if (currentUser != null) {
@@ -626,6 +777,12 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    /**
+     * Populate follower, following (accepted, non-deleted) and visible-post counts on the response.
+     *
+     * @param response the response to mutate
+     * @param user     the user whose counts are computed
+     */
     private void populateUserCounts(UserResponse response, User user) {
         long followers = userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(user, "ACCEPTED");
         long following = userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(user, "ACCEPTED");
@@ -635,6 +792,13 @@ public class UserServiceImpl implements UserService {
         response.setPostsCount(posts);
     }
 
+    /**
+     * List users currently in the lobby (from the Redis {@code lobby:users} set), excluding the
+     * caller, each enriched with presence/block status and counts. Read-only.
+     *
+     * @param currentUser the caller (excluded; may be null)
+     * @return the lobby users (empty when the set is empty)
+     */
     @Override
     @Transactional(readOnly = true)
     public List<UserResponse> getLobbyUsers(User currentUser) {

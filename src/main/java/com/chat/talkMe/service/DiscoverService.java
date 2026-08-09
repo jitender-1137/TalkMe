@@ -4,6 +4,9 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.response.DiscoverProfileResponse;
 import com.chat.talkMe.dto.response.PaginatedResponse;
 
+/**
+ * People-discovery search: filtered, presence-ranked, paginated user browsing plus like/unlike.
+ */
 public interface DiscoverService {
     PaginatedResponse<DiscoverProfileResponse> getDiscover(
             String query,

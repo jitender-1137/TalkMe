@@ -55,6 +55,16 @@ public class StreakServiceImpl implements StreakService {
     private final ReputationRecorder reputationRecorder;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Register today's activity (UTC) for the user, mutating and persisting the streak row.
+     * Idempotent per calendar day; a one-day gap is absorbed by a freeze token if available,
+     * else the run resets to 1. Milestone crossings record a {@link ReputationEventType#STREAK_MILESTONE}
+     * event, grant a capped freeze token, and push a {@code streak_updated} WS event.
+     * Runs in the class-level write transaction; lazily creates the row on first check-in.
+     *
+     * @param user the caller whose streak is advanced
+     * @return the resulting streak snapshot (with the display-effective current streak)
+     */
     @Override
     public StreakResponse checkIn(User user) {
         DailyStreak streak = streakRepository.findByUser(user).orElseGet(() -> create(user));
@@ -112,6 +122,13 @@ public class StreakServiceImpl implements StreakService {
         return toResponse(streak);
     }
 
+    /**
+     * Read-only streak snapshot for the user; never inserts, returning a zeroed response when
+     * no row exists yet.
+     *
+     * @param user the caller whose streak is read
+     * @return the current streak snapshot, or a zeroed one when none exists
+     */
     @Override
     @Transactional(readOnly = true)
     public StreakResponse getStreak(User user) {
@@ -165,6 +182,13 @@ public class StreakServiceImpl implements StreakService {
                 .build();
     }
 
+    /**
+     * Best-effort WS push of a {@code streak_updated} event to the user's reputation queue;
+     * swallows any messaging failure so it never breaks the check-in.
+     *
+     * @param user    the recipient (addressed by username)
+     * @param payload the streak event payload to deliver
+     */
     private void pushEvent(User user, Map<String, Object> payload) {
         try {
             messagingTemplate.convertAndSendToUser(

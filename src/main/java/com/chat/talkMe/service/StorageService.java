@@ -2,6 +2,9 @@ package com.chat.talkMe.service;
 
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Stores uploaded media (images as-is, videos transcoded) via the pluggable storage backend.
+ */
 public interface StorageService {
 
     /**

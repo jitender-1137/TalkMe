@@ -40,6 +40,18 @@ public class LiveAudioServiceImpl implements LiveAudioService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
 
+    /**
+     * Mint a short-lived HS256 LiveKit access token scoping the caller to the chat's room, with a
+     * video grant allowing join/publish/subscribe. Requires the caller to be a member of the chat.
+     *
+     * @param user     the authenticated caller
+     * @param chatUuid uuid string of the chat whose room to join
+     * @return the signed token plus room, identity and ws URL
+     * @throws com.chat.talkMe.exception.BadRequestException if live audio is not enabled/configured,
+     *                                                       or chatUuid is invalid
+     * @throws com.chat.talkMe.exception.NotFoundException   if the chat does not exist
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a chat member
+     */
     @Override
     public LiveTokenResponse mintToken(User user, String chatUuid) {
         if (!props.isReady()) {
@@ -83,6 +95,13 @@ public class LiveAudioServiceImpl implements LiveAudioService {
                 .build();
     }
 
+    /**
+     * Resolve a chat by uuid and assert the caller is a member.
+     *
+     * @throws com.chat.talkMe.exception.BadRequestException if chatUuid is not a valid uuid
+     * @throws com.chat.talkMe.exception.NotFoundException   if the chat does not exist
+     * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not a member
+     */
     private Chat resolveMemberChat(User user, String chatUuid) {
         UUID uuid;
         try {

@@ -55,6 +55,12 @@ public class CityServiceImpl implements CityService {
 
     // ── Reads ────────────────────────────────────────────────────────────────
 
+    /**
+     * Lists every district as a lightweight card (label/emoji/tagline plus live + room counts).
+     * Live counts intersect the district's Redis presence set with the global online set.
+     *
+     * @return one card per {@link CityLocation}
+     */
     @Override
     @Transactional(readOnly = true)
     public List<CityDistrictResponse> listDistricts() {
@@ -66,6 +72,14 @@ public class CityServiceImpl implements CityService {
         return out;
     }
 
+    /**
+     * Full district detail: the card, its curated room cards, and the live (online) roster.
+     *
+     * @param slug district slug
+     * @param user the requesting user (unused beyond routing/entitlement context)
+     * @return the district detail DTO
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_970) if the slug is unknown
+     */
     @Override
     @Transactional(readOnly = true)
     public CityDistrictDetailResponse getDistrict(String slug, User user) {
@@ -78,6 +92,14 @@ public class CityServiceImpl implements CityService {
                 .build();
     }
 
+    /**
+     * The curated room cards for a district.
+     *
+     * @param slug district slug
+     * @param user the requesting user
+     * @return room discovery cards
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_970) if the slug is unknown
+     */
     @Override
     @Transactional(readOnly = true)
     public List<ChatResponse> getRooms(String slug, User user) {
@@ -86,6 +108,16 @@ public class CityServiceImpl implements CityService {
 
     // ── Presence mutations ─────────────────────────────────────────────────────
 
+    /**
+     * Marks the user present in a district: adds their username to the district's Redis set
+     * (best-effort, refreshes the 12h TTL), broadcasts a {@code user_joined} event, and returns
+     * the refreshed district detail.
+     *
+     * @param user the entering user
+     * @param slug district slug
+     * @return the refreshed district detail
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_970) if the slug is unknown
+     */
     @Override
     @Transactional(readOnly = true)
     public CityDistrictDetailResponse enterDistrict(User user, String slug) {
@@ -101,6 +133,15 @@ public class CityServiceImpl implements CityService {
         return getDistrict(slug, user);
     }
 
+    /**
+     * Marks the user absent from a district: removes them from the Redis presence set
+     * (best-effort) and broadcasts a {@code user_left} event. Returns no payload by design so
+     * this USER-gated endpoint can't leak VIRTUAL_CITY-gated detail to a non-entitled caller.
+     *
+     * @param user the leaving user
+     * @param slug district slug
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_970) if the slug is unknown
+     */
     @Override
     @Transactional(readOnly = true)
     public void leaveDistrict(User user, String slug) {
@@ -117,6 +158,13 @@ public class CityServiceImpl implements CityService {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    /**
+     * Resolves a slug to its {@link CityLocation} or fails.
+     *
+     * @param slug district slug
+     * @return the matching location
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_970) if the slug is unknown
+     */
     private CityLocation require(String slug) {
         CityLocation loc = CityLocation.fromSlug(slug);
         if (loc == null) {
@@ -125,6 +173,14 @@ public class CityServiceImpl implements CityService {
         return loc;
     }
 
+    /**
+     * Builds a district card, computing live count as presence-members intersected with the
+     * supplied online set and room count as the curated ROOM chats for the location.
+     *
+     * @param loc the district
+     * @param online the current global online-username set
+     * @return the card DTO
+     */
     private CityDistrictResponse card(CityLocation loc, Set<String> online) {
         Set<String> members = members(loc.getSlug());
         int live = (int) members.stream().filter(online::contains).count();
@@ -153,6 +209,12 @@ public class CityServiceImpl implements CityService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Maps a curated room Chat entity to a discovery {@link ChatResponse} card.
+     *
+     * @param chat the room chat
+     * @return the room card
+     */
     private ChatResponse toRoomCard(Chat chat) {
         return ChatResponse.builder()
                 .id(chat.getUuid().toString())
@@ -177,6 +239,12 @@ public class CityServiceImpl implements CityService {
                 .build();
     }
 
+    /**
+     * Cached member count for a chat, falling back to 0 on any lookup failure.
+     *
+     * @param chat the chat
+     * @return member count (0 on failure)
+     */
     private int safeMemberCount(Chat chat) {
         try {
             return memberCountCache.get(chat);
@@ -206,6 +274,12 @@ public class CityServiceImpl implements CityService {
         return live;
     }
 
+    /**
+     * Reads the raw Redis presence set for a district slug; empty on read failure (fail-open).
+     *
+     * @param slug district slug
+     * @return the set of member usernames (possibly stale/offline)
+     */
     private Set<String> members(String slug) {
         try {
             Set<String> m = redis.opsForSet().members(key(slug));
@@ -216,6 +290,11 @@ public class CityServiceImpl implements CityService {
         }
     }
 
+    /**
+     * The global online-username set from {@link PresenceService}; empty on failure (fail-open).
+     *
+     * @return online usernames
+     */
     private Set<String> safeOnline() {
         try {
             Set<String> online = presenceService.getOnlineUsernames();
@@ -226,6 +305,15 @@ public class CityServiceImpl implements CityService {
         }
     }
 
+    /**
+     * Best-effort WebSocket broadcast to {@code /topic/city/{slug}} carrying the event, the
+     * acting username and the online-intersected live count (so the WS badge matches the REST
+     * card). Swallows any failure.
+     *
+     * @param event event name (e.g. user_joined / user_left)
+     * @param loc the district
+     * @param user the acting user
+     */
     private void broadcast(String event, CityLocation loc, User user) {
         try {
             // Use the online-intersected count so the live WS badge matches the REST card
@@ -242,6 +330,12 @@ public class CityServiceImpl implements CityService {
         }
     }
 
+    /**
+     * The Redis presence-set key for a district slug.
+     *
+     * @param slug district slug
+     * @return the namespaced Redis key
+     */
     private static String key(String slug) {
         return KEY_PREFIX + slug;
     }

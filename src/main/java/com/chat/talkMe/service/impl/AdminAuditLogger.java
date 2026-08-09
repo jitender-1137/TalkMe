@@ -25,6 +25,16 @@ public class AdminAuditLogger {
 
     private final AdminAuditLogRepository auditRepository;
 
+    /**
+     * Persists one admin audit row in a fresh, suspended (REQUIRES_NEW) transaction so the
+     * write commits independently of the caller's (possibly read-only) transaction.
+     *
+     * @param admin      acting admin's username; stored as "unknown" when null
+     * @param action     the audited action code (e.g. BAN_USER, VIEW_MESSAGES)
+     * @param targetType the target entity type (e.g. USER, CHAT)
+     * @param targetId   the target identifier (uuid or "all")
+     * @param detail     free-form human-readable context for the entry
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void write(String admin, String action, String targetType, String targetId, String detail) {
         auditRepository.save(AdminAuditLog.builder()

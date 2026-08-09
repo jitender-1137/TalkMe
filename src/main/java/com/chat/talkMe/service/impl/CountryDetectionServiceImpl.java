@@ -12,6 +12,13 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Detects a request's country/location, preferring proxy-provided headers (Cloudflare {@code CF-IPCountry},
+ * then a configurable proxy header) and falling back to an ip-api.com GeoIP lookup (1s connect/read timeout).
+ * <p>
+ * Private/local client IPs are normally reported as "Unknown"; in dev ({@code app.geo.geolocate-local-ip})
+ * the lookup instead geolocates the server's own public IP so detection works on localhost.
+ */
 @Slf4j
 @Service
 public class CountryDetectionServiceImpl implements CountryDetectionService {
@@ -36,6 +43,14 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         this.restTemplate = new RestTemplate(factory);
     }
 
+    /**
+     * Resolves the request's location by trying, in order: the Cloudflare country header, a proxy country
+     * header (configured or common fallbacks), then an ip-api.com GeoIP lookup on the resolved client IP.
+     * Returns an "Unknown" result when nothing resolves, on error/timeout, or for local IPs outside dev mode.
+     *
+     * @param request the incoming HTTP request (may be null)
+     * @return the detected country/location and its source; never null
+     */
     @Override
     public CountryDetectionResult detectCountry(HttpServletRequest request) {
         if (request == null) {
@@ -129,6 +144,13 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
                 .build();
     }
 
+    /**
+     * Resolves the real client IP behind Cloudflare/Nginx/load balancers, checking {@code CF-Connecting-IP},
+     * {@code X-Forwarded-For} (first hop), {@code X-Real-IP}, then the raw remote address.
+     *
+     * @param request the incoming request
+     * @return the best-guess client IP
+     */
     private String resolveIp(HttpServletRequest request) {
         // Correctly resolve client IP when behind Cloudflare, Nginx, Load balancers, Proxies
         String ip = request.getHeader("CF-Connecting-IP");
@@ -159,6 +181,13 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         return null;
     }
 
+    /**
+     * Converts an ISO country code to its English display name, returning the code itself when it can't
+     * be resolved to a distinct name.
+     *
+     * @param countryCode the ISO-3166 country code
+     * @return the English country name, or the code on failure
+     */
     private String getCountryNameFromCode(String countryCode) {
         try {
             Locale locale = Locale.of("", countryCode);
@@ -172,6 +201,12 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         return countryCode;
     }
 
+    /**
+     * True when the IP is loopback/localhost or in a private IPv4 range (10/8, 172.16/12, 192.168/16).
+     *
+     * @param ip the client IP
+     * @return whether the IP is local or private
+     */
     private boolean isLocalOrPrivateIp(String ip) {
         if (ip == null || ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.equalsIgnoreCase("localhost") || ip.equalsIgnoreCase("::1")) {
             return true;

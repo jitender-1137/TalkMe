@@ -1,5 +1,8 @@
 package com.chat.talkMe.service;
 
+/**
+ * Server-side Cloudflare Turnstile CAPTCHA verification.
+ */
 public interface CaptchaService {
     /**
      * Verify a Cloudflare Turnstile token. Returns true if the request is a

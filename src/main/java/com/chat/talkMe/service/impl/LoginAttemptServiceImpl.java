@@ -35,6 +35,14 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
      */
     private static final long WINDOW_SECONDS = 15 * 60;
 
+    /**
+     * Reject the login when either the per-username or per-IP failure count has hit its limit within
+     * the sliding window. Fails open (never blocks) if Redis is unavailable.
+     *
+     * @param username the login username (skipped if null/blank)
+     * @param ip       the client IP (skipped if null/blank)
+     * @throws com.chat.talkMe.exception.TooManyRequestsException if the account or IP limit is reached
+     */
     @Override
     public void assertNotBlocked(String username, String ip) {
         if (username != null && !username.isBlank() && count(userKey(username)) >= USER_MAX_ATTEMPTS) {
@@ -47,12 +55,24 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
         }
     }
 
+    /**
+     * Increment the per-username and per-IP failure counters (first hit sets the window TTL).
+     *
+     * @param username the login username (skipped if null/blank)
+     * @param ip       the client IP (skipped if null/blank)
+     */
     @Override
     public void recordFailure(String username, String ip) {
         if (username != null && !username.isBlank()) increment(userKey(username));
         if (ip != null && !ip.isBlank()) increment(ipKey(ip));
     }
 
+    /**
+     * Clear the per-username and per-IP failure counters after a successful login (best-effort).
+     *
+     * @param username the login username (skipped if null/blank)
+     * @param ip       the client IP (skipped if null/blank)
+     */
     @Override
     public void recordSuccess(String username, String ip) {
         try {
@@ -63,6 +83,9 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
         }
     }
 
+    /**
+     * Read the current counter value for a key, returning 0 (fail-open) on any Redis error.
+     */
     private long count(String key) {
         try {
             String v = redisTemplate.opsForValue().get(key);
@@ -73,6 +96,9 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
         }
     }
 
+    /**
+     * Increment a counter, setting the sliding-window TTL on its first increment (best-effort).
+     */
     private void increment(String key) {
         try {
             Long c = redisTemplate.opsForValue().increment(key);

@@ -75,6 +75,17 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Authentication and account-lifecycle implementation: password / guest / Google-OAuth login,
+ * signup, JWT access + rotating refresh tokens (single-device policy), session listing/revocation,
+ * email verification, password reset, profile updates, and soft-delete with scheduled purge.
+ *
+ * <p>Cross-cutting behaviours: brute-force lockout via {@link LoginAttemptService}; best-effort
+ * IP geo-location for country backfill, session location and sign-in alert emails; breached-
+ * password rejection (HIBP); one-time reset/verification tokens stored in Redis only as SHA-256
+ * hashes with TTLs and per-recipient send cooldowns; and feature-access cache eviction whenever an
+ * action can change entitlement.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -136,6 +147,23 @@ public class AuthServiceImpl implements AuthService {
      */
     private static final int MAIL_COOLDOWN_SECONDS = 60;
 
+    /**
+     * Authenticates a password login by case-insensitive username or email. Enforces the
+     * brute-force lockout, rejects guest/banned accounts, verifies the password, recovers a
+     * soft-deleted account within its recovery window (else 401), backfills country from the
+     * request IP when unset, fires a best-effort sign-in alert, and issues a token pair +
+     * session (single-device: prior tokens are revoked). Transactional.
+     *
+     * @param request the login credentials (email/username + password)
+     * @param userAgent the caller's User-Agent (recorded on the session + alert)
+     * @param ip the caller IP (used for lockout accounting)
+     * @param httpRequest the servlet request (used for IP geo-location)
+     * @return the login response with user + tokens
+     * @throws com.chat.talkMe.exception.UnauthorizedException (TM_024) unknown user, bad password,
+     *         or a soft-deleted account past its recovery window
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_029) guest account using this flow,
+     *         or (TM_030) a banned account
+     */
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest) {
@@ -219,6 +247,20 @@ public class AuthServiceImpl implements AuthService {
         return generateLoginResponse(user, userAgent, detection);
     }
 
+    /**
+     * Registers a new password account: canonicalizes the email and enforces case-insensitive
+     * uniqueness, rejects breached passwords, moderates the display name, detects country from
+     * the request IP, resolves optional referral attribution, persists the user, sends the
+     * verification email, and returns a login response. Transactional.
+     *
+     * @param request the signup fields
+     * @param userAgent the caller's User-Agent
+     * @param httpRequest the servlet request (used for country detection)
+     * @return the login response with user + tokens
+     * @throws com.chat.talkMe.exception.ConflictException (TM_047) if the email already exists
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_496) if the password is breached
+     * @throws com.chat.talkMe.exception.ContentModerationException if the display name is explicit
+     */
     @Override
     @Transactional
     public LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest) {
@@ -299,6 +341,15 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * Creates an anonymous guest account (random {@code guest_*} username, ROLE_GUEST, unverified)
+     * with detected country, and returns a login response (guest refresh-token TTL). Transactional.
+     *
+     * @param request the guest details (display name, age, gender)
+     * @param userAgent the caller's User-Agent
+     * @param httpRequest the servlet request (used for country detection)
+     * @return the login response with the guest user + tokens
+     */
     @Override
     @Transactional
     public LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, HttpServletRequest httpRequest) {
@@ -325,6 +376,20 @@ public class AuthServiceImpl implements AuthService {
         return generateLoginResponse(guest, userAgent, detectionResult);
     }
 
+    /**
+     * Logs in (or provisions) a Google-OAuth user. Matches by provider id then canonical email,
+     * creating a verified account on first use (handling the concurrent-create race via the
+     * unique constraint) or linking the Google identity and backfilling missing fields on an
+     * existing account (also recovering a soft-deleted one). Sends a welcome email for brand-new
+     * users, otherwise a best-effort sign-in alert. Transactional.
+     *
+     * @param info the OAuth profile (provider id, email, name, picture, verified, age, gender)
+     * @param userAgent the caller's User-Agent
+     * @param httpRequest the callback servlet request (used for country detection)
+     * @return the login response with user + tokens
+     * @throws org.springframework.dao.DataIntegrityViolationException if a create race cannot be
+     *         resolved to an existing row
+     */
     @Override
     @Transactional
     public LoginResponse oauthLogin(OAuthUserInfo info, String userAgent,
@@ -465,6 +530,20 @@ public class AuthServiceImpl implements AuthService {
         return candidate;
     }
 
+    /**
+     * Rotates a refresh token: validates it, revokes the old one and issues a new access +
+     * refresh token pair, then updates the matching session's last-active timestamp. A revoked/
+     * expired token (single-device supersession or an already-rotated token) is rejected; the
+     * rotation is flushed immediately so a concurrent refresh of the same token loses the
+     * optimistic-lock race with a clean 401 rather than a 500. Transactional.
+     *
+     * @param tokenStr the presented refresh token
+     * @param userAgent the caller's User-Agent (to match the session)
+     * @param ip the caller IP (to match the session)
+     * @return the new access + refresh token pair
+     * @throws com.chat.talkMe.exception.UnauthorizedException (TM_026) unknown, revoked, expired,
+     *         or concurrently-rotated token
+     */
     @Override
     @Transactional
     public JwtTokensResponse refresh(String tokenStr, String userAgent, String ip) {
@@ -531,6 +610,11 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    /**
+     * Revokes the given refresh token (no-op if unknown). Transactional.
+     *
+     * @param refreshTokenStr the refresh token to revoke
+     */
     @Override
     @Transactional
     public void logout(String refreshTokenStr) {
@@ -542,6 +626,12 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * Lists the user's active (non-deleted) sessions. Read-only.
+     *
+     * @param currentUser the user
+     * @return the active session DTOs
+     */
     @Override
     @Transactional(readOnly = true)
     public List<SessionResponse> getSessions(User currentUser) {
@@ -550,6 +640,14 @@ public class AuthServiceImpl implements AuthService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Soft-deletes a single session, after checking it belongs to the caller. Transactional.
+     *
+     * @param sessionUuid the session UUID
+     * @param currentUser the owning user
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_053) if the session is missing
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_103) if it belongs to another user
+     */
     @Override
     @Transactional
     public void revokeSession(String sessionUuid, User currentUser) {
@@ -564,6 +662,11 @@ public class AuthServiceImpl implements AuthService {
         sessionRepository.save(session);
     }
 
+    /**
+     * Soft-deletes all of the user's sessions except the current one. Transactional.
+     *
+     * @param currentUser the user
+     */
     @Override
     @Transactional
     public void revokeAllSessions(User currentUser) {
@@ -576,6 +679,14 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * Initiates password reset for a real, non-guest, active account: mints a single-use token
+     * (only its SHA-256 hash + user UUID are stored in Redis with a TTL) and emails the reset
+     * link. Anti-enumeration (silent return for missing/guest/deleted accounts) and per-recipient
+     * cooldown (anti-bombing) are enforced. Not transactional (Redis + email side effects).
+     *
+     * @param request the forgot-password request carrying the email
+     */
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
         // Never reveal whether the email exists (anti-enumeration): always return
@@ -605,6 +716,15 @@ public class AuthServiceImpl implements AuthService {
         log.info("Password reset requested for user '{}'", user.getUsername());
     }
 
+    /**
+     * Completes a password reset: validates the token via its Redis-stored hash, rejects breached
+     * passwords, sets the new password hash, consumes the token (one-time use), and revokes all of
+     * the user's sessions/tokens (sign-out everywhere). Transactional.
+     *
+     * @param request the reset request (token + new password)
+     * @throws com.chat.talkMe.exception.UnauthorizedException (TM_038) missing/invalid/expired token
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_496) if the new password is breached
+     */
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
@@ -640,6 +760,14 @@ public class AuthServiceImpl implements AuthService {
         log.info("Password reset completed for user '{}'", user.getUsername());
     }
 
+    /**
+     * Verifies an email-address token: validates it via its Redis-stored hash, consumes it
+     * (one-time), and marks the user verified (idempotent when already verified). On first
+     * verification it evicts the feature-access cache and sends the welcome email. Transactional.
+     *
+     * @param token the emailed verification token
+     * @throws com.chat.talkMe.exception.UnauthorizedException (TM_403) missing/invalid/expired token
+     */
     @Override
     @Transactional
     public void verifyEmail(String token) {
@@ -680,6 +808,13 @@ public class AuthServiceImpl implements AuthService {
         emailService.sendWelcomeEmail(user.getEmail(), user.getName(), openLink);
     }
 
+    /**
+     * Resends the verification email to an unverified, non-guest user (no-op for guests / missing
+     * email). Read-only transaction (Redis + email side effects only).
+     *
+     * @param currentUser the user requesting a resend
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_404) if already verified
+     */
     @Override
     @Transactional(readOnly = true)
     public void resendVerificationEmail(User currentUser) {
@@ -772,6 +907,17 @@ public class AuthServiceImpl implements AuthService {
         return os != null ? os : browser;
     }
 
+    /**
+     * Changes the signed-in user's password after confirming the current one and rejecting a
+     * breached new password, then revokes all of the user's tokens (sign-out everywhere).
+     * Transactional.
+     *
+     * @param request the change-password request (current + new password)
+     * @param currentUser the signed-in user
+     * @throws com.chat.talkMe.exception.UnauthorizedException (TM_042) if the current password
+     *         is incorrect
+     * @throws com.chat.talkMe.exception.BadRequestException (TM_496) if the new password is breached
+     */
     @Override
     @Transactional
     public void changePassword(ChangePasswordRequest request, User currentUser) {
@@ -790,6 +936,18 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.revokeAllUserTokens(currentUser);
     }
 
+    /**
+     * Schedules a soft account deletion (recoverable for the configured window): re-authenticates
+     * with the password for accounts that have one (OAuth-only accounts are exempt), marks the
+     * user deleted with a timestamp, and revokes all tokens. Idempotent when already pending.
+     * Transactional.
+     *
+     * @param currentUser the account owner
+     * @param password the current password for re-authentication (required for local accounts)
+     * @throws com.chat.talkMe.exception.ForbiddenException (TM_029) if the account is a guest
+     * @throws com.chat.talkMe.exception.UnauthorizedException (TM_497) if password confirmation
+     *         is missing or wrong for a local account
+     */
     @Override
     @Transactional
     public void requestAccountDeletion(User currentUser, String password) {
@@ -821,6 +979,13 @@ public class AuthServiceImpl implements AuthService {
                 user.getUsername(), accountDeletionWindowDays);
     }
 
+    /**
+     * Scheduled purge: for each soft-deleted account past its recovery window, revokes tokens,
+     * deletes sessions and anonymizes PII (per-account failures are logged and skipped, not fatal).
+     * Transactional.
+     *
+     * @return the number of accounts anonymized
+     */
     @Override
     @Transactional
     public int purgeExpiredDeletedAccounts() {
@@ -895,7 +1060,7 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * Per-recipient email cooldown (anti email-bombing). Returns true and reserves
-     * the slot if Sand is allowed now; false if one was sent within the window.
+     * the slot if a send is allowed now; false if one was sent within the window.
      * Fail-open so a Redis blip never blocks a legitimate reset.
      */
     private boolean mailCooldownOk(String type, String email) {
@@ -910,6 +1075,17 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * Finalizes a successful authentication: enforces the single-device policy by revoking all
+     * prior refresh tokens and clearing the superseded device's push subscriptions (best-effort),
+     * issues a new access + refresh token pair, persists a session and the user's latest activity
+     * location, and returns the user DTO (with a freshly-recomputed feature set) plus tokens.
+     *
+     * @param user the authenticated user
+     * @param userAgent the caller's User-Agent (recorded on the session)
+     * @param detection the resolved location (nullable) for IP/location fields
+     * @return the assembled login response
+     */
     private LoginResponse generateLoginResponse(User user, String userAgent, CountryDetectionResult detection) {
         String ip = detection != null ? detection.getClientIp() : null;
         String location = detection != null ? detection.getDisplayLocation() : null;
@@ -981,11 +1157,25 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    /**
+     * Returns the named role, creating it if it does not yet exist.
+     *
+     * @param roleName the role name (e.g. ROLE_USER, ROLE_GUEST)
+     * @return the persisted role
+     */
     private Role getOrCreateRole(String roleName) {
         return roleRepository.findByName(roleName)
                 .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
     }
 
+    /**
+     * Re-loads the signed-in user and returns their profile DTO with the freshly-computed
+     * effective feature set. Read-only.
+     *
+     * @param currentUser the signed-in user (principal)
+     * @return the current-user DTO including features
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) if the user no longer exists
+     */
     @Override
     @Transactional(readOnly = true)
     public AuthUserResponse getCurrentUser(User currentUser) {
@@ -1003,6 +1193,17 @@ public class AuthServiceImpl implements AuthService {
         return (s == null || s.isBlank()) ? null : s.trim();
     }
 
+    /**
+     * Merges the supplied profile fields into the user (null = leave unchanged; blank on optional
+     * "About me" dropdowns = clear), recomputes the cached profile-completion score, records a
+     * reputation event on reaching 100%, evicts the feature-access cache, and returns the updated
+     * DTO with a fresh feature set. Transactional.
+     *
+     * @param request the partial profile update
+     * @param currentUser the signed-in user
+     * @return the updated current-user DTO including features
+     * @throws com.chat.talkMe.exception.NotFoundException (TM_024) if the user no longer exists
+     */
     @Override
     @Transactional
     public AuthUserResponse updateProfile(UpdateProfileRequest request, User currentUser) {

@@ -26,6 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Shared per-chat Bucket List engine (feature #18). One list per chat, created lazily on
+ * first access; every mutation is membership-guarded and broadcasts the full refreshed list
+ * over WS to {@code /topic/chat/{chatId}/bucket-list}. All public methods are transactional.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -44,6 +49,9 @@ public class BucketListServiceImpl implements BucketListService {
 
     /**
      * IDOR guard: the caller must be a member of the chat the list belongs to.
+     *
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId is not a valid uuid (TM_400)
+     * @throws com.chat.talkMe.exception.ForbiddenException if the user is not a chat member (TM_103)
      */
     private void requireChatMember(User user, String chatId) {
         boolean member;
@@ -59,6 +67,15 @@ public class BucketListServiceImpl implements BucketListService {
         }
     }
 
+    /**
+     * The full list for a chat, auto-creating the list row on first use.
+     *
+     * @param user   the authenticated caller (must be a member of the chat)
+     * @param chatId uuid of the owning chat
+     * @return the list with all items ordered by index
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId is malformed (TM_400)
+     */
     @Override
     public BucketListResponse getList(User user, String chatId) {
         requireChatMember(user, chatId);
@@ -66,6 +83,17 @@ public class BucketListServiceImpl implements BucketListService {
         return buildResponse(list);
     }
 
+    /**
+     * Append a new (open) item at the end of the chat's list, then broadcast the refreshed list.
+     *
+     * @param user   the authenticated caller (recorded as the item's creator)
+     * @param chatId uuid of the owning chat
+     * @param text   the item text (trimmed); must be non-blank
+     * @return the refreshed full list
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.BadRequestException if text is blank (TM_810) or chatId
+     *         is malformed (TM_400)
+     */
     @Override
     public BucketListResponse addItem(User user, String chatId, String text) {
         requireChatMember(user, chatId);
@@ -88,6 +116,19 @@ public class BucketListServiceImpl implements BucketListService {
         return broadcastAndBuild(chatId, list);
     }
 
+    /**
+     * Flip an item's completed flag, stamping (or clearing) who checked it off and when, then
+     * broadcast the refreshed list.
+     *
+     * @param user     the authenticated caller (recorded as completer when marking done)
+     * @param chatId   uuid of the owning chat
+     * @param itemUuid uuid of the item to toggle
+     * @return the refreshed full list
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId (TM_400) or itemUuid (TM_811)
+     *         is malformed
+     * @throws com.chat.talkMe.exception.NotFoundException if the item is not in this list (TM_812)
+     */
     @Override
     public BucketListResponse toggleItem(User user, String chatId, String itemUuid) {
         requireChatMember(user, chatId);
@@ -108,6 +149,18 @@ public class BucketListServiceImpl implements BucketListService {
         return broadcastAndBuild(chatId, list);
     }
 
+    /**
+     * Delete an item from the chat's list, then broadcast the refreshed list.
+     *
+     * @param user     the authenticated caller (must be a chat member)
+     * @param chatId   uuid of the owning chat
+     * @param itemUuid uuid of the item to remove
+     * @return the refreshed full list
+     * @throws com.chat.talkMe.exception.ForbiddenException if the caller is not a chat member (TM_103)
+     * @throws com.chat.talkMe.exception.BadRequestException if chatId (TM_400) or itemUuid (TM_811)
+     *         is malformed
+     * @throws com.chat.talkMe.exception.NotFoundException if the item is not in this list (TM_812)
+     */
     @Override
     public BucketListResponse removeItem(User user, String chatId, String itemUuid) {
         requireChatMember(user, chatId);
@@ -145,6 +198,12 @@ public class BucketListServiceImpl implements BucketListService {
         return bucketListRepository.save(BucketList.builder().chatUuid(chatUuid).build());
     }
 
+    /**
+     * Load an item by uuid, scoped to the given list.
+     *
+     * @throws com.chat.talkMe.exception.BadRequestException if itemUuid is malformed (TM_811)
+     * @throws com.chat.talkMe.exception.NotFoundException if no such item in the list (TM_812)
+     */
     private BucketListItem loadItem(BucketList list, String itemUuid) {
         UUID uuid;
         try {

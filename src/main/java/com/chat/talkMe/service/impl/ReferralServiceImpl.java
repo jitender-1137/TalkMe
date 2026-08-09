@@ -12,6 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Read-only referral reporting: the exact count of a user's non-deleted referred joiners plus a
+ * capped list of the most recent ones. Attribution only — no rewards.
+ */
 @Service
 @RequiredArgsConstructor
 public class ReferralServiceImpl implements ReferralService {
@@ -23,6 +27,13 @@ public class ReferralServiceImpl implements ReferralService {
 
     private final UserRepository userRepository;
 
+    /**
+     * Builds the current user's referral summary: the exact non-deleted referral count plus up to
+     * {@code MAX_LISTED} most-recent joiners mapped to DTOs. Read-only.
+     *
+     * @param currentUser the referrer
+     * @return the referral summary (count + recent joiners)
+     */
     @Override
     @Transactional(readOnly = true)
     public ReferralSummaryResponse getMySummary(User currentUser) {

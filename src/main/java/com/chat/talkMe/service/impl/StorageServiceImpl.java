@@ -43,11 +43,30 @@ public class StorageServiceImpl implements StorageService {
         this.ffmpeg = ffmpeg;
     }
 
+    /**
+     * Stores the upload at the media root (no subfolder); delegates to the three-arg overload.
+     *
+     * @param file the uploaded file
+     * @param type category hint ("video" forces the transcode path)
+     * @return the storage reference of the stored object
+     * @throws com.chat.talkMe.exception.FileStorageException if the file cannot be stored
+     */
     @Override
     public String storeFile(MultipartFile file, String type) {
         return storeFile(file, type, "");
     }
 
+    /**
+     * Stores the upload under the normalized {@code subdir} with a random UUID filename. Videos
+     * (by {@code type} or content-type) go through the compress-then-store path; other files are
+     * staged to a temp file and handed to the backend as-is. The temp file is always cleaned up.
+     *
+     * @param file   the uploaded file
+     * @param type   category hint ("video" forces the transcode path)
+     * @param subdir target subdirectory; normalized and rejected if it attempts traversal; blank ⇒ root
+     * @return the storage reference of the stored object
+     * @throws com.chat.talkMe.exception.FileStorageException on invalid subdir or an I/O failure while storing
+     */
     @Override
     public String storeFile(MultipartFile file, String type, String subdir) {
         String cleanSubdir = normalizeSubdir(subdir);
