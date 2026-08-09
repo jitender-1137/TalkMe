@@ -1,11 +1,14 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
  * Cosmetic star tier a user displays, derived purely from their current {@code level}
  * (features #30/#31). Ranks are ordered ascending by {@link #minLevel}; a user's rank is
  * the highest rank whose {@code minLevel <= level}. This is decoration only — it must
  * NEVER gate features or limits.
  */
+@Getter
 public enum StarRank {
     BRONZE_STAR(1),
     SILVER_STAR(10),
@@ -22,10 +25,6 @@ public enum StarRank {
 
     StarRank(int minLevel) {
         this.minLevel = minLevel;
-    }
-
-    public int getMinLevel() {
-        return minLevel;
     }
 
     /**

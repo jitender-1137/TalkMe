@@ -156,7 +156,7 @@ public class ProfileViewServiceImpl implements ProfileViewService {
     }
 
     /**
-     * Mark all of the caller's viewer rows as seen (clears the badge).
+     * Mark all the caller's viewer rows as seen (clears the badge).
      *
      * @param currentUser the viewed user
      */

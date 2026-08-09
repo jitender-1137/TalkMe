@@ -13,7 +13,6 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.CompatibilityService;
 import com.chat.talkMe.service.DailyCompanionService;
 import com.chat.talkMe.service.NotificationService;
-import com.chat.talkMe.service.ReputationRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -33,7 +32,7 @@ import java.util.Set;
  * blocked users in either direction, and picking the highest-compatibility candidate.
  * <p>
  * Class-level {@code @Transactional}. Pairings expire after 24h unless the user acts (stay-friends /
- * continue / end); the reaper flips still-ACTIVE expired pairings to EXPIRED.
+ * continue / end); the reaper flips still-ACTIVE expired pairings to EXPIRE.
  */
 @Slf4j
 @Service
@@ -59,7 +58,6 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
     private final BlockUserRepository blockUserRepository;
     private final CompatibilityService compatibilityService;
     private final NotificationService notificationService;
-    private final ReputationRecorder reputationRecorder;
 
     /**
      * Returns the user's companion pairing for today, or an empty card when none is assigned yet.
@@ -205,7 +203,7 @@ public class DailyCompanionServiceImpl implements DailyCompanionService {
     }
 
     /**
-     * Flips all ACTIVE pairings whose {@code expiresAt} is before {@code now} to EXPIRED.
+     * Flips all ACTIVE pairings whose {@code expiresAt} is before {@code now} to EXPIRE.
      *
      * @param now the cutoff instant
      * @return the number of pairings expired

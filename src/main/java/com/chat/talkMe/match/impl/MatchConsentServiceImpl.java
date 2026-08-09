@@ -38,7 +38,7 @@ public class MatchConsentServiceImpl implements MatchConsentService {
      * status, decline count and whether the cap is reached) so the UI can flag it in-place.
      *
      * @param sender   the username whose explicit message was held
-     * @param clientId the sender's client-generated message id (may be null)
+     * @param clientId the sender's client-generated message id (maybe null)
      * @param session  the active match session carrying the consent state
      */
     @Override
@@ -76,13 +76,13 @@ public class MatchConsentServiceImpl implements MatchConsentService {
      * Grants 18+ consent for the session (status GRANTED, decline count reset, pending
      * requester cleared) and notifies both peers with an anonymous CONSENT_GRANTED event.
      *
-     * @param accepter the authenticated accepting username
-     * @throws java.lang.IllegalArgumentException if the accepter has no active session
+     * @param acceptor the authenticated accepting username
+     * @throws java.lang.IllegalArgumentException if the accepted has no active session
      */
     @Override
-    public void acceptConsent(String accepter) {
-        MatchSession session = sessionService.getSessionByUser(accepter)
-                .orElseThrow(() -> new IllegalArgumentException("No active session found for user: " + accepter));
+    public void acceptConsent(String acceptor) {
+        MatchSession session = sessionService.getSessionByUser(acceptor)
+                .orElseThrow(() -> new IllegalArgumentException("No active session found for user: " + acceptor));
 
         session.setConsentStatus(ConsentStatus.GRANTED);
         session.setConsentDeclineCount(0);

@@ -37,7 +37,7 @@ public class MatchRequest extends BaseEntity {
     @Column(name = "filter_region", length = 50)
     private String filterRegion;
 
-    @Column(name = "filter_interests", length = 255)
+    @Column(name = "filter_interests")
     private String filterInterests;
 
     @Column(name = "status", nullable = false, length = 30)

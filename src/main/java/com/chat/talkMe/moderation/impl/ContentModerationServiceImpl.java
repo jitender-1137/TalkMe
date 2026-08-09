@@ -195,7 +195,7 @@ public class ContentModerationServiceImpl implements ContentModerationService {
     /**
      * Classifies an in-flight upload by streaming its bytes to a short-lived temp file and
      * delegating to {@link #moderateMedia}; CLEAN for non-image/video content types, and
-     * fail-open (CLEAN) on any error. The temp file is always deleted afterwards.
+     * fail-open (CLEAN) on any error. The temp file is always deleted afterward.
      *
      * @param file the org.springframework.web.multipart.MultipartFile upload to inspect
      * @return the com.chat.talkMe.moderation.ModerationResult verdict
@@ -254,25 +254,14 @@ public class ContentModerationServiceImpl implements ContentModerationService {
      * @return the folded char
      */
     private char deLeet(char c) {
-        switch (c) {
-            case '@':
-                return 'a';
-            case '4':
-                return 'a';
-            case '0':
-                return 'o';
-            case '1':
-                return 'i';
-            case '3':
-                return 'e';
-            case '5':
-                return 's';
-            case '$':
-                return 's';
-            case '7':
-                return 't';
-            default:
-                return c;
-        }
+        return switch (c) {
+            case '@', '4' -> 'a';
+            case '0' -> 'o';
+            case '1' -> 'i';
+            case '3' -> 'e';
+            case '5', '$' -> 's';
+            case '7' -> 't';
+            default -> c;
+        };
     }
 }

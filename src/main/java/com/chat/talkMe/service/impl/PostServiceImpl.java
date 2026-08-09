@@ -124,7 +124,7 @@ public class PostServiceImpl implements PostService {
             throw new BadRequestException("A post must have text, media, or a poll", "TM_230");
         }
         // Public feed is hard-blocked: explicit captions are rejected outright.
-        if (moderationService.moderateText(request.getContent()).isExplicit()) {
+        if (moderationService.moderateText(request.getContent()).explicit()) {
             throw new ContentModerationException(
                     "Your post contains content that violates our community guidelines.");
         }
@@ -139,13 +139,12 @@ public class PostServiceImpl implements PostService {
             if (!featureAccessService.hasAccess(currentUser, FeatureKey.TEMPORARY_POSTS)) {
                 throw new FeatureLockedException();
             }
-            long ttl = Math.max(TEMP_POST_MIN_SECONDS,
-                    Math.min(TEMP_POST_MAX_SECONDS, request.getExpiresInSeconds()));
+            long ttl = Math.clamp(request.getExpiresInSeconds(), TEMP_POST_MIN_SECONDS, TEMP_POST_MAX_SECONDS);
             expiresAt = Instant.now().plusSeconds(ttl);
         }
 
         if (request.getCaption() != null && !request.getCaption().isBlank()
-                && moderationService.moderateText(request.getCaption()).isExplicit()) {
+                && moderationService.moderateText(request.getCaption()).explicit()) {
             throw new ContentModerationException(
                     "Your post contains content that violates our community guidelines.");
         }
@@ -162,7 +161,7 @@ public class PostServiceImpl implements PostService {
 
         post = postRepository.save(post);
 
-        // Instagram-style photo + music → merge into an auto-playing video. When the
+        // Instagram-style photo + music → merge into an autoplaying video. When the
         // post is a SINGLE image with a soundtrack, mux the still image + trimmed clip
         // into an MP4 so the sound plays with the post like an uploaded video. Falls
         // back silently to the plain image (+ audio attribution) if muxing is
@@ -174,12 +173,12 @@ public class PostServiceImpl implements PostService {
         String muxedMediaUrl = null;
         if (request.getAudio() != null && request.getAudio().getAudioUrl() != null
                 && request.getMedia() != null && request.getMedia().size() == 1) {
-            var only = request.getMedia().get(0);
+            var only = request.getMedia().getFirst();
             boolean isImage = !"VIDEO".equalsIgnoreCase(only.getMediaType());
             if (isImage) {
                 // Moderate the still image up front (public feed hard-blocks NSFW).
                 try (var local = mediaStorage.localCopy(only.getMediaUrl()).orElse(null)) {
-                    if (local != null && moderationService.moderateMedia(local.path(), MessageType.IMAGE).isExplicit()) {
+                    if (local != null && moderationService.moderateMedia(local.path(), MessageType.IMAGE).explicit()) {
                         throw new ContentModerationException(
                                 "Your post contains media that violates our community guidelines.");
                     }
@@ -207,7 +206,7 @@ public class PostServiceImpl implements PostService {
                         if (local != null) {
                             boolean isVideo = "VIDEO".equalsIgnoreCase(mediaReq.getMediaType());
                             var mt = isVideo ? MessageType.VIDEO : MessageType.IMAGE;
-                            if (moderationService.moderateMedia(local.path(), mt).isExplicit()) {
+                            if (moderationService.moderateMedia(local.path(), mt).explicit()) {
                                 throw new ContentModerationException(
                                         "Your post contains media that violates our community guidelines.");
                             }
@@ -236,13 +235,13 @@ public class PostServiceImpl implements PostService {
             List<String> options = pollReq.getOptions() == null ? List.of() : pollReq.getOptions().stream()
                                                                               .filter(o -> o != null && !o.isBlank())
                                                                               .map(String::trim)
-                                                                              .collect(Collectors.toList());
+                                                                              .toList();
             if (options.size() < 2) {
                 throw new BadRequestException("A poll needs at least 2 options", "TM_225");
             }
             // Poll question + options are public → hard-block explicit content.
-            if (moderationService.moderateText(pollReq.getQuestion()).isExplicit()
-                    || options.stream().anyMatch(o -> moderationService.moderateText(o).isExplicit())) {
+            if (moderationService.moderateText(pollReq.getQuestion()).explicit()
+                    || options.stream().anyMatch(o -> moderationService.moderateText(o).explicit())) {
                 throw new ContentModerationException(
                         "Your poll contains content that violates our community guidelines.");
             }
@@ -407,7 +406,7 @@ public class PostServiceImpl implements PostService {
         if (post.getMedia() == null || post.getMedia().isEmpty()) {
             return null;
         }
-        var m = post.getMedia().get(0);
+        var m = post.getMedia().getFirst();
         return m.getCoverImageUrl() != null && !m.getCoverImageUrl().isBlank()
                 ? m.getCoverImageUrl()
                 : m.getMediaUrl();
@@ -418,7 +417,7 @@ public class PostServiceImpl implements PostService {
      * to the author or an accepted follow in either direction.
      *
      * @param post   the post
-     * @param viewer the viewer (may be null)
+     * @param viewer the viewer (maybe null)
      * @return true if the viewer is allowed to see the post
      */
     private boolean canViewPost(Post post, User viewer) {
@@ -454,7 +453,7 @@ public class PostServiceImpl implements PostService {
         // `content`; a text post's caption is the separate `caption` field (its
         // formatted body is left untouched on edit).
         if (request.getContent() != null) {
-            if (moderationService.moderateText(request.getContent()).isExplicit()) {
+            if (moderationService.moderateText(request.getContent()).explicit()) {
                 throw new ContentModerationException(
                         "Your post contains content that violates our community guidelines.");
             }
@@ -462,7 +461,7 @@ public class PostServiceImpl implements PostService {
         }
         if (request.getCaption() != null) {
             if (!request.getCaption().isBlank()
-                    && moderationService.moderateText(request.getCaption()).isExplicit()) {
+                    && moderationService.moderateText(request.getCaption()).explicit()) {
                 throw new ContentModerationException(
                         "Your post contains content that violates our community guidelines.");
             }
@@ -618,7 +617,7 @@ public class PostServiceImpl implements PostService {
      * @param postUuid    the post's UUID
      * @param pageable    paging/sort
      * @param currentUser the caller
-     * @return a page of likers
+     * @return a page of likes
      * @throws com.chat.talkMe.exception.NotFoundException post not found
      */
     @Override
@@ -649,7 +648,7 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public PostCommentResponse addComment(String postUuid, PostCommentRequest request, User currentUser) {
         // Comments are public → hard-block explicit content.
-        if (moderationService.moderateText(request.getContent()).isExplicit()) {
+        if (moderationService.moderateText(request.getContent()).explicit()) {
             throw new ContentModerationException(
                     "Your comment contains content that violates our community guidelines.");
         }
@@ -981,7 +980,7 @@ public class PostServiceImpl implements PostService {
      * and reply count.
      *
      * @param c           the comment entity
-     * @param currentUser the viewer (may be null; drives the liked flag)
+     * @param currentUser the viewer (maybe null; drives the liked flag)
      * @return the mapped comment response
      */
     private PostCommentResponse mapToCommentResponse(PostComment c, User currentUser) {

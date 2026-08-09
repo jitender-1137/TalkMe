@@ -164,9 +164,9 @@ public class SecretCrushServiceImpl implements SecretCrushService {
             if (wasMatched) {
                 secretCrushRepository
                         .findByCrusherAndTargetAndStatus(target, crusher, SecretCrushStatus.MATCHED)
-                        .ifPresent(recip -> {
-                            recip.setStatus(SecretCrushStatus.ACTIVE);
-                            secretCrushRepository.save(recip);
+                        .ifPresent(recipe -> {
+                            recipe.setStatus(SecretCrushStatus.ACTIVE);
+                            secretCrushRepository.save(recipe);
                         });
                 // Tell the demoted partner so their client refreshes (no phantom "Matched").
                 try {

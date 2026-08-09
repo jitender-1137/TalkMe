@@ -23,8 +23,6 @@ public interface MatchReportRepository extends JpaRepository<MatchReport, Long> 
 
     Page<MatchReport> findByStatus(String status, Pageable pageable);
 
-    long countByStatus(String status);
-
     long countByReportedId(Long reportedId);
 
     long countByReporterId(Long reporterId);

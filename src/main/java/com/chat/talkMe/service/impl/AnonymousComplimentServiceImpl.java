@@ -93,7 +93,7 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
             throw new BadRequestException("Compliment message cannot be empty", "TM_964");
         }
         // Hard-block explicit text — a compliment is a positive, public-guidelines surface.
-        if (moderationService.moderateText(message).isExplicit()) {
+        if (moderationService.moderateText(message).explicit()) {
             throw new ContentModerationException(
                     "Your compliment contains content that violates our community guidelines.");
         }
@@ -261,7 +261,7 @@ public class AnonymousComplimentServiceImpl implements AnonymousComplimentServic
     }
 
     /**
-     * Parse a uuid string, mapping malformed/null input to a clean 400.
+     * Parse an uuid string, mapping malformed/null input to a clean 400.
      *
      * @throws com.chat.talkMe.exception.BadRequestException on invalid/null input (TM_961)
      */

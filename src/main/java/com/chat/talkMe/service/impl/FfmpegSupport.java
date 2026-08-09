@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
  * Resolves the ffmpeg executable to use across the app (muxing, video transcoding,
  * frame moderation).
  * <p>
- * By default it returns the ffmpeg binary BUNDLED with the app via Bytedeco
+ * By default, it returns the ffmpeg binary BUNDLED with the app via Bytedeco
  * ({@code org.bytedeco:ffmpeg}) — extracted to the JavaCPP cache on first use — so
- * ffmpeg works everywhere with no manual install. An explicit
+ * ffmpeg works everywhere with no manual installation. An explicit
  * {@code media.ffmpeg-path} (anything other than the bare "ffmpeg" default) always
  * wins, letting an operator point at a system ffmpeg. If the bundled binary can't
  * load for some reason, it falls back to "ffmpeg" on PATH.

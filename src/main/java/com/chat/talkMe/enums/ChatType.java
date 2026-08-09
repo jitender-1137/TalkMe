@@ -10,7 +10,7 @@ public enum ChatType {
     /**
      * True for every multi-party type. Use this instead of {@code == GROUP}
      * so new multi-party types are automatically covered by 1:1-vs-group
-     * branching (send authz, moderation, watermark receipts, fan-out).
+     * branching (send auth, moderation, watermark receipts, fan-out).
      */
     public boolean isMultiParty() {
         return this == GROUP || this == CHANNEL || this == ROOM;

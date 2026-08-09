@@ -89,13 +89,11 @@ public class ListenerController {
     /**
      * The current live queue of available listeners (oldest-waiting first).
      *
-     * @param userDetails the authenticated caller
      * @return the list of currently AVAILABLE listener shifts wrapped in a success envelope
      */
     @GetMapping("/available")
     @PreAuthorize("@featureGuard.check('LISTENER')")
-    public ResponseEntity<ResponseDto<List<ListenerShiftResponse>>> listAvailable(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<ResponseDto<List<ListenerShiftResponse>>> listAvailable() {
         return ResponseEntity.ok(SuccessResponseDto.success(listenerService.listAvailable()));
     }
 }

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Peer-endorseable cosmetic badges (feature #30). Gated by the BADGES entitlement.
+ * Peer-endorse able cosmetic badges (feature #30). Gated by the BADGES entitlement.
  * Badges are decoration only — they never gate any feature or limit.
  */
 @RestController

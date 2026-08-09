@@ -280,7 +280,7 @@ public class AdminServiceImpl implements AdminService {
             default -> "createdAt";
         };
         Sort.Direction dir = "asc".equalsIgnoreCase(f.getDir()) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(dir, sortField));
 
         Page<User> result = userRepository.findAll(buildUserSpec(f), pageable);
@@ -530,7 +530,7 @@ public class AdminServiceImpl implements AdminService {
         }
         String q = (query == null || query.isBlank()) ? null : "%" + query.trim().toLowerCase() + "%";
 
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(Sort.Direction.DESC, "updatedAt"));
         Page<Chat> result = chatRepository.findForAdmin(chatType, q, includeDeleted, pageable);
 
@@ -572,7 +572,7 @@ public class AdminServiceImpl implements AdminService {
         log.info("[AdminAudit] {} viewed decrypted messages of chat {}", adminUsername, chatUuid);
         audit(adminUsername, "VIEW_MESSAGES", "CHAT", chatUuid, "page=" + page);
 
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 200),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 200),
                 Sort.by(Sort.Direction.DESC, "id"));
         // Admin sees the FULL history — deleted messages included (badged via .deleted).
         Page<Message> result = messageRepository.findByChat(chat, pageable);
@@ -580,7 +580,7 @@ public class AdminServiceImpl implements AdminService {
 
         List<AdminMessageView> items = result.getContent().stream().map(m -> {
             MessageAttachment att = m.getAttachments() == null || m.getAttachments().isEmpty()
-                    ? null : m.getAttachments().iterator().next();
+                    ? null : m.getAttachments().getFirst();
             return AdminMessageView.builder()
                     .id(m.getUuid() != null ? m.getUuid().toString() : String.valueOf(m.getId()))
                     .chatId(chatUuid)
@@ -742,12 +742,12 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminAuditView> listAudit(
             String action, String targetType, String admin, String from, String to, int page, int size) {
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
         Instant fromI = parseFilterInstant(from, false);
         Instant toI = parseFilterInstant(to, true);
         Specification<AdminAuditLog> spec =
-                (root, cq, cb) -> {
+                (root, _, cb) -> {
                     List<Predicate> ps = new ArrayList<>();
                     if (action != null && !action.isBlank())
                         ps.add(cb.equal(root.get("action"), action.trim()));
@@ -761,7 +761,7 @@ public class AdminServiceImpl implements AdminService {
                     return cb.and(ps.toArray(new Predicate[0]));
                 };
         Page<AdminAuditLog> result = auditRepository.findAll(spec, pageable);
-        // Batch-resolve the acting admins' uuids once for the whole page (for cross-linking).
+        // Batch-resolve the acting admins' uuid once for the whole page (for cross-linking).
         Set<String> adminUsernames = result.getContent().stream()
                 .map(AdminAuditLog::getAdminUsername)
                 .filter(Objects::nonNull)
@@ -770,7 +770,7 @@ public class AdminServiceImpl implements AdminService {
                 ? Map.of()
                 : userRepository.findByUsernameIn(adminUsernames).stream()
                   .filter(u -> u.getUuid() != null)
-                  .collect(Collectors.toMap(User::getUsername, u -> u.getUuid().toString(), (x, y) -> x));
+                  .collect(Collectors.toMap(User::getUsername, u -> u.getUuid().toString(), (x, _) -> x));
         List<AdminAuditView> items = result.getContent().stream()
                 .map(a -> AdminAuditView.builder()
                         .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
@@ -1026,7 +1026,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public List<AdminTimeseriesPoint> getSignupTimeseries(int days) {
-        int d = Math.min(Math.max(days, 1), 365);
+        int d = Math.clamp(days, 1, 365);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         Instant since = today.minusDays(d - 1L).atStartOfDay(ZoneOffset.UTC).toInstant();
         Map<LocalDate, Long> counts = userRepository.findSignupTimesSince(since).stream()
@@ -1064,7 +1064,6 @@ public class AdminServiceImpl implements AdminService {
             case "7d", "1w" -> spec(now, DAY, 7, "day");
             case "90d", "3m" -> spec(now, DAY, 90, "day");
             case "1y", "365d" -> spec(now, 7 * DAY, 52, "day");    // weekly buckets
-            case "30d", "1m" -> spec(now, DAY, 30, "day");
             default -> spec(now, DAY, 30, "day");
         };
     }
@@ -1171,8 +1170,8 @@ public class AdminServiceImpl implements AdminService {
             to = now;
             bucket = ov;
         }
-        int buckets = (int) Math.min(500, Math.max(1,
-                (long) Math.ceil((double) (to.toEpochMilli() - from.toEpochMilli()) / bucket)));
+        int buckets = Math.clamp(
+                (long) Math.ceil((double) (to.toEpochMilli() - from.toEpochMilli()) / bucket), 1, 500);
         String gran = bucket >= DAY ? "day" : "hour";
         return new RangeSpec(from, bucket, buckets, gran);
     }
@@ -1407,7 +1406,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminPostView> listPosts(int page, int size) {
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(Sort.Direction.DESC, "id"));
         // Admin sees ALL posts, including soft-deleted ones (flagged in the DTO).
         Page<Post> result = postRepository.findAll(pageable);
@@ -1430,7 +1429,7 @@ public class AdminServiceImpl implements AdminService {
     public PaginatedResponse<AdminPostLikeView> getPostLikes(String postUuid, int page, int size) {
         Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_180"));
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(Sort.Direction.DESC, "id"));
         Page<PostLike> result = postLikeRepository.findByPost(post, pageable);
         List<AdminPostLikeView> items = result.getContent().stream().map(l -> {
@@ -1461,7 +1460,7 @@ public class AdminServiceImpl implements AdminService {
     public PaginatedResponse<AdminPostCommentView> getPostComments(String postUuid, int page, int size) {
         Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
                 .orElseThrow(() -> new NotFoundException("Post not found", "TM_180"));
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
         Page<PostComment> result = postCommentRepository.findAllForPost(post, pageable);
         List<AdminPostCommentView> items = result.getContent().stream().map(c -> {
             User u = c.getUser();
@@ -1521,7 +1520,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminReportView> listReports(String status, int page, int size) {
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(Sort.Direction.DESC, "id"));
         String s = status == null ? "" : status.trim().toUpperCase();
         Page<MatchReport> result =
@@ -1646,7 +1645,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<AdminFeedbackView> listFeedback(String type, String status, int page, int size) {
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100),
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
                 Sort.by(Sort.Direction.DESC, "id"));
         FeedbackType t = parseFeedbackType(type);
         FeedbackStatus s = parseFeedbackStatus(status);
@@ -1864,7 +1863,7 @@ public class AdminServiceImpl implements AdminService {
         audit(adminUsername, "VIEW_ATTACHMENTS", "ATTACHMENT",
                 userUuid != null ? userUuid : "all", "type=" + type + " page=" + page);
 
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
         Page<MessageAttachment> result = attachmentRepository.findForAdmin(senderId, mt, includeDeleted, pageable);
 
         List<AdminAttachmentView> items = result.getContent().stream()
@@ -1909,6 +1908,7 @@ public class AdminServiceImpl implements AdminService {
                                      .build())
                           .collect(Collectors.toList());
 
+        assert m != null;
         return AdminAttachmentView.builder()
                 .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
                 .messageId(m.getUuid() != null ? m.getUuid().toString() : null)
@@ -2032,7 +2032,7 @@ public class AdminServiceImpl implements AdminService {
 
         // ── paginate ──────────────────────────────────────────────────────────
         int p = Math.max(0, page);
-        int s = Math.min(Math.max(1, size), 200);
+        int s = Math.clamp(size, 1, 200);
         int from = Math.min(p * s, filtered.size());
         int to = Math.min(from + s, filtered.size());
         List<AdminStorageObjectView> pageItems = filtered.subList(from, to);
@@ -2058,7 +2058,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void deleteStorageObject(String key, String adminUsername) {
-        if (key == null || !MediaKeys.isSafeKey(key)) {
+        if (!MediaKeys.isSafeKey(key)) {
             throw new BadRequestException("Invalid object key", "TM_071");
         }
         String reference = storageProperties.getMediaRoot() + "/" + key;
@@ -2113,7 +2113,7 @@ public class AdminServiceImpl implements AdminService {
                 MediaContext.STRANGER, PageRequest.of(0, 10));
         List<Long> ownerIds = rows.stream().map(r -> ((Number) r[0]).longValue()).collect(Collectors.toList());
         Map<Long, User> owners = userRepository.findAllById(ownerIds).stream()
-                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a));
+                .collect(Collectors.toMap(User::getId, u -> u, (a, _) -> a));
         List<AdminMediaOwnershipResponse.UploaderStat> topUploaders = rows.stream()
                 .map(r -> {
                     User u = owners.get(((Number) r[0]).longValue());
@@ -2175,7 +2175,7 @@ public class AdminServiceImpl implements AdminService {
             String userUuid, int page, int size, String adminUsername) {
         User user = requireUser(userUuid);
         audit(adminUsername, "VIEW_USER_MEDIA", "MEDIA", userUuid, "page=" + page);
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
         Page<MediaAsset> result =
                 mediaAssetRepository.findByOwner_IdOrderByCreatedAtDesc(user.getId(), pageable);
         List<AdminMediaOwnershipResponse.Bucket> byContext =
@@ -2216,7 +2216,7 @@ public class AdminServiceImpl implements AdminService {
         Chat chat = chatRepository.findByUuidWithMembers(parseUuid(chatUuid, "Chat not found", "TM_121"))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
         audit(adminUsername, "VIEW_CHAT_MEDIA", "MEDIA", chatUuid, "page=" + page);
-        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
         Page<MessageAttachment> result = attachmentRepository.findByChatForAdmin(chat.getId(), pageable);
         List<AdminMediaAssetView> items = result.getContent().stream()
                 .map(a -> toChatMediaView(a, chat))
@@ -2547,7 +2547,7 @@ public class AdminServiceImpl implements AdminService {
         User u = null;
         try {
             u = userRepository.findByUuid(UUID.fromString(uuid)).orElse(null);
-        } catch (RuntimeException ignored) { /* not a uuid (IllegalArgumentException) / lookup fail */ }
+        } catch (RuntimeException ignored) { /* not an uuid (IllegalArgumentException) / lookup fail */ }
         cache.put(uuid, u);
         return u;
     }
@@ -2671,13 +2671,13 @@ public class AdminServiceImpl implements AdminService {
 
     /**
      * Map a chat to its admin view: members, a derived name from member names when unnamed, and a
-     * short decrypted preview of the latest non-deleted message (media messages labelled by type).
+     * short decrypted preview of the latest non-deleted message (media messages labeled by type).
      */
     private AdminChatView toChatView(Chat chat) {
         List<AdminChatView.Member> members = chat.getMembers() == null ? List.of()
                 : chat.getMembers().stream()
                   .map(ChatMember::getUser)
-                  .filter(mu -> mu != null)
+                  .filter(Objects::nonNull)
                   .map(mu -> AdminChatView.Member.builder()
                              .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
                              .username(mu.getUsername())
@@ -2688,7 +2688,7 @@ public class AdminServiceImpl implements AdminService {
         String name = chat.getName();
         if (name == null || name.isBlank()) {
             name = members.stream().map(AdminChatView.Member::getName)
-                    .filter(n -> n != null).collect(Collectors.joining(", "));
+                    .filter(Objects::nonNull).collect(Collectors.joining(", "));
         }
 
         // Latest (non-deleted) message → a short, decrypted preview + its sender.

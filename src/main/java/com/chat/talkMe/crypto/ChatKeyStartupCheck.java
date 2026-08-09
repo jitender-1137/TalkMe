@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.ChatKey;
 import com.chat.talkMe.repository.ChatKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.domain.PageRequest;
@@ -37,7 +38,7 @@ public class ChatKeyStartupCheck implements ApplicationRunner {
      *                                         existing chat key (lost/rotated/wrong-environment) or the result is malformed
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         if (!messageCryptoService.isEnabled()) {
             return; // encryption off or no master key → nothing to verify
         }
@@ -47,7 +48,7 @@ public class ChatKeyStartupCheck implements ApplicationRunner {
             return; // fresh deployment
         }
         try {
-            byte[] raw = masterKeyService.unwrap(sample.get(0).getWrappedKey());
+            byte[] raw = masterKeyService.unwrap(sample.getFirst().getWrappedKey());
             if (raw == null || raw.length != 32) {
                 throw new IllegalStateException("unwrapped data key has unexpected length");
             }
@@ -56,8 +57,8 @@ public class ChatKeyStartupCheck implements ApplicationRunner {
             throw new IllegalStateException(
                     "CRYPTO_MASTER_KEY cannot decrypt existing chat keys — it appears to be lost, "
                             + "changed, or from another environment. Starting with the wrong master key would "
-                            + "make all encrypted chats unreadable. Restore the correct key (or run a re-wrap "
-                            + "migration). Refusing to start.", e);
+                            + "make all encrypted chats unreadable. Restore the correct key "
+                            + "(or run a re-wrap migration).Refusing to start.", e);
         }
     }
 }

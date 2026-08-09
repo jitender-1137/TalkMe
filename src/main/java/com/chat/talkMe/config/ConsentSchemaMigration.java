@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,7 +31,7 @@ public class ConsentSchemaMigration implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         dropCheck("chat_explicit_consent", "chat_explicit_consent_status_check");
         dropCheck("messages", "messages_moderation_status_check");
     }

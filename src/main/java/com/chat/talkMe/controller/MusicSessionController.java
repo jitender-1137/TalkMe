@@ -93,7 +93,7 @@ public class MusicSessionController {
     }
 
     /**
-     * Seeks the shared playhead to a new position and broadcasts the updated state to the chat.
+     * Seeks the shared play head to a new position and broadcasts the updated state to the chat.
      *
      * @param chatId      UUID of the chat
      * @param request     body carrying the target position in seconds

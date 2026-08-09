@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -37,7 +38,7 @@ public class ProfileSchemaMigration implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         // Expanded Interest enum — REQUIRED, or every interest insert fails.
         dropCheck("user_interests", "user_interests_interest_check");
         // New enum columns on users.

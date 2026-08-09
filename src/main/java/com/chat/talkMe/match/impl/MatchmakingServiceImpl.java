@@ -319,8 +319,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         }
         if (!relaxB) {
             if (!ageOk(b, a.getOwnAge())) return false;
-            if (hasText(b.getCountryFilter()) && !equalsIgnoreCase(b.getCountryFilter(), a.getOwnCountry()))
-                return false;
+            return !hasText(b.getCountryFilter()) || equalsIgnoreCase(b.getCountryFilter(), a.getOwnCountry());
         }
         return true;
     }
@@ -362,15 +361,14 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * unset filter passes, but a missing age fails a set filter.
      *
      * @param snap     the requiring party's snapshot (age filter source)
-     * @param otherAge the other party's age (may be null)
+     * @param otherAge the other party's age (maybe null)
      * @return true if within range or no filter set
      */
     private static boolean ageOk(MatchPreferenceSnapshot snap, Integer otherAge) {
         if (snap.getAgeMin() == null && snap.getAgeMax() == null) return true;
         if (otherAge == null) return false;
         if (snap.getAgeMin() != null && otherAge < snap.getAgeMin()) return false;
-        if (snap.getAgeMax() != null && otherAge > snap.getAgeMax()) return false;
-        return true;
+        return snap.getAgeMax() == null || otherAge <= snap.getAgeMax();
     }
 
     /**
@@ -390,8 +388,8 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * filters. As a side effect, a valid mood/energy in the request updates and persists
      * the user's live mood/energy.
      *
-     * @param me      the seeking user's entity (may be mutated and saved)
-     * @param filters the request filters (may be null)
+     * @param me      the seeking user's entity (maybe mutated and saved)
+     * @param filters the request filters (maybe null)
      * @return the assembled preference snapshot
      */
     private MatchPreferenceSnapshot buildSnapshot(User me, MatchStartRequest filters) {
@@ -416,14 +414,14 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         }
         if (dirty) userRepository.save(me);
 
-        Set<String> langs = me.getLanguages() == null ? Set.of()
+        Set<String> languages = me.getLanguages() == null ? Set.of()
                 : me.getLanguages().stream().map(Enum::name).collect(Collectors.toSet());
 
         return MatchPreferenceSnapshot.builder()
                 .ownGender(me.getGender() != null ? me.getGender().toUpperCase() : null)
                 .ownAge(me.getAge())
                 .ownCountry(me.getCountry())
-                .ownLanguages(langs)
+                .ownLanguages(languages)
                 .ownVerified(me.isVerified())
                 .mood(me.getMood() != null ? me.getMood().name() : null)
                 .energy(me.getConversationEnergy() != null ? me.getConversationEnergy().name() : null)
@@ -462,7 +460,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      * @param username     the recipient's username
      * @param peerUsername the partner's username (anonymized before sending)
      * @param session      the created match session
-     * @param partnerAlias the partner's Mask alias as seen by this recipient (may be null)
+     * @param partnerAlias the partner's Mask alias as seen by this recipient (maybe null)
      * @param bucket       the coarse compatibility bucket, or null for blind matches
      */
     private void notifyMatchFound(String username, String peerUsername, MatchSession session,
@@ -533,7 +531,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     }
 
     private static boolean equalsIgnoreCase(String a, String b) {
-        return a != null && b != null && a.equalsIgnoreCase(b);
+        return a != null && a.equalsIgnoreCase(b);
     }
 
     private static boolean containsIgnoreCase(Set<String> set, String value) {

@@ -263,7 +263,7 @@ public class CityServiceImpl implements CityService {
         if (members.size() > live.size()) {
             try {
                 Set<String> stale = new HashSet<>(members);
-                stale.removeAll(live);
+                live.forEach(stale::remove);
                 if (!stale.isEmpty()) {
                     redis.opsForSet().remove(key(slug), stale.toArray());
                 }

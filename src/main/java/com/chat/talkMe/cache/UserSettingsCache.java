@@ -19,7 +19,7 @@ import java.time.Duration;
  * {@code messagingFriendsOnly} for every 1:1 conversation (an N+1 across the list),
  * and group member-adds read the target's {@code groupAddPrivacy}. Settings change
  * very rarely, so caching them (with an explicit evict on write + a safety TTL) cuts
- * a lot of repeated {@code SELECT}s without risking stale behaviour beyond the TTL.
+ * a lot of repeated {@code SELECT}s without risking stale behavior beyond the TTL.
  * <p>
  * Value format: {@code "<MESSAGING_PRIVACY>|<GROUP_ADD_PRIVACY>"} (enum names).
  */

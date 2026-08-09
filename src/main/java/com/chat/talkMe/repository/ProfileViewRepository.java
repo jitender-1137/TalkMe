@@ -31,5 +31,5 @@ public interface ProfileViewRepository extends JpaRepository<ProfileView, Long> 
 
     @Modifying
     @Query("UPDATE ProfileView pv SET pv.seen = true WHERE pv.viewed = :viewed AND pv.seen = false")
-    int markAllSeen(@Param("viewed") User viewed);
+    void markAllSeen(@Param("viewed") User viewed);
 }

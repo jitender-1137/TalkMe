@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
  *
  * <p>The client sends the track fields directly (title/artist/artwork + a playable {@link #url}).
  * {@link #trackId} is an optional opaque id (e.g. the iTunes trackId from {@code MusicService}) that
- * lets the server keep the current playhead when the same track is resumed. A playable {@link #url}
+ * lets the server keep the current play head when the same track is resumed. A playable {@link #url}
  * is required — that is what makes a track streamable by the peers.
  */
 @Data

@@ -18,7 +18,7 @@ public interface MatchConsentService {
     /**
      * Peer accepted the 18+ request — explicit text flows for the rest of this session.
      */
-    void acceptConsent(String accepter);
+    void acceptConsent(String acceptor);
 
     /**
      * Peer declined — increments the decline count (capped); explicit text stays blocked.

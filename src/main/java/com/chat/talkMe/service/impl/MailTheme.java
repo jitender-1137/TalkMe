@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.util.Arrays;
 
 /**
- * Single source of truth for every colour, gradient and font used in transactional email.
+ * Single source of truth for every color, gradient and font used in transactional email.
  *
  * <p>{@link EmailTemplates} reads all of its visual tokens from this one object, so the entire
  * email palette — header, button, links, text, avatars — is tuned in one place (and can be
@@ -142,10 +142,10 @@ public class MailTheme {
     }
 
     /**
-     * Pick a stable avatar colour for a seed by hashing it into the configured palette.
+     * Pick a stable avatar color for a seed by hashing it into the configured palette.
      *
-     * @param seed the value to derive a colour from (e.g. a name); null maps to the first colour
-     * @return a hex colour string from the palette
+     * @param seed the value to derive a color from (e.g. a name); null maps to the first color
+     * @return a hex color string from the palette
      */
     public String avatarColor(String seed) {
         String[] colors = avatarColors();

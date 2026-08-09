@@ -26,7 +26,7 @@ public interface FeatureAccessService {
     Set<FeatureKey> effectiveKeys(User user);
 
     /**
-     * Wire names of all accessible features — the payload for AuthUserResponse.features / GET /features.
+     * Wire names of all accessible features — the payload for AuthUserResponse. Features / GET /features.
      */
     Set<String> effectiveWireNames(User user);
 

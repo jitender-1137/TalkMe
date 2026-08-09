@@ -31,7 +31,6 @@ import com.chat.talkMe.repository.ChatRepository;
 import com.chat.talkMe.repository.FriendRepository;
 import com.chat.talkMe.repository.GroupInviteRepository;
 import com.chat.talkMe.repository.UserRepository;
-import com.chat.talkMe.repository.UserSettingRepository;
 import com.chat.talkMe.service.ChatService;
 import com.chat.talkMe.service.EventService;
 import com.chat.talkMe.service.GroupAuthzService;
@@ -81,7 +80,6 @@ public class GroupServiceImpl implements GroupService {
     private final FriendRepository friendRepository;
     private final AuditLogRepository auditLogRepository;
     private final NotificationService notificationService;
-    private final UserSettingRepository userSettingRepository;
     private final GroupInviteRepository groupInviteRepository;
     private final MemberCountCache memberCountCache;
     private final UserSettingsCache userSettingsCache;
@@ -247,7 +245,7 @@ public class GroupServiceImpl implements GroupService {
      * then emit system messages, WS join events and best-effort notifications.
      *
      * @param chatUuid    target group uuid
-     * @param memberUuids user uuids to add (invalid/unknown ids skipped)
+     * @param memberUuids user uuid to add (invalid/unknown ids skipped)
      * @param currentUser the adder
      * @return the group as seen by the adder
      * @throws com.chat.talkMe.exception.ForbiddenException  caller can't add members (TM_291) or
@@ -737,7 +735,7 @@ public class GroupServiceImpl implements GroupService {
      * @param chatUuid    target group uuid
      * @param currentUser the invitee accepting
      * @return the group as seen by the invitee
-     * @throws com.chat.talkMe.exception.NotFoundException   no pending invite for this group (TM_307)
+     * @throws com.chat.talkMe.exception.NotFoundException   no, pending invite for this group (TM_307)
      * @throws com.chat.talkMe.exception.BadRequestException group is full (TM_297)
      */
     @Override
@@ -746,7 +744,7 @@ public class GroupServiceImpl implements GroupService {
         Chat chat = loadGroup(chatUuid);
         User me = userRepository.findById(currentUser.getId()).orElse(currentUser);
         GroupInvite invite = groupInviteRepository.findByChatAndInviteeAndStatus(chat, me, "PENDING")
-                .orElseThrow(() -> new NotFoundException("No pending invite for this group", "TM_307"));
+                .orElseThrow(() -> new NotFoundException("No, pending invite for this group", "TM_307"));
 
         if (chatMemberRepository.countActiveMembers(chat) >= chat.getMemberLimit()) {
             throw new BadRequestException("This group is full", "TM_297");

@@ -1,5 +1,7 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
  * The registry of every gate-able feature in the Late-Night Social ecosystem.
  * <p>
@@ -18,6 +20,7 @@ package com.chat.talkMe.enums;
  * The wire name ({@link #wireName()} = lowercase enum name) is what crosses the
  * API/JSON boundary and what the client's {@code useFeature("flirt_lobby")} reads.
  */
+@Getter
 public enum FeatureKey {
 
     // key                    parent            requiresVerified  requiresAgeVerified  minRole                 defaultEntitled
@@ -103,26 +106,6 @@ public enum FeatureKey {
         this.requiresAgeVerified = requiresAgeVerified;
         this.minRole = minRole;
         this.defaultEntitled = defaultEntitled;
-    }
-
-    public FeatureKey getParent() {
-        return parent;
-    }
-
-    public boolean isRequiresVerified() {
-        return requiresVerified;
-    }
-
-    public boolean isRequiresAgeVerified() {
-        return requiresAgeVerified;
-    }
-
-    public String getMinRole() {
-        return minRole;
-    }
-
-    public boolean isDefaultEntitled() {
-        return defaultEntitled;
     }
 
     /**

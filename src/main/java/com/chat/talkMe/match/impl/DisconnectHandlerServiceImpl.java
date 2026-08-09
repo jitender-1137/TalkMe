@@ -7,6 +7,7 @@ import com.chat.talkMe.match.OnlineCountPublisher;
 import com.chat.talkMe.match.SessionCleanupService;
 import com.chat.talkMe.match.SessionService;
 import com.chat.talkMe.match.WaitingQueueService;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -29,6 +30,7 @@ import java.util.Set;
  */
 @Slf4j
 @Service
+@Getter
 @RequiredArgsConstructor
 public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
 
@@ -119,7 +121,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
     @Override
     public void scheduleDisconnect(String username) {
         // Hold the matchmaking state across a brief disconnect (tab-switch / blip /
-        // backgrounded PWA). MatchDisconnectReaper runs the real teardown if the grace
+        // backgrounder PWA). MatchDisconnectReaper runs the real teardown if the grace
         // expires; cancelDisconnect() aborts it when the user reconnects in time.
         long now = System.currentTimeMillis();
         long deadline = now + MATCH_DISCONNECT_GRACE.toMillis();

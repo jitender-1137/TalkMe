@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -28,7 +29,7 @@ public class Phase3SchemaMigration implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         dropCheck("secret_crushes", "secret_crushes_status_check");
         dropCheck("daily_companions", "daily_companions_status_check");
         dropCheck("game_sessions", "game_sessions_game_type_check");

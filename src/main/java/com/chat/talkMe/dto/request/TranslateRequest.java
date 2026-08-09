@@ -27,7 +27,7 @@ public class TranslateRequest {
     private String text;
 
     /**
-     * Target language code (e.g. "es", "fr", "hi").
+     * Target language code (e.g. "es", "en", "hi").
      */
     @NotBlank
     private String target;

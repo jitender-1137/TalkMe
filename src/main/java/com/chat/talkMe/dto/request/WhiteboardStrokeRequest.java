@@ -14,7 +14,7 @@ import java.util.List;
  *
  * <p>{@code points} are normalized 0..1 canvas coordinates ({@code [x, y]} pairs), so the same
  * stroke renders identically on any viewport size. The list is capped at 2000 points; because
- * bean-validation cannot introspect the element type of a {@code List<double[]>}, the cap is
+ * bean-validation cannot introspect the element type of {@code List<double[]>}, the cap is
  * ALSO enforced defensively in {@code WhiteboardServiceImpl}.
  */
 @Data
@@ -24,7 +24,7 @@ public class WhiteboardStrokeRequest {
     private String chatUuid;
 
     /**
-     * CSS colour string (e.g. "#ff0055"); echoed back verbatim to peers — bounded to keep the
+     * CSS color string (e.g. "#ff0055"); echoed back verbatim to peers — bounded to keep the
      * stored/rebroadcast payload small (the field is not a free-text vector).
      */
     @Size(max = 64, message = "color is too long")

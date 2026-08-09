@@ -62,7 +62,7 @@ public class StoryServiceImpl implements StoryService {
      *
      * <p>The caption is moderated and rejected if explicit. A VOICE story requires the
      * VOICE_STATUS entitlement and an audio-clip media URL; a visual photo paired with a
-     * soundtrack is muxed into an auto-playing video. Followers and following are notified
+     * soundtrack is muxed into an autoplaying video. Followers and following are notified
      * best-effort (a notification failure never fails the post).
      *
      * @param request     the story payload (media URL, caption, audience, kind, optional audio)
@@ -78,7 +78,7 @@ public class StoryServiceImpl implements StoryService {
     public StoryResponse createStory(StoryRequest request, User currentUser) {
         // Stories are publicly visible — the caption must be clean. (The media image
         // is hard-blocked at upload time for the "story" context in UploadController.)
-        if (moderationService.moderateText(request.getCaption()).isExplicit()) {
+        if (moderationService.moderateText(request.getCaption()).explicit()) {
             throw new ContentModerationException(
                     "Your story caption contains content that violates our community guidelines.");
         }
@@ -102,7 +102,7 @@ public class StoryServiceImpl implements StoryService {
                         "A voice status must be an audio clip", "TM_232");
             }
         } else {
-            // Photo + music story → merge into an auto-playing video (Instagram-style) so
+            // Photo + music story → merge into an autoplaying video (Instagram-style) so
             // the sound plays with the story like a video. Skip if the media is already a
             // video; fall back to the plain image if muxing is unavailable.
             boolean alreadyVideo = mediaUrl != null && mediaUrl.toLowerCase().contains(".mp4");
@@ -277,7 +277,7 @@ public class StoryServiceImpl implements StoryService {
     @Override
     @Transactional(readOnly = true)
     public List<StoryResponse> getMyStories(User currentUser) {
-        // All of the current user's non-deleted stories, incl. expired (archive).
+        // All the current user's non-deleted stories, incl. expired (archive).
         return storyRepository.findAllByUser(currentUser).stream()
                 .map(story -> mapToStoryResponse(story, currentUser))
                 .collect(Collectors.toList());

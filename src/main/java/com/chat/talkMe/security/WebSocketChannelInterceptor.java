@@ -50,8 +50,8 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     // activity, match frames) never pass through the HTTP RateLimitingFilter, so
     // this is the only guard against a client amplifying broadcasts. Set well above
     // real usage — typing/activity/presence frames are chatty, so the earlier
-    // 120/10s (~12/s) tripped during normal use. 600/10s (~60/s) leaves ample head-
-    // room for a human while still stopping a true flood (orders of magnitude higher).
+    // 120/10s (~12/s) tripped during normal use. 600/10s (~60/s) leaves ample head-room
+    // for a human while still stopping a true flood (orders of magnitude higher).
     // Exceeding it DROPS the frame (connection stays alive).
     private static final int SEND_LIMIT = 600;
     private static final int SEND_WINDOW_SECONDS = 10;
@@ -164,10 +164,8 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
                         if (payloadStr.contains("\"event\":\"call_") || payloadStr.contains("\"event\": \"call_")) {
                             Object principal = accessor.getUser();
-                            if (principal instanceof UsernamePasswordAuthenticationToken) {
-                                UsernamePasswordAuthenticationToken authToken = (UsernamePasswordAuthenticationToken) principal;
-                                if (authToken.getPrincipal() instanceof UserDetails) {
-                                    UserDetails userDetails = (UserDetails) authToken.getPrincipal();
+                            if (principal instanceof UsernamePasswordAuthenticationToken authToken) {
+                                if (authToken.getPrincipal() instanceof UserDetails userDetails) {
                                     String currentUsername = userDetails.getUsername();
 
                                     try {

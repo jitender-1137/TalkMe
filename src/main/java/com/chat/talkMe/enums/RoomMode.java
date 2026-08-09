@@ -1,7 +1,7 @@
 package com.chat.talkMe.enums;
 
 /**
- * Behavioural mode of a {@link com.chat.talkMe.domain.Chat} ROOM (features #26/#27).
+ * Behavioral mode of a {@link com.chat.talkMe.domain.Chat} ROOM (features #26/#27).
  *
  * <ul>
  *   <li>{@code STANDARD} — an ordinary interest room (the default; every existing room backfills here).</li>
@@ -12,7 +12,7 @@ package com.chat.talkMe.enums;
  * </ul>
  *
  * <p>Non-recording is enforced server-side (MessageServiceImpl) so a private, ephemeral space
- * stays ephemeral regardless of client behaviour.
+ * stays ephemeral regardless of client behavior.
  */
 public enum RoomMode {
     STANDARD,

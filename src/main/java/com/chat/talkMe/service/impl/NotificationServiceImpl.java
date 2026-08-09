@@ -69,7 +69,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     /**
-     * Marks all of the user's notifications as read in a single bulk update. Transactional.
+     * Marks all the user's notifications as read in a single bulk update. Transactional.
      *
      * @param currentUser the owner
      */

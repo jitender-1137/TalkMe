@@ -16,7 +16,7 @@ import org.springframework.util.StringUtils;
 
 /**
  * Default {@link FeedbackService} implementation: validates and persists user-submitted feedback
- * (rating clamped 0–5, blank fields normalised to null) and maps it to a response DTO.
+ * (rating clamped 0–5, blank fields normalized to null) and maps it to a response DTO.
  */
 @Slf4j
 @Service
@@ -37,7 +37,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Override
     @Transactional
     public FeedbackResponse submit(FeedbackRequest request, User currentUser) {
-        int rating = Math.max(0, Math.min(5, request.getRating()));
+        int rating = Math.clamp(request.getRating(), 0, 5);
         String reason = trimToNull(request.getReason());
         String comment = trimToNull(request.getComment());
 
@@ -62,7 +62,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     /**
-     * Parse a feedback type, defaulting to MANUAL when blank and OTHER when unrecognised.
+     * Parse a feedback type, defaulting to MANUAL when blank and OTHER when unrecognized.
      *
      * @param raw the raw type string
      * @return the resolved {@link FeedbackType}

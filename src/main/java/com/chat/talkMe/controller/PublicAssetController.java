@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Public, UNAUTHENTICATED brand assets — served so email clients (which can't send
- * an Authorization header) can load them by URL. Currently the header logo embedded
+ * an Authorization header) can load them by URL. Currently, the header logo embedded
  * in transactional emails, served from classpath {@code mail/logo.png}.
  *
  * <p>Must be allow-listed in SecurityConfig ({@code /api/v1/assets/**}).

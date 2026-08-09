@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * Tier-1 global kill-switches for the Late-Night Social features. Backed by
  * {@code features.*} in application.yml (per-env overridable via env vars), so any
- * feature can be dark-launched or emergency-disabled platform-wide without a deploy.
+ * feature can be dark-launched or emergency-disabled platform-wide without a deployment.
  * <p>
  * A key omitted from {@link #flags} falls back to {@link #enabledByDefault}. Global
  * enablement rolls up through {@link FeatureKey#getParent()} — a child is globally
@@ -40,7 +40,7 @@ public class FeatureFlags {
      * When true, {@link FeatureKey#FLIRT_MODE} skips the email-verified requirement, so
      * users who have NOT verified their email can still use Flirt Mode. The 18+
      * age-verification gate is deliberately NOT relaxed (adults-only stays enforced).
-     * Default false → current behaviour (email verification required). Bound from
+     * Default false → current behavior (email verification required). Bound from
      * {@code features.allow-non-verified-flirt-mode}.
      */
     private boolean allowNonVerifiedFlirtMode = false;

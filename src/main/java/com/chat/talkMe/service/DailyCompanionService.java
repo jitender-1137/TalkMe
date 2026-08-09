@@ -33,7 +33,7 @@ public interface DailyCompanionService {
     DailyCompanion assignFor(User user);
 
     /**
-     * Flip ACTIVE pairings past their 24h window to EXPIRED. Returns the number reaped.
+     * Flip ACTIVE pairings past their 24h window to EXPIRE. Returns the number reaped.
      */
     int reapExpired(Instant now);
 }

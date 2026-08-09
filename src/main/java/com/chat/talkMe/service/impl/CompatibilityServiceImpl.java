@@ -90,7 +90,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
                         + fMood * weights.getMood();
         int total = Math.max(1, weights.total());
         int overall = (int) Math.round((weighted / total) * 100.0);
-        overall = Math.max(0, Math.min(100, overall));
+        overall = Math.clamp(overall, 0, 100);
 
         Map<String, Integer> breakdown = new LinkedHashMap<>();
         breakdown.put("interests", pct(fInterests));
@@ -138,7 +138,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
      * Narrows a user's interests to the "creative / hobbies / music" subset used by the
      * secondary hobby-overlap factor.
      *
-     * @param interests the user's full interest set (may be null)
+     * @param interests the user's full interest set (maybe null)
      * @return the creative subset (empty when none)
      */
     private static Set<Interest> intersectType(Set<Interest> interests) {
@@ -230,7 +230,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
             nb += vb * vb;
         }
         if (na == 0 || nb == 0) return 0.5;
-        return Math.max(0.0, Math.min(1.0, dot / (Math.sqrt(na) * Math.sqrt(nb))));
+        return Math.clamp(dot / (Math.sqrt(na) * Math.sqrt(nb)), 0.0, 1.0);
     }
 
     /**
@@ -275,7 +275,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
      * @return percentage in 0..100
      */
     private static int pct(double factor) {
-        return (int) Math.round(Math.max(0.0, Math.min(1.0, factor)) * 100.0);
+        return (int) Math.round(Math.clamp(factor, 0.0, 1.0) * 100.0);
     }
 
     /**
@@ -298,9 +298,9 @@ public class CompatibilityServiceImpl implements CompatibilityService {
         if (!sharedInterests.isEmpty()) {
             out.add("You both love " + humanJoin(sharedInterests));
         }
-        List<String> sharedLangs = sharedNames(a.getLanguages(), b.getLanguages(), 2);
-        if (!sharedLangs.isEmpty()) {
-            out.add("You both speak " + humanJoin(sharedLangs));
+        List<String> sharedLanguages = sharedNames(a.getLanguages(), b.getLanguages(), 2);
+        if (!sharedLanguages.isEmpty()) {
+            out.add("You both speak " + humanJoin(sharedLanguages));
         }
         if (fEnergy >= 0.9 && a.getConversationEnergy() != null) {
             out.add("Matching " + a.getConversationEnergy().name().toLowerCase() + " energy");
@@ -365,7 +365,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
     }
 
     /**
-     * Turns an ENUM_NAME into a "Enum name" title-ish label.
+     * Turns an ENUM_NAME into an "Enum name" title-ish label.
      *
      * @param enumName raw enum constant name
      * @return prettified label
@@ -385,6 +385,6 @@ public class CompatibilityServiceImpl implements CompatibilityService {
         if (items.isEmpty()) return "";
         if (items.size() == 1) return items.get(0);
         if (items.size() == 2) return items.get(0) + " and " + items.get(1);
-        return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.get(items.size() - 1);
+        return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.getLast();
     }
 }

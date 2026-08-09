@@ -130,10 +130,6 @@ class BadgeControllerUnitTest {
                 .build();
     }
 
-    private static String repeat(char c, int n) {
-        return String.valueOf(c).repeat(n);
-    }
-
     // ──────────────────────────────────────────────────────────────────────────
     //  GET /reputation/badges/{userUuid}
     // ──────────────────────────────────────────────────────────────────────────

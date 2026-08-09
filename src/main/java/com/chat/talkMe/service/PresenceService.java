@@ -50,7 +50,7 @@ public interface PresenceService {
      * background transition (an intentional background — see
      * {@link #markBackgrounded}), the drop is just the OS suspending the
      * backgrounded tab, so the staged ONLINE → IDLE → OFFLINE timeline and its
-     * frozen last-seen are kept. Otherwise this behaves like {@link #markIdle}
+     * frozen last-seen are kept. Otherwise, this behaves like {@link #markIdle}
      * with {@code idleGrace} (a genuine ungraceful disconnect while active).
      */
     void markDisconnected(User user, Duration idleGrace);

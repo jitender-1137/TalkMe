@@ -38,7 +38,7 @@ public class MusicSessionState {
     private String artworkUrl;
 
     /**
-     * Playhead position (seconds) at the moment {@link #updatedAtEpochMs} was stamped.
+     * PlayHead position (seconds) at the moment {@link #updatedAtEpochMs} was stamped.
      */
     private double positionSec;
 

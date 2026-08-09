@@ -1,8 +1,10 @@
 package com.chat.talkMe.cache;
 
+import com.chat.talkMe.dto.response.MessageResponse;
 import com.chat.talkMe.event.MessageSentEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -43,15 +45,7 @@ public class RedisMessageCache {
 
         // Last-message cache: used by the chat-list API to show preview text + timestamp.
         String lastMsgKey = "chat:" + event.getChatUuid() + ":lastmsg";
-        Map<String, String> fields = new HashMap<>();
-        fields.put("id", msg.getId() != null ? msg.getId() : "");
-        fields.put("clientId", msg.getClientId() != null ? msg.getClientId() : "");
-        fields.put("content", msg.getContent() != null ? msg.getContent() : "");
-        fields.put("sender", event.getSenderName() != null ? event.getSenderName() : "");
-        fields.put("createdAt", msg.getCreatedAt() != null ? msg.getCreatedAt() : "");
-        fields.put("messageType", msg.getMessageType() != null ? msg.getMessageType() : "TEXT");
-        fields.put("seqNum", msg.getSequenceNumber() != null
-                ? msg.getSequenceNumber().toString() : "");
+        Map<String, String> fields = getFieldsMap(event, msg);
         redisTemplate.opsForHash().putAll(lastMsgKey, fields);
         redisTemplate.expire(lastMsgKey, TTL);
 
@@ -66,6 +60,22 @@ public class RedisMessageCache {
                 redisTemplate.expire(unreadKey, TTL);
             }
         }
+    }
+
+    /**
+     * Builds a map of last-message fields for the chat-list cache.
+     */
+    private static @NonNull Map<String, String> getFieldsMap(MessageSentEvent event, MessageResponse msg) {
+        Map<String, String> fields = new HashMap<>();
+        fields.put("id", msg.getId() != null ? msg.getId() : "");
+        fields.put("clientId", msg.getClientId() != null ? msg.getClientId() : "");
+        fields.put("content", msg.getContent() != null ? msg.getContent() : "");
+        fields.put("sender", event.getSenderName() != null ? event.getSenderName() : "");
+        fields.put("createdAt", msg.getCreatedAt() != null ? msg.getCreatedAt() : "");
+        fields.put("messageType", msg.getMessageType() != null ? msg.getMessageType() : "TEXT");
+        fields.put("seqNum", msg.getSequenceNumber() != null
+                ? msg.getSequenceNumber().toString() : "");
+        return fields;
     }
 
     /**

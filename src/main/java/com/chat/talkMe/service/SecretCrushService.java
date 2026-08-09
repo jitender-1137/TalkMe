@@ -15,7 +15,7 @@ public interface SecretCrushService {
     /**
      * Add (or re-activate) the caller's crush on {@code targetUuid}, then check reciprocity.
      * If the target already crushes back, both rows flip to MATCHED, both users are notified,
-     * and a matched response (with compatibility) is returned. Otherwise a non-matched
+     * and a matched response (with compatibility) is returned. Otherwise, a non-matched
      * response is returned that reveals nothing about the target's own crushes.
      */
     SecretCrushMatchResponse addCrush(User crusher, String targetUuid);

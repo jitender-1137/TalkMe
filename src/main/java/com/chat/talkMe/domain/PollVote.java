@@ -29,7 +29,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class PollVote extends BaseEntity {
 
-    // Denormalised poll reference so the (poll, user) uniqueness holds across options.
+    // Denormalized poll reference so the (poll, user) uniqueness holds across options.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "poll_id", nullable = false)
     private Poll poll;

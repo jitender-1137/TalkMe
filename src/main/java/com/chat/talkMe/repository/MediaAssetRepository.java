@@ -24,8 +24,6 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
      */
     List<MediaAsset> findByStorageKeyIn(Collection<String> storageKeys);
 
-    boolean existsByStorageKey(String storageKey);
-
     // ── Admin dashboard analytics ────────────────────────────────────────────
 
     @Query("SELECT COALESCE(SUM(m.fileSize), 0) FROM MediaAsset m")
@@ -89,11 +87,6 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
     List<Object[]> aggregateByContextForOwner(@Param("ownerId") Long ownerId);
 
     // ── Per-conversation (admin chat detail) ─────────────────────────────────
-
-    Page<MediaAsset> findByContextAndContextIdOrderByCreatedAtDesc(
-            MediaContext context, String contextId, Pageable pageable);
-
-    long countByContextAndContextId(MediaContext context, String contextId);
 
     @Query("SELECT COALESCE(SUM(m.fileSize), 0) FROM MediaAsset m "
             + "WHERE m.context = :context AND m.contextId = :contextId")

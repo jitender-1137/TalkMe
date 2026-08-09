@@ -4,12 +4,14 @@ import com.chat.talkMe.domain.Chat;
 import com.chat.talkMe.domain.ChatMember;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.enums.MemberRole;
+import com.chat.talkMe.enums.SendPolicy;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Objects;
 
 /**
  * Centralized authorization for group/channel/room actions. Every membership,
@@ -51,12 +53,9 @@ public class GroupAuthzService {
     public boolean canSend(Chat chat, ChatMember member) {
         if (member == null || member.isBanned()) return false;
         if (member.getMutedUntil() != null && member.getMutedUntil().isAfter(Instant.now())) return false;
-        switch (chat.getSettings().getWhoCanSend()) {
-            case ADMINS_ONLY:
-                return member.getRole().atLeast(MemberRole.ADMIN);
-            case EVERYONE:
-            default:
-                return true;
+        if (Objects.requireNonNull(chat.getSettings().getWhoCanSend()) == SendPolicy.ADMINS_ONLY) {
+            return member.getRole().atLeast(MemberRole.ADMIN);
         }
+        return true;
     }
 }

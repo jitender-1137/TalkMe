@@ -1,8 +1,6 @@
 package com.chat.talkMe.moderation;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
 
 import java.util.List;
 
@@ -13,17 +11,10 @@ import java.util.List;
  * NOTE: {@code matchedTerms} is for server-side telemetry/debugging ONLY — it must
  * never be logged at INFO or returned to another user (it would leak the explicit terms).
  */
-@Getter
 @Builder
-@AllArgsConstructor
-public class ModerationResult {
+public record ModerationResult(boolean explicit, Category category, double score, List<String> matchedTerms) {
 
     public enum Category {CLEAN, PROFANITY, ABUSE, SEXUAL, NSFW_IMAGE, NSFW_VIDEO}
-
-    private final boolean explicit;
-    private final Category category;
-    private final double score;
-    private final List<String> matchedTerms;
 
     /**
      * Builds a non-explicit CLEAN result (score 0.0, empty matched-terms list).

@@ -99,15 +99,15 @@ public class UploadController {
         // group conversation media is intentionally NOT hard-blocked here (it's handled
         // at send time with the consent flow), and stranger/lobby are excluded.
         if (context != null && MODERATED_CONTEXTS.contains(context.toLowerCase())
-                && moderationService.moderateUpload(file).isExplicit()) {
+                && moderationService.moderateUpload(file).explicit()) {
             throw new ContentModerationException(
                     "This image violates our community guidelines and can't be uploaded.");
         }
 
-        String subdir = resolveSubdir(context, contextId, userDetails);
-        String url = storageService.storeFile(file, type, subdir);
+        String subdivide = resolveSubdivide(context, contextId, userDetails);
+        String url = storageService.storeFile(file, type, subdivide);
 
-        // Report the ACTUAL stored size — videos are transcoded server-side and
+        // Report the ACTUAL stored size — videos are transcode server-side and
         // are typically much smaller than the uploaded multipart file.
         long storedSize = file.getSize();
         try {
@@ -213,7 +213,7 @@ public class UploadController {
      * Stranger media stays anonymous (no id in the peer-visible path). Anything
      * unknown/unverified falls back to {@code others/}.
      */
-    private String resolveSubdir(String context, String contextId, CustomUserDetails userDetails) {
+    private String resolveSubdivide(String context, String contextId, CustomUserDetails userDetails) {
         if (context == null) {
             return "others";
         }

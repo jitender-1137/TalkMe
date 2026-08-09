@@ -120,7 +120,7 @@ public class Chat extends BaseEntity {
     private int memberLimit = 256;
 
     /**
-     * Denormalized owner id for cheap authz; the OWNER-role member is source of truth.
+     * Denormalized owner id for cheap auth; the OWNER-role member is source of truth.
      */
     @Column(name = "owner_id")
     private Long ownerId;
@@ -163,7 +163,7 @@ public class Chat extends BaseEntity {
     private CityLocation cityLocation;
 
     /**
-     * Behavioural mode of a ROOM (features #26/#27). STANDARD for every ordinary room.
+     * Behavioral mode of a ROOM (features #26/#27). STANDARD for every ordinary room.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "room_mode", length = 20, nullable = false)

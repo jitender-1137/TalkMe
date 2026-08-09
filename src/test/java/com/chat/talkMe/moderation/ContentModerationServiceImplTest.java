@@ -49,38 +49,38 @@ class ContentModerationServiceImplTest {
 
     @Test
     void cleanTextIsNotExplicit() {
-        assertFalse(service.moderateText("hey how are you doing today").isExplicit());
-        assertFalse(service.moderateText("let's meet for coffee").isExplicit());
-        assertFalse(service.moderateText("").isExplicit());
-        assertFalse(service.moderateText(null).isExplicit());
+        assertFalse(service.moderateText("hey how are you doing today").explicit());
+        assertFalse(service.moderateText("let's meet for coffee").explicit());
+        assertFalse(service.moderateText("").explicit());
+        assertFalse(service.moderateText(null).explicit());
     }
 
     @Test
     void plainProfanityIsExplicit() {
-        assertTrue(service.moderateText("you are a fuck").isExplicit());
-        assertTrue(service.moderateText("what the shit").isExplicit());
+        assertTrue(service.moderateText("you are a fuck").explicit());
+        assertTrue(service.moderateText("what the shit").explicit());
     }
 
     @Test
     void hinglishAbuseIsExplicit() {
-        assertTrue(service.moderateText("tu ek chutiya hai").isExplicit());
-        assertTrue(service.moderateText("madarchod kahin ka").isExplicit());
+        assertTrue(service.moderateText("tu ek chutiya hai").explicit());
+        assertTrue(service.moderateText("madarchod kahin ka").explicit());
     }
 
     @Test
     void evasionsAreCaught() {
-        assertTrue(service.moderateText("f u c k you").isExplicit(), "spaced");
-        assertTrue(service.moderateText("fuuuuck off").isExplicit(), "repeated chars");
-        assertTrue(service.moderateText("f.u.c.k").isExplicit(), "punctuated");
-        assertTrue(service.moderateText("sh1t").isExplicit(), "leetspeak digits");
-        assertTrue(service.moderateText("a55hole").isExplicit(), "leetspeak 5->s");
+        assertTrue(service.moderateText("f u c k you").explicit(), "spaced");
+        assertTrue(service.moderateText("fuuuuck off").explicit(), "repeated chars");
+        assertTrue(service.moderateText("f.u.c.k").explicit(), "punctuated");
+        assertTrue(service.moderateText("sh1t").explicit(), "leetspeak digits");
+        assertTrue(service.moderateText("a55hole").explicit(), "leetspeak 5->s");
     }
 
     @Test
     void benignSubstringIsNotFlagged() {
         // "assassin"/"class" contain short bad substrings but must not trip the filter.
-        assertFalse(service.moderateText("the assassin joined the class").isExplicit());
-        assertFalse(service.moderateText("scunthorpe is a town").isExplicit());
+        assertFalse(service.moderateText("the assassin joined the class").explicit());
+        assertFalse(service.moderateText("scunthorpe is a town").explicit());
     }
 
     // ── isEnabled() ──────────────────────────────────────────────────────────
@@ -101,12 +101,12 @@ class ContentModerationServiceImplTest {
         ReflectionTestUtils.setField(off, "enabled", false);
         ReflectionTestUtils.invokeMethod(off, "load");
 
-        assertFalse(off.moderateText("you are a fuck").isExplicit());
+        assertFalse(off.moderateText("you are a fuck").explicit());
     }
 
     @Test
     void whitespaceOnlyText_returnsClean() {
-        assertFalse(service.moderateText("     ").isExplicit());
+        assertFalse(service.moderateText("     ").explicit());
     }
 
     @Test
@@ -115,17 +115,17 @@ class ContentModerationServiceImplTest {
         ContentModerationServiceImpl noList = new ContentModerationServiceImpl(null);
         ReflectionTestUtils.setField(noList, "enabled", true);
 
-        assertFalse(noList.moderateText("you are a fuck").isExplicit());
+        assertFalse(noList.moderateText("you are a fuck").explicit());
     }
 
     @Test
     void explicitResultCarriesAbuseCategory_scoreAndMatchedTerms() {
         ModerationResult r = service.moderateText("you fuck");
 
-        assertTrue(r.isExplicit());
-        assertEquals(ModerationResult.Category.ABUSE, r.getCategory());
-        assertTrue(r.getScore() >= 1.0);            // score = matched count
-        assertFalse(r.getMatchedTerms().isEmpty());
+        assertTrue(r.explicit());
+        assertEquals(ModerationResult.Category.ABUSE, r.category());
+        assertTrue(r.score() >= 1.0);            // score = matched count
+        assertFalse(r.matchedTerms().isEmpty());
     }
 
     // ── moderateMedia() ──────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ class ContentModerationServiceImplTest {
         NsfwClient client = mock(NsfwClient.class);
         ContentModerationServiceImpl s = mediaService(client);
 
-        assertFalse(s.moderateMedia(null, MessageType.IMAGE).isExplicit());
+        assertFalse(s.moderateMedia(null, MessageType.IMAGE).explicit());
         verifyNoInteractions(client);
     }
 
@@ -154,7 +154,7 @@ class ContentModerationServiceImplTest {
         ContentModerationServiceImpl s = new ContentModerationServiceImpl(client);
         ReflectionTestUtils.setField(s, "enabled", false);
 
-        assertFalse(s.moderateMedia(Path.of("/tmp/x.jpg"), MessageType.IMAGE).isExplicit());
+        assertFalse(s.moderateMedia(Path.of("/tmp/x.jpg"), MessageType.IMAGE).explicit());
         verifyNoInteractions(client);
     }
 
@@ -163,7 +163,7 @@ class ContentModerationServiceImplTest {
         NsfwClient client = mock(NsfwClient.class);
         ContentModerationServiceImpl s = mediaService(client);
 
-        assertFalse(s.moderateMedia(Path.of("/tmp/a.mp3"), MessageType.AUDIO).isExplicit());
+        assertFalse(s.moderateMedia(Path.of("/tmp/a.mp3"), MessageType.AUDIO).explicit());
         verifyNoInteractions(client);
     }
 
@@ -173,7 +173,7 @@ class ContentModerationServiceImplTest {
         when(client.classify(any(), eq(false))).thenReturn(Optional.empty());
         ContentModerationServiceImpl s = mediaService(client);
 
-        assertFalse(s.moderateMedia(Path.of("/tmp/pic.jpg"), MessageType.IMAGE).isExplicit());
+        assertFalse(s.moderateMedia(Path.of("/tmp/pic.jpg"), MessageType.IMAGE).explicit());
     }
 
     @Test
@@ -184,10 +184,10 @@ class ContentModerationServiceImplTest {
 
         ModerationResult r = s.moderateMedia(Path.of("/tmp/pic.jpg"), MessageType.IMAGE);
 
-        assertTrue(r.isExplicit());
-        assertEquals(ModerationResult.Category.NSFW_IMAGE, r.getCategory());
-        assertEquals(1.0, r.getScore());
-        assertEquals("nsfw_image", r.getMatchedTerms().get(0));
+        assertTrue(r.explicit());
+        assertEquals(ModerationResult.Category.NSFW_IMAGE, r.category());
+        assertEquals(1.0, r.score());
+        assertEquals("nsfw_image", r.matchedTerms().getFirst());
     }
 
     @Test
@@ -198,9 +198,9 @@ class ContentModerationServiceImplTest {
 
         ModerationResult r = s.moderateMedia(Path.of("/tmp/clip.mp4"), MessageType.VIDEO);
 
-        assertTrue(r.isExplicit());
-        assertEquals(ModerationResult.Category.NSFW_VIDEO, r.getCategory());
-        assertEquals("nsfw_video", r.getMatchedTerms().get(0));
+        assertTrue(r.explicit());
+        assertEquals(ModerationResult.Category.NSFW_VIDEO, r.category());
+        assertEquals("nsfw_video", r.matchedTerms().getFirst());
         verify(client).classify(any(), eq(true));
     }
 
@@ -210,7 +210,7 @@ class ContentModerationServiceImplTest {
         when(client.classify(any(), eq(false))).thenReturn(Optional.of(false));
         ContentModerationServiceImpl s = mediaService(client);
 
-        assertFalse(s.moderateMedia(Path.of("/tmp/pic.jpg"), MessageType.IMAGE).isExplicit());
+        assertFalse(s.moderateMedia(Path.of("/tmp/pic.jpg"), MessageType.IMAGE).explicit());
     }
 
     // ── moderateUpload() ─────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ class ContentModerationServiceImplTest {
         NsfwClient client = mock(NsfwClient.class);
         ContentModerationServiceImpl s = mediaService(client);
 
-        assertFalse(s.moderateUpload(null).isExplicit());
+        assertFalse(s.moderateUpload(null).explicit());
         verifyNoInteractions(client);
     }
 
@@ -230,7 +230,7 @@ class ContentModerationServiceImplTest {
         ContentModerationServiceImpl s = mediaService(client);
         MockMultipartFile empty = new MockMultipartFile("f", "e.jpg", "image/jpeg", new byte[0]);
 
-        assertFalse(s.moderateUpload(empty).isExplicit());
+        assertFalse(s.moderateUpload(empty).explicit());
         verifyNoInteractions(client);
     }
 
@@ -241,7 +241,7 @@ class ContentModerationServiceImplTest {
         ReflectionTestUtils.setField(s, "enabled", false);
         MockMultipartFile img = new MockMultipartFile("f", "a.jpg", "image/jpeg", new byte[]{1, 2, 3});
 
-        assertFalse(s.moderateUpload(img).isExplicit());
+        assertFalse(s.moderateUpload(img).explicit());
         verifyNoInteractions(client);
     }
 
@@ -251,7 +251,7 @@ class ContentModerationServiceImplTest {
         ContentModerationServiceImpl s = mediaService(client);
         MockMultipartFile file = new MockMultipartFile("f", "a.bin", null, new byte[]{1, 2, 3});
 
-        assertFalse(s.moderateUpload(file).isExplicit());
+        assertFalse(s.moderateUpload(file).explicit());
         verifyNoInteractions(client);
     }
 
@@ -261,7 +261,7 @@ class ContentModerationServiceImplTest {
         ContentModerationServiceImpl s = mediaService(client);
         MockMultipartFile txt = new MockMultipartFile("f", "a.txt", "text/plain", "hello".getBytes());
 
-        assertFalse(s.moderateUpload(txt).isExplicit());
+        assertFalse(s.moderateUpload(txt).explicit());
         verifyNoInteractions(client);
     }
 
@@ -274,8 +274,8 @@ class ContentModerationServiceImplTest {
 
         ModerationResult r = s.moderateUpload(img);
 
-        assertTrue(r.isExplicit());
-        assertEquals(ModerationResult.Category.NSFW_IMAGE, r.getCategory());
+        assertTrue(r.explicit());
+        assertEquals(ModerationResult.Category.NSFW_IMAGE, r.category());
         verify(client).classify(any(), eq(false));
     }
 
@@ -286,7 +286,7 @@ class ContentModerationServiceImplTest {
         ContentModerationServiceImpl s = mediaService(client);
         MockMultipartFile vid = new MockMultipartFile("f", "a.mp4", "video/mp4", new byte[]{1, 2, 3, 4});
 
-        assertFalse(s.moderateUpload(vid).isExplicit());
+        assertFalse(s.moderateUpload(vid).explicit());
         verify(client).classify(any(), eq(true));
     }
 
@@ -298,6 +298,6 @@ class ContentModerationServiceImplTest {
         MockMultipartFile img = new MockMultipartFile("f", "a.png", "image/png", new byte[]{9, 9, 9});
 
         // classify blows up inside moderateMedia → moderateUpload's catch → fail-open clean
-        assertFalse(s.moderateUpload(img).isExplicit());
+        assertFalse(s.moderateUpload(img).explicit());
     }
 }

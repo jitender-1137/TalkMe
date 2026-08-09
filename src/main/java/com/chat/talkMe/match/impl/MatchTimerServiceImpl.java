@@ -60,7 +60,7 @@ public class MatchTimerServiceImpl implements MatchTimerService {
     /**
      * Arms the countdown for a session: records the deadline in Redis and the session
      * mirror, clears post-timer state, and sends COFFEE_STARTED or CHEMISTRY_STARTED to
-     * both peers. For Chemistry it also sends the first prompt and schedules the rotation.
+     * both peers. For Chemistry, it also sends the first prompt and schedules the rotation.
      * No-op if the session no longer exists.
      *
      * @param sessionId the match session id
@@ -114,7 +114,7 @@ public class MatchTimerServiceImpl implements MatchTimerService {
     public void continueRequest(String username) {
         MatchSession session = sessionService.getSessionByUser(username).orElse(null);
         if (session == null) return;
-        // Serialize the put + both-agree check so concurrent CONTINUEs send exactly once.
+        // Serialize the put + both-agree check so concurrent Continues to send exactly once.
         synchronized (session) {
             session.getTimedActionByUser().put(username, "CONTINUE");
             boolean bothContinue = "CONTINUE".equals(session.getTimedActionByUser().get(session.getUserA()))

@@ -217,7 +217,7 @@ public class PostController {
      * @param postUuid    UUID of the post
      * @param pageable    pagination (default size 30, sorted by createdAt DESC)
      * @param userDetails authenticated caller
-     * @return a page of {@link AuthUserResponse} likers
+     * @return a page of {@link AuthUserResponse} likes
      * @throws com.chat.talkMe.exception.NotFoundException if the post does not exist
      */
     @GetMapping("/{id}/likes")

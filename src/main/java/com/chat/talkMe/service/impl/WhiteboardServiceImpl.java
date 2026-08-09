@@ -11,6 +11,7 @@ import com.chat.talkMe.service.WhiteboardService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -104,20 +105,7 @@ public class WhiteboardServiceImpl implements WhiteboardService {
     public WhiteboardOp addStroke(User me, WhiteboardStrokeRequest req) {
         requireChatMember(me, req.getChatUuid());
 
-        List<double[]> points = req.getPoints();
-        if (points != null) {
-            if (points.size() > MAX_POINTS) {
-                throw new BadRequestException("A stroke may contain at most " + MAX_POINTS + " points", "TM_821");
-            }
-            // Bound each point to an [x, y] pair. Without this a caller could pass 2000 arrays of
-            // arbitrary length (or one giant array) that pass the count cap but store/rebroadcast
-            // tens of MB — a Redis-memory + peer-bandwidth amplification vector.
-            for (double[] p : points) {
-                if (p == null || p.length != 2) {
-                    throw new BadRequestException("Each point must be an [x, y] pair", "TM_821");
-                }
-            }
-        }
+        List<double[]> points = getPoints(req);
 
         String chatUuid = req.getChatUuid();
         WhiteboardOp op = WhiteboardOp.builder()
@@ -134,6 +122,24 @@ public class WhiteboardServiceImpl implements WhiteboardService {
         pushOp(chatUuid, op);
         broadcast(chatUuid, "whiteboard_stroke", op);
         return op;
+    }
+
+    private static @Nullable List<double[]> getPoints(WhiteboardStrokeRequest req) {
+        List<double[]> points = req.getPoints();
+        if (points != null) {
+            if (points.size() > MAX_POINTS) {
+                throw new BadRequestException("A stroke may contain at most " + MAX_POINTS + " points", "TM_821");
+            }
+            // Bound each point to an [x, y] pair. Without this a caller could pass 2000 arrays of
+            // arbitrary length (or one giant array) that pass the count cap but store/rebroadcast
+            // tens of MB — a Redis-memory + peer-bandwidth amplification vector.
+            for (double[] p : points) {
+                if (p == null || p.length != 2) {
+                    throw new BadRequestException("Each point must be an [x, y] pair", "TM_821");
+                }
+            }
+        }
+        return points;
     }
 
     /**

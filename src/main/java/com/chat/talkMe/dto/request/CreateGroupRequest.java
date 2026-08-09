@@ -22,7 +22,7 @@ public class CreateGroupRequest {
     private String imageUrl;
 
     /**
-     * Initial member user uuids (creator is added as OWNER automatically).
+     * Initial member user uuid (creator is added as OWNER automatically).
      */
     private List<String> memberIds;
 

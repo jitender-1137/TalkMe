@@ -6,6 +6,7 @@ import com.chat.talkMe.repository.RoleRepository;
 import com.chat.talkMe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -46,7 +47,7 @@ public class SuperAdminSeeder implements ApplicationRunner {
      */
     @Override
     @Transactional
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         if (superAdminEmails == null || superAdminEmails.isBlank()) {
             log.info("[SuperAdmin] SUPER_ADMIN_EMAILS not set — no super-admins seeded");
             return;

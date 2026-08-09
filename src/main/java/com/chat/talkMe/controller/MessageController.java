@@ -299,7 +299,7 @@ public class MessageController {
             @PathVariable("messageId") String messageUuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         messageService.setMessageStarred(chatUuid, messageUuid, false, userDetails.getUser());
-        return ResponseEntity.ok(SuccessResponseDto.success(null, "Message unstarred", "TM_309"));
+        return ResponseEntity.ok(SuccessResponseDto.success(null, "Message unStarred", "TM_309"));
     }
 
     /**

@@ -60,7 +60,7 @@ public class NotificationController {
     }
 
     /**
-     * Marks all of the caller's notifications as read.
+     * Marks all the caller's notifications as read.
      *
      * @param userDetails authenticated caller
      * @return an empty success response

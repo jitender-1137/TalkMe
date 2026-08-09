@@ -110,7 +110,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 .gender(gender)
                 .build();
 
-        // Pass the request so AuthService can geo-locate the user's country from the
+        // Pass the request so AuthService can geolocate the user's country from the
         // callback IP (same detection used by password/guest signup).
         LoginResponse login = authService.oauthLogin(info, request.getHeader("User-Agent"), request);
 

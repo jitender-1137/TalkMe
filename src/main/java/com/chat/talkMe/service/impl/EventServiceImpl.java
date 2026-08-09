@@ -125,7 +125,7 @@ public class EventServiceImpl implements EventService {
      * @return the event as seen by the caller after the change
      * @throws com.chat.talkMe.exception.NotFoundException   event not found (TM_955)
      * @throws com.chat.talkMe.exception.BadRequestException invalid status (TM_960), event
-     *                                                       cancelled/ended (TM_958), or full (TM_959)
+     *                                                       canceled/ended (TM_958), or full (TM_959)
      */
     @Override
     public EventResponse rsvp(User user, String eventUuid, String status) {
@@ -165,14 +165,14 @@ public class EventServiceImpl implements EventService {
     }
 
     /**
-     * Cancel an event (host-only), setting its status to CANCELLED.
+     * Cancel an event (host-only), setting its status to CANCEL.
      *
      * @param eventUuid the event uuid
      * @param host      the caller (must be the event host)
-     * @return the cancelled event
+     * @return the canceled event
      * @throws com.chat.talkMe.exception.NotFoundException   event not found (TM_955)
      * @throws com.chat.talkMe.exception.ForbiddenException  caller is not the host (TM_956)
-     * @throws com.chat.talkMe.exception.BadRequestException already ended/cancelled (TM_961)
+     * @throws com.chat.talkMe.exception.BadRequestException already ended/canceled (TM_961)
      */
     @Override
     public EventResponse cancelEvent(String eventUuid, User host) {
@@ -181,7 +181,7 @@ public class EventServiceImpl implements EventService {
             throw new ForbiddenException("Only the host can cancel this event", "TM_956");
         }
         if (event.getStatus() == EventStatus.ENDED || event.getStatus() == EventStatus.CANCELLED) {
-            throw new BadRequestException("This event can no longer be cancelled", "TM_961");
+            throw new BadRequestException("This event can no longer be canceled", "TM_961");
         }
         event.setStatus(EventStatus.CANCELLED);
         scheduledEventRepository.save(event);

@@ -5,6 +5,7 @@ import com.chat.talkMe.repository.PostRepository;
 import com.chat.talkMe.util.ShortCodes;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,7 @@ public class PostShortCodeBackfill implements ApplicationRunner {
      */
     @Override
     @Transactional
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         List<Post> missing = postRepository.findByShortCodeIsNull();
         if (missing.isEmpty()) {
             return;

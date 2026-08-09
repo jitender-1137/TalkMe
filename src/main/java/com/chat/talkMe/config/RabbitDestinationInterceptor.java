@@ -1,5 +1,6 @@
 package com.chat.talkMe.config;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -57,7 +58,7 @@ public class RabbitDestinationInterceptor implements ChannelInterceptor {
      * @return the original or destination-rewritten {@link Message}.
      */
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
         if (!relayEnabled) {
             return message;
         }
@@ -72,7 +73,7 @@ public class RabbitDestinationInterceptor implements ChannelInterceptor {
         String rewritten = TOPIC_PREFIX + routingKey.replace('/', '.');
 
         // Preferred: mutate the existing accessor in place so the headers stay
-        // mutable for the relay (which sets the session id afterwards).
+        // mutable for the relay (which sets the session id afterward).
         SimpMessageHeaderAccessor accessor =
                 MessageHeaderAccessor.getAccessor(message, SimpMessageHeaderAccessor.class);
         if (accessor != null && accessor.isMutable()) {

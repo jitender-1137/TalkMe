@@ -204,7 +204,7 @@ public class ListenerServiceImpl implements ListenerService {
                 .orElseThrow(() -> new NotFoundException("You are not on an active listening shift", "TM_996"));
 
         // Only credit a genuinely completed session: the shift must be ENGAGED with a bound room.
-        // Otherwise a listener could farm the Great Listener trend by spamming /complete while idle.
+        // Otherwise, a listener could farm the Great Listener trend by spamming /complete while idle.
         if (shift.getStatus() == ShiftStatus.ENGAGED && shift.getRoomChatUuid() != null) {
             creditHelp(shift);
         }

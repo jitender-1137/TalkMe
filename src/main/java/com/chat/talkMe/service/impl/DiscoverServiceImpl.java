@@ -195,7 +195,7 @@ public class DiscoverServiceImpl implements DiscoverService {
                 if (onlineUsernames.isEmpty() && awayUsernames.isEmpty()) {
                     presenceRank = cb.literal(2);
                 } else {
-                    CriteriaBuilder.Case<Integer> tier = cb.<Integer>selectCase();
+                    CriteriaBuilder.Case<Integer> tier = cb.selectCase();
                     if (!onlineUsernames.isEmpty()) {
                         tier = tier.when(root.get("username").in(onlineUsernames), 0);
                     }

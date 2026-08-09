@@ -10,6 +10,7 @@ import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.service.GroupService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -30,7 +31,7 @@ import java.util.UUID;
  * {@code cityLocation} + {@code roomCurated} and saved. The room OWNER is a "system" host resolved
  * from {@code app.super-admin.emails} (falling back to the most-recent real account). If no such
  * account exists yet on a fresh install, seeding is skipped and retried on the next boot — mirroring
- * {@link SuperAdminSeeder}'s "elevated on next boot" behaviour.
+ * {@link SuperAdminSeeder}'s "elevated on next boot" behavior.
  *
  * <p>NOTE: {@code run()} is deliberately NOT {@code @Transactional}. Each {@code createGroup} owns its
  * own transaction, so one district failing to seed can't mark a shared transaction rollback-only and
@@ -61,7 +62,7 @@ public class NightCitySeeder implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         User host = resolveHost();
         if (host == null) {
             log.warn("[NightCity] no host account available yet — city rooms will be seeded on a later boot");
@@ -129,6 +130,6 @@ public class NightCitySeeder implements ApplicationRunner {
         }
         List<User> fallback = userRepository
                 .findByIsGuestFalseAndBannedFalseAndIsDeletedFalseOrderByCreatedAtDesc(PageRequest.of(0, 1));
-        return fallback.isEmpty() ? null : fallback.get(0);
+        return fallback.isEmpty() ? null : fallback.getFirst();
     }
 }

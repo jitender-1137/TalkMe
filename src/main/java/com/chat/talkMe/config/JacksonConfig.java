@@ -16,7 +16,7 @@ import tools.jackson.databind.DeserializationFeature;
  * its Java default ({@code false}/{@code 0}) — for every request DTO, not just one field.
  *
  * <p>Registered as a {@link JsonMapperBuilderCustomizer} bean so it is applied to the exact
- * auto-configured {@code JsonMapper} used by Spring MVC (a bare {@code spring.jackson.*} property is
+ * autoconfigured {@code JsonMapper} used by Spring MVC (a bare {@code spring.jackson.*} property is
  * not reliably applied under every test slice).
  */
 @Configuration

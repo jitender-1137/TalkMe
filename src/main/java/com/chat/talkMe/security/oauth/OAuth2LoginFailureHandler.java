@@ -3,6 +3,7 @@ package com.chat.talkMe.security.oauth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * On a failed / cancelled Google sign-in, bounce the user back to the SPA's Sign In
+ * On a failed / canceled Google sign-in, bounce the user back to the SPA's Sign In
  * page with an error marker instead of showing Spring's default error page.
  */
 @Slf4j
@@ -22,7 +23,7 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
     private String frontendBaseUrl;
 
     /**
-     * Redirects a failed/cancelled OAuth login back to the SPA's login page with an
+     * Redirects a failed/canceled OAuth login back to the SPA's login page with an
      * {@code error=oauth} marker.
      *
      * @param request   the callback request
@@ -31,7 +32,7 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
      * @throws IOException if issuing the redirect fails
      */
     @Override
-    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
+    public void onAuthenticationFailure(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
                                         AuthenticationException exception) throws IOException {
         log.warn("Google OAuth login failed: {}", exception.getMessage());
         String target = frontendBaseUrl.replaceAll("/+$", "") + "/#login?error=oauth";

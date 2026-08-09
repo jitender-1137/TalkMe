@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -32,11 +33,12 @@ public class FeatureGrantSchemaMigration implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         // FeatureKey grows every phase — its CHECK would break constantly, so drop it too.
-        dropCheck("user_feature_grants", "user_feature_grants_feature_key_check");
-        dropCheck("user_feature_grants", "user_feature_grants_decision_check");
-        dropCheck("user_feature_grants", "user_feature_grants_scope_check");
+        String table = "user_feature_grants";
+        dropCheck(table, table + "_feature_key_check");
+        dropCheck(table, table + "_decision_check");
+        dropCheck(table, table + "_scope_check");
     }
 
     /**

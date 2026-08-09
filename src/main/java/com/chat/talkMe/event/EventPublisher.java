@@ -36,7 +36,8 @@ public class EventPublisher {
      * survives an app crash between publish and delivery.
      */
     public boolean publishMessageSent(MessageSentEvent event) {
-        return publish(RabbitConfig.RK_MESSAGE_SEND, event);
+        String rkMessage = RabbitConfig.RK_MESSAGE_SEND;
+        return publish(rkMessage, event);
     }
 
     /**
@@ -44,7 +45,7 @@ public class EventPublisher {
      * Returns {@code false} immediately when AMQP is disabled, and {@code false} (after logging a
      * warning) if {@code convertAndSend} throws — e.g. a down or half-open broker connection — so
      * the caller can fall back to inline delivery. No publisher confirm is awaited, so the broker
-     * round-trip never adds latency to a send.
+     * round-trip never adds latency to send.
      *
      * @param routingKey the AMQP routing key to publish under
      * @param event      the event payload to convert and send
@@ -56,7 +57,7 @@ public class EventPublisher {
         }
         try {
             // Fire-and-forget: we do NOT wait for publisher confirms here, so the
-            // broker RTT never adds latency to a send. If convertAndSend throws
+            // broker RTT never adds latency to send. If convertAndSend throws
             // (broker down / half-open connection), we return false and the caller
             // falls back to inline delivery. The rare buffered-then-dropped case is
             // covered by the client's reconnect-sync (DB is the source of truth).

@@ -26,7 +26,7 @@ public class PresenceServiceHelper {
 
     /*
      * Attempts to find the user's presence or create a default one inside a separate transaction.
-     * Running in REQUIRES_NEW propagation guarantees that the write is committed immediately
+     * Running in REQUIRES_NEW propagation guarantees that to write is committed immediately
      * upon returning and database locks are released, avoiding cross-thread race conditions.
      */
 

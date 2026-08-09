@@ -12,13 +12,13 @@ import java.util.Map;
 
 /**
  * All tunable knobs for advertising, bound from {@code ads.*} in application.yml and
- * overridable per-environment via env vars. This is customisation only — the on/off
+ * overridable per-environment via env vars. This is customization only — the on/off
  * gate is the {@code ads} {@link com.chat.talkMe.enums.FeatureKey} (driven by
  * {@code features.flags.ads}). Everything here is non-sensitive, client-safe config
  * (publisher ids are public — they ship inside the ad script on the page anyway).
  *
- * <p>Only two networks are supported: <b>adsense</b> and <b>adsterra</b>. Switching or
- * mixing them is a config change, not a deploy: set the global {@link #provider} (or a
+ * <p>Only two networks are supported: <b>AdSense</b> and <b>AdsTerra</b>. Switching or
+ * mixing them is a config change, not a deployment: set the global {@link #provider} (or a
  * per-surface override), the loader ({@link #scriptUrl}/{@link #clientId}), the
  * {@link #placements}, and the network's {@link #cspDomains}.
  *
@@ -51,18 +51,18 @@ public class AdsProperties {
     private String clientId = "";
 
     /**
-     * Global network loader script URL (adsterra zone script). Empty until configured.
+     * Global network loader script URL (AdsTerra zone script). Empty until configured.
      */
     private String scriptUrl = "";
 
     /**
-     * Site-wide Adsterra Popunder loader — loaded ONCE for the whole app (not per slot).
+     * Site-wide AdsTerra PopUnder loader — loaded ONCE for the whole app (not per slot).
      * Triggers a pop-under tab on user interaction. Empty = off. High revenue, intrusive.
      */
     private String popunderScriptUrl = "";
 
     /**
-     * Site-wide Adsterra Social Bar loader — loaded ONCE for the whole app. Injects its
+     * Site-wide AdsTerra Social Bar loader — loaded ONCE for the whole app. Injects its
      * own floating widget/bar. Empty = off.
      */
     private String socialBarScriptUrl = "";
@@ -103,20 +103,20 @@ public class AdsProperties {
         /**
          * Whether ads show on this surface at all.
          */
-        private boolean enabled = true;
+        private boolean enabled;
         /**
          * Insert an ad after every N organic items.
          */
-        private int everyN = 8;
+        private int everyN;
         /**
          * Max ads for this surface per session.
          */
-        private int maxPerSession = 12;
+        private int maxPerSession;
         /**
          * Network id for this surface: AdSense slot id, Adsterra Native-Banner container
          * id, or Adsterra Banner key — depending on {@link #format}/provider.
          */
-        private String unitId = "";
+        private String unitId;
         /**
          * Optional per-surface provider override — empty means "use the global
          * {@link AdsProperties#provider}". Lets different surfaces run different networks
@@ -125,26 +125,30 @@ public class AdsProperties {
         private String provider = "";
         /**
          * Optional per-surface network loader script — empty means "use the global
-         * {@link AdsProperties#scriptUrl}". Needed when adsterra zones differ per surface
+         * {@link AdsProperties#scriptUrl}". Needed when AdsTerra zones differ per surface
          * (each zone ships its own script).
          */
         private String scriptUrl = "";
         /**
-         * Adsterra ad format for this surface: {@code native} (invoke.js + container div)
+         * AdsTerra ad format for this surface: {@code native} (invoke.js + container div)
          * or {@code banner} (fixed-size iframe with atOptions key + width/height). Ignored
          * for AdSense.
          */
         private String format = "native";
         /**
-         * Banner width in px (Adsterra banner format only; e.g. 300, 336, 728, 320).
+         * Banner width in px (AdsTerra banner format only; e.g. 300, 336, 728, 320).
          */
         private int width = 0;
         /**
-         * Banner height in px (Adsterra banner format only; e.g. 250, 280, 90, 50, 100).
+         * Banner height in px (AdsTerra banner format only; e.g. 250, 280, 90, 50, 100).
          */
         private int height = 0;
 
         public Placement() {
+            this.enabled = true;
+            this.everyN = 8;
+            this.maxPerSession = 12;
+            this.unitId = "";
         }
 
         public Placement(boolean enabled, int everyN, int maxPerSession, String unitId) {

@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit test for the MapStruct {@link ChatMapper}. The real generated implementation is
- * obtained via {@link Mappers#getMapper} (never mocked). Covers: null input, the two
+ * obtained via  (never mocked). Covers: null input, the two
  *
  * @Mapping expressions (uuid→id, chatType→name), the plain name copy, and that every
  * ignored/derived field stays at its default.

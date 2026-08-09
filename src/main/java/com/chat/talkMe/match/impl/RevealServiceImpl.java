@@ -43,7 +43,7 @@ public class RevealServiceImpl implements RevealService {
     /**
      * Requests (and simultaneously offers) a channel reveal. Under a session lock: no-ops
      * if already exchanged; blocks a PHOTO reveal when the voice-before-photo gate applies;
-     * rejects once the decline cap is hit. Otherwise marks the requester's side REVEALED and
+     * rejects once the decline cap is hit. Otherwise, marks the requester's side REVEALED and
      * either exchanges immediately (if the peer already revealed) or notifies the peer.
      *
      * @param requester the requesting username
@@ -82,24 +82,24 @@ public class RevealServiceImpl implements RevealService {
 
     /**
      * Accepts a channel reveal. Under a session lock: no-ops if already exchanged; enforces
-     * the voice-before-photo gate; marks the accepter's side REVEALED and exchanges when
+     * the voice-before-photo gate; marks the acceptor's side REVEALED and exchanges when
      * both sides have revealed.
      *
-     * @param accepter the accepting username
+     * @param acceptor the accepting username
      * @param channel  the channel being accepted
-     * @throws java.lang.IllegalArgumentException if the accepter has no active session
+     * @throws java.lang.IllegalArgumentException if the acceptor has no active session
      */
     @Override
-    public void acceptReveal(String accepter, RevealChannel channel) {
-        MatchSession session = session(accepter);
+    public void acceptReveal(String acceptor, RevealChannel channel) {
+        MatchSession session = session(acceptor);
         synchronized (session) {
             if (session.getRevealExchanged().contains(channel)) return; // already done — terminal
-            // Enforce the voice-before-photo gate here too (accept is directly reachable).
+            // Enforce the voice-before-photo gate here too (accepts is directly reachable).
             if (!photoAllowed(session, channel)) {
-                send(accepter, "REVEAL_BLOCKED", Map.of("channel", "PHOTO", "requires", "VOICE"));
+                send(acceptor, "REVEAL_BLOCKED", Map.of("channel", "PHOTO", "requires", "VOICE"));
                 return;
             }
-            mapFor(session, accepter).put(channel, RevealState.REVEALED);
+            mapFor(session, acceptor).put(channel, RevealState.REVEALED);
             if (bothRevealed(session, channel)) {
                 exchange(session, channel);
             }
@@ -171,7 +171,7 @@ public class RevealServiceImpl implements RevealService {
      * Returns just the channel name when the other user is unavailable.
      *
      * @param channel the channel being revealed
-     * @param other   the other peer's user entity (may be null)
+     * @param other   the other peer's user entity (maybe null)
      * @return the payload map to send to the receiving peer
      */
     private Map<String, Object> grantPayload(RevealChannel channel, User other) {

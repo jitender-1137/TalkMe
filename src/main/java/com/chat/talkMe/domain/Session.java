@@ -27,13 +27,13 @@ public class Session extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "user_agent", length = 255)
+    @Column(name = "user_agent")
     private String userAgent;
 
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
-    @Column(name = "location", length = 255)
+    @Column(name = "location")
     private String location;
 
     @Column(name = "last_active_at")

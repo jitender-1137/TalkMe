@@ -1,5 +1,7 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
  * Curated themed districts of the "Virtual Night City" (feature #25). Each maps to a set of
  * seeded ROOM {@link com.chat.talkMe.domain.Chat}s and a live presence set keyed on {@link #slug}
@@ -9,6 +11,7 @@ package com.chat.talkMe.enums;
  * <p>{@code slug} is the stable wire identifier (safe in URLs/topics); {@code label}/{@code emoji}/
  * {@code tagline} are display copy for the city map.
  */
+@Getter
 public enum CityLocation {
     NEON_DISTRICT("neon-district", "Neon District", "🌆", "Bright lights, fast talk, night energy"),
     MIDNIGHT_CAFE("midnight-cafe", "Midnight Café", "☕", "Slow chats over late coffee"),
@@ -31,22 +34,6 @@ public enum CityLocation {
         this.label = label;
         this.emoji = emoji;
         this.tagline = tagline;
-    }
-
-    public String getSlug() {
-        return slug;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public String getEmoji() {
-        return emoji;
-    }
-
-    public String getTagline() {
-        return tagline;
     }
 
     /**

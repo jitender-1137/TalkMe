@@ -11,8 +11,8 @@ import java.util.Map;
 /**
  * Client-facing advertising configuration served at {@code GET /api/v1/ads/config}.
  * {@link #enabled} mirrors the single master gate ({@code features.flags.ads}); the
- * rest is customisation the {@code <AdSlot>} component reads to decide provider
- * (adsense | adsterra), cadence, and caps. Server-only fields (e.g. CSP domains) are
+ * rest is customization the {@code <AdSlot>} component reads to decide provider
+ * (AdSense | AdsTerra), cadence, and caps. Server-only fields (e.g. CSP domains) are
  * intentionally omitted.
  */
 @Data

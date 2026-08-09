@@ -28,9 +28,4 @@ public class RelationshipStatsResponse {
     private Instant friendsSince;
     private long daysKnown;
     private Instant firstMessageAt;
-
-    // ── Deferred (add as nullable fields when backed by data) ──
-    // private Long voiceCalls;
-    // private Long longestChatSessionMinutes;
-    // private Long insideJokes;
 }

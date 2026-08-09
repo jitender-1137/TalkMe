@@ -10,7 +10,7 @@ import com.chat.talkMe.enums.RevealChannel;
 public interface RevealService {
     void requestReveal(String requester, RevealChannel channel);
 
-    void acceptReveal(String accepter, RevealChannel channel);
+    void acceptReveal(String acceptor, RevealChannel channel);
 
     void declineReveal(String decliner, RevealChannel channel);
 }

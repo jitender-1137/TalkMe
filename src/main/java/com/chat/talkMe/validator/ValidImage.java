@@ -11,8 +11,8 @@ import java.lang.annotation.Target;
 
 /**
  * Bean-validation constraint asserting a filename/URL {@code String} ends in a supported image
- * extension (jpg, jpeg, png, webp, gif, heic). A {@code null} value is treated as valid. Default
- * message: "Invalid image format. Supported formats: jpg, jpeg, png, webp, gif, heic".
+ * extension (jpg, jpeg, png, webp, GIF, heic). A {@code null} value is treated as valid. Default
+ * message: "Invalid image format. Supported formats: jpg, jpeg, png, webp, GIF, heic".
  *
  * @see ImageValidator
  */
@@ -21,7 +21,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD, ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidImage {
-    String message() default "Invalid image format. Supported formats: jpg, jpeg, png, webp, gif, heic";
+    String message() default "Invalid image format. Supported formats: jpg, jpeg, png, webp, GIF, heic";
 
     Class<?>[] groups() default {};
 

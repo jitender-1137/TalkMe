@@ -25,7 +25,7 @@ public class Device extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "device_token", nullable = false, unique = true, length = 255)
+    @Column(name = "device_token", nullable = false, unique = true)
     private String deviceToken;
 
     @Column(name = "device_type", length = 50)

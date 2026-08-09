@@ -172,7 +172,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     /**
      * Distinct ids of users who have at least one NEW unread message — unread AND newer
      * (by message id) than their last digest watermark. Eligibility (non-guest, not deleted,
-     * verified, has email) is filtered HERE so ineligible users never become candidates and
+     * verified, has email) is filtered HERE so ineligible users never become candidates, and
      * we don't run the expensive per-user queries for them. This is the candidate set the
      * daily job iterates.
      */

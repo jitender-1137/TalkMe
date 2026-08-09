@@ -1,7 +1,7 @@
 package com.chat.talkMe.enums;
 
 /**
- * Who created a {@code UserFeatureGrant}, which sets its precedence:
+ * Who created a {@code UserFeatureGrant}, which sets its precedent:
  * <ul>
  *   <li>{@code ADMIN} — moderation/manual override. An ADMIN DENY is a hard block
  *       that outranks entitlement rules.</li>

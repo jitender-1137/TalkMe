@@ -155,7 +155,7 @@ public class ReputationServiceImpl implements ReputationService {
      * a parse failure yields an empty contributor list rather than an error.
      *
      * @param user the caller
-     * @return the explainer with a (possibly empty) list of labelled contributors
+     * @return the explainer with a (possibly empty) list of labeled contributors
      */
     @Override
     public ReputationWhyResponse why(User user) {
@@ -183,7 +183,7 @@ public class ReputationServiceImpl implements ReputationService {
     }
 
     /**
-     * Prestiges the caller: folds in pending ledger rows, then (only at level 100) increments the
+     * Prestige the caller: folds in pending ledger rows, then (only at level 100) increments the
      * prestige count and resets current-cycle progression to level 1 / BRONZE while preserving
      * all-time totals. Persists, evicts the cache, and pushes a "prestige" WS event. Transactional.
      *
@@ -238,8 +238,8 @@ public class ReputationServiceImpl implements ReputationService {
     /**
      * Read-path recompute that never lets a lost write-race surface as a 500. {@link #recomputeFor}
      * runs in its OWN transaction (via the proxy), so if a concurrent recompute wins the
-     * {@code @Version} race or a create loses the unique race, that transaction rolls back on its
-     * own and we fail open here: serve the last persisted snapshot (or a transient default). Only
+     * {@code @Version} race or a creation loses the unique race, that transaction rolls back on its
+     * own, and we fail open here: serve the last persisted snapshot (or a transient default). Only
      * genuinely unexpected errors propagate.
      */
     private UserReputation recomputeSafely(User user) {

@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -30,7 +31,7 @@ public class ReputationSchemaMigration implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         try {
             jdbcTemplate.execute(
                     "ALTER TABLE reputation_events DROP CONSTRAINT IF EXISTS reputation_events_type_check");

@@ -34,12 +34,12 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
     /**
      * Advance the multi-party unread watermark atomically. A direct conditional
      * UPDATE (only moves forward) instead of load-modify-save, so concurrent
-     * mark-read calls (e.g. join + chat-open both firing on an invite open) can't
+     * mark-read calls (e.g. join + chat-open both firing on an invitation open) can't
      * collide on the @Version and throw ObjectOptimisticLockingFailureException.
      */
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ChatMember m SET m.lastReadMessageId = :maxId " +
             "WHERE m.chat = :chat AND m.user = :user " +
             "AND (m.lastReadMessageId IS NULL OR m.lastReadMessageId < :maxId)")
-    int advanceReadWatermark(@Param("chat") Chat chat, @Param("user") User user, @Param("maxId") Long maxId);
+    void advanceReadWatermark(@Param("chat") Chat chat, @Param("user") User user, @Param("maxId") Long maxId);
 }

@@ -9,7 +9,6 @@ import com.chat.talkMe.enums.ChatType;
 import com.chat.talkMe.enums.ConsentStatus;
 import com.chat.talkMe.exception.ForbiddenException;
 import com.chat.talkMe.exception.NotFoundException;
-import com.chat.talkMe.mapper.MessageMapper;
 import com.chat.talkMe.repository.ChatExplicitConsentRepository;
 import com.chat.talkMe.repository.ChatMemberRepository;
 import com.chat.talkMe.repository.ChatRepository;
@@ -49,7 +48,6 @@ public class ChatConsentServiceImpl implements ChatConsentService {
     private final ChatMemberRepository chatMemberRepository;
     private final ChatExplicitConsentRepository consentRepository;
     private final MessageRepository messageRepository;
-    private final MessageMapper messageMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final MessageService messageService;
 

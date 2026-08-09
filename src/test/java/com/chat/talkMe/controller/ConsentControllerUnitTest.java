@@ -498,7 +498,7 @@ class ConsentControllerUnitTest {
             mockMvc.perform(post(BASE + "/accept")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"type\":\"AGE_18_PLUS\",\"version\":\"1\"}"))
-                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(status().isUnprocessableContent())
                     .andExpect(jsonPath("$.messageCode").value("TM_143"));
         }
 

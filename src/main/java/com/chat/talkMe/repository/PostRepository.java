@@ -27,12 +27,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     List<Post> findByShortCodeIsNull();
 
-    Page<Post> findByUserAndIsDeletedFalse(User user, Pageable pageable);
-
-    Page<Post> findByIsDeletedFalse(Pageable pageable);
-
-    long countByUserAndIsDeletedFalse(User user);
-
     /**
      * Profile post count that matches the visible feed: excludes expired temporary posts (#22).
      */

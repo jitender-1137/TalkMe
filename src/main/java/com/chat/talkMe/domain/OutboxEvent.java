@@ -53,7 +53,7 @@ public class OutboxEvent {
     private Long id;
 
     /**
-     * Unique business key for this event — a message UUID for a message.send event,
+     * Unique business key for this event — a message UUID for a message. Send event,
      * or a generated UUID for a status event. Used for dedup and for the unique
      * constraint that makes the producing insert idempotent.
      */

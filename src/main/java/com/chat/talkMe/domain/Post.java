@@ -75,7 +75,7 @@ public class Post extends BaseEntity {
     private List<PostBookmark> bookmarks = new ArrayList<>();
 
     // Optional: present only when this post is a poll.
-    @OneToOne(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private Poll poll;
 
     // Optional soundtrack.

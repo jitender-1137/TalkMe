@@ -67,7 +67,7 @@ public class UserFeatureGrant extends BaseEntity {
     @Column(name = "cohort", length = 60)
     private String cohort;
 
-    @Column(name = "note", length = 255)
+    @Column(name = "note")
     private String note;
 
     /**

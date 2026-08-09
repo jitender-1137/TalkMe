@@ -17,8 +17,6 @@ public interface UserReputationRepository extends JpaRepository<UserReputation, 
     @Query("select r from UserReputation r where r.user.uuid = :uuid")
     Optional<UserReputation> findByUserUuid(@Param("uuid") UUID uuid);
 
-    boolean existsByUser(User user);
-
     /**
      * Ids of users who already have a reputation snapshot — the aggregation job's work set.
      */

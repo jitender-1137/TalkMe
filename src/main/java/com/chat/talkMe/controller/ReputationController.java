@@ -44,7 +44,7 @@ public class ReputationController {
     }
 
     /**
-     * Explainer for the caller's reputation — labelled contributor breakdown (fails open to a
+     * Explainer for the caller's reputation — labeled contributor breakdown (fails open to a
      * level-1 baseline if the stored breakdown cannot be parsed).
      *
      * @param userDetails the authenticated caller

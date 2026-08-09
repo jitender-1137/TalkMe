@@ -15,8 +15,6 @@ import java.util.Optional;
 public interface UserPresenceRepository extends JpaRepository<UserPresence, Long> {
     Optional<UserPresence> findByUser(User user);
 
-    long countByStatus(String status);
-
     // Atomic updates for the high-churn presence paths (connect/disconnect).
     // These avoid optimistic-lock (version) conflicts and lost updates when
     // multiple sessions/listeners touch the same presence row concurrently.

@@ -42,13 +42,13 @@ public class PushSubscription extends BaseEntity {
     /**
      * Client public key (base64url).
      */
-    @Column(name = "p256dh", nullable = false, length = 255)
+    @Column(name = "p256dh", nullable = false)
     private String p256dh;
 
     /**
      * Auth secret (base64url).
      */
-    @Column(name = "auth_key", nullable = false, length = 255)
+    @Column(name = "auth_key", nullable = false)
     private String auth;
 
     @Enumerated(EnumType.STRING)

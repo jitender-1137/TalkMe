@@ -48,7 +48,7 @@ public class MatchWebSocketController {
             @Payload(required = false) MatchStartRequest filters,
             Principal principal) {
         if (principal == null) return;
-        // No body → legacy blind quick-match; a body → preference-aware match.
+        // Nobody → legacy blind quick-match; a body → preference-aware match.
         if (filters == null) {
             matchmakingService.startMatching(principal.getName());
         } else {
@@ -105,7 +105,7 @@ public class MatchWebSocketController {
      * Handles {@code /match/accept-consent}: the peer grants this session's 18+ text
      * consent, unblocking held explicit messages. No-op when the principal is null.
      *
-     * @param principal the authenticated accepter (null ⇒ ignored)
+     * @param principal the authenticated acceptor (null ⇒ ignored)
      */
     @MessageMapping("/match/accept-consent")
     public void acceptConsent(Principal principal) {
@@ -212,7 +212,7 @@ public class MatchWebSocketController {
      * principal or payload is null.
      *
      * @param payload   map containing a {@code channel} name
-     * @param principal the authenticated accepter (null ⇒ ignored)
+     * @param principal the authenticated acceptor (null ⇒ ignored)
      */
     @MessageMapping("/match/reveal-accept")
     public void revealAccept(@Payload Map<String, Object> payload, Principal principal) {

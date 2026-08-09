@@ -53,7 +53,7 @@ public class FollowController {
      * Makes the current user stop following the target user (soft-deletes the follow edge).
      *
      * @param userUuid    the UUID of the user to unfollow
-     * @param userDetails the authenticated user performing the unfollow
+     * @param userDetails the authenticated user performing to unfollow
      * @return 200 with an empty payload and success code TM_255
      * @throws com.chat.talkMe.exception.NotFoundException   if no user matches the UUID
      * @throws com.chat.talkMe.exception.BadRequestException if not currently following the user

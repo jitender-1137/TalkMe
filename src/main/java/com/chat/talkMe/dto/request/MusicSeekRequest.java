@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 public class MusicSeekRequest {
 
     /**
-     * Target playhead position in seconds.
+     * Target play head position in seconds.
      */
     private Double positionSec;
 }

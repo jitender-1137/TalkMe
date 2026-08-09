@@ -142,12 +142,12 @@ public class MusicSessionServiceImpl implements MusicSessionService {
     }
 
     /**
-     * Pause the live session (optionally recording the playhead), persist, and broadcast
+     * Pause the live session (optionally recording the play head), persist, and broadcast
      * {@code music_pause}.
      *
      * @param user        the caller (becomes the host; must be a chat member)
      * @param chatId      the chat UUID
-     * @param positionSec optional playhead to record (clamped to >= 0)
+     * @param positionSec optional play head to record (clamped to >= 0)
      * @return the updated session state
      * @throws com.chat.talkMe.exception.BadRequestException malformed chat id or no active session
      * @throws com.chat.talkMe.exception.ForbiddenException  caller is not a chat member
@@ -170,11 +170,11 @@ public class MusicSessionServiceImpl implements MusicSessionService {
     }
 
     /**
-     * Move the live session's playhead, persist, and broadcast {@code music_seek}.
+     * Move the live session's play head, persist, and broadcast {@code music_seek}.
      *
      * @param user        the caller (becomes the host; must be a chat member)
      * @param chatId      the chat UUID
-     * @param positionSec the new playhead in seconds (required, >= 0)
+     * @param positionSec the new play head in seconds (required, >= 0)
      * @return the updated session state
      * @throws com.chat.talkMe.exception.BadRequestException malformed chat id, missing/negative
      *                                                       position, or no active session

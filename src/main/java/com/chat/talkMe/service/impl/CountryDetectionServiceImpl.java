@@ -48,7 +48,7 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
      * header (configured or common fallbacks), then an ip-api.com GeoIP lookup on the resolved client IP.
      * Returns an "Unknown" result when nothing resolves, on error/timeout, or for local IPs outside dev mode.
      *
-     * @param request the incoming HTTP request (may be null)
+     * @param request the incoming HTTP request (maybe null)
      * @return the detected country/location and its source; never null
      */
     @Override
@@ -192,7 +192,7 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         try {
             Locale locale = Locale.of("", countryCode);
             String country = locale.getDisplayCountry(Locale.ENGLISH);
-            if (country != null && !country.isBlank() && !country.equalsIgnoreCase(countryCode)) {
+            if (!country.isBlank() && !country.equalsIgnoreCase(countryCode)) {
                 return country;
             }
         } catch (Exception e) {

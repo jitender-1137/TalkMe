@@ -34,7 +34,7 @@ public enum MediaContext {
      */
     STORY,
     /**
-     * Anything uncategorised ({@code others/}).
+     * Anything uncategorized ({@code others/}).
      */
     OTHER;
 

@@ -23,9 +23,9 @@ import java.time.Duration;
  *
  * <p>On connect it registers the STOMP session id in the per-user Redis session set
  * (TTL-refreshed), marks the user ONLINE, and cancels any pending match-disconnect grace
- * (resuming a reconnect). On disconnect it removes the session id and, only when it was the
+ * (resuming a reconnect). On disconnect, it removes the session id and, only when it was the
  * user's last live session, marks them IDLE for a grace window (the idle reaper flips them
- * OFFLINE afterwards) and schedules a matchmaking disconnect grace.</p>
+ * OFFLINE afterward) and schedules a matchmaking disconnect grace.</p>
  */
 @Slf4j
 @Component
@@ -122,7 +122,7 @@ public class WebSocketPresenceListener {
 
         // Last session gone (tab closed / navigated away / OS suspended a
         // backgrounded tab). Don't drop straight to OFFLINE — show IDLE for a
-        // 5-minute grace and let the idle reaper flip OFFLINE afterwards. A quick
+        // 5-minute grace and let the idle reaper flip OFFLINE afterward. A quick
         // reconnect (refresh, brief network blip) re-fires CONNECT → ONLINE and
         // cancels the pending offline. markDisconnected defers to an in-progress
         // staged background transition (intentional minimize) so the ONLINE grace

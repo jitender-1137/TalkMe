@@ -1,11 +1,14 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
  * Optional context a person can attach when asking to talk to a volunteer listener
  * ("Someone Is Listening", features #26/#27). Purely a hint for the listener — it shapes
  * the support room's title so the volunteer knows the general shape of the conversation
  * before they join. Never exposed to anyone but the two people in the room.
  */
+@Getter
 public enum ListenerReason {
 
     NEED_TO_TALK("Just need to talk"),
@@ -17,17 +20,14 @@ public enum ListenerReason {
     JUST_VENT("Just need to vent"),
     OTHER("Something else");
 
+    /**
+     * -- GETTER --
+     *  Human-friendly label used in the support room's title.
+     */
     private final String label;
 
     ListenerReason(String label) {
         this.label = label;
-    }
-
-    /**
-     * Human-friendly label used in the support room's title.
-     */
-    public String getLabel() {
-        return label;
     }
 
     /**

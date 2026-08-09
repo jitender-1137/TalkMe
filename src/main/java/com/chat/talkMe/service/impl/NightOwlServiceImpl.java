@@ -100,7 +100,7 @@ public class NightOwlServiceImpl implements NightOwlService {
     @Override
     @Transactional(readOnly = true)
     public List<TrendingRoomCard> trendingRooms(int limit) {
-        int capped = Math.min(Math.max(1, limit), TRENDING_ROOMS_MAX);
+        int capped = Math.clamp(limit, 1, TRENDING_ROOMS_MAX);
         List<Chat> rooms = chatRepository.findTrendingRooms(PageRequest.of(0, capped));
         return rooms.stream().map(this::toRoomCard).collect(Collectors.toList());
     }

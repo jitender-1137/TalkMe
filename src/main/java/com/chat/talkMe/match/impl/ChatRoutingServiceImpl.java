@@ -23,7 +23,7 @@ import java.util.UUID;
  * peers of a session over STOMP, always resolving the recipient as "the other user" so
  * identities are never leaked. Enforces per-session 18+ text consent (explicit messages
  * are held until granted) and image permission (photos rejected until approved), and for
- * a backgrounded recipient with no live socket it buffers the frame for replay and fires
+ * a backgrounder recipient with no live socket it buffers the frame for replay and fires
  * an anonymous push.
  */
 @Slf4j
@@ -67,7 +67,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
         // Explicit text requires per-session 18+ consent. Until the peer has GRANTED,
         // the message is held (never relayed): we auto-ask the peer and flag the
         // sender's own message in-place — no spammy toasts.
-        if (moderationService.moderateText(content).isExplicit()
+        if (moderationService.moderateText(content).explicit()
                 && session.getConsentStatus() != ConsentStatus.GRANTED) {
             matchConsentService.handleHeldExplicit(sender, clientId, session);
             return;
@@ -169,7 +169,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
     }
 
     /**
-     * Handle a relayed event for a recipient that may be backgrounded. If they have a
+     * Handle a relayed event for a recipient that may be backgrounder. If they have a
      * live socket the STOMP frame above was delivered in-app — nothing more to do. If
      * not, that frame was dropped, so we (1) BUFFER the event for replay when they
      * reconnect (match messages are otherwise ephemeral and would be lost from the

@@ -38,7 +38,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     @Modifying
     @Query("UPDATE OutboxEvent o SET o.status = 'PUBLISHED', o.publishedAt = :now " +
             "WHERE o.eventKey = :eventKey AND o.status = 'PENDING'")
-    int markPublished(@Param("eventKey") String eventKey, @Param("now") Instant now);
+    void markPublished(@Param("eventKey") String eventKey, @Param("now") Instant now);
 
     /**
      * Housekeeping: drop delivered rows older than the cutoff so the table stays small.

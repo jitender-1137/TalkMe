@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
  * state (archive/mute/pin/clear/delete, manual unread), and drives read/delivered receipts.
  * <p>
  * Receipt changes are broadcast over the transactional outbox (persist-then-publish, re-driven by the
- * outbox poller) and honour Ghost-mode privacy (a ghost recipient's receipts stay invisible to senders).
+ * outbox poller) and honor Ghost-mode privacy (a ghost recipient's receipts stay invisible to senders).
  * Uses {@link MemberCountCache}/{@link UserSettingsCache}/{@link BlockCache} to avoid N+1 reads and
  * {@link SimpMessagingTemplate} for WebSocket chat events.
  */

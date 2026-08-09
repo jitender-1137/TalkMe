@@ -33,7 +33,7 @@ public interface MusicSessionService {
     MusicSessionState pause(User user, String chatId, Double positionSec);
 
     /**
-     * Move the live session's playhead to {@code positionSec} (required).
+     * Move the live session's play head to {@code positionSec} (required).
      */
     MusicSessionState seek(User user, String chatId, Double positionSec);
 

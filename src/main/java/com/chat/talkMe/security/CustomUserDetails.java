@@ -2,10 +2,12 @@ package com.chat.talkMe.security;
 
 import com.chat.talkMe.domain.User;
 import lombok.Getter;
+import lombok.NonNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.io.Serial;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.List;
  */
 @Getter
 public class CustomUserDetails implements UserDetails {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final User user;
@@ -55,6 +58,7 @@ public class CustomUserDetails implements UserDetails {
     }
 
     @Override
+    @NonNull
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;
     }
@@ -65,6 +69,7 @@ public class CustomUserDetails implements UserDetails {
     }
 
     @Override
+    @NonNull
     public String getUsername() {
         return user.getUsername();
     }

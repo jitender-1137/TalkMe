@@ -126,7 +126,6 @@ public class MessageServiceImpl implements MessageService {
      * @throws com.chat.talkMe.exception.ForbiddenException          if not a member, left, blocked,
      *                                                               or messaging-privacy/authz denies
      * @throws com.chat.talkMe.exception.TooManyRequestsException    if slow mode gate is hit
-     * @throws com.chat.talkMe.moderation.ContentModerationException if explicit content is hard-blocked
      */
     @Override
     @Transactional
@@ -245,13 +244,13 @@ public class MessageServiceImpl implements MessageService {
         // text/path (decrypt is a passthrough for plaintext / disabled encryption).
         String plainContent = messageCryptoService.decrypt(chat.getId(), request.getContent());
         String plainFileUrl = messageCryptoService.decrypt(chat.getId(), request.getFileUrl());
-        boolean explicit = moderationService.moderateText(plainContent).isExplicit();
+        boolean explicit = moderationService.moderateText(plainContent).explicit();
         if (!explicit && type != MessageType.TEXT && plainFileUrl != null && !plainFileUrl.isBlank()) {
             // Materialize the stored media to a local file (in place on disk, or a temp
             // download from OCI) so the ffmpeg/NSFW moderator can read it, then clean up.
             try (var local = mediaStorage.localCopy(plainFileUrl).orElse(null)) {
                 if (local != null) {
-                    explicit = moderationService.moderateMedia(local.path(), type).isExplicit();
+                    explicit = moderationService.moderateMedia(local.path(), type).explicit();
                 }
             }
         }
@@ -447,7 +446,7 @@ public class MessageServiceImpl implements MessageService {
         // Live-only fan-out (no notifications, no unread badges — nothing is retained).
         if (!isBlocked) {
             try {
-                messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", (Object) response);
+                messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/messages", response);
                 Map<String, Object> eventWrapper = new HashMap<>();
                 eventWrapper.put("event", "message_received");
                 Map<String, Object> eventPayload = new HashMap<>();
@@ -475,13 +474,12 @@ public class MessageServiceImpl implements MessageService {
      * @param chatUuid    uuid of the target chat
      * @param actor       the user the system event is attributed to
      * @param contentJson pre-serialized system-event JSON stored as the message content
-     * @param currentUser the triggering user to exclude from recipients (may be null)
-     * @return the persisted system message as a response DTO
+     * @param currentUser the triggering user to exclude from recipients (maybe null)
      * @throws com.chat.talkMe.exception.NotFoundException if the chat is missing
      */
     @Override
     @Transactional
-    public MessageResponse sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser) {
+    public void sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
 
@@ -517,7 +515,6 @@ public class MessageServiceImpl implements MessageService {
         // Best-effort broadcast (system events are non-critical): outbox + fast path.
         persistOutbox(response.getId(), broadcastEvent);
         eventPublisher.publishEvent(broadcastEvent);
-        return response;
     }
 
     /**
@@ -621,7 +618,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * Fetch one older page of messages (DESC, newest first) before {@code cursor}, honouring the
+     * Fetch one older page of messages (DESC, newest first) before {@code cursor}, honoring the
      * member's cleared-at / left-at boundaries, with ghost-aware status and starred flags applied.
      *
      * @param chatUuid    uuid of the chat
@@ -692,7 +689,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     /**
-     * Full-text search within a chat's history the caller can see (honouring cleared-at), returning a
+     * Full-text search within a chat's history the caller can see (honoring cleared-at), returning a
      * ghost-aware page.
      *
      * @param chatUuid    uuid of the chat
@@ -943,7 +940,6 @@ public class MessageServiceImpl implements MessageService {
      * @throws com.chat.talkMe.exception.NotFoundException           if the chat/message is missing
      * @throws com.chat.talkMe.exception.ForbiddenException          if not a member or not the sender
      * @throws com.chat.talkMe.exception.BadRequestException         if deleted, non-text, or empty
-     * @throws com.chat.talkMe.moderation.ContentModerationException if the new text is disallowed explicit
      */
     @Override
     @Transactional
@@ -967,7 +963,7 @@ public class MessageServiceImpl implements MessageService {
         // Client sends ciphertext (encrypted chats) or plaintext — decrypt for moderation
         // (passthrough when plaintext / encryption off), then re-check like a fresh send.
         String plain = messageCryptoService.decrypt(chatId, content);
-        if (moderationService.moderateText(plain).isExplicit()) {
+        if (moderationService.moderateText(plain).explicit()) {
             Chat chat = message.getChat();
             boolean allowedExplicit = chat.isMultiParty() && chat.isAllowExplicitContent();
             if (!allowedExplicit) {

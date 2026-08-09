@@ -52,7 +52,7 @@ public class ProfileViewController {
             viewType = ProfileViewType.PROFILE;
         }
         profileViewService.recordView(userDetails.getUser(), userUuid, viewType);
-        return ResponseEntity.ok(ResponseDto.<Void>success(null, "View recorded", "TM_000"));
+        return ResponseEntity.ok(ResponseDto.success(null, "View recorded", "TM_000"));
     }
 
     /**
@@ -89,6 +89,6 @@ public class ProfileViewController {
     public ResponseEntity<ResponseDto<Void>> markSeen(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         profileViewService.markAllSeen(userDetails.getUser());
-        return ResponseEntity.ok(ResponseDto.<Void>success(null, "Marked seen", "TM_000"));
+        return ResponseEntity.ok(ResponseDto.success(null, "Marked seen", "TM_000"));
     }
 }

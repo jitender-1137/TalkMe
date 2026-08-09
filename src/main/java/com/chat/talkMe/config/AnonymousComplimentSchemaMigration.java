@@ -2,6 +2,7 @@ package com.chat.talkMe.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -32,8 +33,10 @@ public class AnonymousComplimentSchemaMigration implements ApplicationRunner {
      * @param args the Spring Boot application arguments (unused)
      */
     @Override
-    public void run(ApplicationArguments args) {
-        dropCheck("anonymous_compliments", "anonymous_compliments_status_check");
+    public void run(@NonNull ApplicationArguments args) {
+        String table = "anonymous_compliments";
+        String constraint = "anonymous_compliments_status_check";
+        dropCheck(table, constraint);
     }
 
     /**

@@ -20,7 +20,7 @@ public class TranslateResponse {
     private String translatedText;
 
     /**
-     * Language the source was detected/assumed to be (may be null/"auto").
+     * Language the source was detected/assumed to be (maybe null/"auto").
      */
     private String detectedSource;
 
@@ -35,7 +35,7 @@ public class TranslateResponse {
     private boolean cached;
 
     /**
-     * Which provider produced the result: "libretranslate", "mymemory", "none", or "cache".
+     * Which provider produced the result: "libre translate", "mymemory", "none", or "cache".
      */
     private String provider;
 }

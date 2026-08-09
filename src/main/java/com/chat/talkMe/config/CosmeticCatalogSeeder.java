@@ -7,6 +7,7 @@ import com.chat.talkMe.enums.CosmeticUnlockType;
 import com.chat.talkMe.repository.UnlockableCosmeticRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -64,7 +65,7 @@ public class CosmeticCatalogSeeder implements ApplicationRunner {
      */
     @Override
     @Transactional
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         int inserted = 0, updated = 0;
         for (Object[] row : SEED) {
             String code = (String) row[0];

@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  * Redis-backed fixed-window HTTP rate limiter. Skipped entirely in local/dev/test profiles and for
  * CORS preflight, WebSocket handshakes, and non-{@code /api/} static requests. Counts per
  * authenticated username ({@code AUTH_LIMIT} req/window) or, when anonymous, per resolved client
- * IP ({@code ANON_LIMIT} req/window), over a {@code WINDOW_SECONDS} window. On breach it returns 429
+ * IP ({@code ANON_LIMIT} req/window), over a {@code WINDOW_SECONDS} window. On breach, it returns 429
  * with a
  * {@code Retry-After} header; if Redis is unavailable it fails open (allows the request).
  */

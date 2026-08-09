@@ -14,7 +14,7 @@ public class PasswordValidator implements ConstraintValidator<ValidPassword, Str
      *
      * @param password the password to check; {@code null} is considered invalid
      * @param context  the {@code jakarta.validation.ConstraintValidatorContext} (unused)
-     * @return {@code true} only if length is 6-128 and it holds at least one letter and one digit
+     * @return {@code true} only if length is 6-128, and it holds at least one letter and one digit
      */
     @Override
     public boolean isValid(String password, ConstraintValidatorContext context) {

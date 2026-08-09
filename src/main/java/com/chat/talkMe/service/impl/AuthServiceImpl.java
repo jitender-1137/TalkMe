@@ -29,7 +29,6 @@ import com.chat.talkMe.exception.UnauthorizedException;
 import com.chat.talkMe.mapper.SessionMapper;
 import com.chat.talkMe.mapper.UserMapper;
 import com.chat.talkMe.moderation.ContentModerationService;
-import com.chat.talkMe.repository.PermissionRepository;
 import com.chat.talkMe.repository.RefreshTokenRepository;
 import com.chat.talkMe.repository.RoleRepository;
 import com.chat.talkMe.repository.SessionRepository;
@@ -80,9 +79,9 @@ import java.util.stream.Collectors;
  * signup, JWT access + rotating refresh tokens (single-device policy), session listing/revocation,
  * email verification, password reset, profile updates, and soft-delete with scheduled purge.
  *
- * <p>Cross-cutting behaviours: brute-force lockout via {@link LoginAttemptService}; best-effort
- * IP geo-location for country backfill, session location and sign-in alert emails; breached-
- * password rejection (HIBP); one-time reset/verification tokens stored in Redis only as SHA-256
+ * <p>Cross-cutting behaviors: brute-force lockout via {@link LoginAttemptService}; best-effort
+ * IP geolocation for country backfill, session location and sign-in alert emails; breached-password
+ * rejection (HIBP); one-time reset/verification tokens stored in Redis only as SHA-256
  * hashes with TTLs and per-recipient send cooldowns; and feature-access cache eviction whenever an
  * action can change entitlement.
  */
@@ -93,7 +92,6 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final PermissionRepository permissionRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionRepository sessionRepository;
     private final PasswordEncoder passwordEncoder;
@@ -157,7 +155,7 @@ public class AuthServiceImpl implements AuthService {
      * @param request     the login credentials (email/username + password)
      * @param userAgent   the caller's User-Agent (recorded on the session + alert)
      * @param ip          the caller IP (used for lockout accounting)
-     * @param httpRequest the servlet request (used for IP geo-location)
+     * @param httpRequest the servlet request (used for IP geolocation)
      * @return the login response with user + tokens
      * @throws com.chat.talkMe.exception.UnauthorizedException (TM_024) unknown user, bad password,
      *                                                         or a soft-deleted account past its recovery window
@@ -216,7 +214,7 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
-        // Resolve the client's country + closest location (city/area) from the request
+        // Resolve the client's country + the closest location (city/area) from the request
         // IP once, and reuse it for: (a) one-time country backfill, (b) the session +
         // user activity-location record, and (c) the new-sign-in alert email. Best-effort
         // — a detection failure must never block login.
@@ -279,7 +277,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // The display name is publicly visible — reject a non-clean one at signup.
-        if (moderationService.moderateText(request.getName()).isExplicit()) {
+        if (moderationService.moderateText(request.getName()).explicit()) {
             throw new ContentModerationException(
                     "Your display name contains content that violates our community guidelines.");
         }
@@ -387,14 +385,14 @@ public class AuthServiceImpl implements AuthService {
      * @param userAgent   the caller's User-Agent
      * @param httpRequest the callback servlet request (used for country detection)
      * @return the login response with user + tokens
-     * @throws org.springframework.dao.DataIntegrityViolationException if a create race cannot be
+     * @throws org.springframework.dao.DataIntegrityViolationException if a creation race cannot be
      *                                                                 resolved to an existing row
      */
     @Override
     @Transactional
     public LoginResponse oauthLogin(OAuthUserInfo info, String userAgent,
                                     HttpServletRequest httpRequest) {
-        // Geo-locate from the callback request IP — the OAuth callback is a top-level
+        // Geolocate from the callback request IP — the OAuth callback is a top-level
         // browser navigation so the client IP is the real user's. Google's profile has
         // no reliable country, so we reuse the SAME detector as password/guest signup
         // (IP → proxy headers → server public IP fallback; see CountryDetectionService).
@@ -500,7 +498,7 @@ public class AuthServiceImpl implements AuthService {
             emailService.sendWelcomeEmail(user.getEmail(), user.getName(), openLink);
         } else {
             // Returning sign-in (or linking Google to an existing account) → new-sign-in
-            // alert, honouring the user's emailLoginAlerts preference.
+            // alert, honoring the user's emailLoginAlerts preference.
             maybeSendLoginAlert(user, userAgent, detection);
         }
 
@@ -663,7 +661,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Soft-deletes all of the user's sessions except the current one. Transactional.
+     * Soft-deletes all the user's sessions except the current one. Transactional.
      *
      * @param currentUser the user
      */
@@ -718,7 +716,7 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * Completes a password reset: validates the token via its Redis-stored hash, rejects breached
-     * passwords, sets the new password hash, consumes the token (one-time use), and revokes all of
+     * passwords, sets the new password hash, consumes the token (one-time use), and revokes all
      * the user's sessions/tokens (sign-out everywhere). Transactional.
      *
      * @param request the reset request (token + new password)
@@ -909,7 +907,7 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * Changes the signed-in user's password after confirming the current one and rejecting a
-     * breached new password, then revokes all of the user's tokens (sign-out everywhere).
+     * breached new password, then revokes all the user's tokens (sign-out everywhere).
      * Transactional.
      *
      * @param request     the change-password request (current + new password)
@@ -1060,7 +1058,7 @@ public class AuthServiceImpl implements AuthService {
 
     /**
      * Per-recipient email cooldown (anti email-bombing). Returns true and reserves
-     * the slot if a send is allowed now; false if one was sent within the window.
+     * the slot if a Send is allowed now; false if one was sent within the window.
      * Fail-open so a Redis blip never blocks a legitimate reset.
      */
     private boolean mailCooldownOk(String type, String email) {
@@ -1276,7 +1274,7 @@ public class AuthServiceImpl implements AuthService {
             user.getPersonality().clear();
             for (var e : request.getPersonality().entrySet()) {
                 if (e.getKey() != null && e.getValue() != null) {
-                    user.getPersonality().put(e.getKey(), Math.max(0, Math.min(100, e.getValue())));
+                    user.getPersonality().put(e.getKey(), Math.clamp(e.getValue(), 0, 100));
                 }
             }
         }

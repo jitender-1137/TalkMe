@@ -22,5 +22,4 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
     Page<Feedback> findByTypeAndStatus(FeedbackType type, FeedbackStatus status, Pageable pageable);
 
-    long countByStatus(FeedbackStatus status);
 }

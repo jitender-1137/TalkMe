@@ -14,7 +14,7 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
- * Per-group behaviour settings, embedded directly into {@code chats} (1:1 with
+ * Per-group behavior settings, embedded directly into {@code chats} (1:1 with
  * the chat, always loaded with it, never queried alone). Columns carry
  * {@code @ColumnDefault} so ddl-auto can add these NOT NULL columns to the
  * existing, non-empty chats table (Postgres backfills existing rows).

@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Performs the actual WebSocket fan-out for a sent message: chat-topic broadcast,
+ * Performs the actual WebSocket fan-out for sent message: chat-topic broadcast,
  * per-member personal-queue events, and notification dispatch. Shared by
  * {@link MessageEventConsumer} (the normal delivery path via RabbitMQ) and by the
  * inline fallback in {@link MessageBroadcastListener} (used when the broker is
@@ -30,7 +30,7 @@ public class MessageBroadcaster {
     private final NotificationDispatchService notificationDispatchService;
 
     /**
-     * Fans a sent message out over WebSocket: a broadcast to the chat topic
+     * Fans sent message out over WebSocket: a broadcast to the chat topic
      * ({@code /topic/chat/{uuid}/messages}), then a per-recipient personal-queue
      * {@code message_received} event ({@code /queue/chats}) plus notification dispatch. All
      * recipients are loaded in a single {@code findByUsernameIn} query to avoid N+1, and each
@@ -63,7 +63,7 @@ public class MessageBroadcaster {
         // Load all recipients in ONE query (avoids N+1 across the fan-out loop).
         Map<String, User> recipients = userRepository.findByUsernameIn(event.getRecipientUsernames())
                 .stream()
-                .collect(Collectors.toMap(User::getUsername, u -> u, (a, b) -> a));
+                .collect(Collectors.toMap(User::getUsername, u -> u, (a, _) -> a));
 
         for (String username : event.getRecipientUsernames()) {
             messagingTemplate.convertAndSendToUser(username, "/queue/chats", eventWrapper);

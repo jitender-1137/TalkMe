@@ -1,7 +1,6 @@
 package com.chat.talkMe.repository;
 
 import com.chat.talkMe.domain.User;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -24,15 +23,11 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     // Batch lookup for fan-out (avoids N+1 when notifying all chat recipients).
     List<User> findByUsernameIn(Collection<String> usernames);
 
-    Optional<User> findByEmail(String email);
-
     Optional<User> findByGoogleId(String googleId);
 
     Optional<User> findByUuid(UUID uuid);
 
     boolean existsByUsername(String username);
-
-    boolean existsByEmail(String email);
 
     // ── Case-insensitive lookups ─────────────────────────────────────────────
     // Email is treated case-insensitively (users type it in any case); usernames
@@ -103,11 +98,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Query("SELECT u.country, COUNT(u) FROM User u WHERE u.isGuest = false AND u.country IS NOT NULL GROUP BY u.country ORDER BY COUNT(u) DESC")
     List<Object[]> countGroupedByCountry();
-
-    // Paginated search over name/username/email for the admin user list.
-    Page<User>
-    findByUsernameContainingIgnoreCaseOrNameContainingIgnoreCaseOrEmailContainingIgnoreCase(
-            String username, String name, String email, Pageable pageable);
 
     @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u " +
             "WHERE up.status = 'ONLINE' " +

@@ -39,9 +39,6 @@ public class GameServiceImpl implements GameService {
     private final ChatMemberRepository chatMemberRepository;
 
     /**
-     * IDOR guard: the caller must be a member of the chat the game runs in.
-     */
-    /**
      * IDOR guard: assert the caller is a member of the chat the game runs in.
      *
      * @param user   the caller

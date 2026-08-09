@@ -24,10 +24,10 @@ public class AudioTrack {
     @Column(name = "audio_url", length = 1024)
     private String audioUrl;
 
-    @Column(name = "audio_title", length = 255)
+    @Column(name = "audio_title")
     private String audioTitle;
 
-    @Column(name = "audio_artist", length = 255)
+    @Column(name = "audio_artist")
     private String audioArtist;
 
     @Column(name = "audio_artwork_url", length = 1024)

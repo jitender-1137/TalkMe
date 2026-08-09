@@ -16,8 +16,6 @@ public interface UserFeatureGrantRepository extends JpaRepository<UserFeatureGra
 
     Optional<UserFeatureGrant> findByUserAndFeatureKeyAndScope(User user, FeatureKey key, GrantScope scope);
 
-    void deleteByUserAndFeatureKey(User user, FeatureKey key);
-
     /**
      * Admin revoke: clear ADMIN/COHORT grants but PRESERVE the user's own SELF opt-out.
      */

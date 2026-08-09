@@ -154,7 +154,7 @@ public class UserControllerTest {
         // so return a non-explicit result by default to avoid NPEs on the unstubbed mock.
         ModerationResult clean =
                 Mockito.mock(ModerationResult.class);
-        Mockito.lenient().when(clean.isExplicit()).thenReturn(false);
+        Mockito.lenient().when(clean.explicit()).thenReturn(false);
         Mockito.lenient().when(moderationService.moderateText(any())).thenReturn(clean);
         Mockito.lenient().when(moderationService.moderateUpload(any())).thenReturn(clean);
     }

@@ -94,7 +94,7 @@ public class GroupController {
     }
 
     /**
-     * Add members to a group; targets whose privacy disallows a direct add get an invite instead.
+     * Add members to a group; targets whose privacy disallows a direct add get an invitation instead.
      *
      * @param uuid        UUID of the group
      * @param body        map with {@code memberIds} (list of user UUIDs); defaults to empty

@@ -40,7 +40,7 @@ public class StoryController {
      * Posts a new story for the current user, expiring 24 hours after creation.
      *
      * <p>Supports a visual story (image/video) or a VOICE story; a photo paired
-     * with music is muxed server-side into an auto-playing video. Followers and
+     * with music is mixed server-side into an autoplaying video. Followers and
      * following are notified best-effort. See
      * {@link StoryService#createStory(StoryRequest, com.chat.talkMe.domain.User)}
      * for the full rules.

@@ -16,13 +16,13 @@ import java.time.Duration;
  * network switch) linger for up to ~2 hours — during which every command just times
  * out. That is the recurring root cause of the reaper timeout storms.
  *
- * <p>This customizer is picked up automatically by Spring Boot's auto-configured
+ * <p>This customizer is picked up automatically by Spring Boot's autoconfigured
  * LettuceConnectionFactory (there is no custom factory bean) and applies to every
  * profile. It:
  * <ul>
  *   <li>bounds connection establishment ({@code connectTimeout});</li>
  *   <li>enables TCP keep-alive so a dead peer is detected in ~30s, not ~2h, and the
- *       client reconnects (fine-grained timing needs a netty native transport —
+ *       client reconnects (fine-grained timing needs a Netty native transport —
  *       epoll/kqueue — otherwise the OS default keep-alive interval is used);</li>
  *   <li>sets TCP_USER_TIMEOUT so unacked writes fail fast on a broken link (Linux);</li>
  *   <li>validates a (re)connection with PING before use ({@code pingBeforeActivateConnection});</li>
@@ -36,7 +36,7 @@ import java.time.Duration;
 public class RedisResilienceConfig {
 
     /**
-     * Lettuce client customizer applied to the auto-configured connection factory. Sets a
+     * Lettuce client customizer applied to the autoconfigured connection factory. Sets a
      * 10s connect timeout, enables TCP keep-alive (15s idle / 5s interval / 3 probes) and
      * a 30s TCP_USER_TIMEOUT, turns on auto-reconnect and PING-before-activate validation,
      * and enforces the command timeout from {@code spring.data.redis.timeout}.

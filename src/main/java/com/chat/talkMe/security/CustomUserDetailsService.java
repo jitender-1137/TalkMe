@@ -3,6 +3,7 @@ package com.chat.talkMe.security;
 import com.chat.talkMe.domain.User;
 import com.chat.talkMe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -30,10 +31,11 @@ public class CustomUserDetailsService implements UserDetailsService {
      */
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
+    @NonNull
+    public UserDetails loadUserByUsername(@NonNull String usernameOrEmail) throws UsernameNotFoundException {
         // Username / email are matched case-insensitively (users may type either in
         // any case). Trim to tolerate stray whitespace from clients.
-        String key = usernameOrEmail == null ? "" : usernameOrEmail.trim();
+        String key = usernameOrEmail.trim();
         User user = userRepository.findByUsernameIgnoreCase(key)
                 .or(() -> userRepository.findByEmailIgnoreCase(key))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username or email: " + usernameOrEmail));

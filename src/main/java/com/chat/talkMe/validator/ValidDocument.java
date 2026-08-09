@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
 /**
  * Bean-validation constraint asserting a filename/URL {@code String} ends in a supported document
  * extension (pdf, doc, docx, xls, xlsx, ppt, pptx, txt, zip). A {@code null} value is treated as
- * valid. Default message: "Invalid document format. Supported formats: pdf, doc, docx, xls, xlsx,
+ * valid. Default message: "Invalid document format. Supported formats: PDF, doc, docx, xls, xlsx,
  * ppt, pptx, txt, zip".
  *
  * @see DocumentValidator

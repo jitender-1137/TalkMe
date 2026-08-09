@@ -71,7 +71,7 @@ public class TranslationServiceImpl implements TranslationService {
      * when both providers fail. No-op echo when disabled or text/target is blank.
      *
      * @param user the caller (used for the per-user daily cap)
-     * @param req  the plaintext plus target/source language (may be null)
+     * @param req  the plaintext plus target/source language (maybe null)
      * @return the translation, or the echoed input on fail-open
      * @throws com.chat.talkMe.exception.TooManyRequestsException when the daily cap is exceeded
      */
@@ -148,7 +148,7 @@ public class TranslationServiceImpl implements TranslationService {
      * Echoes every item when disabled or the batch/target is empty.
      *
      * @param user the caller (the whole batch consumes at most one daily-cap unit)
-     * @param req  the items (id + text), shared target and optional source (may be null)
+     * @param req  the items (id + text), shared target and optional source (maybe null)
      * @return per-item results in input order, with the resolved provider label
      * @throws com.chat.talkMe.exception.TooManyRequestsException when the daily cap is exceeded
      */

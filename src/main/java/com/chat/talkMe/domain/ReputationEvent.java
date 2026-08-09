@@ -24,7 +24,7 @@ import java.time.LocalDate;
 /**
  * Append-only reputation ledger row (feature #31). Intentionally lean — no BaseEntity
  * overhead — because this is a high-volume insert path (pattern of {@code OutboxEvent}).
- * {@code userId} is denormalised so nightly aggregation needs no join. {@code dedupeKey}
+ * {@code userId} is denormalized so nightly aggregation needs no join. {@code dedupeKey}
  * is unique so replays/retries insert once. {@code awardedWeight} is the value after
  * diminishing-returns + caps; {@code counted=false} means it was kept for audit but does
  * not contribute points.

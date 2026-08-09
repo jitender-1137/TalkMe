@@ -64,7 +64,7 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
      * Follow-up style replies to keep an ongoing thread alive.
      */
     private static final List<String> FOLLOWUP_STYLE = List.of(
-            "That's really interesting — tell me more about that.",
+            "That's fascinating — tell me more about that.",
             "Love that. What got you into it?",
             "Same here, honestly. How long have you felt that way?",
             "Okay now I'm curious — what happened next?");
@@ -184,7 +184,7 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
      * Suggest up to {@code max} reply lines by classifying the last message (empty/greeting → opener,
      * question → answer-style, otherwise → follow-up) and returning that template bank.
      *
-     * @param lastMessageText the other person's last message (may be null)
+     * @param lastMessageText the other person's last message (maybe null)
      * @param max             maximum suggestions to return
      * @return reply suggestions (empty if max &lt;= 0)
      */
@@ -224,7 +224,7 @@ public class HeuristicWingmanServiceImpl implements WingmanService {
      * Rewrite a draft into up to {@code max} tone variants: the requested tone first, then a
      * reply-inviting variant, a tidied variant, and other tone templates as backfill. Deduplicated.
      *
-     * @param draft the user's draft message (may be null)
+     * @param draft the user's draft message (maybe null)
      * @param tone  requested tone key (defaults to "friendly"; unknown tones are ignored)
      * @param max   maximum variants to return
      * @return rewrite variants (empty if max &lt;= 0 or the draft is blank)

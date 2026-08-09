@@ -136,7 +136,7 @@ public class UserServiceImpl implements UserService {
 
         if (request.getName() != null) {
             // Display name is publicly visible everywhere — must stay clean.
-            if (moderationService.moderateText(request.getName()).isExplicit()) {
+            if (moderationService.moderateText(request.getName()).explicit()) {
                 throw new ContentModerationException(
                         "Your display name contains content that violates our community guidelines.");
             }
@@ -208,7 +208,7 @@ public class UserServiceImpl implements UserService {
             user.getPersonality().clear();
             for (var e : request.getPersonality().entrySet()) {
                 if (e.getKey() != null && e.getValue() != null) {
-                    user.getPersonality().put(e.getKey(), Math.max(0, Math.min(100, e.getValue())));
+                    user.getPersonality().put(e.getKey(), Math.clamp(e.getValue(), 0, 100));
                 }
             }
         }
@@ -345,7 +345,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
 
         // Profile photos are publicly visible — reject NSFW before storing.
-        if (moderationService.moderateUpload(file).isExplicit()) {
+        if (moderationService.moderateUpload(file).explicit()) {
             throw new ContentModerationException(
                     "This profile photo violates our community guidelines and can't be used.");
         }
@@ -397,7 +397,7 @@ public class UserServiceImpl implements UserService {
      * and a friendship flag relative to the caller. Read-only.
      *
      * @param userId      the target UUID string, or "me"
-     * @param currentUser the caller (may be null in some flows)
+     * @param currentUser the caller (maybe null in some flows)
      * @return the target user response
      * @throws com.chat.talkMe.exception.NotFoundException (TM_USER_NOT_FOUND) when the target is missing
      */
@@ -482,8 +482,8 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * Build the enriched smart profile card for a target: reuses the mapped user response, mutual-
-     * friend count, and a compatibility score (viewer re-loaded as a managed entity to avoid a
+     * Build the enriched smart profile card for a target: reuses the mapped user response, mutual-friend
+     * count, and a compatibility score (viewer re-loaded as a managed entity to avoid a
      * LazyInit), plus fail-open online-streak and recent-public-post enrichments. Read-only.
      *
      * @param userId      the target UUID string
@@ -583,19 +583,19 @@ public class UserServiceImpl implements UserService {
 
         Pageable pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
 
-        Specification<User> spec = (root, q, cb) -> {
+        Specification<User> spec = (root, _, cb) -> {
             String pattern = "%" + query.toLowerCase() + "%";
-            List<Predicate> preds = new ArrayList<>();
-            preds.add(cb.notEqual(root.get("id"), currentUser.getId()));
+            List<Predicate> predicate = new ArrayList<>();
+            predicate.add(cb.notEqual(root.get("id"), currentUser.getId()));
             // Never surface soft-deleted / deletion-requested accounts (both carry
             // isDeleted=true) or guest sessions in people search / discover.
-            preds.add(cb.equal(root.get("isDeleted"), false));
-            preds.add(cb.equal(root.get("isGuest"), false));
-            preds.add(cb.or(
+            predicate.add(cb.equal(root.get("isDeleted"), false));
+            predicate.add(cb.equal(root.get("isGuest"), false));
+            predicate.add(cb.or(
                     cb.like(cb.lower(root.get("username")), pattern),
                     cb.like(cb.lower(root.get("name")), pattern),
                     cb.like(cb.lower(root.get("email")), pattern)));
-            return cb.and(preds.toArray(new Predicate[0]));
+            return cb.and(predicate.toArray(new Predicate[0]));
         };
 
         Page<User> userPage = userRepository.findAll(spec, pageable);
@@ -670,7 +670,7 @@ public class UserServiceImpl implements UserService {
 
         // One OPEN report per (reporter → reported): don't let the same person pile up
         // duplicate pending reports. Once a moderator resolves/dismisses it, they can
-        // report again if the behaviour recurs.
+        // report again if the behavior recurs.
         if (matchReportRepository.existsByReporterIdAndReportedIdAndStatus(
                 currentUser.getId(), targetUser.getId(), "PENDING")) {
             throw new ConflictException(
@@ -730,7 +730,7 @@ public class UserServiceImpl implements UserService {
      * owner sees their own real last-seen.
      *
      * @param response    the response to mutate
-     * @param currentUser the viewer (may be null)
+     * @param currentUser the viewer (maybe null)
      * @param targetUser  the user being described
      */
     private void populatePresenceAndBlockStatus(UserResponse response, User currentUser, User targetUser) {
@@ -769,7 +769,7 @@ public class UserServiceImpl implements UserService {
             Instant own = presenceService.getLastSeen(targetUser);
             response.setLastSeen(own != null ? own.toString() : null);
         } else {
-            // Others: apparent last-seen, nulled for Invisible / Hide-last-seen
+            // Others: apparent last-seen, null for Invisible / Hide-last-seen
             // (single privacy rule in PresenceService — previously this missed
             // hide-last-seen, leaking the timestamp).
             Instant apparent = presenceService.getApparentLastSeen(targetUser);

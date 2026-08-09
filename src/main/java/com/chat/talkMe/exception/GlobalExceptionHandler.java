@@ -145,7 +145,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles an async request aborted by the client. Returns no body (void) and logs at
+     * Handles an async request aborted by the client. Returns nobody (void) and logs at
      * INFO — the socket is already gone, so there is nothing to write.
      */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -154,7 +154,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles a connection aborted by the client mid-response. Returns no body (void) and
+     * Handles a connection aborted by the client mid-response. Returns nobody (void) and
      * logs at INFO rather than treating the dead socket as a server fault.
      */
     @ExceptionHandler(ClientAbortException.class)
@@ -179,7 +179,7 @@ public class GlobalExceptionHandler {
 
     /**
      * Handles a generic {@link IOException}. Broken-pipe / connection-reset causes are logged
-     * quietly at INFO (client disconnect); any other I/O error is logged at ERROR. Returns no body.
+     * quietly at INFO (client disconnect); any other I/O error is logged at ERROR. Returns nobody.
      */
     @ExceptionHandler(IOException.class)
     public void handleIOException(IOException ex) {
@@ -196,7 +196,7 @@ public class GlobalExceptionHandler {
      * socket mid-write (page reload, navigate away, network drop) the broken pipe is
      * buried in the cause chain and the type isn't a ClientAbortException, so it used
      * to fall through to the catch-all and log a full ERROR stack. The socket is gone —
-     * there's nothing to write — so log it quietly and return no body. A genuine
+     * there's nothing to write — so log it quietly and return nobody. A genuine
      * serialization failure (not a client abort) still surfaces as a 500.
      */
     @ExceptionHandler(HttpMessageNotWritableException.class)
@@ -213,7 +213,7 @@ public class GlobalExceptionHandler {
 
     /**
      * Catch-all for any unhandled exception. A client-abort cause is logged quietly and
-     * returns no body; anything else is logged at ERROR and returns HTTP 500 with code {@code TM_002}.
+     * returns nobody; anything else is logged at ERROR and returns HTTP 500 with code {@code TM_002}.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ResponseDto<Void>> handleAllExceptions(Exception ex) {

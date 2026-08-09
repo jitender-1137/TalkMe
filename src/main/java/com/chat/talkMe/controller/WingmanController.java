@@ -49,7 +49,7 @@ public class WingmanController {
      * Icebreakers between the current user and the target user. Because the suggestions are
      * derived from the target's own profile signals (interests / languages / mood via the
      * compatibility highlights), this is gated to real relationships: not yourself, neither side
-     * has blocked the other, and you are friends. Otherwise anyone could harvest a stranger's
+     * has blocked the other, and you are friends. Otherwise, anyone could harvest a stranger's
      * profile traits by UUID (IDOR).
      *
      * @param userUuid    the target user's UUID
@@ -93,14 +93,12 @@ public class WingmanController {
      * Reply suggestions given the other person's last message. Feature-gated by AI_WINGMAN.
      *
      * @param request     body carrying the last message and optional max (default 5)
-     * @param userDetails the authenticated principal
      * @return 200 with the list of reply suggestions
      */
     @PostMapping("/suggest")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
     public ResponseEntity<ResponseDto<List<String>>> suggest(
-            @RequestBody SuggestRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @RequestBody SuggestRequest request) {
         String lastMessage = request == null ? null : request.lastMessage();
         int max = request == null || request.max() == null ? DEFAULT_MAX : request.max();
         List<String> suggestions = wingmanService.replySuggestions(lastMessage, clamp(max));
@@ -113,15 +111,13 @@ public class WingmanController {
      * read — so it needs no relationship gate beyond the feature entitlement.
      *
      * @param request     body carrying the draft, optional tone, and optional max (default 5)
-     * @param userDetails the authenticated principal
      * @return 200 with the list of rewritten variants
      * @throws com.chat.talkMe.exception.BadRequestException if the draft is blank or longer than 1000 chars
      */
     @PostMapping("/rewrite")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
     public ResponseEntity<ResponseDto<List<String>>> rewrite(
-            @RequestBody RewriteRequest request,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @RequestBody RewriteRequest request) {
         if (request == null || request.draft() == null || request.draft().isBlank()) {
             throw new BadRequestException("Nothing to rewrite", "TM_027");
         }

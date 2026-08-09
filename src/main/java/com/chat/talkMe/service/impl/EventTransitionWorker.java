@@ -25,7 +25,7 @@ import java.util.List;
  * Transitions a single Midnight Event (feature #24) in its OWN transaction, isolated from the
  * orchestrator loop. Each start/end runs {@code REQUIRES_NEW} so one bad event (e.g. room
  * creation blows up) can never roll back the events processed alongside it in the same tick.
- * Self-invoked {@code @Transactional} wouldn't apply — this must be a distinct proxied bean
+ * Self-invoked {@code @Transactional} wouldn't apply — this must be a distinct-proxied bean
  * ({@link com.chat.talkMe.service.impl.EventServiceImpl} calls through it). See
  * {@link AdminAuditLogger} for the same idiom.
  */
@@ -43,7 +43,7 @@ public class EventTransitionWorker {
     /**
      * Spin up the ROOM for a due SCHEDULED event, store its uuid, flip to LIVE and notify RSVPs.
      * Returns true when the event actually transitioned (false if it vanished or was no longer
-     * SCHEDULED — e.g. cancelled between the query and this call).
+     * SCHEDULED — e.g. canceled between the query and this call).
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean startEvent(Long eventId) {
@@ -59,7 +59,7 @@ public class EventTransitionWorker {
             return false;
         }
 
-        // Re-load the host as a managed entity so GroupService gets a fully-initialised user.
+        // Re-load the host as a managed entity so GroupService gets a fully-initialized user.
         User host = userRepository.findById(event.getHost().getId()).orElse(event.getHost());
 
         CreateGroupRequest request = new CreateGroupRequest();

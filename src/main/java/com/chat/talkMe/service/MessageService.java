@@ -37,7 +37,7 @@ public interface MessageService {
      * {@code actor} and broadcasts it to the chat like a normal message so it
      * appears inline. {@code contentJson} is the serialized system-event payload.
      */
-    MessageResponse sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser);
+    void sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser);
 
     /**
      * Pin or unpin a message (authz enforced by the caller). Broadcasts the change.

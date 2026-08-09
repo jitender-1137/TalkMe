@@ -36,7 +36,7 @@ public class Story extends BaseEntity {
     @Column(name = "media_url", nullable = false, length = 512)
     private String mediaUrl;
 
-    @Column(name = "caption", length = 255)
+    @Column(name = "caption")
     private String caption;
 
     @Column(name = "expires_at", nullable = false)

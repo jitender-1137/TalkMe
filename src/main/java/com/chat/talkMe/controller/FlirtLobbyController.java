@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * Flirt Lobby (feature #3). Every route is gated by the FLIRT_LOBBY entitlement, which
- * itself requires verified + age-verified + accepted flirt consent (see FeatureKey +
+ * itself requires to be verified + age-verified + accepted flirt consent (see FeatureKey +
  * FeatureAccessService). A locked user gets TM_FEATURE_LOCKED and the client shows the gate.
  */
 @RestController

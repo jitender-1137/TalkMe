@@ -30,7 +30,7 @@ public interface WingmanService {
     /**
      * Rewrite the user's own {@code draft} into up to {@code max} polished variants in the
      * requested {@code tone} (e.g. "friendly", "flirty", "casual", "confident"). Heuristic
-     * today (tone-templated wrapping + light clean-up); the same seam lets a future LLM
+     * today (tone-templated wrapping + light cleanup); the same seam lets a future LLM
      * provider produce genuine rewrites without touching callers. Never returns null.
      */
     List<String> rewrite(String draft, String tone, int max);

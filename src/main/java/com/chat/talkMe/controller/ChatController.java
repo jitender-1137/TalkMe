@@ -40,7 +40,7 @@ public class ChatController {
      * Creates a chat: a 1:1 PRIVATE chat when {@code recipientId} is set (reusing/reopening any existing
      * one between the two users), otherwise a legacy GROUP chat. Notifies the recipient over WebSocket.
      *
-     * @param request     the create payload (recipientId for 1:1, or name + memberIds for a group)
+     * @param request     the creation payload (recipientId for 1:1, or name + memberIds for a group)
      * @param userDetails the authenticated principal, who becomes a member (and admin/owner)
      * @return 200 with the created or reused {@link ChatResponse} (message code TM_120)
      * @throws com.chat.talkMe.exception.NotFoundException if a specified recipient user does not exist
@@ -267,7 +267,7 @@ public class ChatController {
     }
 
     /**
-     * Marks messages across all of the caller's chats as delivered (typically on reconnect), broadcasting
+     * Marks messages across all the caller's chats as delivered (typically on reconnect), broadcasting
      * a {@code messages_delivered} event per updated chat unless the caller is in ghost mode.
      *
      * @param userDetails the authenticated principal whose chats are updated

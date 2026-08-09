@@ -305,8 +305,8 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
     /**
      * Insert a milestone if it is not already present. The exists-check plus the DB unique
      * constraint make this idempotent even under a race between the nightly job and a lazy
-     * read on the same pair — a losing writer's constraint violation is swallowed (this method
-     * runs in its own REQUIRES_NEW transaction, so the violation cannot taint a caller's tx).
+     * read on the same pair — a losing writer's constraint violation is swallowed. (This method
+     * runs in its own REQUIRES_NEW transaction, so the violation cannot taint a caller's tx.)
      *
      * @param userAId    lower user id
      * @param userBId    higher user id
@@ -370,7 +370,7 @@ public class RelationshipJourneyServiceImpl implements RelationshipJourneyServic
     /**
      * The creation time of a friend row when it exists and is not soft-deleted, else null.
      *
-     * @param friend the directional friend row (may be null)
+     * @param friend the directional friend row (maybe null)
      * @return the created-at instant, or null when absent/deleted
      */
     private Instant activeCreatedAt(Friend friend) {

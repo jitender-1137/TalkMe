@@ -59,7 +59,7 @@ public class CosmeticServiceImpl implements CosmeticService {
     public List<CosmeticResponse> catalog(User user) {
         UserReputation rep = reputationRepo.findByUser(user).orElse(null);
         Map<String, UserCosmetic> owned = ownedByCode(user);
-        Set<String> ownedBadgeCodes = ownedBadgeCodes(user);
+        Set<String> ownedBadgeCodes = ownedBadgeCodes();
 
         return catalogRepo.findAll().stream()
                 .filter(c -> !c.isDeleted())
@@ -81,7 +81,7 @@ public class CosmeticServiceImpl implements CosmeticService {
     public List<CosmeticResponse> myCosmetics(User user) {
         UserReputation rep = reputationRepo.findByUser(user).orElse(null);
         Map<String, UserCosmetic> owned = ownedByCode(user);
-        Set<String> ownedBadgeCodes = ownedBadgeCodes(user);
+        Set<String> ownedBadgeCodes = ownedBadgeCodes();
 
         return catalogRepo.findAll().stream()
                 .filter(c -> !c.isDeleted())
@@ -122,7 +122,7 @@ public class CosmeticServiceImpl implements CosmeticService {
         UserCosmetic existing = userCosmeticRepo.findByUserAndCosmeticCode(user, code).orElse(null);
 
         // Ownership: an explicit owned row, OR the unlock condition is currently satisfied.
-        boolean unlocked = isUnlocked(cosmetic, rep, ownedBadgeCodes(user));
+        boolean unlocked = isUnlocked(cosmetic, rep, ownedBadgeCodes());
         if (existing == null && !unlocked) {
             throw new BadRequestException("You have not unlocked this cosmetic yet", "TM_932");
         }
@@ -196,13 +196,10 @@ public class CosmeticServiceImpl implements CosmeticService {
      * Codes of badges the user owns, for {@code BADGE} unlocks. There is no badge inventory
      * yet, so this is always empty — BADGE cosmetics stay locked until one is introduced.
      */
-    private Set<String> ownedBadgeCodes(User user) {
+    private Set<String> ownedBadgeCodes() {
         return new HashSet<>();
     }
 
-    /**
-     * Whether the user currently satisfies a cosmetic's unlock condition.
-     */
     /**
      * @param c               the cosmetic
      * @param rep             the user's reputation snapshot (null → level 1 / no prestige / bronze)

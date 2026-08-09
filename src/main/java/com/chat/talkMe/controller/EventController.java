@@ -91,7 +91,8 @@ public class EventController {
      * @return 200 with the updated event and success code TM_953
      * @throws com.chat.talkMe.exception.NotFoundException   if the UUID is malformed or no event exists
      * @throws com.chat.talkMe.exception.BadRequestException if the status is invalid, the event is
-     *                                                       cancelled/ended, or a new GOING RSVP would exceed the seat cap
+     *                                                       canceled/ended, or a new GOING RSVP would exceed the seat
+     *                                                       cap
      */
     @PostMapping("/{uuid}/rsvp")
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
@@ -108,10 +109,10 @@ public class EventController {
      *
      * @param uuid        the event UUID
      * @param userDetails the authenticated user, who must be the host
-     * @return 200 with the cancelled event and success code TM_954
+     * @return 200 with the canceled event and success code TM_954
      * @throws com.chat.talkMe.exception.NotFoundException   if the UUID is malformed or no event exists
      * @throws com.chat.talkMe.exception.ForbiddenException  if the caller is not the host
-     * @throws com.chat.talkMe.exception.BadRequestException if the event is already ended or cancelled
+     * @throws com.chat.talkMe.exception.BadRequestException if the event is already ended or canceled
      */
     @PostMapping("/{uuid}/cancel")
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
@@ -119,6 +120,6 @@ public class EventController {
             @PathVariable String uuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         EventResponse response = eventService.cancelEvent(uuid, userDetails.getUser());
-        return ResponseEntity.ok(SuccessResponseDto.success(response, "Event cancelled", "TM_954"));
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Event canceled", "TM_954"));
     }
 }

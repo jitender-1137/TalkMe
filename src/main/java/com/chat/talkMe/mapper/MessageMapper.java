@@ -35,7 +35,7 @@ public interface MessageMapper {
     @Mapping(target = "senderName", expression = "java(message.getSender().getName())")
     @Mapping(target = "senderAvatar", expression = "java(message.getSender().getProfileImage())")
     @Mapping(target = "messageType", expression = "java(message.getMessageType().name())")
-    // Never leak the original text of a tombstoned message — clients render their
+    // Never leak the original text of a tombstone message — clients render their
     // own "This message was deleted" placeholder off the isDeleted flag.
     @Mapping(target = "content", expression = "java(message.isDeleted() ? \"This message was deleted\" : message.getContent())")
     @Mapping(target = "createdAt", expression = "java(message.getCreatedAt() != null ? message.getCreatedAt().toString() : null)")

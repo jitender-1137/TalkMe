@@ -1,10 +1,13 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
- * Peer-endorseable, COSMETIC-ONLY badges (feature #30). A badge is earned when enough
+ * Peer-endorse able, COSMETIC-ONLY badges (feature #30). A badge is earned when enough
  * distinct peers endorse a user for that trait; it never gates any feature or limit.
  * Each carries a human-friendly display label served in {@code BadgeResponse}.
  */
+@Getter
 public enum BadgeType {
     GREAT_LISTENER("Great Listener"),
     FRIENDLY("Friendly"),
@@ -21,7 +24,4 @@ public enum BadgeType {
         this.label = label;
     }
 
-    public String getLabel() {
-        return label;
-    }
 }

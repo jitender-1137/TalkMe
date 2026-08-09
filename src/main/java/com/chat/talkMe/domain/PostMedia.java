@@ -54,7 +54,7 @@ public class PostMedia extends BaseEntity {
     private String coverImageUrl;
 
     /**
-     * Id of a CSS filter preset (see UI video-filters); applied at playback.
+     * I'd of a CSS filter preset (see UI video-filters); applied at playback.
      */
     @Column(name = "filter_name", length = 60)
     private String filterName;

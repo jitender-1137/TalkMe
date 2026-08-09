@@ -546,9 +546,9 @@ class GroupServiceImplTest {
             List<GroupMemberResponse> out = service.getMembers(CHAT_UUID_STR, creator);
 
             assertThat(out).hasSize(1);
-            assertThat(out.get(0).getUserId()).isEqualTo(CREATOR_UUID.toString());
-            assertThat(out.get(0).getRole()).isEqualTo("OWNER");
-            assertThat(out.get(0).getPresence()).isEqualTo("online");
+            assertThat(out.getFirst().getUserId()).isEqualTo(CREATOR_UUID.toString());
+            assertThat(out.getFirst().getRole()).isEqualTo("OWNER");
+            assertThat(out.getFirst().getPresence()).isEqualTo("online");
         }
 
         @Test
@@ -578,7 +578,7 @@ class GroupServiceImplTest {
 
             List<GroupMemberResponse> out = noPresence.getMembers(CHAT_UUID_STR, creator);
 
-            assertThat(out.get(0).getPresence()).isEqualTo("offline");
+            assertThat(out.getFirst().getPresence()).isEqualTo("offline");
         }
 
         @Test
@@ -599,8 +599,8 @@ class GroupServiceImplTest {
             List<GroupMemberResponse> out = service.getMembers(CHAT_UUID_STR, creator);
 
             assertThat(out).hasSize(1);
-            assertThat(out.get(0).getJoinedAt()).isNull();
-            assertThat(out.get(0).getMutedUntil()).isEqualTo(muted.toString());
+            assertThat(out.getFirst().getJoinedAt()).isNull();
+            assertThat(out.getFirst().getMutedUntil()).isEqualTo(muted.toString());
         }
     }
 
@@ -1501,10 +1501,10 @@ class GroupServiceImplTest {
             List<ChatResponse> out = service.discover(null, null, null, creator);
 
             assertThat(out).hasSize(1);
-            assertThat(out.get(0).getName()).isEqualTo("City Lounge");
-            assertThat(out.get(0).getGroup().getMemberCount()).isEqualTo(42);
-            assertThat(out.get(0).getGroup().isActive()).isTrue();
-            assertThat(out.get(0).getGroup().getMyRole()).isEqualTo("ADMIN");
+            assertThat(out.getFirst().getName()).isEqualTo("City Lounge");
+            assertThat(out.getFirst().getGroup().getMemberCount()).isEqualTo(42);
+            assertThat(out.getFirst().getGroup().isActive()).isTrue();
+            assertThat(out.getFirst().getGroup().getMyRole()).isEqualTo("ADMIN");
         }
 
         @Test
@@ -1518,9 +1518,9 @@ class GroupServiceImplTest {
 
             List<ChatResponse> out = service.discover(null, null, null, creator);
 
-            assertThat(out.get(0).getGroup().isActive()).isFalse();
-            assertThat(out.get(0).getGroup().getMyRole()).isNull();
-            assertThat(out.get(0).getGroup().getMemberCount()).isZero();
+            assertThat(out.getFirst().getGroup().isActive()).isFalse();
+            assertThat(out.getFirst().getGroup().getMyRole()).isNull();
+            assertThat(out.getFirst().getGroup().getMemberCount()).isZero();
         }
 
         @Test
@@ -1548,9 +1548,9 @@ class GroupServiceImplTest {
 
             List<ChatResponse> out = service.discover(null, null, null, creator);
 
-            assertThat(out.get(0).getGroup().isActive()).isFalse();
-            assertThat(out.get(0).getGroup().getMyRole()).isNull();
-            assertThat(out.get(0).getGroup().getTags()).isEmpty();
+            assertThat(out.getFirst().getGroup().isActive()).isFalse();
+            assertThat(out.getFirst().getGroup().getMyRole()).isNull();
+            assertThat(out.getFirst().getGroup().getTags()).isEmpty();
         }
 
         @Test
@@ -1566,8 +1566,8 @@ class GroupServiceImplTest {
 
             List<ChatResponse> out = service.discover(null, null, null, creator);
 
-            assertThat(out.get(0).getGroup().isActive()).isFalse();
-            assertThat(out.get(0).getGroup().getMyRole()).isNull();
+            assertThat(out.getFirst().getGroup().isActive()).isFalse();
+            assertThat(out.getFirst().getGroup().getMyRole()).isNull();
         }
     }
 

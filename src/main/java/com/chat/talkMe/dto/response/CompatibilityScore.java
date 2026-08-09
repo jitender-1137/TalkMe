@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * Result of the compatibility engine. {@code overall} is 0–100; {@code breakdown} maps
- * each factor name → its 0–100 contribution-normalised score; {@code highlights} are the
+ * each factor name → its 0–100 contribution-normalized score; {@code highlights} are the
  * top shared signals; {@code explanation} is human-readable copy. Never contains identity
  * — callers decide how much to expose (anonymous surfaces show only a coarse bucket).
  */

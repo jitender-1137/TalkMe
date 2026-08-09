@@ -47,13 +47,11 @@ public class SleepRoomController {
     /**
      * List active sleep companion rooms.
      *
-     * @param userDetails the authenticated caller
      * @return the active sleep rooms in a success envelope
      */
     @GetMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
-    public ResponseEntity<ResponseDto<List<SleepRoomResponse>>> list(
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<ResponseDto<List<SleepRoomResponse>>> list() {
         return ResponseEntity.ok(SuccessResponseDto.success(sleepRoomService.listSleepRooms()));
     }
 }

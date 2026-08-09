@@ -165,7 +165,7 @@ public class RabbitConfig {
         template.setMandatory(true);
         // Async broker confirms: a nack means the broker accepted the connection but
         // could not persist/route. We log it; the immediate broker-down case is
-        // handled synchronously by EventPublisher catching the publish exception.
+        // handled synchronously by EventPublisher catching the publishing exception.
         template.setConfirmCallback((correlation, ack, cause) -> {
             if (!ack) {
                 log.error("RabbitMQ publish NACK (cause={}, correlation={})", cause, correlation);

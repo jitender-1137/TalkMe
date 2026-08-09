@@ -39,7 +39,7 @@ public class Feedback extends BaseEntity {
     private User user;
 
     /**
-     * 1–5 star rating; 0 means "no rating given" (allowed for lightweight prompts).
+     * 1–5-star rating; 0 means "no rating given" (allowed for lightweight prompts).
      */
     @Column(name = "rating", nullable = false)
     @ColumnDefault("0")

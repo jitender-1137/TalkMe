@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Holds stranger-match messages that could not be delivered because the recipient had
- * no live websocket (app backgrounded / suspended / briefly offline) and replays them
+ * no live websocket (app backgrounder / suspended / briefly offline) and replays them
  * when the recipient reconnects and re-subscribes. Match messages are otherwise
  * ephemeral (relayed over STOMP, never persisted), so without this a message sent
  * during the reconnect grace would be lost from the thread even though a push fired.

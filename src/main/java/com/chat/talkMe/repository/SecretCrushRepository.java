@@ -16,7 +16,7 @@ import java.util.Optional;
  * query (e.g. {@code findByTarget} / {@code countByTarget}). Enumerating the crushers of a
  * target would reveal one-sided crushes and break the whole feature. Reciprocity is checked
  * only in the narrow, symmetric form {@link #findByCrusherAndTargetAndStatus} — i.e. "does
- * <em>this specific pair</em> crush back?" — which never lists who crushes on someone.
+ * <em>this specific pair</em> crush back?" — which never lists who crush on someone.
  */
 @Repository
 public interface SecretCrushRepository extends JpaRepository<SecretCrush, Long> {

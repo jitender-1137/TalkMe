@@ -17,7 +17,7 @@ import java.util.stream.Stream;
  * preview line. Every value interpolated from user data is HTML-escaped, so names and
  * message snippets can't break the markup or inject content.</p>
  *
- * <p>Every colour and font comes from the single {@link MailTheme} object — the whole palette
+ * <p>Every color and font comes from the single {@link MailTheme} object — the whole palette
  * (header, button, links, avatars) is tuned in one place. Brand identity (name, tagline,
  * support address) is config-driven via {@code app.mail.brand.*}. Links are passed in
  * fully-qualified by the caller (the service knows the frontend base URL).</p>
@@ -178,7 +178,7 @@ public class EmailTemplates {
         // and the IP as a subtle line — instead of a label/value table.
         String deviceLine = Stream.of(device, location)
                 .filter(s -> s != null && !s.isBlank())
-                .map(s -> esc(s))
+                .map(EmailTemplates::esc)
                 .reduce((a, b) -> a + " &middot; " + b)
                 .orElse("a new device");
 
@@ -428,7 +428,7 @@ public class EmailTemplates {
     }
 
     /**
-     * Escape a URL for safe use in an href attribute.
+     * Escape a URL for safe use in a href attribute.
      */
     private static String attr(String s) {
         if (s == null) {

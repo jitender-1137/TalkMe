@@ -17,8 +17,8 @@ public class CountryDetectionResult {
     private String source; // "Cloudflare Header", "Proxy Header", "GeoIP", "Unknown"
     private String clientIp;
 
-    // Finer-grained location (best-effort; only the GeoIP branch fills these — header-
-    // based detection gives country only). Used for the "closest location / area" of a
+    // Finer-grained location (best-effort; only the GeoIP branch fills these — header-based
+    // detection gives country only). Used for the "closest location / area" of a
     // user's activity: stored on the session + user and shown on the admin dashboard,
     // and included in the new-sign-in security email.
     private String city;
@@ -57,14 +57,14 @@ public class CountryDetectionResult {
         if (country != null && !country.isBlank() && !"Unknown".equalsIgnoreCase(country)) {
             appendPart(sb, country);
         }
-        return sb.length() == 0 ? null : sb.toString();
+        return sb.isEmpty() ? null : sb.toString();
     }
 
     private static void appendPart(StringBuilder sb, String part) {
         if (part == null || part.isBlank()) {
             return;
         }
-        if (sb.length() > 0) {
+        if (!sb.isEmpty()) {
             sb.append(", ");
         }
         sb.append(part.trim());

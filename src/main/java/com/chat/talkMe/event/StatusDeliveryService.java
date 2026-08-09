@@ -69,7 +69,7 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
     /**
      * Broadcasts one status change to the chat topic and refreshes the reader's own unread badge.
      *
-     * <p>Honours Ghost mode: if the actor (the recipient who triggered delivered/read) is in
+     * <p>Honors Ghost mode: if the actor (the recipient who triggered delivered/read) is in
      * Ghost mode the topic broadcast is suppressed entirely, so the sender's ticks stay at
      * "sent" — the DB receipt has already been written, so the recipient's own state is intact.
      * For a {@link StatusUpdateEvent#READ} event the actor's unread count is always recomputed

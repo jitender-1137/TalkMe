@@ -1,6 +1,7 @@
 package com.chat.talkMe.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -107,7 +108,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
          * @throws java.io.IOException if reading the underlying resource fails.
          */
         @Override
-        protected Resource getResource(String resourcePath, Resource location) throws IOException {
+        protected Resource getResource(String resourcePath, @NonNull Resource location) throws IOException {
             if (resourcePath.isEmpty()) {
                 return cached(readable(location.createRelative("index.html")));
             }
@@ -207,9 +208,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
      *
      * @param resource the candidate resource.
      * @return the resource when usable, otherwise {@code null}.
-     * @throws java.io.IOException if existence/readability cannot be determined.
      */
-    private static Resource readable(Resource resource) throws IOException {
+    private static Resource readable(Resource resource) {
         return (resource.exists() && resource.isReadable()) ? resource : null;
     }
 

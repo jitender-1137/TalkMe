@@ -126,7 +126,7 @@ public class LocalMediaStorage implements MediaStorage {
     }
 
     /**
-     * Walk the media root (or the {@code prefix} sub-tree) and return one
+     * Walk the media root (or the {@code prefix} subtree) and return one
      * {@link StoredObject} per regular file with a safe key, carrying the
      * {@code <media-root>/<key>} reference, size, last-modified time and guessed content
      * type. Best-effort — unreadable files are skipped and failures yield an empty list.

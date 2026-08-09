@@ -42,7 +42,7 @@ public class AdminMediaOwnershipResponse {
     private List<AdminTimeseriesPoint> uploadsSeries;
 
     /**
-     * A labelled count + byte total (context or media-type breakdown row).
+     * A labeled count + byte total (context or media-type breakdown row).
      */
     @Data
     @Builder

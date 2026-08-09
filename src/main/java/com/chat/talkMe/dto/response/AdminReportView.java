@@ -25,7 +25,7 @@ public class AdminReportView {
 
     private Party reporter;
     private Party reported;
-    private Session session;      // the "area" the report came from (may be null)
+    private Session session;      // the "area" the report came from (maybe null)
 
     // Analysis signals
     private long reportsAgainstReported; // total reports filed against the reported user

@@ -12,15 +12,15 @@ import org.springframework.stereotype.Component;
  *
  * <p>Why: these DTOs are built lazily inside controller/service response mappers, so
  * a nested builder class may not be loaded until the first request that touches it.
- * When the running fat-jar is replaced <em>in place</em> during a deploy (overwriting
+ * When the running fat-jar is replaced <em>in place</em> during a deployment (overwriting
  * the open file rather than an atomic rename + restart), the JVM's view of the jar's
  * central directory is invalidated and any <em>not-yet-loaded</em> class fails with
  * {@code NoClassDefFoundError / ClassNotFoundException} (e.g. {@code AdminPostView$Media$MediaBuilder}
  * on the admin News endpoint). Once a class is loaded it stays resident, so loading
  * them all up-front closes that window.
  *
- * <p>The real fix is an atomic deploy (rename/new path + restart, never overwrite the
- * running jar); this is defence-in-depth, mirroring {@link LoggingWarmup}. Best-effort
+ * <p>The real fix is an atomic deployment (rename/new path + restart, never overwrite the
+ * running jar); this is defense-in-depth, mirroring {@link LoggingWarmup}. Best-effort
  * only — it never fails startup.
  */
 @Slf4j
@@ -43,7 +43,7 @@ public class DtoWarmup {
         // useDefaultFilters=false + an accept-all include filter => every class in the package.
         ClassPathScanningCandidateComponentProvider scanner =
                 new ClassPathScanningCandidateComponentProvider(false);
-        scanner.addIncludeFilter((mr, mrf) -> true);
+        scanner.addIncludeFilter((_, _) -> true);
 
         int loaded = 0;
         for (String pkg : PACKAGES) {

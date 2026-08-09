@@ -46,7 +46,7 @@ public class DiscoverController {
      * @param gender      optional gender filter; "all"/"any" means no filter
      * @param country     optional country filter; "all"/"any" means no filter
      * @param userDetails the authenticated viewer, excluded from and used to enrich the results
-     * @return 200 with a paginated list of discover profiles (like/friend/request flags relative
+     * @return 200 with a paginated list of Discover profiles (like/friend/request flags relative
      * to the viewer) plus cursor/hasNext/total pagination info
      */
     @GetMapping

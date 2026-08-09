@@ -35,7 +35,7 @@ public class MediaAssetService {
      * always agrees with the folder the file landed in.
      *
      * @param reference        the stored reference returned by the storage backend
-     * @param owner            the authenticated uploader (may be null for anonymous flows)
+     * @param owner            the authenticated uploader (maybe null for anonymous flows)
      * @param uploadType       the upload {@code type} param (image / video / …)
      * @param originalFileName client-reported file name
      * @param contentType      MIME type

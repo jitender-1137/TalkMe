@@ -77,7 +77,7 @@ public class RelationshipMilestone extends BaseEntity {
     /**
      * Optional human-readable detail (e.g. a count or the friendship day).
      */
-    @Column(name = "detail", length = 255)
+    @Column(name = "detail")
     private String detail;
 
     /**

@@ -2,6 +2,8 @@ package com.chat.talkMe.exception;
 
 import lombok.Getter;
 
+import java.io.Serial;
+
 /**
  * Base runtime exception for all application-level errors. Carries the HTTP {@code status}
  * to return, a {@code messageCode} (TM_/VE_ code resolved to a localized message) and an
@@ -11,6 +13,7 @@ import lombok.Getter;
  */
 @Getter
 public class ServiceException extends RuntimeException {
+    @Serial
     private static final long serialVersionUID = 1L;
     private final int status;
     private final String messageCode;

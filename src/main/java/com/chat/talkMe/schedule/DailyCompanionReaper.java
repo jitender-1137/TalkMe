@@ -21,7 +21,7 @@ public class DailyCompanionReaper {
     private final DailyCompanionService dailyCompanionService;
 
     /**
-     * Flips ACTIVE companion pairings whose 24h decision window has elapsed to EXPIRED.
+     * Flips ACTIVE companion pairings whose 24h decision window has elapsed to EXPIRE.
      *
      * <p>Runs {@code fixedDelay=${app.daily-companion.reaper-ms:60000}} (every 60s by
      * default, measured from the end of the previous run). Delegates to

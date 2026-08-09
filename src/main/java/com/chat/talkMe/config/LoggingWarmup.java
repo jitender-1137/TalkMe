@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * <p>
  * Loading these classes now — while the jar is healthy — makes them resident for the
  * life of the JVM, so a later on-disk jar swap can't break exception logging. This is
- * defence-in-depth: the real fix is to deploy WITHOUT overwriting the running jar
+ * defense-in-depth: the real fix is to deploy WITHOUT overwriting the running jar
  * (ship a versioned jar / fresh path, then restart the service).
  */
 @Slf4j

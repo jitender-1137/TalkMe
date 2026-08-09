@@ -5,6 +5,7 @@ import com.chat.talkMe.storage.MediaStorage;
 import com.chat.talkMe.storage.StorageProperties;
 import com.chat.talkMe.util.SsrfGuard;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -163,23 +164,11 @@ public class PhotoMusicMuxer {
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .start();
             // Drain stderr on a daemon thread: (1) so the OS pipe buffer never fills
-            // and deadlocks waitFor(), and (2) so we can log ffmpeg's REAL error on
+            // and deadlocks waitFor(), and (2) so we can log FFMpeg's REAL error on
             // failure instead of a bare exit code (the old DISCARD hid every cause).
             final Process running = process;
             final StringBuilder err = new StringBuilder();
-            Thread drain = new Thread(() -> {
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(
-                        running.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = r.readLine()) != null) {
-                        if (err.length() < 8000) err.append(line).append('\n');
-                    }
-                } catch (IOException ignored) {
-                    // stream closed on process exit
-                }
-            }, "ffmpeg-stderr");
-            drain.setDaemon(true);
-            drain.start();
+            Thread drain = getDrain(running, err, "ffmpeg-stderr");
 
             boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!finished) {
@@ -199,9 +188,26 @@ public class PhotoMusicMuxer {
             return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            if (process != null) process.destroyForcibly();
+            process.destroyForcibly();
             return false;
         }
+    }
+
+    private static @NonNull Thread getDrain(Process running, StringBuilder err, String name) {
+        Thread drain = new Thread(() -> {
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                    running.getErrorStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    if (err.length() < 8000) err.append(line).append('\n');
+                }
+            } catch (IOException ignored) {
+                // stream closed on process exit
+            }
+        }, name);
+        drain.setDaemon(true);
+        drain.start();
+        return drain;
     }
 
     /**
@@ -228,19 +234,7 @@ public class PhotoMusicMuxer {
                     .start();
             final Process running = p;
             final StringBuilder err = new StringBuilder();
-            Thread drain = new Thread(() -> {
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(
-                        running.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = r.readLine()) != null) {
-                        if (err.length() < 8000) err.append(line).append('\n');
-                    }
-                } catch (IOException ignored) {
-                    // stream closed on process exit
-                }
-            }, "ffmpeg-probe");
-            drain.setDaemon(true);
-            drain.start();
+            Thread drain = getDrain(running, err, "ffmpeg-probe");
             p.waitFor(20, TimeUnit.SECONDS);
             drain.join(2000);
             Matcher m =

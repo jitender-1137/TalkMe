@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Viewer-relative flirt-mode state for a chat (feature FLIRT_MODE). Also the per-user WS push
+ * Viewer-relative flirt-mode state for a chat (feature FLIRT_MODE). Also, the per-user WS push
  * payload on {@code /user/queue/flirt-mode}. Because {@code myEnabled}/{@code otherEnabled} are
  * relative to the recipient, each participant is sent their OWN instance of this DTO.
  */

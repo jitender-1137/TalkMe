@@ -9,7 +9,7 @@ import lombok.Data;
  */
 @Data
 public class MatchStartRequest {
-    private String genderPref;          // ANY | MALE | FEMALE | NONBINARY | COUPLE
+    private String genderPref;          // ANY | MALE | FEMALE | NON-BINARY | COUPLE
     private Integer ageMin;
     private Integer ageMax;
     private String country;             // required country filter

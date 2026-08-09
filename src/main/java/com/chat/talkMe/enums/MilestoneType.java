@@ -1,5 +1,7 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
  * A single kind of relationship milestone between two users (feature #19, RELATIONSHIP_JOURNEY).
  *
@@ -11,6 +13,7 @@ package com.chat.talkMe.enums;
  * {@link #ONE_MONTH_FRIENDS}). The message- and game-derived types are declared here so the
  * schema and response shape are stable, and are populated by a follow-up (see wiringSpec).
  */
+@Getter
 public enum MilestoneType {
 
     BECAME_FRIENDS("You became friends"),
@@ -21,16 +24,14 @@ public enum MilestoneType {
     ONE_MONTH_FRIENDS("One month of friendship"),
     GAMES_PLAYED("Played your first game together");
 
+    /**
+     * -- GETTER --
+     *  Human-readable label surfaced on the timeline.
+     */
     private final String label;
 
     MilestoneType(String label) {
         this.label = label;
     }
 
-    /**
-     * Human-readable label surfaced on the timeline.
-     */
-    public String getLabel() {
-        return label;
-    }
 }

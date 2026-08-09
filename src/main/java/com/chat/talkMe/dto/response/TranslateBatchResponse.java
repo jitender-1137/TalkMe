@@ -46,7 +46,7 @@ public class TranslateBatchResponse {
         private String translatedText;
 
         /**
-         * Detected/assumed source language (may be null/"auto").
+         * Detected/assumed source language (maybe null/"auto").
          */
         private String detectedSource;
 

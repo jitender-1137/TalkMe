@@ -34,8 +34,8 @@ import java.util.List;
 /**
  * Central Spring Security configuration. Enables web security and method-level security,
  * runs the API stateless (no HTTP session, JWT bearer auth), disables the built-in CSRF in
- * favour of a custom {@link com.chat.talkMe.security.CsrfTokenFilter}, and installs a set of
- * hardened response headers (CSP, HSTS, referrer/permissions policy, COOP/CORP, nosniff,
+ * favor of a custom {@link com.chat.talkMe.security.CsrfTokenFilter}, and installs a set of
+ * hardened response headers (CSP, HSTS, referrer/permissions policy, COOP/CORP, nos niff,
  * frame-deny). Authorization rules gate actuator, Swagger (profile-dependent), the admin API
  * (SUPER_ADMIN), and the public endpoints in {@link #unSecured()}; everything else under
  * {@code /api/**} requires authentication while static SPA routes are permitted. Optionally
@@ -89,7 +89,7 @@ public class SecurityConfig {
     /**
      * Password hashing for stored credentials and password verification.
      *
-     * @return a BCrypt-based {@link PasswordEncoder}.
+     * @return a Bcrypt-based {@link PasswordEncoder}.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -101,7 +101,6 @@ public class SecurityConfig {
      *
      * @param authenticationConfiguration the Spring-managed {@link AuthenticationConfiguration}.
      * @return the shared {@link AuthenticationManager}.
-     * @throws java.lang.Exception if the manager cannot be resolved.
      */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
@@ -118,12 +117,11 @@ public class SecurityConfig {
      *
      * @param http                                 the {@link HttpSecurity} builder.
      * @param environment                          the active {@link Environment} (drives Swagger visibility).
-     * @param clientRegistrationRepository         provider for OAuth2 client registrations (may be absent).
+     * @param clientRegistrationRepository         provider for OAuth2 client registrations (maybe absent).
      * @param cookieAuthorizationRequestRepository cookie-based store for the in-flight OAuth2 request.
      * @param oauth2LoginSuccessHandler            handler invoked on successful OAuth2 login.
      * @param oauth2LoginFailureHandler            handler invoked on failed OAuth2 login.
      * @return the built {@link SecurityFilterChain}.
-     * @throws java.lang.Exception if the chain cannot be built.
      */
     @Bean
     public SecurityFilterChain securityFilterChain(

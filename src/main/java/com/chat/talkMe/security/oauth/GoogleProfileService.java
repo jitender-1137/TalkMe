@@ -14,7 +14,7 @@ import java.time.Period;
  * the standard OIDC {@code profile} scope does NOT include. Requires the caller to
  * have granted the People-API scopes
  * ({@code .../auth/user.birthday.read}, {@code .../auth/user.gender.read}); without
- * them the People API returns 403 and we simply fall back to nulls — social login
+ * them the People API returns 403, and we simply fall back to nulls — social login
  * never fails because of this.
  */
 @Slf4j

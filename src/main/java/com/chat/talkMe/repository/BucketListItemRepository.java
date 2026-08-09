@@ -18,7 +18,7 @@ public interface BucketListItemRepository extends JpaRepository<BucketListItem, 
     List<BucketListItem> findByBucketListOrderByOrderIndexAsc(BucketList bucketList);
 
     /**
-     * A single entry of a list by its uuid (scoped to the list so foreign uuids can't be touched).
+     * A single entry of a list by its uuid (scoped to the list so foreign uuid can't be touched).
      */
     Optional<BucketListItem> findByBucketListAndUuid(BucketList bucketList, UUID uuid);
 }

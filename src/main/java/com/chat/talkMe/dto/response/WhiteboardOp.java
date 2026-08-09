@@ -39,7 +39,7 @@ public class WhiteboardOp {
     private String authorUuid;
 
     /**
-     * CSS colour (stroke ops only).
+     * CSS color (stroke ops only).
      */
     private String color;
 

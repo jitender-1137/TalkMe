@@ -75,7 +75,7 @@ public class ReputationEventRecorder {
             int typeRemaining = Math.max(0, type.getDailyCap() - ledger.sumAwardedForType(userId, type, day));
             int globalRemaining = Math.max(0, props.getDailyCap() - ledger.sumAwardedForDay(userId, day));
 
-            int awarded = Math.max(0, Math.min(diminished, Math.min(typeRemaining, globalRemaining)));
+            int awarded = Math.clamp(diminished, 0, Math.min(typeRemaining, globalRemaining));
             // Source-scoped events are additionally bounded by their per-source cap.
             if (signal.sourceRef() != null && !signal.sourceRef().isBlank()) {
                 awarded = Math.min(awarded, type.getPerSourceCap());

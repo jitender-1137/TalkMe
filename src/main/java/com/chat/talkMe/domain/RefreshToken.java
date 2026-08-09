@@ -27,7 +27,7 @@ public class RefreshToken extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "token", nullable = false, unique = true, length = 255)
+    @Column(name = "token", nullable = false, unique = true)
     private String token;
 
     @Column(name = "expires_at", nullable = false)
@@ -37,7 +37,7 @@ public class RefreshToken extends BaseEntity {
     @Builder.Default
     private boolean revoked = false;
 
-    @Column(name = "replaced_by_token", length = 255)
+    @Column(name = "replaced_by_token")
     private String replacedByToken;
 
     public boolean isExpired() {

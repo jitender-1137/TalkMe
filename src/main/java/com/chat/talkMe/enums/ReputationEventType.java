@@ -1,5 +1,7 @@
 package com.chat.talkMe.enums;
 
+import lombok.Getter;
+
 /**
  * Contributing actions in the reputation ledger (features #30/#31). Each type carries
  * its base weight and anti-abuse caps. The recorder applies diminishing returns +
@@ -12,6 +14,7 @@ package com.chat.talkMe.enums;
  *   <li>{@code perSourceCap} — max points a single source (one post/friend/event) can yield</li>
  * </ul>
  */
+@Getter
 public enum ReputationEventType {
     ACCOUNT_AGE_DAY(1, 1, 1),
     PROFILE_COMPLETED(40, 40, 40),
@@ -47,15 +50,4 @@ public enum ReputationEventType {
         this.perSourceCap = perSourceCap;
     }
 
-    public int getRawWeight() {
-        return rawWeight;
-    }
-
-    public int getDailyCap() {
-        return dailyCap;
-    }
-
-    public int getPerSourceCap() {
-        return perSourceCap;
-    }
 }

@@ -118,9 +118,9 @@ public class StorageServiceImpl implements StorageService {
             long originalSize = Files.size(tempInput);
 
             compressed = Files.createTempFile("talkme-transcode-", ".mp4");
-            boolean transcoded = transcodeVideo(tempInput, compressed);
+            boolean transcode = transcodeVideo(tempInput, compressed);
 
-            if (transcoded
+            if (transcode
                     && Files.exists(compressed)
                     && Files.size(compressed) > 0
                     && Files.size(compressed) < originalSize) {
@@ -216,7 +216,7 @@ public class StorageServiceImpl implements StorageService {
             return false;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            if (process != null) process.destroyForcibly();
+            process.destroyForcibly();
             log.warn("Video transcode interrupted; using original.");
             return false;
         }

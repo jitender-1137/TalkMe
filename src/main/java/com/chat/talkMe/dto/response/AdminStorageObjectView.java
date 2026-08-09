@@ -62,7 +62,7 @@ public class AdminStorageObjectView {
     private String thumbnailUrl;   // DECRYPTED thumbnail reference (image/video), if any
 
     // Message context — the message this file was sent in
-    private String caption;            // DECRYPTED text sent alongside the media (may be empty)
+    private String caption;            // DECRYPTED text sent alongside the media (maybe empty)
     private String messageType;        // IMAGE / VIDEO / VOICE / AUDIO / FILE / ...
     private boolean forwarded;         // the message was forwarded
     private boolean edited;            // the message was edited after sending

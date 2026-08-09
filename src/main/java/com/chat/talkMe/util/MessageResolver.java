@@ -39,7 +39,7 @@ public class MessageResolver {
     /**
      * Resolve message by code with argument substitution.
      * e.g. messages.properties: TM_064=User {0} not found.
-     * MessageResolver.get("TM_064", "johndoe") → "User johndoe not found."
+     * MessageResolver.get("TM_064", "john doe") → "User johnDoe not found."
      */
     public static String get(String code, Object... args) {
         if (messageSource == null) {

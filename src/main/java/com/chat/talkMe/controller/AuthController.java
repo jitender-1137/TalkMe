@@ -216,7 +216,7 @@ public class AuthController {
         try {
             return new ObjectMapper().readValue(json, Map.class);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid login json structure");
+            throw new IllegalArgumentException("Invalid login JSON structure");
         }
     }
 
@@ -254,7 +254,7 @@ public class AuthController {
     /**
      * Invalidate the current refresh token (if present) and clear the auth cookies.
      *
-     * @param refreshToken the refresh token from the {@code refreshToken} cookie (may be null/blank)
+     * @param refreshToken the refresh token from the {@code refreshToken} cookie (maybe null/blank)
      * @param httpResponse the servlet response (auth cookies are cleared on it)
      * @return an empty success envelope confirming logout
      */
@@ -328,7 +328,7 @@ public class AuthController {
     }
 
     /**
-     * Revoke all of the authenticated user's other sessions.
+     * Revoke all the authenticated user's other sessions.
      *
      * @param userDetails the authenticated principal
      * @return an empty success envelope confirming the other sessions were revoked

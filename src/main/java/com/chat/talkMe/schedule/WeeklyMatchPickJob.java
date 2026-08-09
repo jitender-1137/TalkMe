@@ -4,6 +4,7 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.repository.UserRepository;
 import com.chat.talkMe.repository.WeeklyMatchPickRepository;
 import com.chat.talkMe.service.WeeklyMatchPickService;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +26,7 @@ import java.util.List;
  */
 @Slf4j
 @Component
+@Getter
 @RequiredArgsConstructor
 public class WeeklyMatchPickJob {
 

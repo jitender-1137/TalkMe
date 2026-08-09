@@ -52,6 +52,7 @@ public class JwtTokenProvider {
      */
     public String generateToken(Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        assert userDetails != null;
         return generateToken(userDetails.getUsername(), userDetails.isGuest());
     }
 
@@ -113,10 +114,7 @@ public class JwtTokenProvider {
             // Without this, such a token — which is embedded in push payloads and
             // lives for days — could be replayed as a Bearer credential and grant
             // full account access over HTTP and WebSocket.
-            if (DELIVERY_PURPOSE.equals(claims.get("purpose", String.class))) {
-                return false;
-            }
-            return true;
+            return !DELIVERY_PURPOSE.equals(claims.get("purpose", String.class));
         } catch (ExpiredJwtException ex) {
             // An expired access token is a NORMAL, expected condition — the client
             // refreshes via its refresh-token cookie. Log at DEBUG so routine expiry

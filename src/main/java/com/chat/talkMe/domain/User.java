@@ -115,7 +115,7 @@ public class User extends BaseEntity {
     @Column(name = "last_login_ip", length = 45)
     private String lastLoginIp;
 
-    @Column(name = "last_location", length = 255)
+    @Column(name = "last_location")
     private String lastLocation;
 
     @Column(name = "last_location_at")

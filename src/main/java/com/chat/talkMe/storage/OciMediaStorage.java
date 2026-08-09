@@ -244,7 +244,7 @@ public class OciMediaStorage implements MediaStorage {
     private static String extensionOf(String key) {
         int dot = key.lastIndexOf('.');
         int slash = key.lastIndexOf('/');
-        return (dot > slash && dot >= 0) ? key.substring(dot) : ".tmp";
+        return dot > slash ? key.substring(dot) : ".tmp";
     }
 
     /**

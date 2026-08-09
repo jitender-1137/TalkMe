@@ -366,8 +366,8 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminUserView> res = service.listUsers(new AdminUserFilter(), 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getUsername()).isEqualTo("alice");
-            assertThat(res.getItems().get(0).getPresence()).isEqualTo("online");
+            assertThat(res.getItems().getFirst().getUsername()).isEqualTo("alice");
+            assertThat(res.getItems().getFirst().getPresence()).isEqualTo("online");
             assertThat(res.getPagination().getTotal()).isEqualTo(1L);
         }
 
@@ -540,8 +540,8 @@ class AdminServiceImplTest {
             List<AdminChatView> views = service.getUserChats(u.getUuid().toString());
 
             assertThat(views).hasSize(1);
-            assertThat(views.get(0).getType()).isEqualTo("GROUP");
-            assertThat(views.get(0).getMessageCount()).isEqualTo(3L);
+            assertThat(views.getFirst().getType()).isEqualTo("GROUP");
+            assertThat(views.getFirst().getMessageCount()).isEqualTo(3L);
         }
 
         @Test
@@ -624,8 +624,8 @@ class AdminServiceImplTest {
                     service.getChatMessages(c.getUuid().toString(), 0, 50, "root");
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getContent()).isEqualTo("hello world");
-            assertThat(res.getItems().get(0).getSenderUsername()).isEqualTo("frank");
+            assertThat(res.getItems().getFirst().getContent()).isEqualTo("hello world");
+            assertThat(res.getItems().getFirst().getSenderUsername()).isEqualTo("frank");
             verify(auditLogger).write(eq("root"), eq("VIEW_MESSAGES"), eq("CHAT"), anyString(), anyString());
         }
 
@@ -866,8 +866,8 @@ class AdminServiceImplTest {
                     service.listAudit(null, null, null, null, null, 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getAdminUsername()).isEqualTo("root");
-            assertThat(res.getItems().get(0).getAdminId()).isEqualTo(admin.getUuid().toString());
+            assertThat(res.getItems().getFirst().getAdminUsername()).isEqualTo("root");
+            assertThat(res.getItems().getFirst().getAdminId()).isEqualTo(admin.getUuid().toString());
         }
 
         @SuppressWarnings("unchecked")
@@ -1324,7 +1324,7 @@ class AdminServiceImplTest {
             List<AdminConnectorView> res = service.getUserFriends(u.getUuid().toString());
 
             assertThat(res).extracting(AdminConnectorView::getUsername).containsExactly("f2", "f1");
-            assertThat(res.get(0).getFriendCount()).isEqualTo(9L);
+            assertThat(res.getFirst().getFriendCount()).isEqualTo(9L);
         }
 
         @Test
@@ -1374,7 +1374,7 @@ class AdminServiceImplTest {
                     service.getAttachments(u.getUuid().toString(), "image", false, 0, 20, "root");
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getFileUrl()).isEqualTo("/media/conversations/x/f.jpg");
+            assertThat(res.getItems().getFirst().getFileUrl()).isEqualTo("/media/conversations/x/f.jpg");
             verify(auditLogger).write(eq("root"), eq("VIEW_ATTACHMENTS"), eq("ATTACHMENT"), anyString(), anyString());
         }
 
@@ -1451,7 +1451,7 @@ class AdminServiceImplTest {
                     null, null, "video", false, null, "newest", 0, 50, "root");
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getKind()).isEqualTo("video");
+            assertThat(res.getItems().getFirst().getKind()).isEqualTo("video");
             assertThat(res.getTotal()).isEqualTo(1L);       // page total after kind filter
             assertThat(res.getCounts().getAll()).isEqualTo(2L); // counts over the base
         }
@@ -1483,7 +1483,7 @@ class AdminServiceImplTest {
                     null, null, null, false, "holiday", "newest", 0, 50, "root");
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getKey()).contains("holiday");
+            assertThat(res.getItems().getFirst().getKey()).contains("holiday");
         }
 
         @Test
@@ -1567,7 +1567,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminPostView> res = service.listPosts(0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getContent()).isEqualTo("a post");
+            assertThat(res.getItems().getFirst().getContent()).isEqualTo("a post");
         }
 
         @Test
@@ -1584,7 +1584,7 @@ class AdminServiceImplTest {
                     service.getPostLikes(p.getUuid().toString(), 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getUsername()).isEqualTo("liker");
+            assertThat(res.getItems().getFirst().getUsername()).isEqualTo("liker");
         }
 
         @Test
@@ -1612,7 +1612,7 @@ class AdminServiceImplTest {
                     service.getPostComments(p.getUuid().toString(), 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getContent()).isEqualTo("nice");
+            assertThat(res.getItems().getFirst().getContent()).isEqualTo("nice");
         }
 
         @Test
@@ -1659,7 +1659,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminReportView> res = service.listReports(null, 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getStatus()).isEqualTo("PENDING");
+            assertThat(res.getItems().getFirst().getStatus()).isEqualTo("PENDING");
         }
 
         @Test
@@ -1795,7 +1795,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminFeedbackView> res = service.listFeedback("MANUAL", "NEW", 0, 20);
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getStatus()).isEqualTo("NEW");
+            assertThat(res.getItems().getFirst().getStatus()).isEqualTo("NEW");
         }
 
         @Test
@@ -1911,7 +1911,7 @@ class AdminServiceImplTest {
 
             PaginatedResponse<AdminUserView> res = service.listUsers(new AdminUserFilter(), 0, 20);
 
-            assertThat(res.getItems().get(0).getPresence()).isEqualTo("offline");
+            assertThat(res.getItems().getFirst().getPresence()).isEqualTo("offline");
         }
     }
 
@@ -2030,7 +2030,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminMessageView> res =
                     service.getChatMessages(c.getUuid().toString(), 0, 50, "root");
 
-            assertThat(res.getItems().get(0).getMediaUrl()).isEqualTo("mediacipher");
+            assertThat(res.getItems().getFirst().getMediaUrl()).isEqualTo("mediacipher");
         }
     }
 
@@ -2045,7 +2045,6 @@ class AdminServiceImplTest {
     @DisplayName("toAttachmentView (shared-with + orphaned-message branches)")
     class AttachmentViewMapper {
 
-        @SuppressWarnings("unchecked")
         @Test
         @DisplayName("chat members other than the sender become sharedWith; thumbnail + chat metadata render")
         void sharedWithAndThumbnail() {
@@ -2066,7 +2065,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminAttachmentView> res =
                     service.getAttachments(null, null, false, 0, 20, "root");
 
-            var item = res.getItems().get(0);
+            var item = res.getItems().getFirst();
             assertThat(item.getSharedWith())
                     .extracting(AdminAttachmentView.SharedUser::getUsername)
                     .containsExactly("rc"); // sender + null-user member filtered out
@@ -2074,7 +2073,6 @@ class AdminServiceImplTest {
             assertThat(item.getChatType()).isEqualTo("PRIVATE");
         }
 
-        @SuppressWarnings("unchecked")
         @Test
         @DisplayName("orphaned message (no chat/sender/type, no attachment uuid) → null metadata + numeric id")
         void orphanedMessage() {
@@ -2089,7 +2087,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminAttachmentView> res =
                     service.getAttachments(null, "bogus", true, 0, 20, "root");
 
-            var item = res.getItems().get(0);
+            var item = res.getItems().getFirst();
             assertThat(item.getSharedWith()).isEmpty();
             assertThat(item.getChatId()).isNull();
             assertThat(item.getSenderUsername()).isNull();
@@ -2131,7 +2129,7 @@ class AdminServiceImplTest {
 
             PaginatedResponse<AdminPostView> res = service.listPosts(0, 20);
 
-            AdminPostView v = res.getItems().get(0);
+            AdminPostView v = res.getItems().getFirst();
             assertThat(v.isHasPoll()).isTrue();
             assertThat(v.isHasAudio()).isTrue();
             assertThat(v.getMedia()).hasSize(2);
@@ -2149,7 +2147,7 @@ class AdminServiceImplTest {
 
             PaginatedResponse<AdminPostView> res = service.listPosts(0, 20);
 
-            AdminPostView v = res.getItems().get(0);
+            AdminPostView v = res.getItems().getFirst();
             assertThat(v.getAuthorUsername()).isNull();
             assertThat(v.getAuthorId()).isNull();
             assertThat(v.getId()).isEqualTo("88");
@@ -2167,7 +2165,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminPostLikeView> res =
                     service.getPostLikes(p.getUuid().toString(), 0, 20);
 
-            assertThat(res.getItems().get(0).getUsername()).isNull();
+            assertThat(res.getItems().getFirst().getUsername()).isNull();
         }
 
         @Test
@@ -2184,7 +2182,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminPostCommentView> res =
                     service.getPostComments(p.getUuid().toString(), 0, 20);
 
-            var item = res.getItems().get(0);
+            var item = res.getItems().getFirst();
             assertThat(item.getUsername()).isNull();
             assertThat(item.getParentId()).isEqualTo(parent.getUuid().toString());
         }
@@ -2230,7 +2228,7 @@ class AdminServiceImplTest {
 
             PaginatedResponse<AdminReportView> res = service.listReports(null, 0, 20);
 
-            AdminReportView v = res.getItems().get(0);
+            AdminReportView v = res.getItems().getFirst();
             assertThat(v.getSession()).isNotNull();
             assertThat(v.getSession().getHostUsername()).isEqualTo("h");
             assertThat(v.getReportsAgainstReported()).isEqualTo(3L);
@@ -2250,7 +2248,7 @@ class AdminServiceImplTest {
 
             PaginatedResponse<AdminReportView> res = service.listReports("pending", 0, 20);
 
-            AdminReportView v = res.getItems().get(0);
+            AdminReportView v = res.getItems().getFirst();
             assertThat(v.getReporter()).isNull();
             assertThat(v.getReported()).isNull();
             assertThat(v.getSession().getHostUsername()).isNull();
@@ -2473,7 +2471,7 @@ class AdminServiceImplTest {
             last.setCreatedAt(Instant.now());
             stubGetUserChats(owner, c, last, 5L);
 
-            AdminChatView v = service.getUserChats(owner.getUuid().toString()).get(0);
+            AdminChatView v = service.getUserChats(owner.getUuid().toString()).getFirst();
 
             assertThat(v.getName()).contains("m1", "m2");       // derived from member names
             assertThat(v.getLastMessagePreview()).endsWith("…"); // >140 → truncated
@@ -2490,7 +2488,7 @@ class AdminServiceImplTest {
                     .messageType(MessageType.IMAGE).build(); // createdAt null
             stubGetUserChats(owner, c, last, 0L);
 
-            AdminChatView v = service.getUserChats(owner.getUuid().toString()).get(0);
+            AdminChatView v = service.getUserChats(owner.getUuid().toString()).getFirst();
 
             assertThat(v.getName()).isEqualTo("Chat");
             assertThat(v.getLastMessagePreview()).isEqualTo("IMAGE");
@@ -2507,7 +2505,7 @@ class AdminServiceImplTest {
                     .messageType(MessageType.TEXT).build();
             stubGetUserChats(owner, c, last, 1L);
 
-            AdminChatView v = service.getUserChats(owner.getUuid().toString()).get(0);
+            AdminChatView v = service.getUserChats(owner.getUuid().toString()).getFirst();
             assertThat(v.getLastMessagePreview()).isNull();
         }
 
@@ -2520,7 +2518,7 @@ class AdminServiceImplTest {
                     .messageType(MessageType.TEXT).build();
             stubGetUserChats(owner, c, last, 1L);
 
-            AdminChatView v = service.getUserChats(owner.getUuid().toString()).get(0);
+            AdminChatView v = service.getUserChats(owner.getUuid().toString()).getFirst();
             assertThat(v.getLastMessagePreview()).isEqualTo("hi there");
         }
     }
@@ -2572,7 +2570,7 @@ class AdminServiceImplTest {
                     obj("conversations/rp/img.jpg", 10, "image/jpeg", Instant.now())));
 
             var item = service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root")
-                    .getItems().get(0);
+                    .getItems().getFirst();
 
             assertThat(item.isForwarded()).isTrue();
             assertThat(item.isEdited()).isTrue();
@@ -2603,7 +2601,7 @@ class AdminServiceImplTest {
                     obj("conversations/mn/x.bin", 10, null, Instant.now())));
 
             var item = service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root")
-                    .getItems().get(0);
+                    .getItems().getFirst();
 
             assertThat(item.isLinked()).isTrue();
             assertThat(item.getChatId()).isNull();
@@ -2636,7 +2634,7 @@ class AdminServiceImplTest {
                     obj("conversations/ns/p.jpg", 9, "image/jpeg", Instant.now())));
 
             var item = service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root")
-                    .getItems().get(0);
+                    .getItems().getFirst();
 
             assertThat(item.getReceivers())
                     .extracting(AdminStorageObjectView.SharedUser::getUsername)
@@ -2658,7 +2656,7 @@ class AdminServiceImplTest {
                     obj("conversations/z/only.jpg", 12, "image/jpeg", null))); // orphan, null lastModified
 
             var item = service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root")
-                    .getItems().get(0);
+                    .getItems().getFirst();
 
             assertThat(item.isOrphan()).isTrue();     // chat-media category, no DB link
             assertThat(item.getLastModified()).isNull();
@@ -2811,7 +2809,7 @@ class AdminServiceImplTest {
                     .thenReturn(new PageImpl<>(List.of(m)));
             when(messageMapper.resolveMessageStatus(m)).thenReturn("SENT");
 
-            var item = service.getChatMessages(c.getUuid().toString(), 0, 50, "root").getItems().get(0);
+            var item = service.getChatMessages(c.getUuid().toString(), 0, 50, "root").getItems().getFirst();
 
             assertThat(item.getId()).isEqualTo("41");
             assertThat(item.getSenderUsername()).isNull();
@@ -2850,7 +2848,7 @@ class AdminServiceImplTest {
             PaginatedResponse<AdminAuditView> res =
                     service.listAudit(null, null, null, "not-a-date", "   ", 0, 20);
 
-            var item = res.getItems().get(0);
+            var item = res.getItems().getFirst();
             assertThat(item.getId()).isEqualTo("9");
             assertThat(item.getAdminId()).isNull();
             assertThat(item.getCreatedAt()).isNotNull();
@@ -2881,7 +2879,7 @@ class AdminServiceImplTest {
             when(postLikeRepository.countByPost(p)).thenReturn(0L);
             when(postCommentRepository.countForPost(p)).thenReturn(0L);
 
-            AdminPostView v = service.listPosts(0, 20).getItems().get(0);
+            AdminPostView v = service.listPosts(0, 20).getItems().getFirst();
 
             assertThat(v.getMedia()).isEmpty();
             assertThat(v.getAudience()).isNull();
@@ -2902,7 +2900,6 @@ class AdminServiceImplTest {
     @DisplayName("toAttachmentView (null-sender inclusion, null members, null chat uuid/type, createdAt)")
     class AttachmentViewEdge {
 
-        @SuppressWarnings("unchecked")
         @Test
         @DisplayName("null sender → all members shared; null-uuid member, chat uuid/type null; createdAt present")
         void nullSenderAllMembers() {
@@ -2922,7 +2919,7 @@ class AdminServiceImplTest {
             when(attachmentRepository.findForAdmin(eq(null), eq(MessageType.IMAGE), eq(false), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(a)));
 
-            var item = service.getAttachments(null, "image", false, 0, 20, "root").getItems().get(0);
+            var item = service.getAttachments(null, "image", false, 0, 20, "root").getItems().getFirst();
 
             assertThat(item.getSharedWith())
                     .extracting(AdminAttachmentView.SharedUser::getUsername)
@@ -2932,7 +2929,6 @@ class AdminServiceImplTest {
             assertThat(item.getCreatedAt()).isNotNull();
         }
 
-        @SuppressWarnings("unchecked")
         @Test
         @DisplayName("null members list → empty sharedWith; sender present but without uuid → null senderId")
         void nullMembersSenderNoUuid() {
@@ -2947,7 +2943,7 @@ class AdminServiceImplTest {
             when(attachmentRepository.findForAdmin(eq(null), eq(null), eq(false), any(Pageable.class)))
                     .thenReturn(new PageImpl<>(List.of(a)));
 
-            var item = service.getAttachments(null, null, false, 0, 20, "root").getItems().get(0);
+            var item = service.getAttachments(null, null, false, 0, 20, "root").getItems().getFirst();
 
             assertThat(item.getSharedWith()).isEmpty();
             assertThat(item.getSenderUsername()).isEqualTo("as");
@@ -2988,7 +2984,7 @@ class AdminServiceImplTest {
             when(matchReportRepository.countByReporterIdAndReportedId(reporter.getId(), reported.getId()))
                     .thenReturn(0L);
 
-            AdminReportView v = service.listReports(null, 0, 20).getItems().get(0);
+            AdminReportView v = service.listReports(null, 0, 20).getItems().getFirst();
 
             assertThat(v.getId()).isEqualTo("71");
             assertThat(v.getCreatedAt()).isNotNull();
@@ -3099,7 +3095,7 @@ class AdminServiceImplTest {
 
             List<AdminFeedbackView> items = service.listFeedback(null, null, 0, 20).getItems();
 
-            AdminFeedbackView v1 = items.get(0);
+            AdminFeedbackView v1 = items.getFirst();
             assertThat(v1.getAuthor()).isNull();
             assertThat(v1.getId()).isNull();
             assertThat(v1.getType()).isNull();
@@ -3240,10 +3236,10 @@ class AdminServiceImplTest {
                             AdminMediaOwnershipResponse.Bucket::getLabel)
                     .contains("image", "video");
             assertThat(res.getTopUploaders()).hasSize(1);
-            assertThat(res.getTopUploaders().get(0).getUsername()).isEqualTo("shutterbug");
-            assertThat(res.getTopUploaders().get(0).getStrangerCount()).isEqualTo(2L);
+            assertThat(res.getTopUploaders().getFirst().getUsername()).isEqualTo("shutterbug");
+            assertThat(res.getTopUploaders().getFirst().getStrangerCount()).isEqualTo(2L);
             assertThat(res.getRecent()).hasSize(1);
-            assertThat(res.getRecent().get(0).isStrangerMode()).isTrue();
+            assertThat(res.getRecent().getFirst().isStrangerMode()).isTrue();
             assertThat(res.getUploadsSeries()).isNotEmpty();
             verify(auditLogger).write(eq("root"), eq("VIEW_MEDIA_STATS"), eq("MEDIA"), eq("30d"), any());
         }
@@ -3297,10 +3293,10 @@ class AdminServiceImplTest {
             var res = service.getUserMedia(u.getUuid().toString(), 0, 24, "root");
 
             assertThat(res.getItems()).hasSize(1);
-            assertThat(res.getItems().get(0).getContext()).isEqualTo("STRANGER");
-            assertThat(res.getItems().get(0).isStrangerMode()).isTrue();
-            assertThat(res.getItems().get(0).getOwnerUsername()).isEqualTo("mia");
-            assertThat(res.getItems().get(0).getKind()).isEqualTo("image");
+            assertThat(res.getItems().getFirst().getContext()).isEqualTo("STRANGER");
+            assertThat(res.getItems().getFirst().isStrangerMode()).isTrue();
+            assertThat(res.getItems().getFirst().getOwnerUsername()).isEqualTo("mia");
+            assertThat(res.getItems().getFirst().getKind()).isEqualTo("image");
             assertThat(res.getTotal()).isEqualTo(1L);
             assertThat(res.getTotalBytes()).isEqualTo(50L);
             assertThat(res.getByContext()).extracting(
@@ -3348,7 +3344,7 @@ class AdminServiceImplTest {
             var res = service.getChatMedia(c.getUuid().toString(), 0, 24, "root");
 
             assertThat(res.getItems()).hasSize(1);
-            var item = res.getItems().get(0);
+            var item = res.getItems().getFirst();
             assertThat(item.getKind()).isEqualTo("image");
             assertThat(item.getContext()).isEqualTo("CONVERSATION");
             assertThat(item.getContextId()).isEqualTo(c.getUuid().toString());
@@ -3398,7 +3394,7 @@ class AdminServiceImplTest {
 
         private AdminStorageObjectView only() {
             return service.getStorageObjects(null, null, null, false, null, "newest", 0, 50, "root")
-                    .getItems().get(0);
+                    .getItems().getFirst();
         }
 
         @Test

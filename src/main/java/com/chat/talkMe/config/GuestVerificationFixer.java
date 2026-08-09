@@ -3,6 +3,7 @@ package com.chat.talkMe.config;
 import com.chat.talkMe.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -32,7 +33,7 @@ public class GuestVerificationFixer implements ApplicationRunner {
      */
     @Override
     @Transactional
-    public void run(ApplicationArguments args) {
+    public void run(@NonNull ApplicationArguments args) {
         try {
             int fixed = userRepository.unverifyAllGuests();
             if (fixed > 0) {

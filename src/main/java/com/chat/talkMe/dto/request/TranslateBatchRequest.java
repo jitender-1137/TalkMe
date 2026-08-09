@@ -33,7 +33,7 @@ public class TranslateBatchRequest {
     private List<Item> items;
 
     /**
-     * Target language code (e.g. "es", "fr", "hi") — same for every item in the batch.
+     * Target language code (e.g. "es", "en", "hi") — same for every item in the batch.
      */
     @NotBlank
     private String target;

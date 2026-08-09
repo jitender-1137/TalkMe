@@ -367,7 +367,7 @@ public class PresenceServiceImpl implements PresenceService {
             }
             // Already in a staged background transition (ONLINE grace or IDLE → OFFLINE
             // countdown): those flips are deadline-driven and preserve the real
-            // last-seen. The liveness watchdog must NOT pre-empt the grace or stamp a
+            // last-seen. The liveness watchdog must NOT pre-empty the grace or stamp a
             // fresh last-seen, so leave them to their deadline (claim already dropped
             // their stale heartbeat above).
             if (redisTemplate.opsForZSet().score(AWAY_DEADLINE_ZSET, username) != null
@@ -916,7 +916,7 @@ public class PresenceServiceImpl implements PresenceService {
      * @param user     the user whose presence is broadcast
      * @param flags    the user's privacy flags
      * @param status   the resolved status before masking
-     * @param lastSeen the last-seen instant before masking (may be null)
+     * @param lastSeen the last-seen instant before masking (maybe null)
      */
     private void broadcastPresence(User user, PresenceFlags flags, PresenceStatus status, Instant lastSeen) {
         String statusToBroadcast = status.name();
@@ -941,7 +941,7 @@ public class PresenceServiceImpl implements PresenceService {
      *
      * @param user     the subject of the update
      * @param status   already-masked status string to broadcast
-     * @param lastSeen already-masked last-seen string (may be null)
+     * @param lastSeen already-masked last-seen string (maybe null)
      */
     private void sendWebSocketUpdate(User user, String status, String lastSeen) {
         PresenceNotification notification = PresenceNotification.builder()

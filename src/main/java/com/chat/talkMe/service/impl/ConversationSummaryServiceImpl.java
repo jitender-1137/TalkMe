@@ -65,7 +65,7 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         }
 
         // Membership gate (IDOR): the caller must be an active member of this chat.
-        ChatMember mine = chatMemberRepository.findByChatAndUser(chat, me)
+        chatMemberRepository.findByChatAndUser(chat, me)
                 .filter(m -> m.getLeftAt() == null && !m.isBanned())
                 .orElseThrow(() -> new ForbiddenException("You are not part of this conversation", "TM_026"));
 
@@ -207,11 +207,11 @@ public class ConversationSummaryServiceImpl implements ConversationSummaryServic
         if (items.isEmpty()) return "";
         if (items.size() == 1) return items.get(0);
         if (items.size() == 2) return items.get(0) + " and " + items.get(1);
-        return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.get(items.size() - 1);
+        return String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.getLast();
     }
 
     /**
-     * Turns an ENUM_NAME into a "Enum name" title-ish label.
+     * Turns an ENUM_NAME into an "Enum name" title-ish label.
      *
      * @param enumName raw enum constant name
      * @return prettified label

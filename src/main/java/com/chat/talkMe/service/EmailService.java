@@ -70,7 +70,7 @@ public interface EmailService {
      * (Resend → Brevo → SMTP). Best-effort: failures are logged, never thrown.
      *
      * @param toEmail recipient address
-     * @param toName  recipient display name (may be null/blank)
+     * @param toName  recipient display name (maybe null/blank)
      * @param subject email subject
      * @param html    full HTML body
      */

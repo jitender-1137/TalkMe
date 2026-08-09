@@ -67,7 +67,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     }
 
     /**
-     * Returns up to {@code max} waiting candidates oldest-first (favouring longest waiters),
+     * Returns up to {@code max} waiting candidates oldest-first (favoring longest waiters),
      * excluding the given user, without removing them from the queue.
      *
      * @param max     the maximum number of candidates to return
@@ -77,7 +77,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     @Override
     public List<String> peekCandidates(int max, String exclude) {
         // The queue is a LIST filled via leftPush, so index 0 is newest; read the TAIL
-        // range (oldest-first) to favour users who've waited longest.
+        // range (oldest-first) to favor users who've waited longest.
         Long size = redisTemplate.opsForList().size(QUEUE_KEY);
         if (size == null || size == 0) return List.of();
         List<String> all = redisTemplate.opsForList().range(QUEUE_KEY, 0, -1);

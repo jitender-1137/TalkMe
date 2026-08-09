@@ -46,7 +46,7 @@ public class MusicServiceImpl implements MusicService {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        int lim = Math.min(Math.max(limit, 1), 50);
+        int lim = Math.clamp(limit, 1, 50);
         try {
             String url = "https://itunes.apple.com/search?media=music&entity=song&limit=" + lim
                     + "&term=" + URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);

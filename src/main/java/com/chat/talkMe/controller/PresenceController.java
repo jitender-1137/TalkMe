@@ -160,7 +160,7 @@ public class PresenceController {
                     .hideLastSeenEnabled(targetPresence.isHideLastSeenEnabled());
         } else {
             // Other users see apparent (Invisible-masked) status + apparent last-seen
-            // (nulled by Invisible / Hide-last-seen) — the single privacy rule lives in
+            // (null by Invisible / Hide-last-seen) — the single privacy rule lives in
             // the service so every consumer is consistent.
             PresenceStatus apparentStatus = presenceService.getStatus(targetUser);
             builder.status(apparentStatus.name());
