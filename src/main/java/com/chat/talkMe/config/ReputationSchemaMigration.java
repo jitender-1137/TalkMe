@@ -21,6 +21,14 @@ public class ReputationSchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): drops the frozen {@code type} CHECK on
+     * {@code reputation_events}, adds the append-only {@code snapshot_applied} flag column, then
+     * backfills that flag to true for rows already folded into a snapshot by the old id-cursor.
+     * All three steps are idempotent and fail-open (each error logged and swallowed).
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         try {

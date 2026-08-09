@@ -36,6 +36,16 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Core matchmaking engine. Blind quick-match polls the waiting queue directly; a
+ * preference/mode request instead ranks eligible waiting candidates by compatibility and
+ * atomically claims the best (retrying so two seekers never grab the same peer). On a pair
+ * it creates a session, applies the mode (generating Mask aliases, arming Coffee/Chemistry
+ * timers), and notifies each side with an anonymized partner view; otherwise the seeker is
+ * enqueued with their snapshot. Hard filters (gender/verified/language/mood) must hold both
+ * ways; soft filters (age/country) relax per-party after a wait. Every partner payload is
+ * privacy-safe — no name/avatar/id/city is exposed except through the reveal handshake.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -62,11 +72,27 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      */
     private static final long RELAX_AFTER_MS = 25_000L;
 
+    /**
+     * Starts blind quick-matching for a user (no filters/mode).
+     *
+     * @param username the seeking user's username
+     */
     @Override
     public void startMatching(String username) {
         startMatching(username, null);
     }
 
+    /**
+     * Starts matching for a user. Ignores the call if they already have a session or no
+     * longer exist. Builds their preference snapshot, resets stale queue/prefs state, and
+     * either preference-ranks a peer (when filters or a non-QUICK mode are present) or polls
+     * the blind queue. On a pair it creates the session, applies mode-specific setup (Mask
+     * aliases, Coffee/Chemistry timer) and notifies both peers; otherwise enqueues and saves
+     * the snapshot and notifies WAITING. Always rebroadcasts the online count.
+     *
+     * @param username the seeking user's username
+     * @param filters optional preferences/filters; null ⇒ blind quick-match
+     */
     @Override
     public void startMatching(String username, MatchStartRequest filters) {
         log.info("User {} requested to start matching (mode={})",
@@ -131,6 +157,12 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         onlineCountPublisher.publish();
     }
 
+    /**
+     * Cancels an in-progress search: dequeues the user, clears prefs and active-user
+     * tracking, sends MATCH_ENDED (reason CANCELLED), and rebroadcasts the online count.
+     *
+     * @param username the user cancelling the search
+     */
     @Override
     public void cancelMatching(String username) {
         log.info("User {} requested to cancel matchmaking", username);
@@ -146,6 +178,13 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         onlineCountPublisher.publish();
     }
 
+    /**
+     * Handles a user leaving the chat or cancelling their search: dequeues them, clears
+     * prefs and active-user tracking, cleans up any active session with reason EXIT, and
+     * rebroadcasts the online count.
+     *
+     * @param username the exiting user's username
+     */
     @Override
     public void handleExit(String username) {
         log.info("User {} requested to exit matchmaking chat / cancel search", username);
@@ -159,6 +198,12 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         onlineCountPublisher.publish();
     }
 
+    /**
+     * Ends the user's current session (reason NEW_CHAT) and re-enters matchmaking via the
+     * blind path (the client re-sends filters on an explicit new search).
+     *
+     * @param username the user requesting a new chat
+     */
     @Override
     public void handleNewChat(String username) {
         log.info("User {} requested a new matchmaking chat", username);
@@ -168,11 +213,22 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         startMatching(username);
     }
 
+    /**
+     * Returns the current live online count for matchmaking.
+     *
+     * @return the current online user count
+     */
     @Override
     public long getOnlineCount() {
         return onlineCountPublisher.currentCount();
     }
 
+    /**
+     * Returns the current user's active match as a response DTO, or null if none.
+     *
+     * @param currentUser the querying user
+     * @return the active session response, or null if the user has no session
+     */
     @Override
     public MatchSessionResponse checkMatch(User currentUser) {
         return sessionService.getSessionByUser(currentUser.getUsername())
@@ -182,6 +238,17 @@ public class MatchmakingServiceImpl implements MatchmakingService {
 
     // ── preference-aware selection ──────────────────────────────────────────────
 
+    /**
+     * Ranks eligible waiting candidates (up to the scan cap) by compatibility score and
+     * atomically claims the best still-unmatched one, retrying the next-best if a concurrent
+     * seeker claims it first. A candidate with no loadable snapshot is only usable when the
+     * seeker has no filters and QUICK mode. Relaxation is applied per-party by wait time.
+     *
+     * @param seeker the seeking user's username (excluded from candidates)
+     * @param me the seeking user's entity
+     * @param snapshot the seeker's preference snapshot
+     * @return the claimed peer's username, or empty if none eligible/claimable
+     */
     private Optional<String> selectBestMatch(String seeker, User me, MatchPreferenceSnapshot snapshot) {
         List<String> candidates = waitingQueueService.peekCandidates(SCAN_CAP, seeker);
         long now = System.currentTimeMillis();
@@ -278,11 +345,26 @@ public class MatchmakingServiceImpl implements MatchmakingService {
             Set.of("VOICE_CALLS", "VIDEO_CALLS"),
             Set.of("TRAVEL", "STUDY_PARTNER"));
 
+    /**
+     * Whether a candidate's own gender satisfies a gender preference (ANY/null passes all).
+     *
+     * @param pref the requiring party's gender preference
+     * @param ownGender the candidate's own gender
+     * @return true if compatible
+     */
     private static boolean genderOk(GenderPreference pref, String ownGender) {
         if (pref == null || pref == GenderPreference.ANY) return true;
         return ownGender != null && ownGender.equalsIgnoreCase(pref.name());
     }
 
+    /**
+     * Whether the other party's age falls within a snapshot's min/max age filter; an
+     * unset filter passes, but a missing age fails a set filter.
+     *
+     * @param snap the requiring party's snapshot (age filter source)
+     * @param otherAge the other party's age (may be null)
+     * @return true if within range or no filter set
+     */
     private static boolean ageOk(MatchPreferenceSnapshot snap, Integer otherAge) {
         if (snap.getAgeMin() == null && snap.getAgeMax() == null) return true;
         if (otherAge == null) return false;
@@ -291,10 +373,27 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         return true;
     }
 
+    /**
+     * Whether a party has waited long enough (past {@link #RELAX_AFTER_MS}) to relax their
+     * own soft filters.
+     *
+     * @param snap the party's snapshot (carries the enqueue timestamp)
+     * @param now current epoch millis
+     * @return true if soft filters should be relaxed for this party
+     */
     private static boolean shouldRelax(MatchPreferenceSnapshot snap, long now) {
         return snap.getEnqueuedAtEpochMs() > 0 && (now - snap.getEnqueuedAtEpochMs()) > RELAX_AFTER_MS;
     }
 
+    /**
+     * Builds the server-only preference snapshot from the user's entity and request
+     * filters. As a side effect, a valid mood/energy in the request updates and persists
+     * the user's live mood/energy.
+     *
+     * @param me the seeking user's entity (may be mutated and saved)
+     * @param filters the request filters (may be null)
+     * @return the assembled preference snapshot
+     */
     private MatchPreferenceSnapshot buildSnapshot(User me, MatchStartRequest filters) {
         // mood/energy in the request also update the user's live mood/energy.
         boolean dirty = false;
@@ -343,6 +442,11 @@ public class MatchmakingServiceImpl implements MatchmakingService {
 
     // ── notifications ───────────────────────────────────────────────────────────
 
+    /**
+     * Sends a WAITING event to a user who has been enqueued without an immediate match.
+     *
+     * @param username the waiting user's username
+     */
     private void notifyWaiting(String username) {
         MatchServerEvent event = MatchServerEvent.builder()
                 .event("WAITING")
@@ -351,6 +455,16 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         messagingTemplate.convertAndSendToUser(username, "/queue/match", event);
     }
 
+    /**
+     * Sends a MATCH_FOUND event to one side, carrying the session/chat id, the anonymized
+     * partner view, the mode, and (when present) the coarse match-quality bucket.
+     *
+     * @param username the recipient's username
+     * @param peerUsername the partner's username (anonymized before sending)
+     * @param session the created match session
+     * @param partnerAlias the partner's Mask alias as seen by this recipient (may be null)
+     * @param bucket the coarse compatibility bucket, or null for blind matches
+     */
     private void notifyMatchFound(String username, String peerUsername, MatchSession session,
                                   String partnerAlias, String bucket) {
         Map<String, Object> payload = new HashMap<>();
@@ -368,6 +482,14 @@ public class MatchmakingServiceImpl implements MatchmakingService {
         messagingTemplate.convertAndSendToUser(username, "/queue/match", event);
     }
 
+    /**
+     * Maps a session to a response DTO from the current user's perspective, exposing only
+     * the anonymized partner view (with the Mask alias in MASK mode) and the mode.
+     *
+     * @param session the match session
+     * @param currentUser the requesting user
+     * @return the session response DTO
+     */
     private MatchSessionResponse mapToSessionResponse(MatchSession session, User currentUser) {
         boolean isA = session.getUserA().equals(currentUser.getUsername());
         String partnerUsername = isA ? session.getUserB() : session.getUserA();

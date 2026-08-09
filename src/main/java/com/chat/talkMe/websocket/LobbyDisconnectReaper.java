@@ -38,6 +38,13 @@ public class LobbyDisconnectReaper {
     private static final String LOBBY_LEAVE_ZSET = "lobby:leave-deadlines";
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
 
+    /**
+     * Scheduled sweep of due lobby leave-deadlines: for each username whose deadline has
+     * passed, atomically claims it via {@code ZREM} (so only one instance handles it),
+     * skips users who reconnected (a live session still exists), otherwise removes them
+     * from {@code lobby:users} and broadcasts a LEAVE to {@code /topic/lobby}. Errors are
+     * swallowed and logged so the schedule keeps running.
+     */
     @Scheduled(fixedDelayString = "${lobby.leave-reaper.interval-ms:1000}")
     public void reapExpiredLobbyLeaves() {
         try {

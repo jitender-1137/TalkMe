@@ -17,6 +17,16 @@ import java.security.Security;
 @Configuration
 public class WebPushConfig {
 
+    /**
+     * Builds the singleton {@link PushService}. Registers BouncyCastle if absent, then applies
+     * the VAPID public/private keys and subject only when both keys are present; otherwise
+     * returns a keyless {@link PushService} (and logs a warning) so the app boots in keyless
+     * environments and Web Push simply no-ops until keys are configured.
+     *
+     * @param props the {@link WebPushProperties} carrying the VAPID key material.
+     * @return the configured (possibly keyless) {@link PushService}.
+     * @throws java.lang.Exception if the web-push library rejects the supplied key material.
+     */
     @Bean
     public PushService pushService(WebPushProperties props) throws Exception {
         if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {

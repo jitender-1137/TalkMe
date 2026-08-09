@@ -40,6 +40,16 @@ public class RevealServiceImpl implements RevealService {
     @Value("${match.voice-before-photo.enabled:false}")
     private boolean voiceBeforePhoto;
 
+    /**
+     * Requests (and simultaneously offers) a channel reveal. Under a session lock: no-ops
+     * if already exchanged; blocks a PHOTO reveal when the voice-before-photo gate applies;
+     * rejects once the decline cap is hit. Otherwise marks the requester's side REVEALED and
+     * either exchanges immediately (if the peer already revealed) or notifies the peer.
+     *
+     * @param requester the requesting username
+     * @param channel the channel to reveal (PROFILE/VOICE/PHOTO)
+     * @throws java.lang.IllegalArgumentException if the requester has no active session
+     */
     @Override
     public void requestReveal(String requester, RevealChannel channel) {
         MatchSession session = session(requester);
@@ -70,6 +80,15 @@ public class RevealServiceImpl implements RevealService {
         }
     }
 
+    /**
+     * Accepts a channel reveal. Under a session lock: no-ops if already exchanged; enforces
+     * the voice-before-photo gate; marks the accepter's side REVEALED and exchanges when
+     * both sides have revealed.
+     *
+     * @param accepter the accepting username
+     * @param channel the channel being accepted
+     * @throws java.lang.IllegalArgumentException if the accepter has no active session
+     */
     @Override
     public void acceptReveal(String accepter, RevealChannel channel) {
         MatchSession session = session(accepter);
@@ -87,6 +106,16 @@ public class RevealServiceImpl implements RevealService {
         }
     }
 
+    /**
+     * Declines a channel reveal. Under a session lock: no-ops if already exchanged; marks
+     * the decliner's side DECLINED and resets the requester's side to HIDDEN so it can be
+     * re-offered later; increments the per-channel decline count and notifies both peers
+     * with REVEAL_DECLINED (carrying whether the cap is reached).
+     *
+     * @param decliner the declining username
+     * @param channel the channel being declined
+     * @throws java.lang.IllegalArgumentException if the decliner has no active session
+     */
     @Override
     public void declineReveal(String decliner, RevealChannel channel) {
         MatchSession session = session(decliner);
@@ -114,6 +143,14 @@ public class RevealServiceImpl implements RevealService {
 
     // ── internals ───────────────────────────────────────────────────────────────
 
+    /**
+     * Performs the terminal mutual exchange for a channel: marks it exchanged (idempotent,
+     * so it never fires twice), grants image permission for a PHOTO reveal, and sends each
+     * peer the OTHER's payload via REVEAL_GRANTED.
+     *
+     * @param session the match session
+     * @param channel the channel being exchanged
+     */
     private void exchange(MatchSession session, RevealChannel channel) {
         // Terminal: mark exchanged first; add() is false if already done → never fire twice.
         if (!session.getRevealExchanged().add(channel)) return;
@@ -128,6 +165,15 @@ public class RevealServiceImpl implements RevealService {
         log.info("Reveal {} completed for session {}", channel, session.getId());
     }
 
+    /**
+     * Builds the reveal payload for a channel from the other peer's user: PROFILE exposes
+     * identity (the single consent-gated point), VOICE the voice intro, PHOTO the avatar.
+     * Returns just the channel name when the other user is unavailable.
+     *
+     * @param channel the channel being revealed
+     * @param other the other peer's user entity (may be null)
+     * @return the payload map to send to the receiving peer
+     */
     private Map<String, Object> grantPayload(RevealChannel channel, User other) {
         Map<String, Object> p = new HashMap<>();
         p.put("channel", channel.name());
@@ -153,28 +199,70 @@ public class RevealServiceImpl implements RevealService {
         return p;
     }
 
+    /**
+     * Whether both peers have marked the channel REVEALED.
+     *
+     * @param session the match session
+     * @param channel the channel to check
+     * @return true if both sides have revealed
+     */
     private boolean bothRevealed(MatchSession session, RevealChannel channel) {
         return mapFor(session, session.getUserA()).get(channel) == RevealState.REVEALED
                 && mapFor(session, session.getUserB()).get(channel) == RevealState.REVEALED;
     }
 
+    /**
+     * Returns the current decline count for a channel (0 if none).
+     *
+     * @param session the match session
+     * @param channel the channel to check
+     * @return the decline count
+     */
     private int declineCount(MatchSession session, RevealChannel channel) {
         return session.getRevealDeclineCount().getOrDefault(channel, 0);
     }
 
+    /**
+     * Returns the per-channel reveal-state map belonging to the given user (revealA/revealB).
+     *
+     * @param session the match session
+     * @param username the participant whose side to select
+     * @return that participant's reveal-state map
+     */
     private Map<RevealChannel, RevealState> mapFor(MatchSession session, String username) {
         return session.getUserA().equals(username) ? session.getRevealA() : session.getRevealB();
     }
 
+    /**
+     * Returns the other participant relative to the given user.
+     *
+     * @param session the match session
+     * @param username one participant's username
+     * @return the peer's username
+     */
     private String peerOf(MatchSession session, String username) {
         return session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
     }
 
+    /**
+     * Resolves the user's active session.
+     *
+     * @param username the participant's username
+     * @return the active match session
+     * @throws java.lang.IllegalArgumentException if the user has no active session
+     */
     private MatchSession session(String username) {
         return sessionService.getSessionByUser(username)
                 .orElseThrow(() -> new IllegalArgumentException("No active session for user: " + username));
     }
 
+    /**
+     * Sends a single match event with the given payload to one user's match queue.
+     *
+     * @param username the recipient's username
+     * @param event the event name
+     * @param payload the event payload
+     */
     private void send(String username, String event, Map<String, Object> payload) {
         messagingTemplate.convertAndSendToUser(username, "/queue/match",
                 MatchServerEvent.builder().event(event).payload(payload).build());

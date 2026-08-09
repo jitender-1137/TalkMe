@@ -12,6 +12,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+/**
+ * Tears down a match session gracefully: destroys the in-memory session, notifies both
+ * peers with a MATCH_ENDED event carrying the reason, clears their active-user tracking,
+ * and rebroadcasts the online count. Used for exit/new-chat style endings.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -22,6 +27,14 @@ public class SessionCleanupServiceImpl implements SessionCleanupService {
     private final StringRedisTemplate redisTemplate;
     private final OnlineCountPublisher onlineCountPublisher;
 
+    /**
+     * Cleans up the given session if it exists: destroys it, sends MATCH_ENDED (with the
+     * reason) to both peers, removes both from active-user tracking, and rebroadcasts the
+     * online count. No-op if the session is already gone.
+     *
+     * @param sessionId the session id to clean up
+     * @param reason the end reason relayed to both peers (e.g. EXIT, NEW_CHAT)
+     */
     @Override
     public void cleanupSession(String sessionId, String reason) {
         sessionService.getSession(sessionId).ifPresent(session -> {

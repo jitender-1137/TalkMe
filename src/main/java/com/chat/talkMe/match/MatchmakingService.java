@@ -4,6 +4,13 @@ import com.chat.talkMe.domain.User;
 import com.chat.talkMe.dto.request.MatchStartRequest;
 import com.chat.talkMe.dto.response.MatchSessionResponse;
 
+/**
+ * Anonymous stranger matchmaking engine. Enrolls searching users into the Redis waiting queue,
+ * pairs them (blind quick-match or preference-filtered), and creates the resulting
+ * {@link MatchSession}. Enforces the anonymity invariant: the partner payload surfaced to a peer
+ * stays anonymous (never leaks username, real name, avatar, or UUID). Also tracks the live
+ * online-user count and answers client match-status polls.
+ */
 public interface MatchmakingService {
     void startMatching(String username);
 

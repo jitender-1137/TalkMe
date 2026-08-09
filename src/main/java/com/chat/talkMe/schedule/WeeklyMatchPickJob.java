@@ -37,6 +37,18 @@ public class WeeklyMatchPickJob {
     private final WeeklyMatchPickRepository weeklyMatchPickRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Prunes prior-week picks then regenerates Weekly Match Picks for eligible users.
+     *
+     * <p>Runs on cron {@code ${app.weekly-picks.cron:0 0 9 * * MON}} in zone
+     * {@code ${app.weekly-picks.zone:Asia/Kolkata}} (Mondays at 09:00 IST by default).
+     * First calls {@link com.chat.talkMe.service.WeeklyMatchPickService#pruneOlderThan(java.time.LocalDate)}
+     * for the current week start, then pages the most-recent {@value #MAX_ELIGIBLE_USERS}
+     * active non-guest accounts and calls
+     * {@link com.chat.talkMe.service.WeeklyMatchPickService#generateFor(com.chat.talkMe.domain.User)}
+     * per user. Prune and each generation run in their own service transactions, so one
+     * failure only increments the failure count rather than aborting the batch.</p>
+     */
     @Scheduled(
             cron = "${app.weekly-picks.cron:0 0 9 * * MON}",
             zone = "${app.weekly-picks.zone:Asia/Kolkata}")

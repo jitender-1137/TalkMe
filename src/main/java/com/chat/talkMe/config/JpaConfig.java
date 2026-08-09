@@ -8,10 +8,24 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
 
+/**
+ * Enables Spring Data JPA auditing so {@code @CreatedBy}/{@code @LastModifiedBy}
+ * fields are populated automatically. The auditor is resolved from the current
+ * Spring Security authentication via the {@code auditorProvider} bean.
+ */
 @Configuration
 @EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 public class JpaConfig {
 
+    /**
+     * Supplies the current auditor for JPA {@code @CreatedBy}/{@code @LastModifiedBy}
+     * columns. Returns the authenticated principal's name, or {@code "SYSTEM"} when
+     * there is no authentication, it is unauthenticated, or the principal is the
+     * anonymous user (background jobs, startup, pre-login flows).
+     *
+     * @return an {@link org.springframework.data.domain.AuditorAware} that never yields
+     *         an empty {@link java.util.Optional}.
+     */
     @Bean
     public AuditorAware<String> auditorProvider() {
         return () -> {

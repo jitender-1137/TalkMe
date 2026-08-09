@@ -11,6 +11,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.stream.Collectors;
 
+/**
+ * Global CORS setup, bound from {@code app.cors.*}. Each of origins/methods/headers/
+ * exposed-headers is a comma-separated property applied to every path ({@code /**});
+ * a blank list falls back to the {@code "*"} wildcard for that dimension, except that
+ * a blank {@code allowed-origins} combined with {@code allow-credentials=true} is
+ * rejected at startup (credentials cannot be sent with a wildcard origin).
+ */
 @Configuration
 public class CorsConfig {
 
@@ -32,10 +39,15 @@ public class CorsConfig {
     /**
      * Configures and returns a {@link CorsFilter} bean to handle Cross-Origin Resource Sharing (CORS) requests.
      * <p>
-     * This filter allows requests from any origin, with any header, and any HTTP method.
-     * It is typically used to enable CORS support for a Spring Boot application.
+     * Origins, methods, headers and exposed headers are each read from the corresponding
+     * {@code app.cors.*} property (comma-separated, trimmed); any dimension left blank
+     * falls back to the {@code "*"} wildcard. {@code allow-credentials} is taken from
+     * {@code app.cors.allow-credentials}. The resulting configuration is registered for
+     * all paths ({@code /**}).
      *
      * @return a {@link CorsFilter} that applies the CORS configuration to all incoming requests.
+     * @throws java.lang.IllegalStateException if credentials are allowed but no explicit
+     *         origins are configured (see {@link #isHasOrigins()}).
      */
     @Bean
     public CorsFilter corsFilter() {
@@ -64,6 +76,14 @@ public class CorsConfig {
         return new CorsFilter(source);
     }
 
+    /**
+     * Whether an explicit origin list is configured. Guards against the unsafe
+     * combination of credentialed CORS with a wildcard origin.
+     *
+     * @return {@code true} when {@code app.cors.allowed-origins} is non-blank.
+     * @throws java.lang.IllegalStateException if origins are blank while
+     *         {@code allow-credentials=true} (refuses to fall back to {@code "*"}).
+     */
     private boolean isHasOrigins() {
         boolean hasOrigins = allowedOrigins != null && !allowedOrigins.isBlank();
         if (!hasOrigins && allowCredentials) {

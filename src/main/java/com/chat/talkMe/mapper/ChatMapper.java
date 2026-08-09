@@ -5,6 +5,12 @@ import com.chat.talkMe.dto.response.ChatResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+/**
+ * MapStruct mapper from a {@link com.chat.talkMe.domain.Chat} entity to a
+ * {@link com.chat.talkMe.dto.response.ChatResponse}. Maps the UUID/chat-type to strings and
+ * ignores the viewer-relative fields (last message, unread/mute/archive/pin flags, other user,
+ * typing users, avatar, group, friend/block flags), which are enriched by the service layer.
+ */
 @Mapper(componentModel = "spring", uses = {MessageMapper.class})
 public interface ChatMapper {
 

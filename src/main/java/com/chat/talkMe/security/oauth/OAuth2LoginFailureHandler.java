@@ -21,6 +21,15 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
     @Value("${app.frontend-base-url:http://localhost:3000}")
     private String frontendBaseUrl;
 
+    /**
+     * Redirects a failed/cancelled OAuth login back to the SPA's login page with an
+     * {@code error=oauth} marker.
+     *
+     * @param request   the callback request
+     * @param response  the response used to issue the redirect
+     * @param exception the authentication failure
+     * @throws IOException if issuing the redirect fails
+     */
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException {

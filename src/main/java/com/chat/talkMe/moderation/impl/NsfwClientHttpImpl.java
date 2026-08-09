@@ -42,6 +42,16 @@ public class NsfwClientHttpImpl implements NsfwClient {
             .connectTimeout(Duration.ofSeconds(3))
             .build();
 
+    /**
+     * Classifies a stored file: for video it extracts frames and returns NSFW if ANY frame
+     * is flagged (empty only if no frame could be classified); for images it classifies the
+     * bytes directly. Returns empty when disabled, unreadable, or on any error (fail policy
+     * left to the caller). Extracted video frames are always cleaned up.
+     *
+     * @param storedFile the java.nio.file.Path of the media file to classify
+     * @param isVideo    true to treat the file as a video (frame-sample), false for an image
+     * @return java.util.Optional of java.lang.Boolean — true=NSFW, false=clean, empty=unknown
+     */
     @Override
     public Optional<Boolean> classify(Path storedFile, boolean isVideo) {
         if (!nsfwEnabled || storedFile == null || !Files.isReadable(storedFile)) {
@@ -71,6 +81,13 @@ public class NsfwClientHttpImpl implements NsfwClient {
         }
     }
 
+    /**
+     * POSTs the raw bytes to the sidecar's {@code /classify} endpoint and reads the boolean
+     * {@code nsfw} field of the JSON response; returns empty on non-200 status or any error.
+     *
+     * @param bytes the raw image bytes to send
+     * @return java.util.Optional of java.lang.Boolean — true=NSFW, false=clean, empty=unknown
+     */
     private Optional<Boolean> classifyBytes(byte[] bytes) {
         try {
             HttpRequest req = HttpRequest.newBuilder()

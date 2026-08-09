@@ -15,6 +15,17 @@ import org.springframework.web.socket.config.annotation.WebSocketTransportRegist
 
 import java.util.Arrays;
 
+/**
+ * STOMP-over-WebSocket messaging configuration. In relay mode
+ * ({@code app.broker.relay-enabled=true}) {@code /topic} and {@code /queue} are relayed
+ * through RabbitMQ's STOMP plugin (enabling multi-instance fan-out and user-destination
+ * resolution); otherwise a single-instance in-memory simple broker is used with a 25s
+ * heartbeat backed by a dedicated scheduler. Application sends are prefixed {@code /app}
+ * and user destinations {@code /user}. Registers the {@code /ws} (and {@code /api/v1/ws})
+ * endpoints with and without SockJS, restricting origins to {@code app.cors.allowed-origins}.
+ * The client inbound channel runs JWT auth then RabbitMQ destination rewriting, and transport
+ * limits cap inbound frame size, send time, and outbound buffer to resist slow/malicious clients.
+ */
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
@@ -41,6 +52,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Value("${app.broker.relay-passcode:talkme_dev_pass}")
     private String relayPasscode;
 
+    /**
+     * Configures the message broker: RabbitMQ STOMP relay when the relay is enabled (with
+     * client/system credentials and user-destination/registry broadcast topics), else an
+     * in-memory simple broker with a 25s/25s heartbeat and dedicated scheduler. Sets the
+     * {@code /app} application prefix and {@code /user} user-destination prefix.
+     *
+     * @param config the {@link MessageBrokerRegistry} to configure.
+     */
     @Override
     public void configureMessageBroker(@NonNull MessageBrokerRegistry config) {
         if (relayEnabled) {
@@ -75,6 +94,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         config.setUserDestinationPrefix("/user");
     }
 
+    /**
+     * Single-thread scheduler ({@code ws-heartbeat-*}) that drives the simple broker's
+     * STOMP heartbeats. Required — without it the negotiated heartbeat collapses to 0.
+     *
+     * @return an initialized {@link ThreadPoolTaskScheduler}.
+     */
     private ThreadPoolTaskScheduler heartbeatScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);
@@ -83,6 +108,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         return scheduler;
     }
 
+    /**
+     * Registers the STOMP handshake endpoints {@code /ws} and {@code /api/v1/ws}, both with a
+     * SockJS fallback and as raw WebSocket, restricting allowed origins to the trimmed
+     * {@code app.cors.allowed-origins} list (or {@code "*"} when unset).
+     *
+     * @param registry the {@link StompEndpointRegistry} to register endpoints on.
+     */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         String[] origins = allowedOrigins != null ?
@@ -97,12 +129,24 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns(origins);
     }
 
+    /**
+     * Registers, in order, the JWT auth interceptor and the RabbitMQ destination-rewriting
+     * interceptor on the client inbound channel (auth before rewrite).
+     *
+     * @param registration the client-inbound {@link ChannelRegistration}.
+     */
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         // JWT auth first, then rewrite client SUBSCRIBE/SEND destinations for RabbitMQ.
         registration.interceptors(channelInterceptor, rabbitDestinationInterceptor);
     }
 
+    /**
+     * Bounds per-connection resource use to resist memory-exhaustion DoS: 64 KB max inbound
+     * STOMP message, 20s send time limit, and 512 KB outbound buffer per session.
+     *
+     * @param registration the {@link WebSocketTransportRegistration} to configure.
+     */
     @Override
     public void configureWebSocketTransport(@NonNull WebSocketTransportRegistration registration) {
         // Bound per-connection resource use to prevent memory-exhaustion DoS from a

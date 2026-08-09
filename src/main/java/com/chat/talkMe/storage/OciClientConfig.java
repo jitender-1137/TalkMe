@@ -23,6 +23,17 @@ import java.io.IOException;
 @ConditionalOnProperty(name = "storage.provider", havingValue = "oci")
 public class OciClientConfig {
 
+    /**
+     * Build the {@link ObjectStorageClient} from the OCI config-file API-key credentials,
+     * applying the configured region and auto-resolving the tenancy namespace (via a
+     * GetNamespace call) when it was left blank. Registered as a singleton bean closed on
+     * shutdown.
+     *
+     * @param props the storage configuration holding the OCI settings
+     *              ({@link StorageProperties})
+     * @return the configured {@link ObjectStorageClient}
+     * @throws java.io.IOException if the OCI config file cannot be read/parsed
+     */
     @Bean(destroyMethod = "close")
     public ObjectStorageClient objectStorageClient(StorageProperties props) throws IOException {
         StorageProperties.Oci oci = props.getOci();

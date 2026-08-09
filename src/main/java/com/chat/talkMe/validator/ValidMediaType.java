@@ -9,6 +9,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Bean-validation constraint asserting a media-category {@code String} is one of the allowed
+ * categories ("image", "video", "audio", "document"), compared case-insensitively. A {@code null}
+ * value is treated as invalid. Default message: "Invalid file media type".
+ *
+ * @see MediaTypeValidator
+ */
 @Documented
 @Constraint(validatedBy = MediaTypeValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER})

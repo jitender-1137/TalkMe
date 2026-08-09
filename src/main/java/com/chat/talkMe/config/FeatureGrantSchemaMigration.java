@@ -25,6 +25,12 @@ public class FeatureGrantSchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): drops the frozen {@code feature_key},
+     * {@code decision} and {@code scope} CHECKs on {@code user_feature_grants}. Idempotent, fail-open.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         // FeatureKey grows every phase — its CHECK would break constantly, so drop it too.
@@ -33,6 +39,13 @@ public class FeatureGrantSchemaMigration implements ApplicationRunner {
         dropCheck("user_feature_grants", "user_feature_grants_scope_check");
     }
 
+    /**
+     * Idempotently drops a named CHECK constraint via {@code DROP CONSTRAINT IF EXISTS}. Fail-open:
+     * any error is logged and swallowed so a heal failure never blocks startup.
+     *
+     * @param table      the table owning the constraint
+     * @param constraint the constraint name to drop
+     */
     private void dropCheck(String table, String constraint) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraint);

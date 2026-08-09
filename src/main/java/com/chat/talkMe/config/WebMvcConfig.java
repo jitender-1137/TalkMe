@@ -18,18 +18,38 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Spring MVC web configuration. Prefixes every {@code @RestController} mapping with
+ * {@code /api/v1} (see {@link #configurePathMatch}), serves user-uploaded files from the
+ * local storage directory, and serves the bundled Next.js static export with an in-memory
+ * caching resolver that maps clean URLs to {@code .html} files, falls back to
+ * {@code index.html} for SPA routes, and avoids concurrent fat-jar inflation corruption.
+ */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
     @Value("${storage.local.directory}")
     private String uploadDir;
 
+    /**
+     * Primary {@link ObjectMapper} bean (plain Jackson 2 mapper).
+     *
+     * @return a default {@link ObjectMapper}.
+     */
     @Bean
     @Primary
     public ObjectMapper objectMapper() {
         return new ObjectMapper();
     }
 
+    /**
+     * Registers two resource handlers: {@code /talkMe/**} → the local upload directory
+     * (matched first, being more specific), and {@code /**} → {@code classpath:/static/}
+     * served through {@link CachingSpaResourceResolver} for clean-URL/SPA routing plus
+     * in-memory caching. API routes are unaffected (handled by controllers under {@code /api/v1}).
+     *
+     * @param registry the {@link ResourceHandlerRegistry} to configure.
+     */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // User-uploaded files. More specific pattern than "/**" below, so it is
@@ -75,6 +95,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
          */
         private final Object inflateLock = new Object();
 
+        /**
+         * Resolves a request path to a cached resource: an extensionless route prefers
+         * {@code <path>.html}, then an exact file match, then (for extensionless paths only)
+         * falls back to {@code index.html} for SPA routing. A missing path that has an
+         * extension returns {@code null} so it 404s normally.
+         *
+         * @param resourcePath the request path relative to the handler mapping.
+         * @param location     the configured static resource location.
+         * @return the resolved (cached) {@link Resource}, or {@code null} if none matches.
+         * @throws java.io.IOException if reading the underlying resource fails.
+         */
         @Override
         protected Resource getResource(String resourcePath, Resource location) throws IOException {
             if (resourcePath.isEmpty()) {
@@ -171,6 +202,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
         }
     }
 
+    /**
+     * Returns the resource only if it exists and is readable, else {@code null}.
+     *
+     * @param resource the candidate resource.
+     * @return the resource when usable, otherwise {@code null}.
+     * @throws java.io.IOException if existence/readability cannot be determined.
+     */
     private static Resource readable(Resource resource) throws IOException {
         return (resource.exists() && resource.isReadable()) ? resource : null;
     }
@@ -184,6 +222,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
         return lastSegment.contains(".");
     }
 
+    /**
+     * Prefixes all {@code @RestController}-annotated handler mappings with {@code /api/v1}.
+     *
+     * @param configurer the {@link PathMatchConfigurer} to apply the prefix to.
+     */
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {
         configurer.addPathPrefix("/api/v1", HandlerTypePredicate.forAnnotation(RestController.class));

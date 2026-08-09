@@ -20,6 +20,15 @@ public class UnreadDigestReaper {
 
     private final UnreadDigestService unreadDigestService;
 
+    /**
+     * Sends the daily "unread messages" email digest.
+     *
+     * <p>Runs on cron {@code ${app.mail.unread-digest.cron:0 0 21 * * *}} in zone
+     * {@code ${app.mail.unread-digest.zone:Asia/Kolkata}} (daily at 21:00 IST by default).
+     * Delegates the find-and-send with per-user dedup to
+     * {@link com.chat.talkMe.service.UnreadDigestService#sendDailyUnreadDigests()}. Any
+     * exception is caught and logged so a failed run never aborts the schedule.</p>
+     */
     @Scheduled(
             cron = "${app.mail.unread-digest.cron:0 0 21 * * *}",
             zone = "${app.mail.unread-digest.zone:Asia/Kolkata}")

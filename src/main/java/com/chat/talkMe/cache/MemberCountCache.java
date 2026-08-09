@@ -74,6 +74,11 @@ public class MemberCountCache {
         }
     }
 
+    /**
+     * Convenience overload that evicts by the chat's UUID; no-op when the chat or its UUID is null.
+     *
+     * @param chat the {@code com.chat.talkMe.domain.Chat} whose cached count to invalidate
+     */
     public void evict(Chat chat) {
         if (chat != null && chat.getUuid() != null) {
             evict(chat.getUuid().toString());

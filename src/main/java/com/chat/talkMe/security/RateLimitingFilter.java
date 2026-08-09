@@ -21,6 +21,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Redis-backed fixed-window HTTP rate limiter. Skipped entirely in local/dev/test profiles and for
+ * CORS preflight, WebSocket handshakes, and non-{@code /api/} static requests. Counts per
+ * authenticated username ({@code AUTH_LIMIT} req/window) or, when anonymous, per resolved client
+ * IP ({@code ANON_LIMIT} req/window), over a {@code WINDOW_SECONDS} window. On breach it returns 429
+ * with a
+ * {@code Retry-After} header; if Redis is unavailable it fails open (allows the request).
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -35,6 +43,17 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private static final int ANON_LIMIT = 60;
     private static final int WINDOW_SECONDS = 60;
 
+    /**
+     * Applies the fixed-window rate limit to eligible {@code /api/} requests, short-circuiting with
+     * a 429 JSON error and {@code Retry-After} header on breach; skips non-API/preflight/WS/dev
+     * traffic and fails open when Redis errors.
+     *
+     * @param request     the incoming HTTP request
+     * @param response    the HTTP response
+     * @param filterChain the remaining filter chain
+     * @throws ServletException if chain processing fails
+     * @throws IOException      if writing the error or chain processing fails
+     */
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
@@ -110,6 +129,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     /**
      * Resolve the real client IP, respecting common reverse-proxy headers.
      * Only trusts the first non-private entry so that a user cannot spoof the header.
+     *
+     * @param request the incoming HTTP request
+     * @return the first {@code X-Forwarded-For} entry, else {@code X-Real-IP}, else the remote addr
      */
     private String resolveClientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
@@ -123,6 +145,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         return request.getRemoteAddr();
     }
 
+    /**
+     * Writes a 429 JSON error response ({@code TM_007}) for a rate-limited request.
+     *
+     * @param response the HTTP response to write into
+     * @throws IOException if writing the response body fails
+     */
     private void sendRateLimitError(HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json");

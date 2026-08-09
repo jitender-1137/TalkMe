@@ -9,6 +9,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Bean-validation constraint asserting message content is a non-{@code null} {@code String} that is
+ * non-empty after trimming and at most 4096 characters (measured on the trimmed value). Default
+ * message: "Message content must not be empty and cannot exceed 4096 characters".
+ *
+ * @see MessageContentValidator
+ */
 @Documented
 @Constraint(validatedBy = MessageContentValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER})

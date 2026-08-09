@@ -32,6 +32,11 @@ public class DtoWarmup {
             "com.chat.talkMe.dto.request",
     };
 
+    /**
+     * On startup, scans the request/response DTO packages and eagerly loads every class
+     * (and recursively its nested builder classes) so none can later fail to load after an
+     * in-place jar swap. Best-effort: scanning or a single class failing never aborts startup.
+     */
     @PostConstruct
     void warmUp() {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
@@ -61,6 +66,11 @@ public class DtoWarmup {
 
     /**
      * Load a class and recursively force-load its nested classes (Lombok builders, etc.).
+     *
+     * @param className fully-qualified class name to load.
+     * @param cl        the class loader to load through.
+     * @return the count of classes loaded (this class plus all nested classes).
+     * @throws java.lang.ClassNotFoundException if the named class itself cannot be found.
      */
     private int load(String className, ClassLoader cl) throws ClassNotFoundException {
         Class<?> c = Class.forName(className, true, cl);

@@ -33,6 +33,17 @@ public class ReputationAggregationJob {
     private final UserRepository userRepository;
     private final ReputationService reputationService;
 
+    /**
+     * Folds newly-recorded reputation ledger rows into each user's snapshot.
+     *
+     * <p>Runs on cron {@code ${app.reputation.aggregation-cron:0 15 3 * * *}} (nightly at
+     * 03:15 by default). Builds the work set as the union of users who already have a
+     * snapshot and users with any ledger activity, then calls
+     * {@link com.chat.talkMe.service.ReputationService#recomputeFor(com.chat.talkMe.domain.User)}
+     * for each (skipping ids that no longer resolve to a user). Recompute is bounded via the
+     * {@code lastLedgerIdApplied} cursor, and per-user try/catch keeps one bad row from
+     * aborting the run.</p>
+     */
     @Scheduled(cron = "${app.reputation.aggregation-cron:0 15 3 * * *}")
     public void aggregate() {
         try {

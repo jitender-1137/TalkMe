@@ -9,6 +9,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Bean-validation constraint asserting a {@code Long} byte size does not exceed the configured
+ * {@link #max()} limit (default 104857600, i.e. 100 MB). A {@code null} value is treated as valid.
+ * Default message: "File size exceeds the allowed limit".
+ *
+ * @see FileSizeValidator
+ */
 @Documented
 @Constraint(validatedBy = FileSizeValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER})

@@ -25,6 +25,11 @@ public class CompatibilityProperties {
     private int energy = 8;
     private int mood = 5;
 
+    /**
+     * Sum of all factor weights (intended to be ~100 so the score reads as a percentage).
+     *
+     * @return the total of every configured weight.
+     */
     public int total() {
         return interests + hobbies + languages + age + timezone + activity + personality + energy + mood;
     }

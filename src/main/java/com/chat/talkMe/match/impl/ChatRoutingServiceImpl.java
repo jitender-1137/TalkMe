@@ -18,6 +18,14 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Relays ephemeral stranger-match content (text, GIFs, images, typing) between the two
+ * peers of a session over STOMP, always resolving the recipient as "the other user" so
+ * identities are never leaked. Enforces per-session 18+ text consent (explicit messages
+ * are held until granted) and image permission (photos rejected until approved), and for
+ * a backgrounded recipient with no live socket it buffers the frame for replay and fires
+ * an anonymous push.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -41,6 +49,16 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
     private final NotificationDispatchService notificationDispatchService;
     private final MatchMessageBufferService matchMessageBuffer;
 
+    /**
+     * Relays a text message to the sender's partner. If the content is explicit and the
+     * session's 18+ consent is not GRANTED, the message is held (auto-asking the peer and
+     * flagging the sender's bubble) instead of relayed.
+     *
+     * @param sender the authenticated sending username
+     * @param content the message body
+     * @param clientId client-generated id echoed back if the message is held
+     * @throws java.lang.IllegalArgumentException if the sender has no active session
+     */
     @Override
     public void relayMessage(String sender, String content, String clientId) {
         MatchSession session = sessionService.getSessionByUser(sender)
@@ -70,6 +88,13 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
         onRelayed(recipient, event, content);
     }
 
+    /**
+     * Relays a GIF descriptor to the sender's partner over the match queue.
+     *
+     * @param sender the authenticated sending username
+     * @param media the GIF media descriptor
+     * @throws java.lang.IllegalArgumentException if the sender has no active session
+     */
     @Override
     public void relayGif(String sender, Map<String, Object> media) {
         MatchSession session = sessionService.getSessionByUser(sender)
@@ -90,6 +115,15 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
         onRelayed(recipient, event, "🎬 GIF");
     }
 
+    /**
+     * Relays a photo descriptor to the sender's partner, but only if image exchange has
+     * been approved for the session.
+     *
+     * @param sender the authenticated sending username
+     * @param media the image media descriptor
+     * @throws java.lang.IllegalArgumentException if the sender has no active session
+     * @throws java.lang.IllegalStateException if image exchange is not approved
+     */
     @Override
     public void relayImage(String sender, Map<String, Object> media) {
         MatchSession session = sessionService.getSessionByUser(sender)
@@ -114,6 +148,13 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
         onRelayed(recipient, event, "📷 Photo");
     }
 
+    /**
+     * Relays an anonymous typing signal (only the boolean, never the username) to the
+     * partner. Silently does nothing if the sender has no active session.
+     *
+     * @param sender the authenticated sending username
+     * @param typing whether the sender is currently typing
+     */
     @Override
     public void relayTyping(String sender, boolean typing) {
         sessionService.getSessionByUser(sender).ifPresent(session -> {

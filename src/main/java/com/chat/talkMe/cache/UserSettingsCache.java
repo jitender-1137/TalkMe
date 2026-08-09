@@ -41,6 +41,15 @@ public class UserSettingsCache {
         return KEY_PREFIX + userId;
     }
 
+    /**
+     * Load a user's privacy {@link Flags}, reading Redis first and, on a miss or any Redis error,
+     * loading from {@code userSettingRepository.findByUser} (defaulting both flags to
+     * {@code EVERYONE} when no settings row exists) and caching the result for {@link #TTL}
+     * (30 minutes). Fail-open: read/write errors are logged and the DB value is used.
+     *
+     * @param user the {@code com.chat.talkMe.domain.User} whose settings to resolve
+     * @return the resolved {@code Flags} (messaging + group-add privacy)
+     */
     private Flags load(User user) {
         // Read from cache first; on any miss/error compute from the DB and cache it.
         String k = key(user.getId());
@@ -67,14 +76,32 @@ public class UserSettingsCache {
         return flags;
     }
 
+    /**
+     * The user's messaging-privacy flag, served from cache (loading + caching on a miss).
+     *
+     * @param user the {@code com.chat.talkMe.domain.User} to look up
+     * @return the {@code com.chat.talkMe.enums.MessagingPrivacy} (defaults to {@code EVERYONE})
+     */
     public MessagingPrivacy getMessagingPrivacy(User user) {
         return load(user).messaging();
     }
 
+    /**
+     * Convenience check: whether the user restricts messaging to friends only.
+     *
+     * @param user the {@code com.chat.talkMe.domain.User} to look up
+     * @return {@code true} when messaging privacy is {@code FRIENDS_ONLY}, else {@code false}
+     */
     public boolean isMessagingFriendsOnly(User user) {
         return getMessagingPrivacy(user) == MessagingPrivacy.FRIENDS_ONLY;
     }
 
+    /**
+     * The user's group-add-privacy flag, served from cache (loading + caching on a miss).
+     *
+     * @param user the {@code com.chat.talkMe.domain.User} to look up
+     * @return the {@code com.chat.talkMe.enums.GroupAddPrivacy} (defaults to {@code EVERYONE})
+     */
     public GroupAddPrivacy getGroupAddPrivacy(User user) {
         return load(user).groupAdd();
     }
@@ -91,6 +118,13 @@ public class UserSettingsCache {
         }
     }
 
+    /**
+     * Parse a messaging-privacy enum name, falling back to {@code EVERYONE} on any unknown/invalid
+     * value.
+     *
+     * @param s the {@code java.lang.String} enum name to parse
+     * @return the {@code com.chat.talkMe.enums.MessagingPrivacy} ({@code EVERYONE} on failure)
+     */
     private static MessagingPrivacy parseMessaging(String s) {
         try {
             return MessagingPrivacy.valueOf(s);
@@ -99,6 +133,13 @@ public class UserSettingsCache {
         }
     }
 
+    /**
+     * Parse a group-add-privacy enum name, falling back to {@code EVERYONE} on any unknown/invalid
+     * value.
+     *
+     * @param s the {@code java.lang.String} enum name to parse
+     * @return the {@code com.chat.talkMe.enums.GroupAddPrivacy} ({@code EVERYONE} on failure)
+     */
     private static GroupAddPrivacy parseGroupAdd(String s) {
         try {
             return GroupAddPrivacy.valueOf(s);

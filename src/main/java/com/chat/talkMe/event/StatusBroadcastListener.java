@@ -21,6 +21,14 @@ public class StatusBroadcastListener {
 
     private final StatusDeliveryService statusDeliveryService;
 
+    /**
+     * Delivers a committed read/delivered status change on the {@code broadcastExecutor} pool
+     * after the receipt update commits, via
+     * {@link StatusDeliveryService#deliverOnce(StatusUpdateEvent)}. A failure is logged and left
+     * to the outbox poller to re-drive, so a status tick is never lost.
+     *
+     * @param event the committed {@link StatusUpdateEvent} to deliver
+     */
     @Async("broadcastExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onStatusUpdate(StatusUpdateEvent event) {

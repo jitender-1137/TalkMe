@@ -68,6 +68,12 @@ public final class UploadValidator {
         }
     }
 
+    /**
+     * Map the client's declared type hint to the expected {@link Category}.
+     *
+     * @param declaredType the category hint (image|sticker|video|audio|voice|document|file|…)
+     * @return the matching category, or {@link Category#UNKNOWN} for unrecognized/unpoliced types
+     */
     private static Category expectedCategory(String declaredType) {
         if (declaredType == null) return Category.UNKNOWN;
         return switch (declaredType.toLowerCase(Locale.ROOT)) {
@@ -79,6 +85,12 @@ public final class UploadValidator {
         };
     }
 
+    /**
+     * Detect the real media category from a file's leading magic bytes.
+     *
+     * @param b the file's head bytes
+     * @return the detected {@link Category}, or {@link Category#UNKNOWN} if no signature matches
+     */
     private static Category detect(byte[] b) {
         // ---- Images ----
         if (startsWith(b, 0xFF, 0xD8, 0xFF)) return Category.IMAGE;                       // JPEG
@@ -118,6 +130,11 @@ public final class UploadValidator {
         };
     }
 
+    /**
+     * @param b   the bytes to test
+     * @param sig the expected unsigned-byte signature values
+     * @return {@code true} if {@code b} begins with the given signature
+     */
     private static boolean startsWith(byte[] b, int... sig) {
         if (b.length < sig.length) return false;
         for (int i = 0; i < sig.length; i++) {
@@ -139,6 +156,11 @@ public final class UploadValidator {
         return true;
     }
 
+    /**
+     * @param head the file's head bytes
+     * @return {@code true} if the content looks like SVG/XML (starts with {@code <?xml},
+     *         {@code <svg}, or {@code <!doctype svg})
+     */
     private static boolean looksLikeSvg(byte[] head) {
         String s = new String(head, StandardCharsets.UTF_8).trim().toLowerCase(Locale.ROOT);
         return s.startsWith("<?xml") || s.startsWith("<svg") || s.startsWith("<!doctype svg");
@@ -159,6 +181,12 @@ public final class UploadValidator {
         }
     }
 
+    /**
+     * Read up to the first 64 bytes of the upload for signature sniffing.
+     *
+     * @param file the uploaded file
+     * @return the leading bytes (up to 64), or an empty array if the file is unreadable
+     */
     private static byte[] readHead(MultipartFile file) {
         try (InputStream in = file.getInputStream()) {
             byte[] buf = new byte[64];

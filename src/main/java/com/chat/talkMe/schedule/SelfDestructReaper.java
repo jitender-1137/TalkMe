@@ -26,6 +26,16 @@ public class SelfDestructReaper {
 
     private final MessageService messageService;
 
+    /**
+     * Destroys self-destruct / view-once media whose armed deadline has passed.
+     *
+     * <p>Runs {@code fixedDelay=${app.self-destruct.reaper-ms:5000}} (every 5s by default).
+     * Delegates to
+     * {@link com.chat.talkMe.service.MessageService#reapExpiredSelfDestruct(java.time.Instant)}
+     * with the current instant; that scan only touches the small set of armed,
+     * not-yet-destroyed messages. Logs only when at least one message was destroyed, and any
+     * exception is caught so one failed tick never aborts the schedule.</p>
+     */
     @Scheduled(fixedDelayString = "${app.self-destruct.reaper-ms:5000}")
     public void reap() {
         try {

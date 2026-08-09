@@ -55,6 +55,13 @@ public class CosmeticCatalogSeeder implements ApplicationRunner {
             new Object[]{"border_winter_2026", CosmeticType.BORDER, "Winter 2026 Border", CosmeticRarity.EPIC, CosmeticUnlockType.SEASONAL, 0, "border/winter-2026", true}
     );
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}, transactional): upserts every {@link #SEED}
+     * entry into the cosmetic catalog. Idempotent — each row is matched by {@code code}; missing
+     * rows are inserted and existing rows updated in place. Counts are logged on completion.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {

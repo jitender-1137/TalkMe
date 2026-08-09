@@ -35,6 +35,14 @@ import java.time.Duration;
 @Configuration
 public class RedisResilienceConfig {
 
+    /**
+     * Lettuce client customizer applied to the auto-configured connection factory. Sets a
+     * 10s connect timeout, enables TCP keep-alive (15s idle / 5s interval / 3 probes) and
+     * a 30s TCP_USER_TIMEOUT, turns on auto-reconnect and PING-before-activate validation,
+     * and enforces the command timeout from {@code spring.data.redis.timeout}.
+     *
+     * @return a {@link LettuceClientConfigurationBuilderCustomizer} hardening the Redis client.
+     */
     @Bean
     public LettuceClientConfigurationBuilderCustomizer redisResilienceCustomizer() {
         SocketOptions socketOptions = SocketOptions.builder()

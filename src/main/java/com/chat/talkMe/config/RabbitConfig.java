@@ -49,11 +49,22 @@ public class RabbitConfig {
     public static final String Q_MESSAGE_SEND = "q.message.send";
     public static final String DLQ_MESSAGE_SEND = "dlq.message.send";
 
+    /**
+     * Primary domain-event exchange {@code talkme.events} (durable, non-auto-delete topic).
+     *
+     * @return the events {@link TopicExchange}.
+     */
     @Bean
     TopicExchange eventsExchange() {
         return new TopicExchange(EVENTS_EXCHANGE, true, false);
     }
 
+    /**
+     * Dead-letter exchange {@code talkme.dlx} (durable, non-auto-delete topic) where
+     * terminally-failed messages are routed.
+     *
+     * @return the dead-letter {@link TopicExchange}.
+     */
     @Bean
     TopicExchange dlxExchange() {
         return new TopicExchange(DLX_EXCHANGE, true, false);
@@ -61,6 +72,12 @@ public class RabbitConfig {
 
     // ── Work queue (durable, dead-letters to talkme.dlx on the same routing key) ──
 
+    /**
+     * Durable work queue {@code q.message.send}, dead-lettering to {@code talkme.dlx}
+     * on the same routing key ({@code message.send}) once the listener retry budget is spent.
+     *
+     * @return the message-send work {@link Queue}.
+     */
     @Bean
     Queue messageSendQueue() {
         return QueueBuilder.durable(Q_MESSAGE_SEND)
@@ -69,6 +86,12 @@ public class RabbitConfig {
                 .build();
     }
 
+    /**
+     * Binds the message-send work queue to {@code talkme.events} with routing key
+     * {@code message.send}.
+     *
+     * @return the work-queue {@link Binding}.
+     */
     @Bean
     Binding messageSendBinding() {
         return BindingBuilder.bind(messageSendQueue()).to(eventsExchange()).with(RK_MESSAGE_SEND);
@@ -76,11 +99,22 @@ public class RabbitConfig {
 
     // ── Dead-letter queue ──
 
+    /**
+     * Durable dead-letter queue {@code dlq.message.send} that captures poison
+     * message-send events for later inspection/replay.
+     *
+     * @return the dead-letter {@link Queue}.
+     */
     @Bean
     Queue dlqMessageSend() {
         return QueueBuilder.durable(DLQ_MESSAGE_SEND).build();
     }
 
+    /**
+     * Binds the dead-letter queue to {@code talkme.dlx} with routing key {@code message.send}.
+     *
+     * @return the dead-letter {@link Binding}.
+     */
     @Bean
     Binding dlqMessageSendBinding() {
         return BindingBuilder.bind(dlqMessageSend()).to(dlxExchange()).with(RK_MESSAGE_SEND);
@@ -88,6 +122,15 @@ public class RabbitConfig {
 
     // ── Serialization + template ──
 
+    /**
+     * JSON {@link MessageConverter} wired into both the {@link RabbitTemplate} and the
+     * listener container factory. Trusts the {@code com.chat.talkMe.*} packages so the
+     * type-id header deserializes back to the concrete event class, and is configured
+     * leniently (null→primitive default, ignore unknown properties) to tolerate Lombok
+     * boolean-getter naming quirks and DTO evolution.
+     *
+     * @return the configured {@link MessageConverter}.
+     */
     @Bean
     MessageConverter jsonMessageConverter() {
         // Boot wires this into both the RabbitTemplate and the listener container factory.
@@ -106,6 +149,15 @@ public class RabbitConfig {
         return new JacksonJsonMessageConverter(mapper, "com.chat.talkMe.*");
     }
 
+    /**
+     * The publishing {@link RabbitTemplate}. Uses the JSON converter, sets
+     * {@code mandatory=true} so unroutable messages are returned, logs publisher
+     * confirm NACKs, and logs returned (unroutable) messages.
+     *
+     * @param connectionFactory    the AMQP {@link ConnectionFactory}.
+     * @param jsonMessageConverter the JSON {@link MessageConverter} for payloads.
+     * @return the configured {@link RabbitTemplate}.
+     */
     @Bean
     RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, MessageConverter jsonMessageConverter) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);

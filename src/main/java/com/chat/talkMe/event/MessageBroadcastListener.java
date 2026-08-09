@@ -34,6 +34,16 @@ public class MessageBroadcastListener {
     private final EventPublisher eventPublisher;
     private final MessageDeliveryService deliveryService;
 
+    /**
+     * Bridges a committed message to delivery on the {@code broadcastExecutor} pool after the
+     * send transaction commits. Primary path hands the event to RabbitMQ via
+     * {@link EventPublisher#publishMessageSent(MessageSentEvent)}; if that returns {@code false}
+     * (broker unreachable) it delivers inline through
+     * {@link MessageDeliveryService#deliverOnce(MessageSentEvent)}. If even the inline delivery
+     * throws, it is logged and left to the outbox poller to re-drive, so no message is lost.
+     *
+     * @param event the committed {@link MessageSentEvent} to deliver
+     */
     @Async("broadcastExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMessageSent(MessageSentEvent event) {

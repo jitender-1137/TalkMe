@@ -23,6 +23,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Central {@code @ControllerAdvice} that translates exceptions thrown by controllers
+ * (and the framework) into a consistent {@link com.chat.talkMe.dto.response.ResponseDto}
+ * error body with an HTTP status and localized message. Client-disconnect exceptions
+ * (broken pipe / connection reset) are recognized and logged quietly instead of as errors.
+ */
 @Slf4j
 @ControllerAdvice
 @RequiredArgsConstructor
@@ -30,6 +36,14 @@ public class GlobalExceptionHandler {
 
     private final MessageSource messageSource;
 
+    /**
+     * Resolve {@code code} against the configured {@code MessageSource} for the current
+     * locale, returning {@code defaultMessage} if it is missing or resolution fails.
+     *
+     * @param code           the message code to resolve
+     * @param defaultMessage fallback message when the code has no entry
+     * @return the localized message, or {@code defaultMessage}
+     */
     private String getLocalizedMessage(String code, String defaultMessage) {
         try {
             return messageSource.getMessage(code, null, defaultMessage, LocaleContextHolder.getLocale());
@@ -38,6 +52,10 @@ public class GlobalExceptionHandler {
         }
     }
 
+    /**
+     * Catches every {@link ServiceException} (and subclass) and returns its carried status,
+     * localized message code and optional errors payload as a {@code ResponseDto} error.
+     */
     @ExceptionHandler(ServiceException.class)
     public ResponseEntity<ResponseDto<Void>> handleServiceException(ServiceException ex) {
         log.error("ServiceException occurred: [Code: {}] {}", ex.getMessageCode(), ex.getMessage());
@@ -46,8 +64,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(response);
     }
 
-    // A file over the global multipart cap (30MB) is rejected during parsing — before
-    // the controller runs — so surface a clean 413 instead of a generic 500.
+    /**
+     * Catches multipart uploads exceeding the global size cap and returns HTTP 413 with
+     * message code {@code TM_493}. A file over the global multipart cap (30MB) is rejected
+     * during parsing — before the controller runs — so surface a clean 413 instead of a 500.
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ResponseDto<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         log.warn("Upload exceeded multipart limit: {}", ex.getMessage());
@@ -56,6 +77,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(response);
     }
 
+    /**
+     * Catches bean-validation failures on {@code @Valid} request bodies and returns HTTP 400
+     * with code {@code VE_101} and a field→message map of the violations in the errors payload.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ResponseDto<Void>> handleValidationException(MethodArgumentNotValidException ex) {
         log.error("Validation error occurred");
@@ -71,6 +96,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    /**
+     * Catches Spring Security {@link AccessDeniedException} and returns HTTP 403 with
+     * message code {@code TM_005}.
+     */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ResponseDto<Void>> handleAccessDeniedException(AccessDeniedException ex) {
         log.error("AccessDeniedException: {}", ex.getMessage());
@@ -79,6 +108,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
+    /**
+     * Catches {@link IllegalArgumentException} and returns HTTP 400. Uses code {@code TM_071}
+     * generally, or {@code TM_INVALID_UUID} ("Invalid ID format provided") when the message
+     * indicates a bad UUID string.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ResponseDto<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
         log.error("IllegalArgumentException occurred: {}", ex.getMessage());
@@ -93,6 +127,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    /**
+     * Catches unmatched static/resource paths and returns HTTP 404 with code {@code TM_004}.
+     * These are almost always vulnerability scanners probing for leaked files, so they are
+     * logged quietly at DEBUG rather than as errors.
+     */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ResponseDto<Void>> handleNoResourceFoundException(NoResourceFoundException ex) {
         // Almost always automated vulnerability scanners probing for leaked files
@@ -105,16 +144,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    /**
+     * Handles an async request aborted by the client. Returns no body (void) and logs at
+     * INFO — the socket is already gone, so there is nothing to write.
+     */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void handleAsyncRequestNotUsableException(AsyncRequestNotUsableException ex) {
         log.info("Async request aborted by client: {}", ex.getMessage());
     }
 
+    /**
+     * Handles a connection aborted by the client mid-response. Returns no body (void) and
+     * logs at INFO rather than treating the dead socket as a server fault.
+     */
     @ExceptionHandler(ClientAbortException.class)
     public void handleClientAbortException(ClientAbortException ex) {
         log.info("Client aborted connection: {}", ex.getMessage());
     }
 
+    /**
+     * Catches a missing static/classpath resource and returns a quiet HTTP 404 with code
+     * {@code TM_004} instead of a full stack trace per request.
+     */
     @ExceptionHandler(FileNotFoundException.class)
     public ResponseEntity<ResponseDto<Void>> handleFileNotFoundException(FileNotFoundException ex) {
         // Missing static/classpath resource (e.g. '/' -> static/index.html, '/sw.js' when the
@@ -126,6 +177,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    /**
+     * Handles a generic {@link IOException}. Broken-pipe / connection-reset causes are logged
+     * quietly at INFO (client disconnect); any other I/O error is logged at ERROR. Returns no body.
+     */
     @ExceptionHandler(IOException.class)
     public void handleIOException(IOException ex) {
         String msg = ex.getMessage();
@@ -156,6 +211,10 @@ public class GlobalExceptionHandler {
                 .body(ResponseDto.error(localizedMessage, "TM_002"));
     }
 
+    /**
+     * Catch-all for any unhandled exception. A client-abort cause is logged quietly and
+     * returns no body; anything else is logged at ERROR and returns HTTP 500 with code {@code TM_002}.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ResponseDto<Void>> handleAllExceptions(Exception ex) {
         // Belt-and-suspenders: any exception whose cause chain is a client abort

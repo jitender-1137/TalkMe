@@ -49,6 +49,12 @@ public final class BackgroundTaskErrors {
         }
     }
 
+    /**
+     * Walk to the root cause and render a compact "SimpleName: message" summary for one-line logs.
+     *
+     * @param t the throwable to unwrap
+     * @return the root cause's simple class name, plus its message when present
+     */
     private static String rootMessage(Throwable t) {
         Throwable c = t;
         while (c.getCause() != null && c.getCause() != c) {

@@ -29,6 +29,16 @@ public class MessageEventConsumer {
 
     private final MessageDeliveryService deliveryService;
 
+    /**
+     * Consumes one {@code q.message.send} event and delivers it via
+     * {@link MessageDeliveryService#deliverOnce(MessageSentEvent)}, which is idempotent and marks
+     * the outbox row PUBLISHED. The queue is at-least-once, so a retry may redeliver the same
+     * event; the dedup in the delivery service guarantees the fan-out happens exactly once. A
+     * poison message dead-letters to {@code dlq.message.send} and is still re-driven by the
+     * outbox poller.
+     *
+     * @param event the {@link MessageSentEvent} dequeued from {@link RabbitConfig#Q_MESSAGE_SEND}
+     */
     @RabbitListener(queues = RabbitConfig.Q_MESSAGE_SEND)
     public void onMessageSent(MessageSentEvent event) {
         deliveryService.deliverOnce(event);

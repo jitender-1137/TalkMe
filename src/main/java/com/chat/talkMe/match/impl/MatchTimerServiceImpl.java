@@ -17,6 +17,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Server-authoritative countdown for timed match modes (Coffee/Chemistry). Deadlines and
+ * Chemistry prompt-rotation schedules live in Redis ZSETs so they survive across instances
+ * and are reaped centrally; the session's in-memory deadline is only a mirror. Arms the
+ * timer and emits the start event (plus rotating intro prompts for Chemistry), reaps due
+ * time-ups (MATCH_TIME_UP) and prompt ticks, and lets both peers mutually agree to CONTINUE
+ * (extend) exactly once. All events go to both peers.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -49,6 +57,15 @@ public class MatchTimerServiceImpl implements MatchTimerService {
     @Value("${match.chemistry.prompt-interval-ms:45000}")
     private long promptIntervalMs;
 
+    /**
+     * Arms the countdown for a session: records the deadline in Redis and the session
+     * mirror, clears post-timer state, and sends COFFEE_STARTED or CHEMISTRY_STARTED to
+     * both peers. For Chemistry it also sends the first prompt and schedules the rotation.
+     * No-op if the session no longer exists.
+     *
+     * @param sessionId the match session id
+     * @param seconds countdown length in seconds (floored to at least 1)
+     */
     @Override
     public void arm(String sessionId, int seconds) {
         MatchSession session = sessionService.getSession(sessionId).orElse(null);
@@ -73,6 +90,12 @@ public class MatchTimerServiceImpl implements MatchTimerService {
         log.info("Timer armed for session {} ({}s, mode={})", sessionId, seconds, session.getMode());
     }
 
+    /**
+     * Cancels a session's timer by removing its deadline, prompt schedule and prompt index
+     * from Redis.
+     *
+     * @param sessionId the match session id
+     */
     @Override
     public void cancel(String sessionId) {
         redis.opsForZSet().remove(TIMER_ZSET, sessionId);
@@ -80,6 +103,13 @@ public class MatchTimerServiceImpl implements MatchTimerService {
         redis.delete(IDX_PREFIX + sessionId);
     }
 
+    /**
+     * Records this user's CONTINUE choice and, if both peers have chosen CONTINUE while the
+     * session is still timed, cancels the timer and sends TIMER_CONTINUED to both — fired at
+     * most once via synchronization on the session. No-op if the user has no active session.
+     *
+     * @param username the requesting user's username
+     */
     @Override
     public void continueRequest(String username) {
         MatchSession session = sessionService.getSessionByUser(username).orElse(null);
@@ -99,6 +129,11 @@ public class MatchTimerServiceImpl implements MatchTimerService {
         }
     }
 
+    /**
+     * Reaper pass over the Redis schedules: for each expired timer, marks the session
+     * post-timer (once) and sends MATCH_TIME_UP; for each due Chemistry prompt, advances
+     * the rotating index, sends the next prompt, and re-schedules until the deadline.
+     */
     @Override
     public void reapDue() {
         long now = System.currentTimeMillis();
@@ -139,11 +174,25 @@ public class MatchTimerServiceImpl implements MatchTimerService {
         }
     }
 
+    /**
+     * Sends the Chemistry prompt at the given rotating index (wrapped into range) to both
+     * peers as a CHEMISTRY_PROMPT event.
+     *
+     * @param session the match session
+     * @param index the (possibly out-of-range) rotating prompt index
+     */
     private void sendPrompt(MatchSession session, int index) {
         String prompt = PROMPTS[Math.floorMod(index, PROMPTS.length)];
         sendBoth(session, "CHEMISTRY_PROMPT", Map.of("prompt", prompt, "index", index));
     }
 
+    /**
+     * Sends a match event with the given payload to both peers of the session.
+     *
+     * @param session the match session
+     * @param event the event name
+     * @param payload the event payload (copied defensively before sending)
+     */
     private void sendBoth(MatchSession session, String event, Map<String, Object> payload) {
         MatchServerEvent e = MatchServerEvent.builder().event(event).payload(new HashMap<>(payload)).build();
         messagingTemplate.convertAndSendToUser(session.getUserA(), "/queue/match", e);

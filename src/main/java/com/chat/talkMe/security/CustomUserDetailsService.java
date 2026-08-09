@@ -9,12 +9,25 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Loads users for Spring Security. Resolves the login identifier as either a username or an
+ * email (case-insensitive, whitespace-trimmed) and adapts the domain user to a
+ * {@link CustomUserDetails}.
+ */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
 
+    /**
+     * Loads a user by username or email, matched case-insensitively after trimming.
+     *
+     * @param usernameOrEmail the login identifier (username or email)
+     * @return the wrapped user details
+     * @throws org.springframework.security.core.userdetails.UsernameNotFoundException if no user
+     *                                                                                 matches
+     */
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
@@ -27,6 +40,14 @@ public class CustomUserDetailsService implements UserDetailsService {
         return new CustomUserDetails(user);
     }
 
+    /**
+     * Loads a user by primary key.
+     *
+     * @param id the user's database id
+     * @return the wrapped user details
+     * @throws org.springframework.security.core.userdetails.UsernameNotFoundException if no user
+     *                                                                                 has that id
+     */
     @Transactional(readOnly = true)
     public UserDetails loadUserById(Long id) {
         User user = userRepository.findById(id)

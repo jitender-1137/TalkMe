@@ -17,6 +17,16 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Manages match teardown around websocket disconnects with a reconnect grace. A drop
+ * does not tear down immediately: the user's teardown is scheduled on a Redis deadline
+ * ZSET, and the peer's "reconnecting…" notice is further deferred so a brief blip never
+ * surfaces a banner. Reconnecting within the window cancels teardown (silently if the
+ * notice never fired, otherwise telling the peer RECONNECTED); the reaper fires deferred
+ * notices and performs the real teardown once graces expire, claiming entries atomically
+ * so multiple app instances don't double-tear-down. All peer events are anonymous
+ * (session id only).
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,6 +61,13 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
      */
     private static final Duration RECONNECT_NOTIFY_DELAY = Duration.ofSeconds(8);
 
+    /**
+     * Performs the immediate, final teardown for a user: dequeues them, drops active-user
+     * and pending-notice tracking, destroys any active session, notifies the peer
+     * anonymously with STRANGER_DISCONNECTED, and rebroadcasts the online count.
+     *
+     * @param username the disconnected user's username
+     */
     @Override
     public void handleDisconnect(String username) {
         log.info("Handling websocket disconnect for user {}", username);
@@ -92,6 +109,13 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         onlineCountPublisher.publish();
     }
 
+    /**
+     * Holds a dropped user's match state across the grace window instead of tearing down
+     * now: records a teardown deadline (for a matched user or a still-searching queued
+     * user) and, for a matched user, a deferred "reconnecting…" peer-notice deadline.
+     *
+     * @param username the dropped user's username
+     */
     @Override
     public void scheduleDisconnect(String username) {
         // Hold the matchmaking state across a brief disconnect (tab-switch / blip /
@@ -121,6 +145,13 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         }
     }
 
+    /**
+     * Cancels a pending teardown when the user reconnects in time. If nothing was pending
+     * it returns (normal fresh connect); if the "reconnecting…" notice was still deferred
+     * it resumes silently; otherwise it tells the peer STRANGER_RECONNECTED.
+     *
+     * @param username the reconnected user's username
+     */
     @Override
     public void cancelDisconnect(String username) {
         Long removed = redisTemplate.opsForZSet().remove(MATCH_DISCONNECT_ZSET, username);
@@ -144,6 +175,13 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         });
     }
 
+    /**
+     * Reaper pass: fires any due deferred "reconnecting…" peer notices (skipping users who
+     * have since reconnected), then tears down any user whose reconnect grace has expired.
+     * Each entry is claimed atomically via ZSET removal so only one instance acts on it.
+     *
+     * @return the number of users torn down in this pass
+     */
     @Override
     public int reapExpiredDisconnects() {
         long now = System.currentTimeMillis();

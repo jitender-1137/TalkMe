@@ -5,6 +5,11 @@ import com.chat.talkMe.dto.response.SessionResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+/**
+ * MapStruct mapper from a {@link com.chat.talkMe.domain.Session} entity to a
+ * {@link com.chat.talkMe.dto.response.SessionResponse}, rendering the UUID and last-active
+ * timestamp as strings and mapping the {@code current} flag to {@code isCurrent}.
+ */
 @Mapper(componentModel = "spring")
 public interface SessionMapper {
 

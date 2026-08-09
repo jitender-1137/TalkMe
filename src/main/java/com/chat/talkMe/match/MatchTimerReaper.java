@@ -18,6 +18,11 @@ public class MatchTimerReaper {
 
     private final MatchTimerService matchTimerService;
 
+    /**
+     * Scheduled tick (default every 1000ms) that delegates to
+     * {@link MatchTimerService#reapDue()} to fire due time-ups and rotate Chemistry prompts.
+     * Any exception is caught and logged so a single failure never halts the schedule.
+     */
     @Scheduled(fixedDelayString = "${match.timer-reaper.interval-ms:1000}")
     public void reap() {
         try {

@@ -14,6 +14,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * In-memory state for one active stranger-match pairing (userA ⇄ userB). Holds the
+ * anonymity-preserving aliases, the per-session 18+ text-consent handshake, the
+ * multi-channel reveal handshake state (mutated concurrently from both peers' WS
+ * threads and reaper threads, hence the concurrent maps), and the Coffee/Chemistry
+ * timer mirror. Never persisted; destroyed when the match ends.
+ */
 @Data
 @Builder
 @NoArgsConstructor

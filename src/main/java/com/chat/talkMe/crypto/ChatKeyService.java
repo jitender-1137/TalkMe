@@ -35,6 +35,17 @@ public class ChatKeyService {
      */
     private final Map<Long, SecretKey> cache = new ConcurrentHashMap<>();
 
+    /**
+     * Returns the chat's unwrapped AES-256 data key, reading from the in-memory cache first;
+     * otherwise unwraps the persisted wrapped key, or generates a fresh random key and
+     * persists it wrapped on first use. On a concurrent-creation race it reuses the row that
+     * won. The result is cached before return.
+     *
+     * @param chatId the chat's numeric id
+     * @return the unwrapped {@link javax.crypto.SecretKey} for the chat
+     * @throws org.springframework.dao.DataIntegrityViolationException if a concurrent insert
+     *         race cannot be resolved to a winning row
+     */
     @Transactional
     public SecretKey getOrCreateSecretKey(Long chatId) {
         SecretKey cached = cache.get(chatId);
@@ -65,7 +76,11 @@ public class ChatKeyService {
     }
 
     /**
-     * Raw data key (base64) handed to an authorized client to decrypt/encrypt locally.
+     * Raw data key (base64) handed to an authorized client to decrypt/encrypt locally;
+     * resolves or creates the key via {@link #getOrCreateSecretKey}.
+     *
+     * @param chatId the chat's numeric id
+     * @return the chat's raw AES-256 key, base64-encoded
      */
     @Transactional
     public String getRawKeyBase64(Long chatId) {

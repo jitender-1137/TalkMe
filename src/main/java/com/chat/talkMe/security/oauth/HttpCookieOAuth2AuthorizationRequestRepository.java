@@ -36,12 +36,26 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     @Value("${app.cookie.same-site:Lax}")
     private String cookieSameSite;
 
+    /**
+     * Loads the in-flight authorization request from the cookie, if present.
+     *
+     * @param request the current HTTP request
+     * @return the deserialized authorization request, or {@code null} if no valid cookie exists
+     */
     @Override
     public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
         Cookie cookie = readCookie(request);
         return cookie != null ? deserialize(cookie.getValue()) : null;
     }
 
+    /**
+     * Persists the authorization request in a short-lived cookie, or expires the cookie when the
+     * request is {@code null}.
+     *
+     * @param authorizationRequest the request to store, or {@code null} to clear
+     * @param request              the current HTTP request
+     * @param response             the response to attach the Set-Cookie header to
+     */
     @Override
     public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest,
                                          HttpServletRequest request, HttpServletResponse response) {
@@ -55,6 +69,13 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
+    /**
+     * Loads then expires the authorization-request cookie, returning the request it held.
+     *
+     * @param request  the current HTTP request
+     * @param response the response used to expire the cookie
+     * @return the previously-stored authorization request, or {@code null} if none
+     */
     @Override
     public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request,
                                                                  HttpServletResponse response) {
@@ -65,6 +86,12 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         return authRequest;
     }
 
+    /**
+     * Finds the authorization-request cookie on the request.
+     *
+     * @param request the current HTTP request
+     * @return the cookie, or {@code null} if not present
+     */
     private Cookie readCookie(HttpServletRequest request) {
         if (request.getCookies() == null) return null;
         for (Cookie c : request.getCookies()) {
@@ -73,10 +100,21 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         return null;
     }
 
+    /**
+     * Emits a Set-Cookie header that immediately expires the authorization-request cookie.
+     *
+     * @param response the response to attach the header to
+     */
     private void expireCookie(HttpServletResponse response) {
         response.addHeader(HttpHeaders.SET_COOKIE, baseCookie("").maxAge(0).build().toString());
     }
 
+    /**
+     * Builds the shared cookie template (path {@code /}, HttpOnly, configured secure/SameSite).
+     *
+     * @param value the cookie value to set
+     * @return a cookie builder pre-populated with the common attributes
+     */
     private ResponseCookie.ResponseCookieBuilder baseCookie(String value) {
         return ResponseCookie.from(COOKIE_NAME, value)
                 .path("/")
@@ -85,6 +123,13 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
                 .sameSite(cookieSameSite);
     }
 
+    /**
+     * Java-serializes the authorization request and Base64-URL-encodes it for cookie storage.
+     *
+     * @param authRequest the authorization request to encode
+     * @return the Base64-URL-encoded serialized form
+     * @throws java.lang.IllegalStateException if serialization fails
+     */
     private String serialize(OAuth2AuthorizationRequest authRequest) {
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
              ObjectOutputStream oos = new ObjectOutputStream(bos)) {
@@ -96,6 +141,12 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         }
     }
 
+    /**
+     * Decodes and deserializes a cookie value back into an authorization request.
+     *
+     * @param value the Base64-URL-encoded serialized authorization request
+     * @return the deserialized request, or {@code null} if the value is tampered/expired/unreadable
+     */
     private OAuth2AuthorizationRequest deserialize(String value) {
         try {
             byte[] bytes = Base64.getUrlDecoder().decode(value);

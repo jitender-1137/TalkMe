@@ -18,6 +18,15 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import java.security.Principal;
 import java.time.Duration;
 
+/**
+ * Translates raw WebSocket session lifecycle events into presence + matchmaking state.
+ *
+ * <p>On connect it registers the STOMP session id in the per-user Redis session set
+ * (TTL-refreshed), marks the user ONLINE, and cancels any pending match-disconnect grace
+ * (resuming a reconnect). On disconnect it removes the session id and, only when it was the
+ * user's last live session, marks them IDLE for a grace window (the idle reaper flips them
+ * OFFLINE afterwards) and schedules a matchmaking disconnect grace.</p>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,6 +39,13 @@ public class WebSocketPresenceListener {
     private static final String SESSIONS_KEY_PREFIX = "presence:sessions:";
     private static final Duration SESSION_TTL = Duration.ofDays(1);
 
+    /**
+     * On a STOMP session connect: adds the session id to the user's Redis session set with a
+     * refreshed TTL, marks the user ONLINE, and cancels any pending match-disconnect teardown
+     * (resuming the match on reconnect). No-op when the principal or resolved user is null.
+     *
+     * @param event the session-connected event carrying the user principal + STOMP headers
+     */
     @EventListener
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
         Principal principal = event.getUser();
@@ -66,6 +82,14 @@ public class WebSocketPresenceListener {
         }
     }
 
+    /**
+     * On a STOMP session disconnect: removes the session id from the user's Redis session
+     * set; only if that was the last live session does it mark the user disconnected with a
+     * 5-minute IDLE grace (idle reaper finalizes OFFLINE) and schedule a matchmaking
+     * disconnect grace. No-op when the principal or resolved user is null.
+     *
+     * @param event the session-disconnected event carrying the user principal + STOMP headers
+     */
     @EventListener
     public void handleWebSocketDisconnectListener(SessionDisconnectEvent event) {
         Principal principal = event.getUser();
@@ -116,6 +140,13 @@ public class WebSocketPresenceListener {
         }
     }
 
+    /**
+     * Unwraps the authenticated {@link User} from a STOMP principal.
+     *
+     * @param principal the session principal
+     * @return the domain user, or null if it is not an authenticated
+     *         {@code UsernamePasswordAuthenticationToken} carrying {@code CustomUserDetails}
+     */
     private User extractUser(Principal principal) {
         if (principal instanceof UsernamePasswordAuthenticationToken auth) {
             if (auth.getPrincipal() instanceof CustomUserDetails userDetails) {

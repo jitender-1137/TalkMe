@@ -1,5 +1,9 @@
 package com.chat.talkMe.exception;
 
+/**
+ * Signals a failure while storing or retrieving an uploaded file (I/O or storage-backend
+ * error). Maps to HTTP 500 with message code {@code TM_170}.
+ */
 public class FileStorageException extends ServiceException {
     private static final long serialVersionUID = 1L;
     public FileStorageException(String message) {

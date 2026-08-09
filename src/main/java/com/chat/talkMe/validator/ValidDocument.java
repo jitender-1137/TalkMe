@@ -9,6 +9,14 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Bean-validation constraint asserting a filename/URL {@code String} ends in a supported document
+ * extension (pdf, doc, docx, xls, xlsx, ppt, pptx, txt, zip). A {@code null} value is treated as
+ * valid. Default message: "Invalid document format. Supported formats: pdf, doc, docx, xls, xlsx,
+ * ppt, pptx, txt, zip".
+ *
+ * @see DocumentValidator
+ */
 @Documented
 @Constraint(validatedBy = DocumentValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER})

@@ -39,6 +39,12 @@ public class FeatureAccessCache {
         return KEY_PREFIX + userId;
     }
 
+    /**
+     * Read the current global feature epoch from the {@code feature:flags:epoch} Redis counter.
+     * Fail-open: a missing key or any Redis error returns 0.
+     *
+     * @return the current epoch as a {@code long} (0 when absent or on error)
+     */
     private long currentEpoch() {
         try {
             String e = redis.opsForValue().get(EPOCH_KEY);
@@ -101,6 +107,13 @@ public class FeatureAccessCache {
         }
     }
 
+    /**
+     * Parse a comma-separated list of feature wire-names into an order-preserving set,
+     * dropping blank tokens.
+     *
+     * @param csv a {@code java.lang.String} of comma-separated names, possibly null/empty
+     * @return a {@code java.util.Set<java.lang.String>} (a {@code LinkedHashSet}) of wire-names
+     */
     private static Set<String> parse(String csv) {
         Set<String> out = new LinkedHashSet<>();
         if (csv == null || csv.isEmpty()) return out;

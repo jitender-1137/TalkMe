@@ -30,6 +30,12 @@ public class ProfileSchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): drops the frozen enum CHECKs on the expanded
+     * profile columns and {@code @ElementCollection} value columns. Idempotent, fail-open.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         // Expanded Interest enum — REQUIRED, or every interest insert fails.
@@ -45,6 +51,13 @@ public class ProfileSchemaMigration implements ApplicationRunner {
         dropCheck("user_settings", "user_settings_night_owl_mode_check");
     }
 
+    /**
+     * Idempotently drops a named CHECK constraint via {@code DROP CONSTRAINT IF EXISTS}. Fail-open:
+     * any error is logged and swallowed so a heal failure never blocks startup.
+     *
+     * @param table      the table owning the constraint
+     * @param constraint the constraint name to drop
+     */
     private void dropCheck(String table, String constraint) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraint);

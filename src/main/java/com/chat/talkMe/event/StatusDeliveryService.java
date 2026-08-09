@@ -35,6 +35,12 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
     private final ObjectMapper objectMapper;
     private final PresenceService presenceService;
 
+    /**
+     * The outbox event type this handler owns: {@code message.status}
+     * ({@link StatusUpdateEvent#EVENT_TYPE}).
+     *
+     * @return the {@code message.status} event type key
+     */
     @Override
     public String eventType() {
         return StatusUpdateEvent.EVENT_TYPE;
@@ -60,6 +66,18 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
         broadcastEvent(event);
     }
 
+    /**
+     * Broadcasts one status change to the chat topic and refreshes the reader's own unread badge.
+     *
+     * <p>Honours Ghost mode: if the actor (the recipient who triggered delivered/read) is in
+     * Ghost mode the topic broadcast is suppressed entirely, so the sender's ticks stay at
+     * "sent" — the DB receipt has already been written, so the recipient's own state is intact.
+     * For a {@link StatusUpdateEvent#READ} event the actor's unread count is always recomputed
+     * from the DB (independent of Ghost, since it is the reader's own state); that recompute is
+     * idempotent and safe to repeat on a re-drive, and its failure is caught and logged.</p>
+     *
+     * @param event the status change to broadcast
+     */
     private void broadcastEvent(StatusUpdateEvent event) {
         // The actor is the RECIPIENT who triggered delivered/read. If they have Ghost
         // mode on, the sender must never learn their message was delivered/seen — skip

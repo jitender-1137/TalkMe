@@ -14,6 +14,14 @@ import org.mapstruct.MappingTarget;
 
 import java.util.Collections;
 
+/**
+ * MapStruct mapper for {@link com.chat.talkMe.domain.Message} and its related entities
+ * (attachments, reactions, parent/reply message) to their response DTOs. Renders UUIDs, enums
+ * and timestamps as strings; masks deleted messages with a placeholder and never leaks their
+ * original text; derives the delivery status (SENT/DELIVERED/READ) from read receipts; and
+ * strips media from expired self-destruct messages. Default methods implement the derived-field
+ * logic and after-mapping fixups.
+ */
 @Mapper(componentModel = "spring")
 public interface MessageMapper {
 

@@ -41,6 +41,11 @@ public class LoggingWarmup {
             "ch.qos.logback.core.CoreConstants",
     };
 
+    /**
+     * On startup, force-loads logback's throwable-rendering classes so they stay resident and
+     * cannot later fail with {@code NoClassDefFoundError} after an in-place jar swap. Best-effort:
+     * a class that will not load never fails startup, and no throwable is logged here on purpose.
+     */
     @PostConstruct
     void warmUp() {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();

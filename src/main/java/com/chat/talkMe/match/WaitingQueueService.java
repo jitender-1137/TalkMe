@@ -3,6 +3,12 @@ package com.chat.talkMe.match;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Redis-backed FIFO waiting queue of users searching for a stranger match. Backed by a Redis
+ * list (oldest-first) so enqueue/dequeue/peek are cross-instance-safe. Claiming a candidate is
+ * atomic (Redis LREM count == 1) so two concurrent seekers cannot both win the same waiting user,
+ * preventing the double-match race.
+ */
 public interface WaitingQueueService {
     void enqueue(String username);
 

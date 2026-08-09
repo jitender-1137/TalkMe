@@ -29,6 +29,17 @@ public class MessageBroadcaster {
     private final UserRepository userRepository;
     private final NotificationDispatchService notificationDispatchService;
 
+    /**
+     * Fans a sent message out over WebSocket: a broadcast to the chat topic
+     * ({@code /topic/chat/{uuid}/messages}), then a per-recipient personal-queue
+     * {@code message_received} event ({@code /queue/chats}) plus notification dispatch. All
+     * recipients are loaded in a single {@code findByUsernameIn} query to avoid N+1, and each
+     * per-recipient notification is wrapped in its own try/catch so a notification failure never
+     * fails (and thus retries/duplicates) the broadcast. Returns early when the event carries no
+     * recipient usernames.
+     *
+     * @param event the {@link MessageSentEvent} whose message and recipients drive the fan-out
+     */
     public void broadcast(MessageSentEvent event) {
         MessageResponse response = event.getMessage();
         String chatUuid = event.getChatUuid();

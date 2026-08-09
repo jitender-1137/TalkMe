@@ -55,6 +55,12 @@ public class FrameExtractor {
         return frames;
     }
 
+    /**
+     * Best-effort deletes each extracted frame file and its parent temp directory,
+     * swallowing any errors.
+     *
+     * @param frames the java.util.List of java.nio.file.Path frame files to remove
+     */
     public void cleanup(List<Path> frames) {
         for (Path f : frames) {
             try {

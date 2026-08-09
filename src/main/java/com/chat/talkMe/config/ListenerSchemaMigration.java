@@ -25,11 +25,24 @@ public class ListenerSchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): drops the frozen status CHECK on
+     * {@code listener_shifts}. Idempotent, fail-open.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         dropCheck("listener_shifts", "listener_shifts_status_check");
     }
 
+    /**
+     * Idempotently drops a named CHECK constraint via {@code DROP CONSTRAINT IF EXISTS}. Fail-open:
+     * any error is logged and swallowed so a heal failure never blocks startup.
+     *
+     * @param table      the table owning the constraint
+     * @param constraint the constraint name to drop
+     */
     private void dropCheck(String table, String constraint) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraint);

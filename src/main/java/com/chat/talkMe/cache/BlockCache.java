@@ -50,6 +50,14 @@ public class BlockCache {
         return blockedIds(blocker).contains(blockedUserId);
     }
 
+    /**
+     * Return {@code blocker}'s set of blocked user-ids, reading Redis first and, on a miss or any
+     * Redis error, loading from {@code blockUserRepository.findByUser} and caching the result for
+     * {@link #TTL} (15 minutes). Fail-open: read/write errors are logged and the DB value is used.
+     *
+     * @param blocker the blocking {@code com.chat.talkMe.domain.User} (assumed non-null)
+     * @return a {@code java.util.Set<java.lang.Long>} of blocked user-ids (empty if none)
+     */
     private Set<Long> blockedIds(User blocker) {
         String k = key(blocker.getId());
         try {
@@ -85,6 +93,12 @@ public class BlockCache {
         }
     }
 
+    /**
+     * Parse a comma-joined blocked-ids string into a set, silently skipping malformed tokens.
+     *
+     * @param csv a {@code java.lang.String} of comma-separated ids, possibly null/blank
+     * @return a {@code java.util.Set<java.lang.Long>} of parsed ids (empty for null/blank input)
+     */
     private static Set<Long> parse(String csv) {
         Set<Long> out = new HashSet<>();
         if (csv == null || csv.isBlank()) return out;

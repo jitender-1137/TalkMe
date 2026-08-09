@@ -32,6 +32,14 @@ public class GoogleProfileService {
     public record Extended(Integer age, String gender) {
     }
 
+    /**
+     * Best-effort call to the Google People API for the user's birthday-derived age and gender.
+     * Never throws: any failure (blank token, missing scopes/403, network error, unexpected shape)
+     * yields nulls.
+     *
+     * @param accessToken the Google OAuth access token, or {@code null}/blank
+     * @return an {@link Extended} holding age and/or gender, each possibly {@code null}
+     */
     public Extended fetch(String accessToken) {
         if (accessToken == null || accessToken.isBlank()) {
             return new Extended(null, null);
@@ -55,6 +63,9 @@ public class GoogleProfileService {
 
     /**
      * First birthday entry that carries a year → age in whole years.
+     *
+     * @param birthdays the {@code birthdays} JSON array node from the People API response
+     * @return the age in whole years (sanity-bounded to 1..119), or {@code null} if unavailable
      */
     private Integer parseAge(JsonNode birthdays) {
         if (birthdays == null || !birthdays.isArray()) return null;
@@ -77,6 +88,9 @@ public class GoogleProfileService {
 
     /**
      * Normalize Google's gender ("male"/"female"/…) to the app's lowercase value.
+     *
+     * @param genders the {@code genders} JSON array node from the People API response
+     * @return {@code "male"} or {@code "female"}, or {@code null} for unspecified/other/absent
      */
     private String parseGender(JsonNode genders) {
         if (genders == null || !genders.isArray() || genders.isEmpty()) return null;

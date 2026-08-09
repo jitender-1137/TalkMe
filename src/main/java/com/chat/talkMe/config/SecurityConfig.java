@@ -31,6 +31,17 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 import java.util.List;
 
+/**
+ * Central Spring Security configuration. Enables web security and method-level security,
+ * runs the API stateless (no HTTP session, JWT bearer auth), disables the built-in CSRF in
+ * favour of a custom {@link com.chat.talkMe.security.CsrfTokenFilter}, and installs a set of
+ * hardened response headers (CSP, HSTS, referrer/permissions policy, COOP/CORP, nosniff,
+ * frame-deny). Authorization rules gate actuator, Swagger (profile-dependent), the admin API
+ * (SUPER_ADMIN), and the public endpoints in {@link #unSecured()}; everything else under
+ * {@code /api/**} requires authentication while static SPA routes are permitted. Optionally
+ * wires Google OAuth2 login when a client registration is present. The custom filter order is
+ * CSRF → JWT → rate-limiting, ahead of {@code UsernamePasswordAuthenticationFilter}.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -51,6 +62,10 @@ public class SecurityConfig {
      * its hosts are appended to {@code script-src} and {@code frame-src} so the network's
      * loader script and creative frames are allowed; {@code img-src}/{@code connect-src}
      * already permit {@code https:}, so no widening is needed there.
+     *
+     * @param adDomains ad-network hosts to allow (from {@code ads.csp-domains}); null/empty
+     *                  yields the hardened baseline policy unchanged.
+     * @return the assembled {@code Content-Security-Policy} header value.
      */
     static String buildContentSecurityPolicy(List<String> adDomains) {
         StringBuilder ad = new StringBuilder();
@@ -71,16 +86,45 @@ public class SecurityConfig {
                 "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
     }
 
+    /**
+     * Password hashing for stored credentials and password verification.
+     *
+     * @return a BCrypt-based {@link PasswordEncoder}.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Exposes Spring Security's {@link AuthenticationManager} as a bean.
+     *
+     * @param authenticationConfiguration the Spring-managed {@link AuthenticationConfiguration}.
+     * @return the shared {@link AuthenticationManager}.
+     * @throws java.lang.Exception if the manager cannot be resolved.
+     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
+    /**
+     * Builds the application {@link SecurityFilterChain}: stateless sessions, disabled built-in
+     * CSRF (custom filter used instead), the hardened security headers, the authorization rules
+     * (actuator, profile-gated Swagger, {@code /api/v1/admin/**} = SUPER_ADMIN, other {@code /api/**}
+     * authenticated, static routes permitted), optional Google OAuth2 login when a client is
+     * configured, and the CSRF → JWT → rate-limiting filter chain. Swagger docs are public only in
+     * non-prod profiles.
+     *
+     * @param http                            the {@link HttpSecurity} builder.
+     * @param environment                     the active {@link Environment} (drives Swagger visibility).
+     * @param clientRegistrationRepository    provider for OAuth2 client registrations (may be absent).
+     * @param cookieAuthorizationRequestRepository cookie-based store for the in-flight OAuth2 request.
+     * @param oauth2LoginSuccessHandler       handler invoked on successful OAuth2 login.
+     * @param oauth2LoginFailureHandler       handler invoked on failed OAuth2 login.
+     * @return the built {@link SecurityFilterChain}.
+     * @throws java.lang.Exception if the chain cannot be built.
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,

@@ -21,6 +21,15 @@ public class PostExpiryReaper {
 
     private final PostService postService;
 
+    /**
+     * Removes temporary posts whose TTL has elapsed from listings and counts.
+     *
+     * <p>Runs {@code fixedDelay=${app.temporary-posts.reaper-ms:60000}} (every 60s by
+     * default). Delegates to
+     * {@link com.chat.talkMe.service.PostService#reapExpiredPosts(java.time.Instant)} with
+     * the current instant and only logs when at least one post was removed. Any exception is
+     * caught so one failed tick never aborts the schedule.</p>
+     */
     @Scheduled(fixedDelayString = "${app.temporary-posts.reaper-ms:60000}")
     public void reap() {
         try {

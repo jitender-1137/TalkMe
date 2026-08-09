@@ -5,6 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Broadcast payload describing a user's presence transition (identity, current status,
+ * and last-seen timestamp) pushed to presence topics/queues.
+ */
 @Data
 @Builder
 @NoArgsConstructor

@@ -15,6 +15,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * MapStruct mapper from a {@link com.chat.talkMe.domain.User} entity to its response DTOs:
+ * {@link com.chat.talkMe.dto.response.AuthUserResponse} (self) and
+ * {@link com.chat.talkMe.dto.response.UserResponse} (other users). Renders UUIDs/enums/timestamps
+ * as strings, converts interest/language/looking-for enum sets to name sets, and ignores fields
+ * enriched later by the service layer (presence, last seen, block/friend/messaging flags, counts,
+ * and self-only features). Default methods implement the collection/role conversions.
+ */
 @Mapper(componentModel = "spring")
 public interface UserMapper {
 

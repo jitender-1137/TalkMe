@@ -9,6 +9,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Bean-validation constraint asserting a filename/URL {@code String} ends in a supported image
+ * extension (jpg, jpeg, png, webp, gif, heic). A {@code null} value is treated as valid. Default
+ * message: "Invalid image format. Supported formats: jpg, jpeg, png, webp, gif, heic".
+ *
+ * @see ImageValidator
+ */
 @Documented
 @Constraint(validatedBy = ImageValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER})

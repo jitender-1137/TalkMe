@@ -26,6 +26,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * STOMP inbound-channel interceptor enforcing authentication, authorization, and flood control on
+ * the WebSocket connection. On CONNECT it requires a valid Bearer access token (rejecting anonymous
+ * connections) and applies a per-user connect-storm guard. On SUBSCRIBE it requires an authenticated
+ * principal and, for {@code /topic/chat/{uuid}/**} destinations, verifies chat membership. On SEND it
+ * enforces a per-user flood limit (dropping excess frames) and blocks call-event frames between users
+ * who are not friends on PRIVATE chats. Rate-limit checks are Redis fixed-window counters that
+ * fail open.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -53,6 +62,20 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     private static final int CONNECT_LIMIT = 30;
     private static final int CONNECT_WINDOW_SECONDS = 60;
 
+    /**
+     * Inspects each inbound STOMP frame and applies command-specific security: authenticates CONNECT
+     * frames and sets the session principal; authorizes SUBSCRIBE destinations (chat-membership scoped);
+     * rate-limits and friendship-gates SEND frames. Returns {@code null} to silently drop a frame
+     * (flood limit) or throws to reject the frame.
+     *
+     * @param message the inbound STOMP message
+     * @param channel the message channel
+     * @return the (unmodified) message to continue processing, or {@code null} to drop it
+     * @throws org.springframework.security.access.AccessDeniedException if authn/authz or the connect
+     *                                                                   rate limit fails
+     * @throws java.lang.IllegalArgumentException if a call-event SEND targets a non-friend on a
+     *                                            PRIVATE chat
+     */
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
@@ -189,6 +212,11 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
     /**
      * Returns the authenticated username on the STOMP session, or rejects the frame.
+     *
+     * @param accessor the STOMP header accessor for the current frame
+     * @return the authenticated username
+     * @throws org.springframework.security.access.AccessDeniedException if the session has no
+     *                                                                   authenticated principal
      */
     private String requireUsername(StompHeaderAccessor accessor) {
         String username = usernameOrNull(accessor);
@@ -200,6 +228,9 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
     /**
      * Authenticated username on the STOMP session, or null if none.
+     *
+     * @param accessor the STOMP header accessor for the current frame
+     * @return the authenticated username, or {@code null} if the session is not authenticated
      */
     private String usernameOrNull(StompHeaderAccessor accessor) {
         Object principal = accessor.getUser();
@@ -211,16 +242,34 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     }
 
     /**
-     * Redis fixed-window counter; fail-open if Redis is unavailable.
+     * Checks the per-user SEND flood limit. Redis fixed-window counter; fail-open if Redis is
+     * unavailable.
+     *
+     * @param username the sending user
+     * @return {@code true} if the SEND frame is within the per-user rate limit
      */
     private boolean allowSend(String username) {
         return withinLimit("ws:ratelimit:send:" + username, SEND_LIMIT, SEND_WINDOW_SECONDS);
     }
 
+    /**
+     * Checks the per-user CONNECT storm limit.
+     *
+     * @param username the connecting user
+     * @return {@code true} if the CONNECT is within the per-user rate limit
+     */
     private boolean allowConnect(String username) {
         return withinLimit("ws:ratelimit:connect:" + username, CONNECT_LIMIT, CONNECT_WINDOW_SECONDS);
     }
 
+    /**
+     * Increments and evaluates a Redis fixed-window counter, seeding the window TTL on first hit.
+     *
+     * @param key           the Redis counter key
+     * @param limit         the maximum allowed count within the window
+     * @param windowSeconds the window length in seconds
+     * @return {@code true} if within the limit (or if Redis is unavailable — fail-open)
+     */
     private boolean withinLimit(String key, int limit, int windowSeconds) {
         try {
             Long count = redisTemplate.opsForValue().increment(key);

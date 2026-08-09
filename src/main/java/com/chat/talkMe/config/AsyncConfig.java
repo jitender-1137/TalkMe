@@ -21,6 +21,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Configuration
 public class AsyncConfig {
 
+    /**
+     * The {@code broadcastExecutor} thread pool for post-commit fan-out (WebSocket/RabbitMQ/
+     * Redis). Sized 8 core / 32 max / 10,000 queue with a {@code CallerRunsPolicy} backstop,
+     * threads named {@code broadcast-*}. On shutdown it waits up to 10s for in-flight tasks so
+     * already-committed messages are not dropped mid-delivery.
+     *
+     * @return the initialized broadcast {@link Executor}.
+     */
     @Bean(name = "broadcastExecutor")
     public Executor broadcastExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

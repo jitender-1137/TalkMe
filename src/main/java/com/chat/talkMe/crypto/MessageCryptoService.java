@@ -48,7 +48,14 @@ public class MessageCryptoService {
     }
 
     /**
-     * Encrypt one field for a chat. No-op when disabled, null/empty, or already encrypted.
+     * Encrypt one field for a chat with the chat's data key and a fresh random IV, tagging
+     * the output with {@link #MARKER}. No-op returning the input unchanged when disabled,
+     * null/empty, or already marked as encrypted.
+     *
+     * @param chatId    the chat whose data key is used
+     * @param plaintext the field value to encrypt
+     * @return the {@code enc:v1:}-marked ciphertext, or the unchanged input on a no-op
+     * @throws java.lang.IllegalStateException if encryption fails
      */
     public String encrypt(Long chatId, String plaintext) {
         if (!isEnabled() || plaintext == null || plaintext.isEmpty() || plaintext.startsWith(MARKER)) {
@@ -70,8 +77,13 @@ public class MessageCryptoService {
 
     /**
      * Decrypt a field. Anything without the marker (legacy plaintext, SYSTEM JSON,
-     * null) is returned as-is. Used ONLY for server-side external output (push
-     * notifications, digest emails) — client-facing payloads stay ciphertext.
+     * null) is returned as-is. On a decryption failure it logs a warning and returns the
+     * original ciphertext rather than throwing. Used ONLY for server-side external output
+     * (push notifications, digest emails) — client-facing payloads stay ciphertext.
+     *
+     * @param chatId the chat whose data key is used
+     * @param value  the stored field value (marked ciphertext or pass-through plaintext)
+     * @return the decrypted text, or the input unchanged when unmarked or on failure
      */
     public String decrypt(Long chatId, String value) {
         if (value == null || !value.startsWith(MARKER)) {

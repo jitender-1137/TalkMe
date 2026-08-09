@@ -48,6 +48,17 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     @Value("${app.frontend-base-url:http://localhost:3000}")
     private String frontendBaseUrl;
 
+    /**
+     * Handles a successful Google authentication: extracts OIDC profile attributes, best-effort
+     * fetches age/gender via the People API, creates/links the local account through
+     * {@link AuthService#oauthLogin}, sets the HttpOnly refresh-token + CSRF cookies, and redirects
+     * to the SPA's {@code #chats} deep link (no token in the URL).
+     *
+     * @param request        the OAuth callback request
+     * @param response       the response used to set cookies and redirect
+     * @param authentication the successful OAuth authentication (an {@link OAuth2AuthenticationToken})
+     * @throws IOException if issuing the redirect fails
+     */
     @Override
     public void onAuthenticationSuccess(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
                                         Authentication authentication) throws IOException {
@@ -111,6 +122,13 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         getRedirectStrategy().sendRedirect(request, response, target);
     }
 
+    /**
+     * Sets the HttpOnly {@code refreshToken} cookie and a readable {@code csrf_token} cookie, both
+     * with a 30-day lifetime, matching the password-login flow.
+     *
+     * @param response     the response to attach Set-Cookie headers to
+     * @param refreshToken the refresh token to store in the HttpOnly cookie
+     */
     private void setAuthCookies(HttpServletResponse response, String refreshToken) {
         long maxAge = 30L * 24 * 60 * 60; // full account: 30 days
 

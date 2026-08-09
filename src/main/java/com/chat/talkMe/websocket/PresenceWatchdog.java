@@ -31,6 +31,11 @@ public class PresenceWatchdog {
      */
     private static final Duration TIMEOUT = Duration.ofSeconds(60);
 
+    /**
+     * Scheduled sweep that marks OFFLINE every user whose last heartbeat is older than
+     * {@link #TIMEOUT}, then logs the count. Errors are swallowed and logged so the
+     * fixed-delay schedule keeps running.
+     */
     @Scheduled(fixedDelayString = "${presence.watchdog.interval-ms:20000}")
     public void reapStaleUsers() {
         try {

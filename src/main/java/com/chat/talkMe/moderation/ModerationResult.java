@@ -25,6 +25,11 @@ public class ModerationResult {
     private final double score;
     private final List<String> matchedTerms;
 
+    /**
+     * Builds a non-explicit CLEAN result (score 0.0, empty matched-terms list).
+     *
+     * @return a com.chat.talkMe.moderation.ModerationResult flagged as not explicit
+     */
     public static ModerationResult clean() {
         return ModerationResult.builder()
                 .explicit(false)
@@ -34,6 +39,14 @@ public class ModerationResult {
                 .build();
     }
 
+    /**
+     * Builds an explicit (must-gate) result carrying the offending category and evidence.
+     *
+     * @param category     the com.chat.talkMe.moderation.ModerationResult.Category classification
+     * @param score        the double confidence/severity score
+     * @param matchedTerms the java.util.List of matched terms (telemetry-only, never surfaced)
+     * @return a com.chat.talkMe.moderation.ModerationResult flagged as explicit
+     */
     public static ModerationResult explicit(Category category, double score, List<String> matchedTerms) {
         return ModerationResult.builder()
                 .explicit(true)

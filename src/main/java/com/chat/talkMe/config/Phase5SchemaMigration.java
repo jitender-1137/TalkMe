@@ -29,6 +29,13 @@ public class Phase5SchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): adds the new columns onto {@code chats},
+     * {@code posts} and {@code stories} (with NOT-NULL defaults), then drops the frozen enum CHECKs
+     * on those columns. Idempotent, fail-open.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         // #23 curated flag, #25 city location, #26/27 room mode.
@@ -45,6 +52,14 @@ public class Phase5SchemaMigration implements ApplicationRunner {
         dropCheck("stories", "stories_kind_check");
     }
 
+    /**
+     * Idempotently adds a column via {@code ADD COLUMN IF NOT EXISTS}. Fail-open: any error is
+     * logged and swallowed so a heal failure never blocks startup.
+     *
+     * @param table      the table to add the column to
+     * @param column     the column name
+     * @param definition the SQL column definition (type plus any NOT NULL / DEFAULT clauses)
+     */
     private void addColumn(String table, String column, String definition) {
         try {
             jdbcTemplate.execute(
@@ -54,6 +69,13 @@ public class Phase5SchemaMigration implements ApplicationRunner {
         }
     }
 
+    /**
+     * Idempotently drops a named CHECK constraint via {@code DROP CONSTRAINT IF EXISTS}. Fail-open:
+     * any error is logged and swallowed so a heal failure never blocks startup.
+     *
+     * @param table      the table owning the constraint
+     * @param constraint the constraint name to drop
+     */
     private void dropCheck(String table, String constraint) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraint);

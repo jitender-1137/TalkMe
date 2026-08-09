@@ -29,6 +29,14 @@ public class OutboxDispatcher {
     private final OutboxEventRepository outboxRepo;
     private final Map<String, OutboxDeliveryHandler> handlers;
 
+    /**
+     * Indexes all discovered {@link OutboxDeliveryHandler} beans by their
+     * {@link OutboxDeliveryHandler#eventType()} into a lookup map used at dispatch time, and
+     * logs the registered event types.
+     *
+     * @param outboxRepo  repository used to lock and update outbox rows
+     * @param handlerList all delivery handlers registered in the context, one per event type
+     */
     public OutboxDispatcher(OutboxEventRepository outboxRepo, List<OutboxDeliveryHandler> handlerList) {
         this.outboxRepo = outboxRepo;
         this.handlers = handlerList.stream()
@@ -36,6 +44,16 @@ public class OutboxDispatcher {
         log.info("[outbox] Registered delivery handlers: {}", handlers.keySet());
     }
 
+    /**
+     * Re-drives a single pending outbox row within its own transaction. Claims the row with
+     * {@code FOR UPDATE SKIP LOCKED} (returns early if already published/deleted/locked by
+     * another instance), routes it to the handler for its event type, and on success marks it
+     * PUBLISHED with a bumped attempt count. If no handler is registered the row is left PENDING;
+     * if the handler throws, attempts are incremented and the row stays PENDING to be retried on
+     * a later tick.
+     *
+     * @param outboxId the id of the outbox row to re-drive
+     */
     @Transactional
     public void deliverFromOutbox(Long outboxId) {
         OutboxEvent row = outboxRepo.lockPendingById(outboxId).orElse(null);

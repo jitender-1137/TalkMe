@@ -33,6 +33,13 @@ public class MasterKeyService {
     @Value("${app.crypto.master-key:}")
     private String masterKeyB64;
 
+    /**
+     * Loads the master key from configuration at startup: if present, decodes it and arms
+     * encryption; if absent/blank, leaves encryption disabled (messages stored plaintext).
+     *
+     * @throws java.lang.IllegalStateException if the configured key does not decode to the
+     *         required AES-256 length
+     */
     @PostConstruct
     void init() {
         if (masterKeyB64 != null && !masterKeyB64.isBlank()) {
@@ -56,7 +63,12 @@ public class MasterKeyService {
     }
 
     /**
-     * Encrypt a raw data-key with the master key → base64(iv‖ciphertext‖tag).
+     * Encrypt a raw data-key with the master key → base64(iv‖ciphertext‖tag) using a fresh
+     * random IV.
+     *
+     * @param dataKey the raw data-key bytes to wrap
+     * @return base64 of the concatenated IV, ciphertext, and authentication tag
+     * @throws java.lang.IllegalStateException if wrapping fails
      */
     public String wrap(byte[] dataKey) {
         try {
@@ -73,7 +85,12 @@ public class MasterKeyService {
     }
 
     /**
-     * Reverse of {@link #wrap} — returns the raw data-key bytes.
+     * Reverse of {@link #wrap} — parses base64(iv‖ciphertext‖tag) and returns the raw
+     * data-key bytes.
+     *
+     * @param wrapped the base64 wrapped-key string produced by {@link #wrap}
+     * @return the decrypted raw data-key bytes
+     * @throws java.lang.IllegalStateException if unwrapping/authentication fails
      */
     public byte[] unwrap(String wrapped) {
         try {

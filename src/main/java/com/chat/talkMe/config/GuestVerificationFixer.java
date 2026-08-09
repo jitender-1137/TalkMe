@@ -22,6 +22,14 @@ public class GuestVerificationFixer implements ApplicationRunner {
 
     private final UserRepository userRepository;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}, transactional): resets {@code isVerified} to
+     * false on any guest account incorrectly marked verified, via
+     * {@link UserRepository#unverifyAllGuests()}. Idempotent — a no-op once the data is clean.
+     * Fail-open: any error is logged and swallowed so startup is never blocked.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {

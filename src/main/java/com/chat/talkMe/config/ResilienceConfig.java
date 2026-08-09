@@ -19,6 +19,16 @@ import java.time.Duration;
 @Configuration
 public class ResilienceConfig {
 
+    /**
+     * Shared {@link CircuitBreakerRegistry} with the default breaker config: opens when
+     * &gt;50% of calls fail or &gt;80% are slow (slow = &gt;5s), over a count-based sliding
+     * window of 20 calls (minimum 10 before it can trip); waits 30s in the open state
+     * then permits 3 half-open probe calls. State and call metrics are bound to the
+     * supplied Micrometer registry for {@code /actuator/prometheus}.
+     *
+     * @param meterRegistry the Micrometer {@link MeterRegistry} the breaker metrics bind to.
+     * @return the configured {@link CircuitBreakerRegistry}.
+     */
     @Bean
     CircuitBreakerRegistry circuitBreakerRegistry(MeterRegistry meterRegistry) {
         CircuitBreakerConfig config = CircuitBreakerConfig.custom()

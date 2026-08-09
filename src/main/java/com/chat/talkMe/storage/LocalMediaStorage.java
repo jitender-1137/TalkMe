@@ -40,6 +40,19 @@ public class LocalMediaStorage implements MediaStorage {
         log.info("LocalMediaStorage active — media root {}", root);
     }
 
+    /**
+     * Copy {@code source} to {@code <media-root>/<key>}, creating parent folders and
+     * overwriting any existing file, and return the absolute target path as the stored
+     * reference. Rejects keys that are unsafe or that resolve outside the media root.
+     *
+     * @param source      the prepared local file to persist ({@code java.nio.file.Path})
+     * @param key         the object key / relative sub-path under the media root
+     *                    ({@code java.lang.String})
+     * @param contentType the MIME type ({@code java.lang.String}); unused by this backend
+     * @return the absolute path reference {@code <media-root>/<key>} ({@code java.lang.String})
+     * @throws com.chat.talkMe.exception.FileStorageException if the key is unsafe, escapes
+     *                    the root, or the copy fails
+     */
     @Override
     public String store(Path source, String key, String contentType) {
         if (!MediaKeys.isSafeKey(key)) {
@@ -58,6 +71,15 @@ public class LocalMediaStorage implements MediaStorage {
         return target.toString();
     }
 
+    /**
+     * Resolve {@code reference} to a readable file under the media root and wrap it as a
+     * streamable {@link MediaContent} (with probed content type and byte length).
+     *
+     * @param reference the stored reference ({@code java.lang.String})
+     * @return an {@code java.util.Optional} of {@link MediaContent}; empty if the reference
+     *                  is unresolvable, escapes the root, is unreadable, or an
+     *                  {@code java.io.IOException} occurs
+     */
     @Override
     public Optional<MediaContent> open(String reference) {
         Path p = resolve(reference);
@@ -72,12 +94,26 @@ public class LocalMediaStorage implements MediaStorage {
         }
     }
 
+    /**
+     * Expose the on-disk file for a reference as an in-place {@link LocalFile} (no copy;
+     * its {@link LocalFile#close()} is a no-op).
+     *
+     * @param reference the stored reference ({@code java.lang.String})
+     * @return an {@code java.util.Optional} of {@link LocalFile}; empty if the reference is
+     *                  unresolvable or the file is not readable
+     */
     @Override
     public Optional<LocalFile> localCopy(String reference) {
         Path p = resolve(reference);
         return (p != null && Files.isReadable(p)) ? Optional.of(new InPlaceLocalFile(p)) : Optional.empty();
     }
 
+    /**
+     * Best-effort delete of the file for {@code reference}; unresolvable references and
+     * {@code java.io.IOException} are swallowed (logged), never thrown.
+     *
+     * @param reference the stored reference ({@code java.lang.String})
+     */
     @Override
     public void delete(String reference) {
         Path p = resolve(reference);
@@ -89,6 +125,16 @@ public class LocalMediaStorage implements MediaStorage {
         }
     }
 
+    /**
+     * Walk the media root (or the {@code prefix} sub-tree) and return one
+     * {@link StoredObject} per regular file with a safe key, carrying the
+     * {@code <media-root>/<key>} reference, size, last-modified time and guessed content
+     * type. Best-effort — unreadable files are skipped and failures yield an empty list.
+     *
+     * @param prefix a sub-path under the root to restrict the walk, or null/blank for the
+     *               whole store ({@code java.lang.String})
+     * @return a {@code java.util.List} of {@link StoredObject} (never null)
+     */
     @Override
     public List<StoredObject> list(String prefix) {
         Path base = root;

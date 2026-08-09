@@ -17,6 +17,14 @@ import org.springframework.messaging.support.AbstractSubscribableChannel;
 @Configuration
 public class BrokerChannelConfig {
 
+    /**
+     * Adds the {@link RabbitDestinationInterceptor} to the broker channel. Autowired (rather
+     * than configured via {@code WebSocketMessageBrokerConfigurer}, which does not expose the
+     * broker channel). Harmless when the relay is disabled — the interceptor is then a no-op.
+     *
+     * @param brokerChannel                the {@code brokerChannel} used by outbound broadcasts.
+     * @param rabbitDestinationInterceptor the destination-rewriting interceptor to register.
+     */
     @Autowired
     public void registerBrokerInterceptor(
             @Qualifier("brokerChannel") AbstractSubscribableChannel brokerChannel,

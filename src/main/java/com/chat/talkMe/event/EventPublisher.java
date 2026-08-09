@@ -39,6 +39,17 @@ public class EventPublisher {
         return publish(RabbitConfig.RK_MESSAGE_SEND, event);
     }
 
+    /**
+     * Fire-and-forget hand-off of an event to the events exchange under the given routing key.
+     * Returns {@code false} immediately when AMQP is disabled, and {@code false} (after logging a
+     * warning) if {@code convertAndSend} throws — e.g. a down or half-open broker connection — so
+     * the caller can fall back to inline delivery. No publisher confirm is awaited, so the broker
+     * round-trip never adds latency to a send.
+     *
+     * @param routingKey the AMQP routing key to publish under
+     * @param event      the event payload to convert and send
+     * @return {@code true} if the message was handed to the broker; {@code false} otherwise
+     */
     private boolean publish(String routingKey, Object event) {
         if (!amqpEnabled) {
             return false;

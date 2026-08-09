@@ -10,6 +10,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Spring Security {@link UserDetails} adapter wrapping the domain {@link User}. Flattens the
+ * user's roles (as {@code ROLE_...} authorities) and each role's permissions (as raw authorities),
+ * and maps account-status flags (deleted / banned) onto the Spring Security lifecycle checks.
+ */
 @Getter
 public class CustomUserDetails implements UserDetails {
     private static final long serialVersionUID = 1L;
@@ -17,6 +22,11 @@ public class CustomUserDetails implements UserDetails {
     private final User user;
     private final Collection<? extends GrantedAuthority> authorities;
 
+    /**
+     * Wraps the given user, building its granted authorities from roles and their permissions.
+     *
+     * @param user the domain user to adapt
+     */
     public CustomUserDetails(User user) {
         this.user = user;
 
@@ -59,22 +69,34 @@ public class CustomUserDetails implements UserDetails {
         return user.getUsername();
     }
 
+    /**
+     * @return {@code true} unless the account is (soft-)deleted
+     */
     @Override
     public boolean isAccountNonExpired() {
         return !user.isDeleted();
     }
 
+    /**
+     * @return {@code true} unless the account is deleted or banned (a banned account is locked out)
+     */
     @Override
     public boolean isAccountNonLocked() {
         // A banned account is locked out of authentication.
         return !user.isDeleted() && !user.isBanned();
     }
 
+    /**
+     * @return {@code true} unless the account is (soft-)deleted
+     */
     @Override
     public boolean isCredentialsNonExpired() {
         return !user.isDeleted();
     }
 
+    /**
+     * @return {@code true} only when the account is neither deleted nor banned
+     */
     @Override
     public boolean isEnabled() {
         return !user.isDeleted() && !user.isBanned();

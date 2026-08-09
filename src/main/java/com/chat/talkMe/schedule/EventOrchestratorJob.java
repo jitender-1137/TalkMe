@@ -20,6 +20,15 @@ public class EventOrchestratorJob {
 
     private final EventService eventService;
 
+    /**
+     * Advances the Midnight Events lifecycle: starts due events, then ends elapsed ones.
+     *
+     * <p>Runs {@code fixedDelay=${app.midnight-events.orchestrator-ms:30000}} (every 30s by
+     * default). Calls {@link com.chat.talkMe.service.EventService#startDueEvents()} then
+     * {@link com.chat.talkMe.service.EventService#endDueEvents()}, each in its own try/catch
+     * so a failure in one phase never blocks the other; per-tick counts are logged only when
+     * non-zero. Each individual event transitions in its own service transaction.</p>
+     */
     @Scheduled(fixedDelayString = "${app.midnight-events.orchestrator-ms:30000}")
     public void tick() {
         try {

@@ -9,6 +9,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Bean-validation constraint asserting a gender {@code String} is one of the allowed values
+ * ("male" or "female"), compared case-insensitively. A {@code null} value is treated as valid.
+ * Default message: "Gender must be male or female".
+ *
+ * @see GenderValidator
+ */
 @Documented
 @Constraint(validatedBy = GenderValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER})

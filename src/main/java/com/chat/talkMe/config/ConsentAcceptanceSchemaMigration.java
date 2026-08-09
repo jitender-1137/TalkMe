@@ -21,6 +21,13 @@ public class ConsentAcceptanceSchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): idempotently drops the frozen
+     * {@code consent_type} CHECK on {@code consent_acceptances}. Fail-open — any error is logged
+     * and swallowed so startup is never blocked.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         try {

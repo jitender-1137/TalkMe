@@ -50,6 +50,18 @@ public class OciMediaStorage implements MediaStorage {
         this.oci = props.getOci();
     }
 
+    /**
+     * Upload {@code source} to the shared bucket under object name {@code key} (with its
+     * byte length and content type) and return the {@code <media-root>/<key>} reference
+     * the app persists. Rejects unsafe keys.
+     *
+     * @param source      the prepared local file to upload ({@code java.nio.file.Path})
+     * @param key         the object name / key within the bucket ({@code java.lang.String})
+     * @param contentType the MIME type stored on the object ({@code java.lang.String})
+     * @return the reference {@code <media-root>/<key>} ({@code java.lang.String})
+     * @throws com.chat.talkMe.exception.FileStorageException if the key is unsafe or the
+     *                    upload fails
+     */
     @Override
     public String store(Path source, String key, String contentType) {
         if (!MediaKeys.isSafeKey(key)) {
@@ -71,6 +83,15 @@ public class OciMediaStorage implements MediaStorage {
         return props.getMediaRoot() + "/" + key;
     }
 
+    /**
+     * Fetch the bucket object for {@code reference} and wrap its stream as a
+     * {@link MediaContent} whose content length is known up front (so Spring does not
+     * drain the stream to measure it) and whose filename is derived from the key.
+     *
+     * @param reference the stored reference ({@code java.lang.String})
+     * @return an {@code java.util.Optional} of {@link MediaContent}; empty if the key is
+     *                  invalid or the fetch fails
+     */
     @Override
     public Optional<MediaContent> open(String reference) {
         String key = MediaKeys.key(reference, props.getMediaRoot());
@@ -98,6 +119,15 @@ public class OciMediaStorage implements MediaStorage {
         }
     }
 
+    /**
+     * Download the bucket object for {@code reference} to a temp file (extension derived
+     * from the key) and return it as a {@link TempLocalFile} whose {@link LocalFile#close()}
+     * deletes the copy. On failure the temp file is best-effort removed.
+     *
+     * @param reference the stored reference ({@code java.lang.String})
+     * @return an {@code java.util.Optional} of {@link LocalFile}; empty if the key is invalid
+     *                  or the download fails
+     */
     @Override
     public Optional<LocalFile> localCopy(String reference) {
         String key = MediaKeys.key(reference, props.getMediaRoot());
@@ -121,6 +151,12 @@ public class OciMediaStorage implements MediaStorage {
         }
     }
 
+    /**
+     * Best-effort delete of the bucket object for {@code reference}; invalid keys and any
+     * {@code java.lang.RuntimeException} are swallowed (logged), never thrown.
+     *
+     * @param reference the stored reference ({@code java.lang.String})
+     */
     @Override
     public void delete(String reference) {
         String key = MediaKeys.key(reference, props.getMediaRoot());
@@ -136,6 +172,17 @@ public class OciMediaStorage implements MediaStorage {
         }
     }
 
+    /**
+     * Page through the bucket (optionally restricted to {@code prefix}, 1000 objects per
+     * page) and return one {@link StoredObject} per safe-keyed object, carrying the
+     * {@code <media-root>/<key>} reference, size, last-modified/created time and guessed
+     * content type. Best-effort — a {@code java.lang.RuntimeException} yields the partial
+     * list gathered so far.
+     *
+     * @param prefix an object-name prefix to filter by, or null/blank for the whole bucket
+     *               ({@code java.lang.String})
+     * @return a {@code java.util.List} of {@link StoredObject} (never null)
+     */
     @Override
     public List<StoredObject> list(String prefix) {
         List<StoredObject> out = new ArrayList<>();
@@ -172,6 +219,12 @@ public class OciMediaStorage implements MediaStorage {
         return out;
     }
 
+    /**
+     * Issue a GetObject against the configured namespace/bucket for {@code key}.
+     *
+     * @param key the object name within the bucket ({@code java.lang.String})
+     * @return the {@code com.oracle.bmc.objectstorage.responses.GetObjectResponse}
+     */
     private GetObjectResponse getObject(String key) {
         return client.getObject(GetObjectRequest.builder()
                 .namespaceName(oci.getNamespace())
@@ -180,6 +233,14 @@ public class OciMediaStorage implements MediaStorage {
                 .build());
     }
 
+    /**
+     * The file extension (including the dot) of {@code key}, or {@code ".tmp"} if the key
+     * has no extension in its final path segment.
+     *
+     * @param key the object key ({@code java.lang.String})
+     * @return the extension including the leading dot, or {@code ".tmp"}
+     *                  ({@code java.lang.String})
+     */
     private static String extensionOf(String key) {
         int dot = key.lastIndexOf('.');
         int slash = key.lastIndexOf('/');

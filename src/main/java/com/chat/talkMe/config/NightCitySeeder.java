@@ -51,6 +51,15 @@ public class NightCitySeeder implements ApplicationRunner {
     @Value("${app.super-admin.emails:}")
     private String superAdminEmails;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}, deliberately NOT transactional): seeds one
+     * curated room per {@link CityLocation}. Idempotent — each district is guarded by
+     * {@link ChatRepository#existsByCityLocationAndRoomCuratedTrue(CityLocation)}. Skips entirely if
+     * no host account exists yet (retried on a later boot); each district is attempted independently
+     * so one failure never poisons the rest.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         User host = resolveHost();
@@ -76,6 +85,14 @@ public class NightCitySeeder implements ApplicationRunner {
                 created, existing, host.getUsername());
     }
 
+    /**
+     * Creates one curated PUBLIC room for the given district via {@link GroupService#createGroup}
+     * (subtype "room"), then stamps its {@code cityLocation} and {@code roomCurated} flag and saves.
+     *
+     * @param loc  the district to seed a room for
+     * @param host the resolved system host account that owns the room
+     * @throws java.lang.IllegalStateException if the just-created room cannot be re-loaded by UUID
+     */
     private void seedRoom(CityLocation loc, User host) {
         CreateGroupRequest req = new CreateGroupRequest();
         req.setName(loc.getLabel());
@@ -96,7 +113,10 @@ public class NightCitySeeder implements ApplicationRunner {
     }
 
     /**
-     * First configured super-admin email, else the most-recently-joined real account, else null.
+     * Resolves the system host that owns curated rooms.
+     *
+     * @return the first configured super-admin account found, else the most-recently-joined real
+     *         (non-guest, non-banned, non-deleted) account, else {@code null} if none exists yet
      */
     private User resolveHost() {
         if (superAdminEmails != null && !superAdminEmails.isBlank()) {

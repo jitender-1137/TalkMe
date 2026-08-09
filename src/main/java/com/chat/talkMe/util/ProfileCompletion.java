@@ -12,6 +12,12 @@ public final class ProfileCompletion {
     private ProfileCompletion() {
     }
 
+    /**
+     * Compute the weighted profile-completion score for a user.
+     *
+     * @param user the user to score (a {@code null} user scores 0)
+     * @return a completion percentage in the range 0–100
+     */
     public static int compute(User user) {
         if (user == null) return 0;
         int score = 0;
@@ -26,6 +32,10 @@ public final class ProfileCompletion {
         return Math.min(100, score);
     }
 
+    /**
+     * @param s the string to test
+     * @return {@code true} if {@code s} is non-null and not blank
+     */
     private static boolean notBlank(String s) {
         return s != null && !s.isBlank();
     }

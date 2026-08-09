@@ -21,6 +21,13 @@ public class ReferralSchemaMigration implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}): idempotently adds the nullable
+     * {@code users.referred_by_id} self-FK column via {@code ADD COLUMN IF NOT EXISTS}. Fail-open —
+     * any error is logged and swallowed so startup is never blocked.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     public void run(ApplicationArguments args) {
         try {

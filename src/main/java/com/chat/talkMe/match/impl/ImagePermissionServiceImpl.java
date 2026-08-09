@@ -11,6 +11,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+/**
+ * Drives the in-match image-permission handshake over STOMP. A request forwards an
+ * anonymous signal to the peer; an accept flips the session's image permission on and
+ * notifies both peers; a decline notifies both. Every event carries no identity.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -19,6 +24,12 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Forwards an anonymous IMAGE_REQUEST_RECEIVED signal to the requester's partner.
+     *
+     * @param requester the authenticated requesting username
+     * @throws java.lang.IllegalArgumentException if the requester has no active session
+     */
     @Override
     public void requestImage(String requester) {
         MatchSession session = sessionService.getSessionByUser(requester)
@@ -35,6 +46,13 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
         log.info("Forwarded IMAGE_REQUEST from {} to {}", requester, recipient);
     }
 
+    /**
+     * Grants image permission for the session and notifies both peers with an anonymous
+     * IMAGE_REQUEST_ACCEPTED event.
+     *
+     * @param approver the authenticated approving username
+     * @throws java.lang.IllegalArgumentException if the approver has no active session
+     */
     @Override
     public void acceptImageRequest(String approver) {
         MatchSession session = sessionService.getSessionByUser(approver)
@@ -54,6 +72,13 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
         log.info("Image request accepted for session {}", session.getId());
     }
 
+    /**
+     * Notifies both peers with an anonymous IMAGE_REQUEST_DECLINED event; image permission
+     * remains off.
+     *
+     * @param decliner the authenticated declining username
+     * @throws java.lang.IllegalArgumentException if the decliner has no active session
+     */
     @Override
     public void declineImageRequest(String decliner) {
         MatchSession session = sessionService.getSessionByUser(decliner)

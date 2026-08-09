@@ -58,6 +58,10 @@ public class ContentModerationServiceImpl implements ContentModerationService {
     // Collapse a run of 3+ identical chars down to ONE ("fuuuuck" -> "fuck").
     private static final Pattern REPEATS = Pattern.compile("(.)\\1{2,}");
 
+    /**
+     * On startup, loads the English, Hinglish and Devanagari word-lists and copies the
+     * longer-than-{@code RUN_MIN_LEN} entries into the run-scan list used by Pass B.
+     */
     @PostConstruct
     void load() {
         loadList("moderation/profanity_en.txt");
@@ -71,6 +75,12 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         log.info("Content moderation loaded {} terms (enabled={})", badWords.size(), enabled);
     }
 
+    /**
+     * Reads one classpath word-list, skipping blank and {@code #}-comment lines, and adds
+     * each normalized (de-spaced) term to the bad-word set; a missing list is logged, not fatal.
+     *
+     * @param resourcePath the java.lang.String classpath location of the word-list file
+     */
     private void loadList(String resourcePath) {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new ClassPathResource(resourcePath).getInputStream(), StandardCharsets.UTF_8))) {
@@ -91,6 +101,14 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         return enabled;
     }
 
+    /**
+     * Normalizes the text then flags it via Pass A (exact token match) and, if nothing hit,
+     * Pass B (join runs of single-char tokens to catch spaced/punctuated evasions); returns
+     * an ABUSE-category explicit result when any term matches, else CLEAN.
+     *
+     * @param content the java.lang.String text to classify (null/blank/disabled ⇒ CLEAN)
+     * @return the com.chat.talkMe.moderation.ModerationResult verdict
+     */
     @Override
     public ModerationResult moderateText(String content) {
         if (!enabled || content == null || content.isBlank() || badWords.isEmpty()) {
@@ -140,6 +158,14 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         return ModerationResult.explicit(ModerationResult.Category.ABUSE, matched.size(), matched);
     }
 
+    /**
+     * Delegates image/video files to the NSFW sidecar; fail-open (returns CLEAN) when the
+     * classifier is unavailable, and CLEAN for non-media types or when moderation is disabled.
+     *
+     * @param storedFile the java.nio.file.Path of the file on disk to classify
+     * @param type       the com.chat.talkMe.enums.MessageType (only IMAGE/VIDEO are inspected)
+     * @return the com.chat.talkMe.moderation.ModerationResult verdict (NSFW_IMAGE/NSFW_VIDEO if flagged)
+     */
     @Override
     public ModerationResult moderateMedia(Path storedFile, MessageType type) {
         if (!enabled || storedFile == null) {
@@ -166,6 +192,14 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         return ModerationResult.clean();
     }
 
+    /**
+     * Classifies an in-flight upload by streaming its bytes to a short-lived temp file and
+     * delegating to {@link #moderateMedia}; CLEAN for non-image/video content types, and
+     * fail-open (CLEAN) on any error. The temp file is always deleted afterwards.
+     *
+     * @param file the org.springframework.web.multipart.MultipartFile upload to inspect
+     * @return the com.chat.talkMe.moderation.ModerationResult verdict
+     */
     @Override
     public ModerationResult moderateUpload(MultipartFile file) {
         if (!enabled || file == null || file.isEmpty()) {
@@ -212,6 +246,13 @@ public class ContentModerationServiceImpl implements ContentModerationService {
         return REPEATS.matcher(sb).replaceAll("$1");
     }
 
+    /**
+     * Folds common leetspeak substitutions to their letter form (@/4→a, 0→o, 1→i, 3→e,
+     * 5/$→s, 7→t); returns the character unchanged otherwise.
+     *
+     * @param c the input char
+     * @return the folded char
+     */
     private char deLeet(char c) {
         switch (c) {
             case '@':

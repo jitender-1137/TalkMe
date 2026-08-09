@@ -1,5 +1,12 @@
 package com.chat.talkMe.match;
 
+/**
+ * Handles socket drops during matchmaking with a reconnect grace window. An immediate teardown
+ * path exists for explicit exits, while a scheduled path holds the session/queue state for a grace
+ * period so a backgrounded or blipped client can reconnect and resume seamlessly. Pending
+ * teardowns are recorded with a deadline and finalized by {@link #reapExpiredDisconnects()} on a
+ * fixed cadence; a reconnect within the window cancels them.
+ */
 public interface DisconnectHandlerService {
 
     /**

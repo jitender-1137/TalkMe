@@ -5,6 +5,11 @@ import com.chat.talkMe.dto.response.FriendRequestResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+/**
+ * MapStruct mapper from a {@link com.chat.talkMe.domain.FriendRequest} entity to a
+ * {@link com.chat.talkMe.dto.response.FriendRequestResponse}, rendering the UUID and status
+ * enum as strings and delegating the sender to {@link UserMapper}.
+ */
 @Mapper(componentModel = "spring", uses = {UserMapper.class})
 public interface FriendRequestMapper {
 

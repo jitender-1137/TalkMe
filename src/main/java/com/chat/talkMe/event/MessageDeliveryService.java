@@ -36,6 +36,12 @@ public class MessageDeliveryService implements OutboxDeliveryHandler {
     private final OutboxEventRepository outboxRepo;
     private final ObjectMapper objectMapper;
 
+    /**
+     * The outbox/routing event type this handler owns: {@code message.send}
+     * ({@link RabbitConfig#RK_MESSAGE_SEND}).
+     *
+     * @return the {@code message.send} event type key
+     */
     @Override
     public String eventType() {
         return RabbitConfig.RK_MESSAGE_SEND;
@@ -93,6 +99,12 @@ public class MessageDeliveryService implements OutboxDeliveryHandler {
         }
     }
 
+    /**
+     * Extracts the message id used as the Redis dedup key and outbox event key.
+     *
+     * @param event the delivery event
+     * @return the message id, or {@code null} if the event carries no message
+     */
     private String messageIdOf(MessageSentEvent event) {
         return event.getMessage() != null ? event.getMessage().getId() : null;
     }

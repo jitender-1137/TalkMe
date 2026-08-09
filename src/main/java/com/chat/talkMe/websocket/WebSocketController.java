@@ -28,6 +28,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * STOMP entry point for real-time chat/lobby/presence messaging.
+ *
+ * <p>Handles inbound {@code @MessageMapping} frames — heartbeats, tab-visibility signals,
+ * per-chat typing/activity, and the lobby join/leave/chat/typing flows — and fans results
+ * out to {@code /topic/*} broadcasts and {@code /user/queue/*} direct queues via
+ * {@link SimpMessagingTemplate}. Also listens for {@link SessionDisconnectEvent} to arrange
+ * grace-based lobby eviction. Lobby membership and per-user live-session counts are tracked
+ * in Redis; typing authorization is a Redis-cached chat-membership check.</p>
+ */
 @Slf4j
 @Controller
 @RequiredArgsConstructor
@@ -137,6 +147,15 @@ public class WebSocketController {
         return member;
     }
 
+    /**
+     * Handles a legacy typing signal for a chat: resolves the authenticated user, verifies
+     * membership (silently drops non-members), then broadcasts a {@link TypingNotification}
+     * to {@code /topic/chat/{chatUuid}/typing}. Fires per keystroke start/stop.
+     *
+     * @param chatUuid  the target chat's UUID from the destination
+     * @param typing    true when typing started, false when it stopped
+     * @param principal the authenticated STOMP principal; null/unauthenticated is ignored
+     */
     @MessageMapping("/chat/{chatUuid}/typing")
     public void handleTypingNotification(
             @DestinationVariable("chatUuid") String chatUuid,
@@ -213,6 +232,13 @@ public class WebSocketController {
         messagingTemplate.convertAndSend("/topic/chat/" + chatUuid + "/typing", notification);
     }
 
+    /**
+     * Joins the caller to the lobby: cancels any pending grace-eviction deadline, adds them
+     * to the {@code lobby:users} Redis set, and broadcasts a JOIN (with the user's
+     * {@code UserResponse}) to {@code /topic/lobby}.
+     *
+     * @param principal the authenticated STOMP principal; null is ignored
+     */
     @MessageMapping("/lobby/join")
     public void joinLobby(Principal principal) {
         if (principal == null) return;
@@ -237,6 +263,13 @@ public class WebSocketController {
         });
     }
 
+    /**
+     * Explicit lobby leave (navigated out): immediate — drops any pending grace deadline,
+     * removes the caller from {@code lobby:users}, and broadcasts a LEAVE to
+     * {@code /topic/lobby}.
+     *
+     * @param principal the authenticated STOMP principal; null is ignored
+     */
     @MessageMapping("/lobby/leave")
     public void leaveLobby(Principal principal) {
         if (principal == null) return;
@@ -257,6 +290,15 @@ public class WebSocketController {
         messagingTemplate.convertAndSend("/topic/lobby", (Object) payload);
     }
 
+    /**
+     * Relays a lobby direct message: builds a payload (generated id, sender, recipient,
+     * content, timestamp) and sends it to the recipient's and the sender's
+     * {@code /queue/lobby-chat}, then fires a best-effort Web Push if the recipient has no
+     * live socket. Ignored when the principal, message, recipient, or content is null.
+     *
+     * @param message   map payload carrying {@code recipient} and {@code content}
+     * @param principal the authenticated STOMP principal (the sender); null is ignored
+     */
     @MessageMapping("/lobby/chat")
     public void sendLobbyChatMessage(@Payload Map<String, Object> message, Principal principal) {
         if (principal == null || message == null) return;
@@ -286,6 +328,15 @@ public class WebSocketController {
         pushLobbyIfBackgrounded(sender, recipient, content);
     }
 
+    /**
+     * Sends a Web Push for a lobby message only when the recipient has no live session
+     * (in-app delivery already covers connected recipients). Truncates the body to ~120
+     * chars. Best-effort: any failure is swallowed and logged so lobby chat never breaks.
+     *
+     * @param sender    the sender's username (shown in the push; lobby is not anonymous)
+     * @param recipient the recipient's username
+     * @param content   the message body to preview
+     */
     private void pushLobbyIfBackgrounded(String sender, String recipient, String content) {
         try {
             Long live = redisTemplate.opsForSet().size(SESSIONS_KEY_PREFIX + recipient);
@@ -302,6 +353,14 @@ public class WebSocketController {
         }
     }
 
+    /**
+     * Relays a lobby typing status directly to the target recipient's
+     * {@code /queue/lobby-typing}. Ignored when principal, payload, recipient, or the
+     * {@code isTyping} flag is null.
+     *
+     * @param payload   map carrying {@code recipient} and boolean {@code isTyping}
+     * @param principal the authenticated STOMP principal (the sender); null is ignored
+     */
     @MessageMapping("/lobby/typing")
     public void sendLobbyTypingStatus(@Payload Map<String, Object> payload, Principal principal) {
         if (principal == null || payload == null) return;
@@ -321,6 +380,14 @@ public class WebSocketController {
         messagingTemplate.convertAndSendToUser(recipient, "/queue/lobby-typing", response);
     }
 
+    /**
+     * On WebSocket disconnect, does NOT evict a lobby member immediately: if the user is in
+     * {@code lobby:users}, records a short grace deadline in the leave ZSET so a quick
+     * reconnect/re-join avoids a leave/join flicker; {@link LobbyDisconnectReaper} finalizes
+     * the LEAVE if the deadline expires with no live session. Ignored when no principal.
+     *
+     * @param event the Spring session-disconnect event carrying the user principal
+     */
     @EventListener
     public void handleSessionDisconnect(SessionDisconnectEvent event) {
         Principal principal = event.getUser();

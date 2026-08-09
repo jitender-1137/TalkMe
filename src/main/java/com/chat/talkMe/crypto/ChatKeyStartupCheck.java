@@ -27,6 +27,15 @@ public class ChatKeyStartupCheck implements ApplicationRunner {
     private final MasterKeyService masterKeyService;
     private final MessageCryptoService messageCryptoService;
 
+    /**
+     * Boot-time verification: when encryption is enabled and chat keys already exist, unwraps
+     * one sample key and asserts it is a 32-byte AES-256 key. Does nothing when encryption is
+     * off or no keys exist yet. Throws to abort startup if the master key cannot decrypt.
+     *
+     * @param args the Spring application arguments (unused)
+     * @throws java.lang.IllegalStateException if the configured master key cannot unwrap an
+     *         existing chat key (lost/rotated/wrong-environment) or the result is malformed
+     */
     @Override
     public void run(ApplicationArguments args) {
         if (!messageCryptoService.isEnabled()) {

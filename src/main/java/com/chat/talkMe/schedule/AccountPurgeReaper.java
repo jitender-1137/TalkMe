@@ -22,6 +22,15 @@ public class AccountPurgeReaper {
 
     private final AuthService authService;
 
+    /**
+     * Irreversibly purges every account whose soft-delete recovery window has elapsed.
+     *
+     * <p>Runs on the cron {@code ${app.auth.purge-cron:0 0 3 * * *}} (daily at 03:00 by
+     * default). Delegates the actual anonymization to
+     * {@link com.chat.talkMe.service.AuthService#purgeExpiredDeletedAccounts()} and only
+     * logs when at least one account was purged. Any thrown exception is caught and logged
+     * so a failed run never aborts the schedule.</p>
+     */
     @Scheduled(cron = "${app.auth.purge-cron:0 0 3 * * *}")
     public void purgeExpiredDeletedAccounts() {
         try {

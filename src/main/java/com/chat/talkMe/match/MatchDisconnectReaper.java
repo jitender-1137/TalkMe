@@ -24,6 +24,12 @@ public class MatchDisconnectReaper {
 
     private final DisconnectHandlerService disconnectHandlerService;
 
+    /**
+     * Scheduled tick (default every 3000ms) that delegates to
+     * {@link DisconnectHandlerService#reapExpiredDisconnects()} to tear down sessions whose
+     * reconnect grace has elapsed, logging the count when any were reaped. Exceptions are caught
+     * and logged so a single failure never halts the schedule.
+     */
     @Scheduled(fixedDelayString = "${match.disconnect-reaper.interval-ms:3000}")
     public void reapExpiredDisconnects() {
         try {

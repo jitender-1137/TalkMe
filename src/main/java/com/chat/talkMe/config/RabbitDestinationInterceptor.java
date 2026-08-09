@@ -45,6 +45,17 @@ public class RabbitDestinationInterceptor implements ChannelInterceptor {
         this.relayEnabled = relayEnabled;
     }
 
+    /**
+     * Rewrites the segment after {@code /topic/} from slash- to dot-delimited so the frame is
+     * accepted by RabbitMQ's STOMP plugin. No-op when the relay is disabled, the destination is
+     * missing/not a {@code /topic/} destination, or the topic is single-segment. Mutates the
+     * existing accessor in place when mutable (so the relay can still set the session id), else
+     * rebuilds the message keeping the headers mutable.
+     *
+     * @param message the outbound {@link Message}.
+     * @param channel the target {@link MessageChannel}.
+     * @return the original or destination-rewritten {@link Message}.
+     */
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         if (!relayEnabled) {

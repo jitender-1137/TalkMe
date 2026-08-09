@@ -15,6 +15,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Set;
 
+/**
+ * Double-submit-cookie CSRF filter. For state-changing methods (POST/PUT/PATCH/DELETE) that are
+ * not on the exclusion list, it requires the {@code X-CSRF-Token} header to be present and to equal
+ * the {@code csrf_token} cookie; a mismatch or absence yields a 403 JSON error
+ * ({@code CSRF_TOKEN_INVALID}). Safe methods and excluded public/auth endpoints pass through.
+ */
 @Component
 public class CsrfTokenFilter extends OncePerRequestFilter {
 
@@ -47,6 +53,16 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
     // Reuse ObjectMapper — it is thread-safe and expensive to construct per-request
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Enforces double-submit CSRF validation on non-excluded state-changing requests, writing a 403
+     * JSON error and short-circuiting the chain on a missing/mismatched token; otherwise continues.
+     *
+     * @param request     the incoming HTTP request
+     * @param response    the HTTP response
+     * @param filterChain the remaining filter chain
+     * @throws ServletException if chain processing fails
+     * @throws IOException      if writing the error or chain processing fails
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -71,6 +87,9 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
      * Uses startsWith() so that paths with trailing slashes or future sub-paths
      * are still matched correctly against the exclusion list.
      * Normalizes paths by removing the /api/v1 prefix if present for prefix-agnostic matching.
+     *
+     * @param path the request URI to test
+     * @return {@code true} if the path is exempt from CSRF validation
      */
     private boolean isExcluded(String path) {
         String normalizedPath = path.startsWith("/api/v1") ? path.substring(7) : path;
@@ -83,6 +102,12 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
         return false;
     }
 
+    /**
+     * Reads the {@code csrf_token} cookie value from the request.
+     *
+     * @param request the incoming HTTP request
+     * @return the cookie value, or {@code null} if the cookie is absent
+     */
     private String getCsrfTokenFromCookies(HttpServletRequest request) {
         if (request.getCookies() == null) return null;
         for (Cookie cookie : request.getCookies()) {
@@ -93,6 +118,12 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
         return null;
     }
 
+    /**
+     * Writes a 403 JSON error response ({@code CSRF_TOKEN_INVALID}) for a rejected request.
+     *
+     * @param response the HTTP response to write into
+     * @throws IOException if writing the response body fails
+     */
     private void sendCsrfError(HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType("application/json");

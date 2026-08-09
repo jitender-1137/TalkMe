@@ -24,6 +24,14 @@ public class PostShortCodeBackfill implements ApplicationRunner {
 
     private final PostRepository postRepository;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}, transactional): finds every post with a null
+     * short code and assigns a freshly-generated unique code via
+     * {@link com.chat.talkMe.util.ShortCodes#unique(java.util.function.Predicate)}, checking
+     * uniqueness against the repository. Idempotent — a no-op once every post has a code.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {

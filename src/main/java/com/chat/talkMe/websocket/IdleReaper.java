@@ -28,6 +28,11 @@ public class IdleReaper {
 
     private final PresenceService presenceService;
 
+    /**
+     * Scheduled sweep that flips every IDLE user whose offline deadline has passed to
+     * OFFLINE, then logs the count. Any failure is swallowed and logged so the fixed-delay
+     * schedule keeps running.
+     */
     @Scheduled(fixedDelayString = "${presence.idle-reaper.interval-ms:30000}")
     public void reapExpiredIdleUsers() {
         try {

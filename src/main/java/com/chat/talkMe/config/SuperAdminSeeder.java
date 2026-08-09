@@ -35,6 +35,15 @@ public class SuperAdminSeeder implements ApplicationRunner {
     @Value("${app.super-admin.emails:}")
     private String superAdminEmails;
 
+    /**
+     * Runs once at startup ({@link ApplicationRunner}, transactional): grants
+     * {@code ROLE_SUPER_ADMIN} to each configured account. Creates the role if absent, parses and
+     * de-duplicates the configured allow-list, and adds the role only to accounts that don't already
+     * have it. Idempotent. Accounts not yet signed up are skipped and elevated on a later boot.
+     * No-op when the allow-list is unset.
+     *
+     * @param args the Spring Boot application arguments (unused)
+     */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {

@@ -20,6 +20,14 @@ public class FeatureGuard {
 
     private final FeatureAccessService featureAccessService;
 
+    /**
+     * Evaluates whether the currently-authenticated user may access the given feature. Returns
+     * {@code false} for an unknown feature key, when there is no authentication, or when the
+     * principal is not a {@link CustomUserDetails}.
+     *
+     * @param key the wire form of the feature key (resolved via {@code FeatureKey.fromWire})
+     * @return {@code true} if the current user has access to the resolved feature
+     */
     public boolean check(String key) {
         FeatureKey fk = FeatureKey.fromWire(key);
         if (fk == null) return false;

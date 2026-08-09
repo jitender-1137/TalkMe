@@ -16,6 +16,12 @@ public class MessageResolver {
 
     private static MessageSource messageSource;
 
+    /**
+     * Captures the Spring-injected {@code MessageSource} into the static field so the
+     * {@code get(...)} helpers can resolve messages without bean injection at the call site.
+     *
+     * @param messageSource the application message source
+     */
     public MessageResolver(MessageSource messageSource) {
         MessageResolver.messageSource = messageSource;
     }

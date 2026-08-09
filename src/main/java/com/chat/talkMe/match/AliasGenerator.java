@@ -18,7 +18,13 @@ public final class AliasGenerator {
     }
 
     /**
-     * slot 0 = userA, slot 1 = userB.
+     * Computes the deterministic anonymous alias for one side of a session. The same
+     * (sessionId, slot) always yields the same "Word #N" string, and slot A vs B produce
+     * distinct aliases; derived purely from a masked, non-negative hash — never identity.
+     *
+     * @param sessionId the match session id mixed into the hash
+     * @param slot which peer: 0 = userA, 1 = userB
+     * @return a stable alias such as "Moon #247"
      */
     public static String alias(String sessionId, int slot) {
         // Mask the sign bit — Math.abs(Integer.MIN_VALUE) stays negative and would yield a

@@ -42,6 +42,18 @@ public class RelationshipJourneyJob {
     private final FriendRepository friendRepository;
     private final RelationshipJourneyService relationshipJourneyService;
 
+    /**
+     * Derives Relationship Journey milestones for every active friendship pair.
+     *
+     * <p>Runs on cron {@code ${app.relationship-journey.cron:0 30 3 * * *}} in zone
+     * {@code ${app.relationship-journey.zone:Asia/Kolkata}} (nightly at 03:30 IST by
+     * default). Pages the most-recent {@value #MAX_FRIENDSHIP_ROWS} friendship rows,
+     * skips deleted/self/incomplete rows, dedups the two directional rows of a friendship
+     * into one normalized pair, and calls
+     * {@link com.chat.talkMe.service.RelationshipJourneyService#materializeFor(com.chat.talkMe.domain.User,
+     * com.chat.talkMe.domain.User)} once per pair. Each call is its own transaction and the
+     * upserts are idempotent, so a single failing pair only increments the failure count.</p>
+     */
     @Scheduled(
             cron = "${app.relationship-journey.cron:0 30 3 * * *}",
             zone = "${app.relationship-journey.zone:Asia/Kolkata}")
