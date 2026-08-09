@@ -45,10 +45,10 @@ spring:
   # real relay. JavaMailSender is injected via ObjectProvider, so the app still boots
   # in any profile that omits it.
   # RabbitMQ CONNECTION (host/port/credentials) is environment-specific → set per
-  # profile (application-{local,dev,prod}.yml). The publish/consume TUNING below is
+  # profile (application-{local,dev,prod}.yml). The publishing/consume TUNING below is
   # shared across all environments.
   rabbitmq:
-    # Treat a publish as accepted only after the broker confirms it (lets the
+    # Treat a publishing as accepted only after the broker confirms it (lets the
     # producer fall back to a direct broadcast if RabbitMQ is unreachable).
     publisher-confirm-type: correlated
     publisher-returns: true
@@ -98,7 +98,7 @@ management:
         enabled: true
       show-details: when_authorized
   health:
-    # Only health-check RabbitMQ when we actually use it; otherwise readiness
+    # Only health check RabbitMQ when we actually use it; otherwise readiness
     # probes would keep failing to connect on hosts without RabbitMQ.
     rabbit:
       enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
