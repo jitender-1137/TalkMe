@@ -7,12 +7,36 @@ plugins {
     id 'jacoco'
 }
 
-group = 'com.chat'
+group = 'com.neo'
 version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+// Stamp the fat jar's manifest so the startup banner's ${application.title} /
+// ${application.version} resolve to real values when run via `java -jar` (they read
+// Implementation-Title / Implementation-Version from the manifest). Title is branded
+// 'NeoChatHub' even though the artifact name stays 'talkMe'. Note: running from an
+// IDE's exploded classes has no manifest, so the banner defaults still apply there.
+tasks.named('bootJar') {
+    manifest {
+        attributes(
+            'Implementation-Title'  : 'NeoChatHub',
+            'Implementation-Version': project.version
+        )
+    }
+}
+
+// Bake the project version into banner.txt at build time so the startup banner shows the
+// real version even when run from an IDE (exploded classes have no jar manifest, so the
+// ${application.version} token can't resolve there). Only the @appVersion@ token is
+// replaced — Spring's ${...} banner tokens use different delimiters and are left intact.
+tasks.named('processResources') {
+    filesMatching('banner.txt') {
+        filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [appVersion: project.version.toString()])
     }
 }
 
@@ -164,33 +188,33 @@ def coverageExclusions = [
 // websocket handlers and the storage/ package are unit-tested and appear in the report,
 // but are not part of this gate's scope.
 def gateIncludes = [
-        'com.chat.talkMe.service.*',    // service + service.impl (* spans sub-packages in JaCoCo)
-        'com.chat.talkMe.match.*',      // match + match.impl
-        'com.chat.talkMe.mapper.*',
-        'com.chat.talkMe.validator.*',
-        'com.chat.talkMe.security.*',   // security + security.oauth
-        'com.chat.talkMe.crypto.*',
-        'com.chat.talkMe.moderation.*', // moderation + moderation.impl
-        'com.chat.talkMe.event.*',
-        'com.chat.talkMe.cache.*',
-        'com.chat.talkMe.schedule.*',
-        'com.chat.talkMe.util.*',
-        'com.chat.talkMe.exception.*',
+        'com.neo.chat.service.*',    // service + service.impl (* spans sub-packages in JaCoCo)
+        'com.neo.chat.match.*',      // match + match.impl
+        'com.neo.chat.mapper.*',
+        'com.neo.chat.validator.*',
+        'com.neo.chat.security.*',   // security + security.oauth
+        'com.neo.chat.crypto.*',
+        'com.neo.chat.moderation.*', // moderation + moderation.impl
+        'com.neo.chat.event.*',
+        'com.neo.chat.cache.*',
+        'com.neo.chat.schedule.*',
+        'com.neo.chat.util.*',
+        'com.neo.chat.exception.*',
 ]
 
 // Kept in the REPORT but exempt from BOTH gate rules: residual uncovered lines+branches are
 // native (bundled-ffmpeg subprocess paths) — unreachable by a pure Mockito unit test.
 def gateExclusions = [
-        'com.chat.talkMe.service.impl.StorageServiceImpl',  // native ffmpeg video-transcode (lines + branches)
+        'com.neo.chat.service.impl.StorageServiceImpl',  // native ffmpeg video-transcode (lines + branches)
 ]
 
 // Exempt from the BRANCH gate only: residual uncovered branches are integration-only
 // (JPA Specification/Criteria predicates that run solely inside Hibernate) or native — not
 // reachable by a pure Mockito unit test. All their unit-testable branches ARE covered.
 def branchGateExclusions = gateExclusions + [
-        'com.chat.talkMe.service.impl.AdminServiceImpl',    // buildUserSpec/listAudit JPA Specification lambdas
-        'com.chat.talkMe.service.impl.DiscoverServiceImpl', // getDiscover JPA Specification lambda
-        'com.chat.talkMe.moderation.FrameExtractor',        // native ffmpeg frame extraction
+        'com.neo.chat.service.impl.AdminServiceImpl',    // buildUserSpec/listAudit JPA Specification lambdas
+        'com.neo.chat.service.impl.DiscoverServiceImpl', // getDiscover JPA Specification lambda
+        'com.neo.chat.moderation.FrameExtractor',        // native ffmpeg frame extraction
 ]
 
 tasks.named('jacocoTestReport') {

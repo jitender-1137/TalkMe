@@ -1,0 +1,36 @@
+package com.neo.chat.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserSettingResponse {
+    private String id;
+    private String theme;
+    private String language;
+    private boolean notificationsEnabled;
+    private boolean safeModeEnabled;
+    private boolean soundEnabled;
+    /**
+     * "EVERYONE" or "FRIENDS_ONLY".
+     */
+    private String messagingPrivacy;
+    private String groupAddPrivacy;
+
+    // ── Transactional-email preferences ─────────────────────────────────────────
+    private boolean emailLoginAlerts;
+    private boolean emailUnreadMessages;
+    private boolean emailAnnouncements;
+
+    // ── Night Owl Mode ──────────────────────────────────────────────────────────
+    private String nightOwlMode;
+    private int nightStartHour;
+    private int nightEndHour;
+    private String nightAmbientSound;
+    private String nightAccent;
+}

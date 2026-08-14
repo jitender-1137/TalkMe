@@ -1,0 +1,2726 @@
+package com.neo.chat.service.impl;
+
+import com.neo.chat.crypto.MessageCryptoService;
+import com.neo.chat.domain.AdminAuditLog;
+import com.neo.chat.domain.Chat;
+import com.neo.chat.domain.ChatMember;
+import com.neo.chat.domain.Feedback;
+import com.neo.chat.domain.MatchReport;
+import com.neo.chat.domain.MatchSession;
+import com.neo.chat.domain.MediaAsset;
+import com.neo.chat.domain.Message;
+import com.neo.chat.domain.MessageAttachment;
+import com.neo.chat.domain.Post;
+import com.neo.chat.domain.PostComment;
+import com.neo.chat.domain.PostLike;
+import com.neo.chat.domain.Role;
+import com.neo.chat.domain.User;
+import com.neo.chat.dto.request.AdminCreateUserRequest;
+import com.neo.chat.dto.request.AdminUpdateUserRequest;
+import com.neo.chat.dto.request.AdminUserFilter;
+import com.neo.chat.dto.response.AdminAnalyticsResponse;
+import com.neo.chat.dto.response.AdminAttachmentView;
+import com.neo.chat.dto.response.AdminAuditView;
+import com.neo.chat.dto.response.AdminChatView;
+import com.neo.chat.dto.response.AdminConnectorView;
+import com.neo.chat.dto.response.AdminFeedbackView;
+import com.neo.chat.dto.response.AdminMediaAssetView;
+import com.neo.chat.dto.response.AdminMediaListResponse;
+import com.neo.chat.dto.response.AdminMediaOwnershipResponse;
+import com.neo.chat.dto.response.AdminMessageView;
+import com.neo.chat.dto.response.AdminPostCommentView;
+import com.neo.chat.dto.response.AdminPostLikeView;
+import com.neo.chat.dto.response.AdminPostView;
+import com.neo.chat.dto.response.AdminReportView;
+import com.neo.chat.dto.response.AdminStatsResponse;
+import com.neo.chat.dto.response.AdminStorageListResponse;
+import com.neo.chat.dto.response.AdminStorageObjectView;
+import com.neo.chat.dto.response.AdminTimeseriesPoint;
+import com.neo.chat.dto.response.AdminTimeseriesResult;
+import com.neo.chat.dto.response.AdminUserFullView;
+import com.neo.chat.dto.response.AdminUserView;
+import com.neo.chat.dto.response.LabelCount;
+import com.neo.chat.dto.response.PaginatedResponse;
+import com.neo.chat.enums.ChatType;
+import com.neo.chat.enums.FeedbackStatus;
+import com.neo.chat.enums.FeedbackType;
+import com.neo.chat.enums.Interest;
+import com.neo.chat.enums.MediaContext;
+import com.neo.chat.enums.MessageType;
+import com.neo.chat.exception.BadRequestException;
+import com.neo.chat.exception.ConflictException;
+import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.mapper.MessageMapper;
+import com.neo.chat.repository.AdminAuditLogRepository;
+import com.neo.chat.repository.ChatRepository;
+import com.neo.chat.repository.FeedbackRepository;
+import com.neo.chat.repository.FriendRepository;
+import com.neo.chat.repository.FriendRequestRepository;
+import com.neo.chat.repository.MatchReportRepository;
+import com.neo.chat.repository.MediaAssetRepository;
+import com.neo.chat.repository.MessageAttachmentRepository;
+import com.neo.chat.repository.MessageReactionRepository;
+import com.neo.chat.repository.MessageRepository;
+import com.neo.chat.repository.PostCommentRepository;
+import com.neo.chat.repository.PostLikeRepository;
+import com.neo.chat.repository.PostRepository;
+import com.neo.chat.repository.ProfileViewRepository;
+import com.neo.chat.repository.RoleRepository;
+import com.neo.chat.repository.StoryRepository;
+import com.neo.chat.repository.UserFollowRepository;
+import com.neo.chat.repository.UserPresenceRepository;
+import com.neo.chat.repository.UserRepository;
+import com.neo.chat.repository.UserSettingRepository;
+import com.neo.chat.service.AdminService;
+import com.neo.chat.service.PresenceService;
+import com.neo.chat.storage.MediaKeys;
+import com.neo.chat.storage.MediaStorage;
+import com.neo.chat.storage.StorageProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * SuperAdmin dashboard backend: user/chat/message administration, moderation mutations,
+ * audit logging, analytics/timeseries aggregation, and storage/media-ownership reconciliation.
+ *
+ * <p>All callers are assumed to be ROLE_SUPER_ADMIN (enforced upstream). Expensive analytics
+ * aggregates are served through a Redis read-through cache with short TTLs and a generation
+ * counter for wholesale invalidation; every mutating action bumps that generation. Read paths
+ * that record VIEW_* audit rows delegate the insert to {@link AdminAuditLogger} so the write
+ * runs in its own transaction and cannot poison a read-only caller.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AdminServiceImpl implements AdminService {
+
+    private final UserRepository userRepository;
+    private final ChatRepository chatRepository;
+    private final MessageRepository messageRepository;
+    private final PresenceService presenceService;
+    private final MessageCryptoService messageCryptoService;
+    private final MessageMapper messageMapper;
+    private final RoleRepository roleRepository;
+    private final AdminAuditLogRepository auditRepository;
+    private final AdminAuditLogger auditLogger;
+    private final PasswordEncoder passwordEncoder;
+    // ── Analytics-only dependencies ───────────────────────────────────────────
+    private final MessageAttachmentRepository attachmentRepository;
+    private final PostRepository postRepository;
+    private final StoryRepository storyRepository;
+    private final ProfileViewRepository profileViewRepository;
+    private final MatchReportRepository matchReportRepository;
+    private final FeedbackRepository feedbackRepository;
+    private final UserFollowRepository userFollowRepository;
+    private final FriendRepository friendRepository;
+    private final FriendRequestRepository friendRequestRepository;
+    private final MessageReactionRepository reactionRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final PostCommentRepository postCommentRepository;
+    private final UserSettingRepository userSettingRepository;
+    private final UserPresenceRepository userPresenceRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    // ── Storage reconciliation (Attachments gallery: storage ⇄ DB) ────────────
+    private final MediaStorage mediaStorage;
+    private final StorageProperties storageProperties;
+    private final MediaAssetRepository mediaAssetRepository;
+
+    /*
+     * Redis-backed read-through cache for the expensive analytics aggregates, so the
+     * dashboard's auto-refresh polling doesn't re-run a dozen GROUP BY / COUNT queries
+     * against Postgres every few seconds. Short TTLs keep it near-real-time; a Redis
+     * outage transparently falls back to the live DB query.
+     */
+
+    /**
+     * Namespace cache keys with a generation counter so one INCR invalidates ALL of them.
+     */
+    private String genKey(String base) {
+        String gen = null;
+        try {
+            gen = redisTemplate.opsForValue().get("admin:cachegen");
+        } catch (Exception ignored) {
+        }
+        return "admin:g" + (gen == null ? "0" : gen) + ":" + base;
+    }
+
+    /**
+     * Bump the generation → every cached analytics/stats/timeseries value is instantly stale.
+     */
+    private void bumpCacheGen() {
+        try {
+            redisTemplate.opsForValue().increment("admin:cachegen");
+        } catch (Exception e) {
+            log.debug("[AdminCache] gen bump failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Redis read-through cache: return the deserialized value at {@code key} if present, else
+     * run {@code loader}, store its JSON under {@code key} for {@code ttlSeconds}, and return it.
+     * Any Redis read/write failure is swallowed and falls back to the live loader value.
+     *
+     * @param key        the (generation-namespaced) cache key
+     * @param ttlSeconds time-to-live for a freshly stored value
+     * @param type       the value's class, used to deserialize the cached JSON
+     * @param loader     supplies the value on a miss
+     * @return the cached or freshly computed value
+     */
+    private <T> T cached(String key, long ttlSeconds, Class<T> type, Supplier<T> loader) {
+        try {
+            String hit = redisTemplate.opsForValue().get(key);
+            if (hit != null) return objectMapper.readValue(hit, type);
+        } catch (Exception e) {
+            log.debug("[AdminCache] read miss/err for {}: {}", key, e.getMessage());
+        }
+        T value = loader.get();
+        try {
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value),
+                    Duration.ofSeconds(ttlSeconds));
+        } catch (Exception e) {
+            log.warn("[AdminCache] write failed for {}: {}", key, e.getMessage());
+        }
+        return value;
+    }
+
+    /**
+     * Roles an admin may grant/revoke from the dashboard.
+     */
+    private static final Set<String> ASSIGNABLE_ROLES =
+            Set.of("ROLE_SUPER_ADMIN", "ROLE_MODERATOR", "ROLE_USER");
+
+    /**
+     * Headline dashboard counters (users/chats/messages plus recent-signup and online totals),
+     * served from the Redis cache with a 15s TTL.
+     *
+     * @return the stats snapshot
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminStatsResponse getStats() {
+        return cached(genKey("stats"), 15, AdminStatsResponse.class, this::computeStats);
+    }
+
+    /**
+     * Compute the headline counters live from the repositories and presence service.
+     */
+    private AdminStatsResponse computeStats() {
+        Instant now = Instant.now();
+        return AdminStatsResponse.builder()
+                .totalUsers(userRepository.count())
+                .activeUsers(userRepository.countByIsDeletedFalse())
+                .deletedUsers(userRepository.countByIsDeletedTrue())
+                .verifiedUsers(userRepository.countByIsVerifiedTrue())
+                .guestUsers(userRepository.countByIsGuestTrue())
+                .newUsersLast7d(userRepository.countByCreatedAtAfter(now.minus(7, ChronoUnit.DAYS)))
+                .newUsersLast24h(userRepository.countByCreatedAtAfter(now.minus(24, ChronoUnit.HOURS)))
+                .onlineNow(presenceService.getOnlineUsernames().size())
+                .totalChats(chatRepository.count())
+                .totalMessages(messageRepository.count())
+                .build();
+    }
+
+    /**
+     * Paginated user directory with filtering (query, flags, gender, country, age, date ranges,
+     * role) and whitelisted sorting. Online/idle presence is overlaid from the presence service;
+     * page size is clamped to 100.
+     *
+     * @param filter the filter DTO (null treated as an empty filter)
+     * @param page   zero-based page index (clamped to ≥ 0)
+     * @param size   page size (clamped to 1..100)
+     * @return a page of user views with pagination metadata
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminUserView> listUsers(AdminUserFilter filter, int page, int size) {
+        AdminUserFilter f =
+                filter != null ? filter : new AdminUserFilter();
+
+        // Sort — whitelist the sortable columns to avoid injection into the property path.
+        String sortField = switch (f.getSort() == null ? "" : f.getSort()) {
+            case "updatedAt" -> "updatedAt";
+            case "username" -> "username";
+            case "age" -> "age";
+            default -> "createdAt";
+        };
+        Sort.Direction dir = "asc".equalsIgnoreCase(f.getDir()) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(dir, sortField));
+
+        Page<User> result = userRepository.findAll(buildUserSpec(f), pageable);
+
+        Set<String> online = presenceService.getOnlineUsernames();
+        Set<String> away = presenceService.getAwayUsernames();
+        List<AdminUserView> items = result.getContent().stream()
+                .map(u -> toView(u, online, away, false))
+                .collect(Collectors.toList());
+
+        return PaginatedResponse.<AdminUserView>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .page(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    /**
+     * Translate the filter DTO into a JPA Specification over User.
+     */
+    private Specification<User> buildUserSpec(
+            AdminUserFilter f) {
+        return (root, cq, cb) -> {
+            List<Predicate> ps = new ArrayList<>();
+
+            if (f.getQuery() != null && !f.getQuery().isBlank()) {
+                String like = "%" + f.getQuery().trim().toLowerCase() + "%";
+                ps.add(cb.or(
+                        cb.like(cb.lower(root.get("username")), like),
+                        cb.like(cb.lower(root.get("name")), like),
+                        cb.like(cb.lower(root.get("email")), like)));
+            }
+            if (f.getVerified() != null) ps.add(cb.equal(root.get("isVerified"), f.getVerified()));
+            if (f.getGuest() != null) ps.add(cb.equal(root.get("isGuest"), f.getGuest()));
+            if (f.getBanned() != null) ps.add(cb.equal(root.get("banned"), f.getBanned()));
+            if (f.getDeleted() != null) ps.add(cb.equal(root.get("isDeleted"), f.getDeleted()));
+            if (f.getOnline() != null) {
+                // Presence is Redis-authoritative; restrict by the live online-username set
+                // (bounded), so the "online now" cohort paginates correctly at the DB layer.
+                Set<String> onlineNow = presenceService.getOnlineUsernames();
+                if (f.getOnline()) {
+                    ps.add(onlineNow.isEmpty() ? cb.disjunction() : root.get("username").in(onlineNow));
+                } else if (!onlineNow.isEmpty()) {
+                    ps.add(cb.not(root.get("username").in(onlineNow)));
+                }
+            }
+            if (f.getGender() != null && !f.getGender().isBlank())
+                ps.add(cb.equal(cb.lower(root.get("gender")), f.getGender().trim().toLowerCase()));
+            if (f.getCountries() != null && !f.getCountries().isBlank()) {
+                List<String> wanted = Arrays.stream(f.getCountries().split("\\|"))
+                        .map(s -> s.trim().toLowerCase())
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList());
+                if (!wanted.isEmpty()) ps.add(cb.lower(root.get("country")).in(wanted));
+            }
+            if (f.getMinAge() != null) ps.add(cb.ge(root.get("age"), f.getMinAge()));
+            if (f.getMaxAge() != null) ps.add(cb.le(root.get("age"), f.getMaxAge()));
+
+            Instant ca = parseFilterInstant(f.getCreatedAfter(), false);
+            Instant cb2 = parseFilterInstant(f.getCreatedBefore(), true);
+            Instant ua = parseFilterInstant(f.getUpdatedAfter(), false);
+            Instant ub = parseFilterInstant(f.getUpdatedBefore(), true);
+            if (ca != null) ps.add(cb.greaterThanOrEqualTo(root.get("createdAt"), ca));
+            if (cb2 != null) ps.add(cb.lessThanOrEqualTo(root.get("createdAt"), cb2));
+            if (ua != null) ps.add(cb.greaterThanOrEqualTo(root.get("updatedAt"), ua));
+            if (ub != null) ps.add(cb.lessThanOrEqualTo(root.get("updatedAt"), ub));
+
+            if (f.getRole() != null && !f.getRole().isBlank()) {
+                // Membership test via an IN subquery instead of an INNER join +
+                // cq.distinct(true). Joining a to-many association (roles) on a paginated,
+                // sorted query multiplies rows and forces DISTINCT, which breaks under
+                // "SELECT DISTINCT … ORDER BY" on Postgres and interacts badly with the
+                // User entity's EAGER collections. The subquery keeps one row per user.
+                String roleName = f.getRole().trim().toUpperCase();
+                var sub = cq.subquery(Long.class);
+                var subRoot = sub.from(User.class);
+                var subRole = subRoot.join("roles", JoinType.INNER);
+                sub.select(subRoot.get("id"))
+                        .where(cb.equal(subRole.get("name"), roleName));
+                ps.add(root.get("id").in(sub));
+            }
+            return cb.and(ps.toArray(new Predicate[0]));
+        };
+    }
+
+    /**
+     * Parse yyyy-MM-dd or an ISO instant. endOfDay=true pushes a bare date to 23:59:59.
+     */
+    private Instant parseFilterInstant(String s, boolean endOfDay) {
+        if (s == null || s.isBlank()) return null;
+        String v = s.trim();
+        try {
+            return Instant.parse(v);
+        } catch (Exception ignored) {
+        }
+        try {
+            LocalDate d = LocalDate.parse(v);
+            return (endOfDay ? d.atTime(23, 59, 59) : d.atStartOfDay())
+                    .toInstant(ZoneOffset.UTC);
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /**
+     * Detailed view of a single user, enriched with their chat and sent-message counts.
+     *
+     * @param uuid the user's uuid
+     * @return the detail view
+     * @throws com.neo.chat.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminUserView getUser(String uuid) {
+        User u = userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+        AdminUserView view = toView(u, presenceService.getOnlineUsernames(), presenceService.getAwayUsernames(), true);
+        view.setChatCount((long) chatRepository.findChatsByUser(u).size());
+        view.setMessageCount(messageRepository.countBySenderId(u.getId()));
+        return view;
+    }
+
+    /**
+     * Full account dump for a user — account fields, settings, and presence rows assembled
+     * into ordered maps (with placeholder notes when the settings/presence row is absent).
+     *
+     * @param uuid the user's uuid
+     * @return the full view (account/settings/presence sections)
+     * @throws com.neo.chat.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminUserFullView getUserFull(String uuid) {
+        User u = userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+
+        Map<String, Object> account = new LinkedHashMap<>();
+        account.put("uuid", u.getUuid() != null ? u.getUuid().toString() : null);
+        account.put("id", u.getId());
+        account.put("username", u.getUsername());
+        account.put("name", u.getName());
+        account.put("email", u.getEmail());
+        account.put("mobileNumber", u.getMobileNumber());
+        account.put("passwordSet", u.getPasswordHash() != null && !u.getPasswordHash().isBlank());
+        account.put("googleLinked", u.getGoogleId() != null && !u.getGoogleId().isBlank());
+        account.put("age", u.getAge());
+        account.put("gender", u.getGender());
+        account.put("country", u.getCountry());
+        account.put("city", u.getCity());
+        account.put("lastLocation", u.getLastLocation());
+        account.put("lastLoginIp", u.getLastLoginIp());
+        account.put("lastLocationAt", u.getLastLocationAt() != null ? u.getLastLocationAt().toString() : null);
+        account.put("bio", u.getBio());
+        account.put("occupation", u.getOccupation());
+        account.put("education", u.getEducation());
+        account.put("profileImage", u.getProfileImage());
+        account.put("interests", u.getInterests() != null
+                ? u.getInterests().stream().map(Enum::name).sorted().collect(Collectors.toList()) : List.of());
+        account.put("roles", u.getRoles() != null
+                ? u.getRoles().stream().map(Role::getName).sorted().collect(Collectors.toList()) : List.of());
+        account.put("isGuest", u.isGuest());
+        account.put("isVerified", u.isVerified());
+        account.put("banned", u.isBanned());
+        account.put("isDeleted", u.isDeleted());
+        account.put("installationType", u.getInstallationType() != null ? u.getInstallationType().name() : null);
+        account.put("totalUnreadCount", u.getTotalUnreadCount());
+        account.put("onlineSortWeight", u.getOnlineSortWeight());
+        account.put("presenceLastSeenAt", u.getPresenceLastSeenAt() != null ? u.getPresenceLastSeenAt().toString() : null);
+        account.put("deletionRequestedAt", u.getDeletionRequestedAt() != null ? u.getDeletionRequestedAt().toString() : null);
+        account.put("createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : null);
+        account.put("updatedAt", u.getUpdatedAt() != null ? u.getUpdatedAt().toString() : null);
+
+        Map<String, Object> settings = new LinkedHashMap<>();
+        userSettingRepository.findByUser(u).ifPresentOrElse(s -> {
+            settings.put("theme", s.getTheme());
+            settings.put("language", s.getLanguage());
+            settings.put("notificationsEnabled", s.isNotificationsEnabled());
+            settings.put("soundEnabled", s.isSoundEnabled());
+            settings.put("safeModeEnabled", s.isSafeModeEnabled());
+            settings.put("messagingPrivacy", s.getMessagingPrivacy() != null ? s.getMessagingPrivacy().name() : null);
+            settings.put("emailLoginAlerts", s.isEmailLoginAlerts());
+            settings.put("emailUnreadMessages", s.isEmailUnreadMessages());
+            settings.put("emailAnnouncements", s.isEmailAnnouncements());
+        }, () -> settings.put("_note", "No settings row — user is on defaults"));
+
+        Map<String, Object> presence = new LinkedHashMap<>();
+        userPresenceRepository.findByUser(u).ifPresentOrElse(p -> {
+            presence.put("status", p.getStatus());
+            presence.put("lastSeenAt", p.getLastSeenAt() != null ? p.getLastSeenAt().toString() : null);
+            presence.put("ghostModeEnabled", p.isGhostModeEnabled());
+            presence.put("invisibleModeEnabled", p.isInvisibleModeEnabled());
+            presence.put("hideLastSeenEnabled", p.isHideLastSeenEnabled());
+        }, () -> presence.put("_note", "No presence row yet"));
+
+        return AdminUserFullView.builder()
+                .account(account).settings(settings).presence(presence).build();
+    }
+
+    /**
+     * All chats a user belongs to, including soft-deleted ones (flagged in the DTO).
+     *
+     * @param uuid the user's uuid
+     * @return the user's chat views
+     * @throws com.neo.chat.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<AdminChatView> getUserChats(String uuid) {
+        User u = userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+        // Admin view = the full history, including soft-deleted chats (flagged in the DTO).
+        return chatRepository.findAllChatsByUserForAdmin(u).stream()
+                .map(this::toChatView).collect(Collectors.toList());
+    }
+
+    /**
+     * Paginated chat directory filtered by optional name query and chat type, ordered by most
+     * recently updated. Records a VIEW_CHATS audit entry. Unknown type values are ignored.
+     *
+     * @param query          optional case-insensitive name substring
+     * @param type           chat type name, or "all"/blank for no type filter
+     * @param includeDeleted whether soft-deleted chats are included
+     * @param page           zero-based page index (clamped to ≥ 0)
+     * @param size           page size (clamped to 1..100)
+     * @param adminUsername  acting admin, recorded in the audit log
+     * @return a page of chat views with pagination metadata
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminChatView> listChats(
+            String query, String type, boolean includeDeleted, int page, int size, String adminUsername) {
+        audit(adminUsername, "VIEW_CHATS", "CHAT", "all",
+                "type=" + type + " q=" + query + " page=" + page);
+
+        ChatType chatType = null;
+        if (type != null && !type.isBlank() && !type.equalsIgnoreCase("all")) {
+            try {
+                chatType = ChatType.valueOf(type.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
+        }
+        String q = (query == null || query.isBlank()) ? null : "%" + query.trim().toLowerCase() + "%";
+
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(Sort.Direction.DESC, "updatedAt"));
+        Page<Chat> result = chatRepository.findForAdmin(chatType, q, includeDeleted, pageable);
+
+        List<AdminChatView> items = result.getContent().stream()
+                .map(this::toChatView).collect(Collectors.toList());
+
+        return PaginatedResponse.<AdminChatView>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .page(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    /**
+     * Paginated, fully DECRYPTED message history of a chat (deleted messages included and
+     * flagged), newest first. Records a VIEW_MESSAGES audit entry and logs the access; page
+     * size is clamped to 200. Runs read-write because it persists the audit row.
+     *
+     * @param chatUuid      the chat's uuid
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..200)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return a page of decrypted message views with pagination metadata
+     * @throws com.neo.chat.exception.NotFoundException if the uuid is malformed or unknown (TM_121)
+     */
+    @Override
+    @Transactional // NOT readOnly: this writes an admin audit row (auditRepository.save)
+    public PaginatedResponse<AdminMessageView> getChatMessages(String chatUuid, int page, int size, String adminUsername) {
+        Chat chat = chatRepository.findByUuidWithMembers(parseUuid(chatUuid, "Chat not found", "TM_121"))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Access trail: record who read this chat's decrypted contents (log + DB).
+        log.info("[AdminAudit] {} viewed decrypted messages of chat {}", adminUsername, chatUuid);
+        audit(adminUsername, "VIEW_MESSAGES", "CHAT", chatUuid, "page=" + page);
+
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 200),
+                Sort.by(Sort.Direction.DESC, "id"));
+        // Admin sees the FULL history — deleted messages included (badged via .deleted).
+        Page<Message> result = messageRepository.findByChat(chat, pageable);
+        Long chatId = chat.getId();
+
+        List<AdminMessageView> items = result.getContent().stream().map(m -> {
+            MessageAttachment att = m.getAttachments() == null || m.getAttachments().isEmpty()
+                    ? null : m.getAttachments().getFirst();
+            return AdminMessageView.builder()
+                    .id(m.getUuid() != null ? m.getUuid().toString() : String.valueOf(m.getId()))
+                    .chatId(chatUuid)
+                    .senderId(m.getSender() != null && m.getSender().getUuid() != null ? m.getSender().getUuid().toString() : null)
+                    .senderUsername(m.getSender() != null ? m.getSender().getUsername() : null)
+                    .senderName(m.getSender() != null ? m.getSender().getName() : null)
+                    .senderAvatar(m.getSender() != null ? m.getSender().getProfileImage() : null)
+                    .type(m.getMessageType() != null ? m.getMessageType().name() : "TEXT")
+                    .content(messageCryptoService.decrypt(chatId, m.getContent()))
+                    .mediaUrl(att != null ? messageCryptoService.decrypt(chatId, att.getFileUrl()) : null)
+                    .edited(m.isEdited())
+                    .deleted(m.isDeleted())
+                    .moderationStatus(m.getModerationStatus() != null ? m.getModerationStatus().name() : null)
+                    .status(messageMapper.resolveMessageStatus(m))
+                    .createdAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                    .build();
+        }).collect(Collectors.toList());
+
+        return PaginatedResponse.<AdminMessageView>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .page(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    // ── Phase 2: moderation mutations (audited) ───────────────────────────────
+
+    /**
+     * Ban or unban a user; audited (BAN_USER/UNBAN_USER) and cache-invalidating.
+     *
+     * @param uuid          target user uuid
+     * @param banned        true to ban, false to unban
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.neo.chat.exception.NotFoundException if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional
+    public AdminUserView setBanned(String uuid, boolean banned, String adminUsername) {
+        User u = requireUser(uuid);
+        u.setBanned(banned);
+        userRepository.save(u);
+        audit(adminUsername, banned ? "BAN_USER" : "UNBAN_USER", "USER", uuid, "@" + u.getUsername());
+        return detailView(u);
+    }
+
+    /**
+     * Set or clear a user's verified flag; audited (VERIFY_USER/UNVERIFY_USER).
+     *
+     * @param uuid          target user uuid
+     * @param verified      true to mark verified, false to clear
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.neo.chat.exception.NotFoundException if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional
+    public AdminUserView setVerified(String uuid, boolean verified, String adminUsername) {
+        User u = requireUser(uuid);
+        u.setVerified(verified);
+        userRepository.save(u);
+        audit(adminUsername, verified ? "VERIFY_USER" : "UNVERIFY_USER", "USER", uuid, "@" + u.getUsername());
+        return detailView(u);
+    }
+
+    /**
+     * Soft-delete or restore a user, stamping (or clearing) the deletion-requested time;
+     * audited (SOFT_DELETE_USER/RESTORE_USER).
+     *
+     * @param uuid          target user uuid
+     * @param deleted       true to soft-delete, false to restore
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.neo.chat.exception.NotFoundException if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional
+    public AdminUserView setSoftDeleted(String uuid, boolean deleted, String adminUsername) {
+        User u = requireUser(uuid);
+        u.setDeleted(deleted);
+        u.setDeletionRequestedAt(deleted ? Instant.now() : null);
+        userRepository.save(u);
+        audit(adminUsername, deleted ? "SOFT_DELETE_USER" : "RESTORE_USER", "USER", uuid, "@" + u.getUsername());
+        return detailView(u);
+    }
+
+    /**
+     * Grant a role to a user, creating the Role row if absent; no-op (not re-audited) if the
+     * user already has it. Audited (GRANT_ROLE) when actually added.
+     *
+     * @param uuid          target user uuid
+     * @param roleName      role name (normalized to ROLE_*; must be assignable)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.neo.chat.exception.BadRequestException if the role is not assignable (TM_071)
+     * @throws com.neo.chat.exception.NotFoundException   if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional
+    public AdminUserView grantRole(String uuid, String roleName, String adminUsername) {
+        String role = normalizeRole(roleName);
+        User u = requireUser(uuid);
+        Role r = roleRepository.findByName(role)
+                .orElseGet(() -> roleRepository.save(Role.builder().name(role).build()));
+        boolean has = u.getRoles().stream().anyMatch(x -> role.equals(x.getName()));
+        if (!has) {
+            u.getRoles().add(r);
+            userRepository.save(u);
+            audit(adminUsername, "GRANT_ROLE", "USER", uuid, role + " → @" + u.getUsername());
+        }
+        return detailView(u);
+    }
+
+    /**
+     * Revoke a role from a user; no-op (not re-audited) if the user did not have it. Audited
+     * (REVOKE_ROLE) when actually removed.
+     *
+     * @param uuid          target user uuid
+     * @param roleName      role name (normalized to ROLE_*; must be assignable)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.neo.chat.exception.BadRequestException if the role is not assignable (TM_071)
+     * @throws com.neo.chat.exception.NotFoundException   if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional
+    public AdminUserView revokeRole(String uuid, String roleName, String adminUsername) {
+        String role = normalizeRole(roleName);
+        User u = requireUser(uuid);
+        boolean removed = u.getRoles().removeIf(x -> role.equals(x.getName()));
+        if (removed) {
+            userRepository.save(u);
+            audit(adminUsername, "REVOKE_ROLE", "USER", uuid, role + " ✕ @" + u.getUsername());
+        }
+        return detailView(u);
+    }
+
+    /**
+     * Paginated audit-log query filtered by action, target type, acting-admin substring, and a
+     * created-at date range, newest first. Batch-resolves each row's admin uuid for cross-linking.
+     *
+     * @param action     exact action code filter, or blank for any
+     * @param targetType target type filter (upper-cased), or blank for any
+     * @param admin      case-insensitive admin-username substring, or blank for any
+     * @param from       inclusive lower bound (date or ISO instant), or blank
+     * @param to         inclusive upper bound (date pushed to end-of-day, or ISO instant), or blank
+     * @param page       zero-based page index (clamped to ≥ 0)
+     * @param size       page size (clamped to 1..100)
+     * @return a page of audit views with pagination metadata
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminAuditView> listAudit(
+            String action, String targetType, String admin, String from, String to, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        Instant fromI = parseFilterInstant(from, false);
+        Instant toI = parseFilterInstant(to, true);
+        Specification<AdminAuditLog> spec =
+                (root, _, cb) -> {
+                    List<Predicate> ps = new ArrayList<>();
+                    if (action != null && !action.isBlank())
+                        ps.add(cb.equal(root.get("action"), action.trim()));
+                    if (targetType != null && !targetType.isBlank())
+                        ps.add(cb.equal(root.get("targetType"), targetType.trim().toUpperCase()));
+                    if (admin != null && !admin.isBlank())
+                        ps.add(cb.like(cb.lower(root.get("adminUsername")),
+                                "%" + admin.trim().toLowerCase() + "%"));
+                    if (fromI != null) ps.add(cb.greaterThanOrEqualTo(root.get("createdAt"), fromI));
+                    if (toI != null) ps.add(cb.lessThanOrEqualTo(root.get("createdAt"), toI));
+                    return cb.and(ps.toArray(new Predicate[0]));
+                };
+        Page<AdminAuditLog> result = auditRepository.findAll(spec, pageable);
+        // Batch-resolve the acting admins' uuid once for the whole page (for cross-linking).
+        Set<String> adminUsernames = result.getContent().stream()
+                .map(AdminAuditLog::getAdminUsername)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, String> adminUuidByUsername = adminUsernames.isEmpty()
+                ? Map.of()
+                : userRepository.findByUsernameIn(adminUsernames).stream()
+                  .filter(u -> u.getUuid() != null)
+                  .collect(Collectors.toMap(User::getUsername, u -> u.getUuid().toString(), (x, _) -> x));
+        List<AdminAuditView> items = result.getContent().stream()
+                .map(a -> AdminAuditView.builder()
+                        .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
+                        .adminUsername(a.getAdminUsername())
+                        .adminId(adminUuidByUsername.get(a.getAdminUsername()))
+                        .action(a.getAction())
+                        .targetType(a.getTargetType())
+                        .targetId(a.getTargetId())
+                        .detail(a.getDetail())
+                        .createdAt(a.getCreatedAt() != null ? a.getCreatedAt().toString() : null)
+                        .build())
+                .collect(Collectors.toList());
+        return PaginatedResponse.<AdminAuditView>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .page(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    /**
+     * Parse a path id into a UUID, mapping malformed/blank input to the same clean 404
+     * the caller already returns for "not found" — never a raw 500. Path ids reach the
+     * admin API from DTO id fields; a bad or hand-edited value must not crash the endpoint.
+     */
+    private static UUID parseUuid(String s, String message, String code) {
+        try {
+            return UUID.fromString(s);
+        } catch (Exception e) {
+            throw new NotFoundException(message, code);
+        }
+    }
+
+    /**
+     * Load a user by uuid string, or throw a clean 404.
+     *
+     * @throws com.neo.chat.exception.NotFoundException if the uuid is malformed or unknown (TM_064)
+     */
+    private User requireUser(String uuid) {
+        return userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+    }
+
+    /**
+     * A user's uuid string, or null.
+     */
+    private static String uuidOf(User u) {
+        return u != null && u.getUuid() != null ? u.getUuid().toString() : null;
+    }
+
+    /**
+     * Resolve a username to its uuid string (for cross-linking stored username columns).
+     */
+    private String usernameToUuid(String username) {
+        if (username == null || username.isBlank()) return null;
+        return userRepository.findByUsernameIgnoreCase(username).map(AdminServiceImpl::uuidOf).orElse(null);
+    }
+
+    /**
+     * Normalize a role name to its {@code ROLE_*} form and assert it is dashboard-assignable.
+     *
+     * @throws com.neo.chat.exception.BadRequestException if the role is not assignable (TM_071)
+     */
+    private String normalizeRole(String roleName) {
+        String r = roleName == null ? "" : roleName.trim().toUpperCase();
+        if (!r.startsWith("ROLE_")) r = "ROLE_" + r;
+        if (!ASSIGNABLE_ROLES.contains(r)) {
+            throw new BadRequestException("Role not assignable: " + r, "TM_071");
+        }
+        return r;
+    }
+
+    /**
+     * Build a detail user view enriched with chat and sent-message counts.
+     */
+    private AdminUserView detailView(User u) {
+        AdminUserView v = toView(u, presenceService.getOnlineUsernames(), presenceService.getAwayUsernames(), true);
+        v.setChatCount((long) chatRepository.findChatsByUser(u).size());
+        v.setMessageCount(messageRepository.countBySenderId(u.getId()));
+        return v;
+    }
+
+    /**
+     * Write an audit row via {@link AdminAuditLogger} (own transaction; failures swallowed and
+     * logged) and, for any non-VIEW action, bump the cache generation to invalidate aggregates.
+     */
+    private void audit(String admin, String action, String targetType, String targetId, String detail) {
+        try {
+            // Written in a SEPARATE (REQUIRES_NEW) transaction so a VIEW_* audit INSERT
+            // never aborts a readOnly caller's transaction — see AdminAuditLogger.
+            auditLogger.write(admin, action, targetType, targetId, detail);
+        } catch (Exception e) {
+            log.warn("[AdminAudit] failed to persist audit {}/{}: {}", action, targetId, e.getMessage());
+        }
+        // Any state-changing action invalidates the cached aggregates so the dashboard
+        // reflects it on the next poll. Pure reads (VIEW_*) don't touch the generation.
+        if (action != null && !action.startsWith("VIEW")) {
+            bumpCacheGen();
+        }
+    }
+
+    // ── Phase 3: create / edit / delete + charts ──────────────────────────────
+
+    /**
+     * Create a pre-verified, non-guest user with ROLE_USER (email lower-cased; password hashed).
+     * Audited (CREATE_USER).
+     *
+     * @param req           the new-user request (name/email/username/password + optional profile)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the created user's detail view
+     * @throws com.neo.chat.exception.ConflictException if the email (TM_047) or username
+     *                                                     (TM_048) already exists
+     */
+    @Override
+    @Transactional
+    public AdminUserView createUser(AdminCreateUserRequest req, String adminUsername) {
+        String email = req.getEmail() == null ? null : req.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ConflictException("TM_047");
+        }
+        if (userRepository.existsByUsernameIgnoreCase(req.getUsername().trim())) {
+            throw new ConflictException("TM_048");
+        }
+        Role userRole = roleRepository.findByName("ROLE_USER")
+                .orElseGet(() -> roleRepository.save(Role.builder().name("ROLE_USER").build()));
+        User u = User.builder()
+                .name(req.getName())
+                .email(email)
+                .username(req.getUsername().trim())
+                .passwordHash(passwordEncoder.encode(req.getPassword()))
+                .isGuest(false)
+                .isVerified(true) // admin-created accounts are pre-verified
+                .age(req.getAge())
+                .gender(req.getGender())
+                .country(req.getCountry())
+                .roles(new HashSet<>(Set.of(userRole)))
+                .build();
+        u = userRepository.save(u);
+        audit(adminUsername, "CREATE_USER", "USER", u.getUuid().toString(), "@" + u.getUsername() + " <" + email + ">");
+        return detailView(u);
+    }
+
+    /**
+     * Partial update of a user — only non-null request fields are applied (email/username are
+     * unique-checked; interests are parsed leniently, dropping unknown values; a non-blank new
+     * password is re-hashed). Audited (EDIT_USER, noting password resets).
+     *
+     * @param uuid          target user uuid
+     * @param req           the sparse update request
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated detail view
+     * @throws com.neo.chat.exception.NotFoundException if the user is unknown (TM_064)
+     * @throws com.neo.chat.exception.ConflictException if a changed email (TM_047) or
+     *                                                     username (TM_048) collides with another account
+     */
+    @Override
+    @Transactional
+    public AdminUserView updateUser(String uuid, AdminUpdateUserRequest req, String adminUsername) {
+        User u = requireUser(uuid);
+        if (req.getName() != null) u.setName(req.getName());
+        if (req.getBio() != null) u.setBio(req.getBio());
+        if (req.getCountry() != null) u.setCountry(req.getCountry());
+        if (req.getCity() != null) u.setCity(req.getCity());
+        if (req.getAge() != null) u.setAge(req.getAge());
+        if (req.getGender() != null) u.setGender(req.getGender());
+        if (req.getOccupation() != null) u.setOccupation(req.getOccupation());
+        if (req.getEducation() != null) u.setEducation(req.getEducation());
+        if (req.getMobileNumber() != null) u.setMobileNumber(req.getMobileNumber());
+        if (req.getVerified() != null) u.setVerified(req.getVerified());
+        // Identity + account changes (unique-checked so we don't create duplicates).
+        if (req.getEmail() != null) {
+            String email = req.getEmail().trim().toLowerCase();
+            if (!email.equalsIgnoreCase(u.getEmail()) && userRepository.existsByEmailIgnoreCase(email)) {
+                throw new ConflictException("TM_047");
+            }
+            u.setEmail(email);
+        }
+        if (req.getUsername() != null) {
+            String username = req.getUsername().trim();
+            if (!username.equalsIgnoreCase(u.getUsername()) && userRepository.existsByUsernameIgnoreCase(username)) {
+                throw new ConflictException("TM_048");
+            }
+            u.setUsername(username);
+        }
+        if (req.getInterests() != null) {
+            u.setInterests(req.getInterests().stream()
+                    .map(s -> {
+                        try {
+                            return Interest.valueOf(s.trim().toUpperCase());
+                        } catch (IllegalArgumentException e) {
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(HashSet::new)));
+        }
+        if (req.getNewPassword() != null && !req.getNewPassword().isBlank()) {
+            u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        }
+        userRepository.save(u);
+        audit(adminUsername, "EDIT_USER", "USER", uuid, "@" + u.getUsername()
+                + (req.getNewPassword() != null && !req.getNewPassword().isBlank() ? " (password reset)" : ""));
+        return detailView(u);
+    }
+
+    /**
+     * Soft-delete a message (sets its deleted flag); audited (DELETE_MESSAGE).
+     *
+     * @param messageUuid   target message uuid
+     * @param adminUsername acting admin, recorded in the audit log
+     * @throws com.neo.chat.exception.NotFoundException if the message is unknown (TM_150)
+     */
+    @Override
+    @Transactional
+    public void deleteMessage(String messageUuid, String adminUsername) {
+        Message m = messageRepository.findByUuid(parseUuid(messageUuid, "Message not found", "TM_150"))
+                .orElseThrow(() -> new NotFoundException("Message not found", "TM_150"));
+        m.setDeleted(true);
+        messageRepository.save(m);
+        audit(adminUsername, "DELETE_MESSAGE", "MESSAGE", messageUuid,
+                "chat=" + (m.getChat() != null && m.getChat().getUuid() != null ? m.getChat().getUuid() : "?"));
+    }
+
+    /**
+     * Soft-delete a chat (sets its deleted flag); audited (DELETE_CHAT).
+     *
+     * @param chatUuid      target chat uuid
+     * @param adminUsername acting admin, recorded in the audit log
+     * @throws com.neo.chat.exception.NotFoundException if the chat is unknown (TM_121)
+     */
+    @Override
+    @Transactional
+    public void deleteChat(String chatUuid, String adminUsername) {
+        Chat c = chatRepository.findByUuid(parseUuid(chatUuid, "Chat not found", "TM_121"))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        c.setDeleted(true);
+        chatRepository.save(c);
+        audit(adminUsername, "DELETE_CHAT", "CHAT", chatUuid, c.getName());
+    }
+
+    /**
+     * Daily signup counts over the last {@code days} days (UTC), zero-filled and oldest-first.
+     *
+     * @param days number of days back (clamped to 1..365)
+     * @return one point per day, each with an ISO date label and its signup count
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<AdminTimeseriesPoint> getSignupTimeseries(int days) {
+        int d = Math.clamp(days, 1, 365);
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        Instant since = today.minusDays(d - 1L).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Map<LocalDate, Long> counts = userRepository.findSignupTimesSince(since).stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(
+                        t -> t.atZone(ZoneOffset.UTC).toLocalDate(), Collectors.counting()));
+        List<AdminTimeseriesPoint> out = new ArrayList<>(d);
+        for (int i = d - 1; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            out.add(new AdminTimeseriesPoint(day.toString(), counts.getOrDefault(day, 0L)));
+        }
+        return out;
+    }
+
+    /**
+     * A resolved time window: where it starts, bucket size, count and label granularity.
+     */
+    private record RangeSpec(Instant since, long bucketMillis, int buckets, String granularity) {
+    }
+
+    private static final long MIN = 60_000L, HOUR = 3_600_000L, DAY = 86_400_000L;
+
+    /**
+     * Map a preset range key (e.g. "1h", "24h", "7d", "30d", "1y") to a {@link RangeSpec} with
+     * an appropriate bucket size and count; unknown keys default to 30 daily buckets.
+     */
+    private RangeSpec resolveRange(String range) {
+        Instant now = Instant.now();
+        String r = range == null ? "30d" : range.trim().toLowerCase();
+        return switch (r) {
+            case "1h" -> spec(now, 5 * MIN, 12, "hour");   // 12 × 5 min
+            case "6h" -> spec(now, 30 * MIN, 12, "hour");  // 12 × 30 min
+            case "12h" -> spec(now, HOUR, 12, "hour");      // 12 × 1 h
+            case "24h", "1d" -> spec(now, 2 * HOUR, 12, "hour");  // 12 × 2 h
+            case "7d", "1w" -> spec(now, DAY, 7, "day");
+            case "90d", "3m" -> spec(now, DAY, 90, "day");
+            case "1y", "365d" -> spec(now, 7 * DAY, 52, "day");    // weekly buckets
+            default -> spec(now, DAY, 30, "day");
+        };
+    }
+
+    /**
+     * Build a {@link RangeSpec} whose window starts {@code bucketMillis * buckets} before now.
+     */
+    private RangeSpec spec(Instant now, long bucketMillis, int buckets, String gran) {
+        Instant since = now.minusMillis(bucketMillis * (long) buckets);
+        return new RangeSpec(since, bucketMillis, buckets, gran);
+    }
+
+    /**
+     * Bucket raw timestamps into fixed windows, zero-filled; labels are ISO bucket-starts.
+     */
+    private List<AdminTimeseriesPoint> bucketize(List<Instant> times, RangeSpec spec) {
+        long[] counts = new long[spec.buckets()];
+        long start = spec.since().toEpochMilli();
+        for (Instant t : times) {
+            if (t == null) continue;
+            long idx = (t.toEpochMilli() - start) / spec.bucketMillis();
+            if (idx >= 0 && idx < spec.buckets()) counts[(int) idx]++;
+        }
+        List<AdminTimeseriesPoint> out = new ArrayList<>(spec.buckets());
+        for (int i = 0; i < spec.buckets(); i++) {
+            Instant bucketStart = spec.since().plusMillis((long) i * spec.bucketMillis());
+            out.add(new AdminTimeseriesPoint(bucketStart.toString(), counts[i]));
+        }
+        return out;
+    }
+
+    /**
+     * Millisecond span for an interval key (e.g. "5m", "1h", "1d", "1w"); 0 for unknown keys.
+     */
+    private long intervalMillis(String key) {
+        return switch (key == null ? "" : key.trim().toLowerCase()) {
+            case "5m" -> 5 * MIN;
+            case "15m" -> 15 * MIN;
+            case "30m" -> 30 * MIN;
+            case "1h" -> HOUR;
+            case "6h" -> 6 * HOUR;
+            case "12h" -> 12 * HOUR;
+            case "1d" -> DAY;
+            case "1w" -> 7 * DAY;
+            default -> 0L;
+        };
+    }
+
+    /**
+     * Human-readable bucket size, e.g. 3600000 → "1h", 86400000 → "1d".
+     */
+    private String describeBucket(long ms) {
+        if (ms % (7 * DAY) == 0) return (ms / (7 * DAY)) + "w";
+        if (ms % DAY == 0) return (ms / DAY) + "d";
+        if (ms % HOUR == 0) return (ms / HOUR) + "h";
+        return Math.max(1, ms / MIN) + "m";
+    }
+
+    /**
+     * Snap an arbitrary bucket size to the nearest supported interval key.
+     */
+    private String snapInterval(long span) {
+        long target = Math.max(MIN, span / 40); // aim for ~40 buckets
+        long[] opts = {5 * MIN, 15 * MIN, 30 * MIN, HOUR, 6 * HOUR, 12 * HOUR, DAY, 7 * DAY};
+        String[] keys = {"5m", "15m", "30m", "1h", "6h", "12h", "1d", "1w"};
+        for (int i = 0; i < opts.length; i++) if (target <= opts[i]) return keys[i];
+        return "1w";
+    }
+
+    /**
+     * Parse an ISO instant, returning {@code fallback} on blank/null/invalid input.
+     */
+    private Instant parseInstant(String iso, Instant fallback) {
+        if (iso == null || iso.isBlank()) return fallback;
+        try {
+            return Instant.parse(iso.trim());
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * Resolve the effective time window and bucket size. A non-blank {@code fromIso} selects a
+     * custom from/to window (bucket = explicit interval, else snapped to ~40 buckets); otherwise
+     * a preset {@code range} is used, with an optional {@code interval} override. Bucket count is
+     * capped at 500.
+     */
+    private RangeSpec resolveWindow(String range, String interval, String fromIso, String toIso) {
+        boolean custom = (fromIso != null && !fromIso.isBlank());
+        Instant now = Instant.now();
+        long bucket;
+        Instant from, to;
+        if (custom) {
+            to = parseInstant(toIso, now);
+            from = parseInstant(fromIso, to.minusMillis(30 * DAY));
+            if (!from.isBefore(to)) from = to.minusMillis(DAY);
+            long ov = intervalMillis(interval);
+            bucket = ov > 0 ? ov : intervalMillis(snapInterval(to.toEpochMilli() - from.toEpochMilli()));
+        } else {
+            RangeSpec base = resolveRange(range);
+            long ov = intervalMillis(interval);
+            if (ov <= 0) return base; // no override → use the range's default bucketing
+            from = base.since();
+            to = now;
+            bucket = ov;
+        }
+        int buckets = Math.clamp(
+                (long) Math.ceil((double) (to.toEpochMilli() - from.toEpochMilli()) / bucket), 1, 500);
+        String gran = bucket >= DAY ? "day" : "hour";
+        return new RangeSpec(from, bucket, buckets, gran);
+    }
+
+    /**
+     * Bucketed timeseries for a chosen metric. Preset-range results are cached (30s TTL); custom
+     * from/to windows are computed live (unbounded key space is not cached).
+     *
+     * @param metric   the series (e.g. signups, messages, attachments, posts, reports); unknown
+     *                 falls back to messages
+     * @param range    preset range key when no custom window is given
+     * @param interval optional bucket-size override
+     * @param fromIso  custom window start (ISO); non-blank selects the custom, uncached path
+     * @param toIso    custom window end (ISO); defaults to now
+     * @return the metric, granularity, bucket size, total, and points
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminTimeseriesResult getTimeseries(
+            String metric, String range, String interval, String fromIso, String toIso) {
+        // Custom from/to windows aren't cached (unbounded key space); ranged ones are.
+        if (fromIso != null && !fromIso.isBlank()) {
+            return computeTimeseries(metric, range, interval, fromIso, toIso);
+        }
+        String key = genKey(String.join(":", "ts", String.valueOf(metric),
+                String.valueOf(range), String.valueOf(interval)));
+        return cached(key, 30, AdminTimeseriesResult.class,
+                () -> computeTimeseries(metric, range, interval, fromIso, toIso));
+    }
+
+    /**
+     * Resolve the window, query the matching repository for event timestamps since the window
+     * start, bucketize them, and assemble the result (total = sum of bucket counts).
+     */
+    private AdminTimeseriesResult computeTimeseries(
+            String metric, String range, String interval, String fromIso, String toIso) {
+        RangeSpec spec = resolveWindow(range, interval, fromIso, toIso);
+        String m = metric == null ? "messages" : metric.trim().toLowerCase();
+        Instant since = spec.since();
+        List<Instant> times = switch (m) {
+            case "signups", "users" -> userRepository.findSignupTimesSince(since);
+            case "attachments", "media" -> attachmentRepository.findAttachmentTimesSince(since);
+            case "uploads", "media_assets" -> mediaAssetRepository.findUploadTimesSince(since);
+            case "posts" -> postRepository.findTimesSince(since);
+            case "stories" -> storyRepository.findTimesSince(since);
+            case "profileviews", "profile_views", "views" -> profileViewRepository.findTimesSince(since);
+            case "follows" -> userFollowRepository.findTimesSince(since);
+            case "friendrequests", "friend_requests", "friends" -> friendRequestRepository.findTimesSince(since);
+            case "reports" -> matchReportRepository.findTimesSince(since);
+            case "reactions" -> reactionRepository.findTimesSince(since);
+            default -> messageRepository.findMessageTimesSince(since);
+        };
+        List<AdminTimeseriesPoint> points = bucketize(times, spec);
+        long total = points.stream().mapToLong(AdminTimeseriesPoint::getCount).sum();
+        return AdminTimeseriesResult.builder()
+                .metric(m)
+                .granularity(spec.granularity())
+                .interval(describeBucket(spec.bucketMillis()))
+                .total(total)
+                .points(points)
+                .build();
+    }
+
+    /**
+     * The full analytics payload for a range (headline totals, presence + social-graph
+     * breakdowns, top connectors, pending-deletion list, and signup/message series), served
+     * from the Redis cache with a 20s TTL.
+     *
+     * @param range preset range key (null defaults to "30d")
+     * @return the analytics snapshot
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminAnalyticsResponse getAnalytics(String range) {
+        String key = genKey("analytics:" + (range == null ? "30d" : range));
+        return cached(key, 20, AdminAnalyticsResponse.class,
+                () -> computeAnalytics(range));
+    }
+
+    /**
+     * Compute the analytics payload live: a best-effort Redis lobby-size snapshot, a presence
+     * status breakdown, capped pending-deletion list, entity counts and GROUP BY breakdowns, the
+     * friends/social-graph hierarchy, and signup/message timeseries for the range.
+     */
+    private AdminAnalyticsResponse computeAnalytics(String range) {
+        RangeSpec spec = resolveRange(range);
+        Instant now = Instant.now();
+
+        // Live lobby snapshot (ephemeral — Redis set, no history persisted).
+        long lobbyNow = 0L;
+        try {
+            Long size = redisTemplate.opsForSet().size("lobby:users");
+            lobbyNow = size == null ? 0L : size;
+        } catch (Exception e) {
+            log.warn("[AdminAnalytics] lobby size unavailable: {}", e.getMessage());
+        }
+
+        // Presence status breakdown (live snapshot from presence service).
+        long total = userRepository.count();
+        long online = presenceService.getOnlineUsernames().size();
+        long idle = presenceService.getAwayUsernames().size();
+        long offline = Math.max(0, total - online - idle);
+        List<LabelCount> usersByStatus = List.of(
+                new LabelCount("Online", online),
+                new LabelCount("Idle", idle),
+                new LabelCount("Offline", offline));
+
+        // Accounts pending purge — full details (capped for payload sanity).
+        Set<String> onlineSet = presenceService.getOnlineUsernames();
+        Set<String> awaySet = presenceService.getAwayUsernames();
+        List<AdminUserView> pendingDeletion = userRepository
+                .findByIsDeletedTrueAndDeletionRequestedAtIsNotNullOrderByDeletionRequestedAtDesc()
+                .stream()
+                .limit(200)
+                .map(u -> toView(u, onlineSet, awaySet, true))
+                .collect(Collectors.toList());
+
+        return AdminAnalyticsResponse.builder()
+                // headline totals
+                .totalUsers(total)
+                .verifiedUsers(userRepository.countByIsVerifiedTrue())
+                .guestUsers(userRepository.countByIsGuestTrue())
+                .bannedUsers(userRepository.countByBannedTrue())
+                .onlineNow(online)
+                .lobbyNow(lobbyNow)
+                .totalChats(chatRepository.count())
+                .totalMessages(messageRepository.count())
+                .totalAttachments(attachmentRepository.count())
+                .totalAttachmentBytes(attachmentRepository.sumFileSize())
+                .totalPosts(postRepository.count())
+                .totalStories(storyRepository.count())
+                .totalProfileViews(profileViewRepository.count())
+                .totalReports(matchReportRepository.count())
+                .totalFollows(userFollowRepository.count())
+                // active-user snapshot (by last-seen recency)
+                .activeLast1h(userRepository.countByPresenceLastSeenAtAfter(now.minus(1, ChronoUnit.HOURS)))
+                .activeLast24h(userRepository.countByPresenceLastSeenAtAfter(now.minus(24, ChronoUnit.HOURS)))
+                .activeLast7d(userRepository.countByPresenceLastSeenAtAfter(now.minus(7, ChronoUnit.DAYS)))
+                // breakdowns
+                .messagesByType(toLabelCounts(messageRepository.countGroupedByType()))
+                .chatsByType(toLabelCounts(chatRepository.countGroupedByType()))
+                .usersByGender(toLabelCounts(userRepository.countGroupedByGender()))
+                .usersByCountry(topN(toLabelCounts(userRepository.countGroupedByCountry()), 12))
+                .usersByStatus(usersByStatus)
+                .pendingDeletion(pendingDeletion)
+                // friends hierarchy / social graph
+                .friendLinks(friendRepository.count())
+                .friendships(friendRepository.count() / 2)
+                .friendRequestsByStatus(toLabelCounts(friendRequestRepository.countGroupedByStatus()))
+                .friendCountDistribution(friendCountDistribution(total))
+                .topConnectors(topConnectors(15))
+                // time series
+                .range(range == null ? "30d" : range)
+                .timeseriesGranularity(spec.granularity())
+                .signupsSeries(bucketize(userRepository.findSignupTimesSince(spec.since()), spec))
+                .messagesSeries(bucketize(messageRepository.findMessageTimesSince(spec.since()), spec))
+                .build();
+    }
+
+    /**
+     * Map a JPA {@code GROUP BY} result ([label, count]) to sorted LabelCounts.
+     */
+    private List<LabelCount> toLabelCounts(List<Object[]> rows) {
+        return rows.stream()
+                .map(r -> {
+                    Object k = r[0];
+                    String label = k == null ? "Unknown" : (k instanceof Enum<?> e ? e.name() : String.valueOf(k));
+                    long count = r[1] == null ? 0L : ((Number) r[1]).longValue();
+                    return new LabelCount(label, count);
+                })
+                .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                .collect(Collectors.toList());
+    }
+
+    private List<LabelCount> topN(List<LabelCount> in, int n) {
+        return in.size() <= n ? in : new ArrayList<>(in.subList(0, n));
+    }
+
+    /**
+     * Bucket users by how many friends they have (0 bucket derived from total).
+     */
+    private List<LabelCount> friendCountDistribution(long totalUsers) {
+        long[] buckets = new long[6]; // 0 | 1-5 | 6-10 | 11-25 | 26-50 | 50+
+        long usersWithFriends = 0;
+        for (Object[] row : friendRepository.countFriendsPerUser()) {
+            long c = row[1] == null ? 0L : ((Number) row[1]).longValue();
+            usersWithFriends++;
+            if (c <= 5) buckets[1]++;
+            else if (c <= 10) buckets[2]++;
+            else if (c <= 25) buckets[3]++;
+            else if (c <= 50) buckets[4]++;
+            else buckets[5]++;
+        }
+        buckets[0] = Math.max(0, totalUsers - usersWithFriends); // no friend links at all
+        String[] labels = {"0 friends", "1-5", "6-10", "11-25", "26-50", "50+"};
+        List<LabelCount> out = new ArrayList<>(6);
+        for (int i = 0; i < labels.length; i++) {
+            out.add(new LabelCount(labels[i], buckets[i]));
+        }
+        return out;
+    }
+
+    /**
+     * Most-connected users first — the roots of the friends hierarchy.
+     */
+    private List<AdminConnectorView> topConnectors(int n) {
+        return friendRepository.topConnectors(PageRequest.of(0, Math.max(1, n))).stream()
+                .map(row -> connectorView((User) row[0], ((Number) row[1]).longValue()))
+                .collect(Collectors.toList());
+    }
+
+    private AdminConnectorView connectorView(User u, long friendCount) {
+        return AdminConnectorView.builder()
+                .id(u.getUuid() != null ? u.getUuid().toString() : null)
+                .username(u.getUsername())
+                .name(u.getName())
+                .avatar(u.getProfileImage())
+                .country(u.getCountry())
+                .friendCount(friendCount)
+                .build();
+    }
+
+    // ── News / feed ───────────────────────────────────────────────────────────
+
+    /**
+     * Paginated feed of ALL posts, newest first, including soft-deleted ones (flagged in the DTO).
+     *
+     * @param page zero-based page index (clamped to ≥ 0)
+     * @param size page size (clamped to 1..100)
+     * @return a page of post views with pagination metadata
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminPostView> listPosts(int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(Sort.Direction.DESC, "id"));
+        // Admin sees ALL posts, including soft-deleted ones (flagged in the DTO).
+        Page<Post> result = postRepository.findAll(pageable);
+        List<AdminPostView> items =
+                result.getContent().stream().map(this::toPostView).collect(Collectors.toList());
+        return page(items, result, page);
+    }
+
+    /**
+     * Paginated list of the users who liked a post, newest first.
+     *
+     * @param postUuid the post's uuid
+     * @param page     zero-based page index (clamped to ≥ 0)
+     * @param size     page size (clamped to 1..100)
+     * @return a page of like views with pagination metadata
+     * @throws com.neo.chat.exception.NotFoundException if the post is unknown (TM_180)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminPostLikeView> getPostLikes(String postUuid, int page, int size) {
+        Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_180"));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(Sort.Direction.DESC, "id"));
+        Page<PostLike> result = postLikeRepository.findByPost(post, pageable);
+        List<AdminPostLikeView> items = result.getContent().stream().map(l -> {
+            User u = l.getUser();
+            return AdminPostLikeView.builder()
+                    .id(l.getUuid() != null ? l.getUuid().toString() : String.valueOf(l.getId()))
+                    .userId(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
+                    .username(u != null ? u.getUsername() : null)
+                    .name(u != null ? u.getName() : null)
+                    .avatar(u != null ? u.getProfileImage() : null)
+                    .createdAt(l.getCreatedAt() != null ? l.getCreatedAt().toString() : null)
+                    .build();
+        }).collect(Collectors.toList());
+        return page(items, result, page);
+    }
+
+    /**
+     * Paginated list of a post's comments (including replies, with parent references).
+     *
+     * @param postUuid the post's uuid
+     * @param page     zero-based page index (clamped to ≥ 0)
+     * @param size     page size (clamped to 1..100)
+     * @return a page of comment views with pagination metadata
+     * @throws com.neo.chat.exception.NotFoundException if the post is unknown (TM_180)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminPostCommentView> getPostComments(String postUuid, int page, int size) {
+        Post post = postRepository.findByUuid(parseUuid(postUuid, "Post not found", "TM_180"))
+                .orElseThrow(() -> new NotFoundException("Post not found", "TM_180"));
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
+        Page<PostComment> result = postCommentRepository.findAllForPost(post, pageable);
+        List<AdminPostCommentView> items = result.getContent().stream().map(c -> {
+            User u = c.getUser();
+            return AdminPostCommentView.builder()
+                    .id(c.getUuid() != null ? c.getUuid().toString() : String.valueOf(c.getId()))
+                    .userId(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
+                    .username(u != null ? u.getUsername() : null)
+                    .name(u != null ? u.getName() : null)
+                    .avatar(u != null ? u.getProfileImage() : null)
+                    .content(c.getContent())
+                    .parentId(c.getParent() != null && c.getParent().getUuid() != null ? c.getParent().getUuid().toString() : null)
+                    .createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null)
+                    .build();
+        }).collect(Collectors.toList());
+        return page(items, result, page);
+    }
+
+    /**
+     * Map a post to its admin view, including author, media, like/comment counts, and flags.
+     */
+    private AdminPostView toPostView(Post p) {
+        User a = p.getUser();
+        List<AdminPostView.Media> media = p.getMedia() == null ? List.of()
+                : p.getMedia().stream()
+                  .map(m -> new AdminPostView.Media(
+                          m.getMediaUrl(), m.getMediaType()))
+                  .collect(Collectors.toList());
+        return AdminPostView.builder()
+                .id(p.getUuid() != null ? p.getUuid().toString() : String.valueOf(p.getId()))
+                .shortCode(p.getShortCode())
+                .authorId(a != null && a.getUuid() != null ? a.getUuid().toString() : null)
+                .authorUsername(a != null ? a.getUsername() : null)
+                .authorName(a != null ? a.getName() : null)
+                .authorAvatar(a != null ? a.getProfileImage() : null)
+                .content(p.getContent())
+                .audience(p.getAudience() != null ? p.getAudience().name() : null)
+                .likeCount(postLikeRepository.countByPost(p))
+                .commentCount(postCommentRepository.countForPost(p))
+                .hasPoll(p.getPoll() != null)
+                .hasAudio(p.getAudio() != null)
+                .media(media)
+                .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
+                .deleted(p.isDeleted())
+                .build();
+    }
+
+    // ── Moderation report review portal ───────────────────────────────────────
+
+    /**
+     * Paginated moderation reports, newest first, optionally filtered by status.
+     *
+     * @param status status filter; blank or "ALL" returns every report
+     * @param page   zero-based page index (clamped to ≥ 0)
+     * @param size   page size (clamped to 1..100)
+     * @return a page of report views (with per-party counts) and pagination metadata
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminReportView> listReports(String status, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(Sort.Direction.DESC, "id"));
+        String s = status == null ? "" : status.trim().toUpperCase();
+        Page<MatchReport> result =
+                (s.isEmpty() || "ALL".equals(s))
+                        ? matchReportRepository.findAll(pageable)
+                        : matchReportRepository.findByStatus(s, pageable);
+        List<AdminReportView> items =
+                result.getContent().stream().map(r -> toReportView(r, true)).collect(Collectors.toList());
+        return page(items, result, page);
+    }
+
+    /**
+     * A single report enriched for review: the reported user's summary + recent report history
+     * (last 25), and the related private chat between the two parties as evidence, if one exists.
+     *
+     * @param reportUuid the report's uuid
+     * @return the enriched report view
+     * @throws com.neo.chat.exception.NotFoundException if the report is unknown (TM_181)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminReportView getReport(String reportUuid) {
+        MatchReport r = matchReportRepository.findByUuid(parseUuid(reportUuid, "Report not found", "TM_181"))
+                .orElseThrow(() -> new NotFoundException("Report not found", "TM_181"));
+        AdminReportView view = toReportView(r, true);
+
+        User reported = r.getReported();
+        User reporter = r.getReporter();
+        if (reported != null) {
+            view.setReportedSummary(AdminReportView.ReportedSummary.builder()
+                    .joined(reported.getCreatedAt() != null ? reported.getCreatedAt().toString() : null)
+                    .verified(reported.isVerified())
+                    .guest(reported.isGuest())
+                    .banned(reported.isBanned())
+                    .messageCount(messageRepository.countBySenderId(reported.getId()))
+                    .chatCount(chatRepository.findChatsByUser(reported).size())
+                    .build());
+
+            // Full report history against the reported user (most recent 25).
+            view.setHistory(matchReportRepository
+                    .findByReportedId(reported.getId(), PageRequest.of(0, 25, Sort.by(Sort.Direction.DESC, "id")))
+                    .getContent().stream()
+                    .map(h -> AdminReportView.HistoryItem.builder()
+                            .id(h.getUuid() != null ? h.getUuid().toString() : String.valueOf(h.getId()))
+                            .reason(h.getReason())
+                            .reporterUsername(h.getReporter() != null ? h.getReporter().getUsername() : null)
+                            .reporterId(uuidOf(h.getReporter()))
+                            .status(h.getStatus())
+                            .createdAt(h.getCreatedAt() != null ? h.getCreatedAt().toString() : null)
+                            .build())
+                    .collect(Collectors.toList()));
+        }
+
+        // Evidence: a persisted conversation between the two parties, if one exists.
+        if (reporter != null && reported != null) {
+            chatRepository.findPrivateChatBetweenUsers(reporter.getId(), reported.getId()).stream()
+                    .findFirst()
+                    .filter(c -> c.getUuid() != null)
+                    .ifPresent(c -> view.setRelatedChatId(c.getUuid().toString()));
+        }
+        return view;
+    }
+
+    /**
+     * Resolve a report by applying a review action: DISMISS (no action), RESOLVE (reviewed),
+     * or BAN_REPORTED (bans the reported user). Stamps reviewer/time/note; audited (REVIEW_REPORT).
+     *
+     * @param reportUuid    the report's uuid
+     * @param action        one of DISMISS, RESOLVE, BAN_REPORTED (case-insensitive)
+     * @param note          optional resolution note
+     * @param adminUsername acting admin, recorded on the report and in the audit log
+     * @return the updated report view
+     * @throws com.neo.chat.exception.NotFoundException   if the report is unknown (TM_181)
+     * @throws com.neo.chat.exception.BadRequestException if the action is unrecognized (TM_071)
+     */
+    @Override
+    @Transactional
+    public AdminReportView reviewReport(String reportUuid, String action, String note, String adminUsername) {
+        MatchReport r = matchReportRepository.findByUuid(parseUuid(reportUuid, "Report not found", "TM_181"))
+                .orElseThrow(() -> new NotFoundException("Report not found", "TM_181"));
+        String a = action == null ? "" : action.trim().toUpperCase();
+        switch (a) {
+            case "DISMISS" -> {
+                r.setStatus("DISMISSED");
+                r.setActionTaken("NONE");
+            }
+            case "RESOLVE" -> {
+                r.setStatus("ACTION_TAKEN");
+                r.setActionTaken("REVIEWED");
+            }
+            case "BAN_REPORTED" -> {
+                User reported = r.getReported();
+                if (reported != null) {
+                    reported.setBanned(true);
+                    userRepository.save(reported);
+                }
+                r.setStatus("ACTION_TAKEN");
+                r.setActionTaken("BANNED_REPORTED");
+            }
+            default -> throw new BadRequestException("Unknown review action: " + a, "TM_071");
+        }
+        r.setReviewedBy(adminUsername);
+        r.setReviewedAt(Instant.now());
+        if (note != null && !note.isBlank()) r.setResolutionNote(note.trim());
+        matchReportRepository.save(r);
+        audit(adminUsername, "REVIEW_REPORT", "REPORT", reportUuid,
+                a + (r.getReported() != null ? " → @" + r.getReported().getUsername() : ""));
+        return toReportView(r, true);
+    }
+
+    // ── User feedback ─────────────────────────────────────────────────────────
+
+    /**
+     * Paginated user feedback, newest first, optionally filtered by type and/or status.
+     *
+     * @param type   feedback type filter; blank/"ALL"/unknown means no type filter
+     * @param status feedback status filter; blank/"ALL"/unknown means no status filter
+     * @param page   zero-based page index (clamped to ≥ 0)
+     * @param size   page size (clamped to 1..100)
+     * @return a page of feedback views with pagination metadata
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminFeedbackView> listFeedback(String type, String status, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100),
+                Sort.by(Sort.Direction.DESC, "id"));
+        FeedbackType t = parseFeedbackType(type);
+        FeedbackStatus s = parseFeedbackStatus(status);
+
+        Page<Feedback> result;
+        if (t != null && s != null) {
+            result = feedbackRepository.findByTypeAndStatus(t, s, pageable);
+        } else if (t != null) {
+            result = feedbackRepository.findByType(t, pageable);
+        } else if (s != null) {
+            result = feedbackRepository.findByStatus(s, pageable);
+        } else {
+            result = feedbackRepository.findAll(pageable);
+        }
+
+        List<AdminFeedbackView> items =
+                result.getContent().stream().map(this::toFeedbackView).collect(Collectors.toList());
+        return page(items, result, page);
+    }
+
+    /**
+     * Update a feedback row's status; audited (UPDATE_FEEDBACK_STATUS).
+     *
+     * @param feedbackUuid  the feedback uuid
+     * @param status        the new status name (case-insensitive)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the updated feedback view
+     * @throws com.neo.chat.exception.NotFoundException   if the feedback is unknown (TM_312)
+     * @throws com.neo.chat.exception.BadRequestException if the status is unrecognized (TM_071)
+     */
+    @Override
+    @Transactional
+    public AdminFeedbackView updateFeedbackStatus(String feedbackUuid, String status, String adminUsername) {
+        Feedback f = feedbackRepository.findByUuid(parseUuid(feedbackUuid, "Feedback not found", "TM_312"))
+                .orElseThrow(() -> new NotFoundException("Feedback not found", "TM_312"));
+        FeedbackStatus s = parseFeedbackStatus(status);
+        if (s == null) {
+            throw new BadRequestException("Unknown feedback status: " + status, "TM_071");
+        }
+        f.setStatus(s);
+        feedbackRepository.save(f);
+        audit(adminUsername, "UPDATE_FEEDBACK_STATUS", "FEEDBACK", feedbackUuid, s.name());
+        return toFeedbackView(f);
+    }
+
+    /**
+     * Returns null for blank/"ALL" so the caller skips that filter.
+     */
+    private static FeedbackType parseFeedbackType(String raw) {
+        if (raw == null) return null;
+        String v = raw.trim().toUpperCase();
+        if (v.isEmpty() || "ALL".equals(v)) return null;
+        try {
+            return FeedbackType.valueOf(v);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static FeedbackStatus parseFeedbackStatus(String raw) {
+        if (raw == null) return null;
+        String v = raw.trim().toUpperCase();
+        if (v.isEmpty() || "ALL".equals(v)) return null;
+        try {
+            return FeedbackStatus.valueOf(v);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private AdminFeedbackView toFeedbackView(Feedback f) {
+        User u = f.getUser();
+        AdminFeedbackView.Author author = u == null ? null
+                : AdminFeedbackView.Author.builder()
+                  .id(u.getUuid() != null ? u.getUuid().toString() : null)
+                  .username(u.getUsername())
+                  .name(u.getName())
+                  .avatar(u.getProfileImage())
+                  .email(u.getEmail())
+                  .country(u.getCountry())
+                  .verified(u.isVerified())
+                  .guest(u.isGuest())
+                  .build();
+        return AdminFeedbackView.builder()
+                .id(f.getUuid() != null ? f.getUuid().toString() : null)
+                .rating(f.getRating())
+                .reason(f.getReason())
+                .comment(f.getComment())
+                .type(f.getType() != null ? f.getType().name() : null)
+                .contextRef(f.getContextRef())
+                .platform(f.getPlatform())
+                .status(f.getStatus() != null ? f.getStatus().name() : null)
+                .createdAt(f.getCreatedAt() != null ? f.getCreatedAt().toString() : null)
+                .author(author)
+                .build();
+    }
+
+    /**
+     * Map a report to its admin view, including both parties and the match session.
+     *
+     * @param withCounts when true, also populate the reports-against/-by and duplicate counts
+     */
+    private AdminReportView toReportView(MatchReport r, boolean withCounts) {
+        User reporter = r.getReporter();
+        User reported = r.getReported();
+        MatchSession session = r.getSession();
+
+        AdminReportView.Session sessionView = session == null ? null
+                : AdminReportView.Session.builder()
+                  .id(session.getUuid() != null ? session.getUuid().toString() : null)
+                  .hostUsername(session.getHost() != null ? session.getHost().getUsername() : null)
+                  .hostId(uuidOf(session.getHost()))
+                  .peerUsername(session.getPeer() != null ? session.getPeer().getUsername() : null)
+                  .peerId(uuidOf(session.getPeer()))
+                  .active(session.isActive())
+                  .endedAt(session.getEndedAt() != null ? session.getEndedAt().toString() : null)
+                  .build();
+
+        return AdminReportView.builder()
+                .id(r.getUuid() != null ? r.getUuid().toString() : String.valueOf(r.getId()))
+                .reason(r.getReason())
+                .details(r.getDetails())
+                .status(r.getStatus())
+                .actionTaken(r.getActionTaken())
+                .reviewedBy(r.getReviewedBy())
+                .reviewedById(usernameToUuid(r.getReviewedBy()))
+                .reviewedAt(r.getReviewedAt() != null ? r.getReviewedAt().toString() : null)
+                .resolutionNote(r.getResolutionNote())
+                .createdAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null)
+                .reporter(party(reporter))
+                .reported(party(reported))
+                .session(sessionView)
+                .reportsAgainstReported(withCounts && reported != null ? matchReportRepository.countByReportedId(reported.getId()) : 0)
+                .reportsByReporter(withCounts && reporter != null ? matchReportRepository.countByReporterId(reporter.getId()) : 0)
+                .duplicateCount(withCounts && reporter != null && reported != null
+                        ? matchReportRepository.countByReporterIdAndReportedId(reporter.getId(), reported.getId()) : 0)
+                .build();
+    }
+
+    private AdminReportView.Party party(User u) {
+        if (u == null) return null;
+        return AdminReportView.Party.builder()
+                .id(u.getUuid() != null ? u.getUuid().toString() : null)
+                .username(u.getUsername())
+                .name(u.getName())
+                .avatar(u.getProfileImage())
+                .country(u.getCountry())
+                .banned(u.isBanned())
+                .build();
+    }
+
+    /**
+     * Shared PaginatedResponse assembler for the page-numbered admin lists.
+     */
+    private <T> PaginatedResponse<T> page(List<T> items, Page<?> result, int page) {
+        return PaginatedResponse.<T>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .page(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    /**
+     * A user's friends, each with their own friend count, ordered most-connected first.
+     *
+     * @param userUuid the user's uuid
+     * @return the friend connector views
+     * @throws com.neo.chat.exception.NotFoundException if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<AdminConnectorView> getUserFriends(String userUuid) {
+        User u = requireUser(userUuid);
+        return friendRepository.findFriendsByUser(u).stream()
+                .map(f -> connectorView(f, friendRepository.countByUserAndIsDeletedFalse(f)))
+                .sorted((a, b) -> Long.compare(b.getFriendCount(), a.getFriendCount()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Paginated message attachments (file names/URLs decrypted per chat), optionally scoped to a
+     * sender and message type. Records a VIEW_ATTACHMENTS audit entry; runs read-write for the
+     * audit row and decryption. Unknown type values are ignored.
+     *
+     * @param userUuid       optional sender uuid to scope to; blank/null means all senders
+     * @param type           optional message-type filter; unknown values are ignored
+     * @param includeDeleted whether deleted attachments are included
+     * @param page           zero-based page index (clamped to ≥ 0)
+     * @param size           page size (clamped to 1..100)
+     * @param adminUsername  acting admin, recorded in the audit log
+     * @return a page of attachment views with pagination metadata
+     * @throws com.neo.chat.exception.NotFoundException if a given userUuid is unknown (TM_064)
+     */
+    @Override
+    @Transactional // NOT readOnly: writes an admin audit row + decrypts URLs
+    public PaginatedResponse<AdminAttachmentView> getAttachments(
+            String userUuid, String type, boolean includeDeleted, int page, int size, String adminUsername) {
+        Long senderId = null;
+        if (userUuid != null && !userUuid.isBlank()) {
+            senderId = requireUser(userUuid).getId();
+        }
+        MessageType mt = null;
+        if (type != null && !type.isBlank()) {
+            try {
+                mt = MessageType.valueOf(type.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) { /* unknown type → no filter */ }
+        }
+        audit(adminUsername, "VIEW_ATTACHMENTS", "ATTACHMENT",
+                userUuid != null ? userUuid : "all", "type=" + type + " page=" + page);
+
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
+        Page<MessageAttachment> result = attachmentRepository.findForAdmin(senderId, mt, includeDeleted, pageable);
+
+        List<AdminAttachmentView> items = result.getContent().stream()
+                .map(this::toAttachmentView)
+                .collect(Collectors.toList());
+
+        return PaginatedResponse.<AdminAttachmentView>builder()
+                .items(items)
+                .pagination(PaginatedResponse.PaginationInfo.builder()
+                        .cursor(result.hasNext() ? String.valueOf(page + 1) : null)
+                        .hasNext(result.hasNext())
+                        .hasPrevious(result.hasPrevious())
+                        .total(result.getTotalElements())
+                        .page(result.getNumber())
+                        .size(result.getSize())
+                        .totalPages(result.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    /**
+     * Map an attachment to its admin view (file name/URL/thumbnail decrypted per chat), listing
+     * the chat's other members as recipients. Guards every deref for orphaned attachments.
+     */
+    private AdminAttachmentView toAttachmentView(MessageAttachment a) {
+        // An attachment can be orphaned (its message row gone) — guard every deref of m.
+        Message m = a.getMessage();
+        Chat chat = m != null ? m.getChat() : null;
+        Long chatId = chat != null ? chat.getId() : null;
+        User sender = m != null ? m.getSender() : null;
+
+        List<AdminAttachmentView.SharedUser> sharedWith =
+                chat == null || chat.getMembers() == null ? List.of()
+                        : chat.getMembers().stream()
+                          .map(ChatMember::getUser)
+                          .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
+                          .map(mu -> AdminAttachmentView.SharedUser.builder()
+                                     .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                                     .username(mu.getUsername())
+                                     .name(mu.getName())
+                                     .avatar(mu.getProfileImage())
+                                     .build())
+                          .collect(Collectors.toList());
+
+        assert m != null;
+        return AdminAttachmentView.builder()
+                .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
+                .messageId(m.getUuid() != null ? m.getUuid().toString() : null)
+                .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
+                .chatName(chat != null ? chat.getName() : null)
+                .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
+                .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
+                .senderUsername(sender != null ? sender.getUsername() : null)
+                .senderName(sender != null ? sender.getName() : null)
+                .senderAvatar(sender != null ? sender.getProfileImage() : null)
+                .sharedWith(sharedWith)
+                .type(m.getMessageType() != null ? m.getMessageType().name() : null)
+                .fileName(messageCryptoService.decrypt(chatId, a.getFileName()))
+                .fileUrl(messageCryptoService.decrypt(chatId, a.getFileUrl()))
+                .thumbnailUrl(a.getThumbnailUrl() != null ? messageCryptoService.decrypt(chatId, a.getThumbnailUrl()) : null)
+                .mimeType(a.getMimeType())
+                .fileSize(a.getFileSize() != null ? a.getFileSize() : 0L)
+                .createdAt(a.getCreatedAt() != null ? a.getCreatedAt().toString() : null)
+                .build();
+    }
+
+    // ── Storage reconciliation (storage-truth Attachments gallery) ─────────────
+
+    /**
+     * Chat-media top-level folders — an unreferenced object here is a true orphan.
+     */
+    private static final Set<String> CHAT_MEDIA_CATEGORIES = Set.of("conversations", "lobby", "strangers");
+
+    /**
+     * Cached reconcile of one storage prefix (OCI list can be slow — TTL-guarded).
+     */
+    private record StorageSnapshot(long builtAtMs, List<AdminStorageObjectView> objects) {
+    }
+
+    private final ConcurrentHashMap<String, StorageSnapshot> storageCache =
+            new ConcurrentHashMap<>();
+    private static final long STORAGE_CACHE_TTL_MS = 60_000L;
+
+    /**
+     * Storage-truth attachments gallery: reconcile stored objects (TTL-cached) against the DB,
+     * apply category/orphan/search filters, compute kind-independent counts over that base, then
+     * apply the kind filter, sort, and paginate. Records a VIEW_STORAGE audit entry; page size is
+     * clamped to 200.
+     *
+     * @param prefix        storage prefix to list, or null for all
+     * @param category      category filter (conversations/lobby/…), or "all"/blank
+     * @param kind          media-kind filter (image/video/voice/audio/file), or "all"/blank
+     * @param onlyOrphans   restrict to objects with no linked chat attachment
+     * @param search        case-insensitive substring over key/name/sender/chat, or blank
+     * @param sort          one of newest/oldest/largest/smallest/name (default newest)
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..200)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the page of storage objects plus base-set counts and pagination flags
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminStorageListResponse getStorageObjects(
+            String prefix, String category, String kind, boolean onlyOrphans,
+            String search, String sort, int page, int size, String adminUsername) {
+
+        audit(adminUsername, "VIEW_STORAGE", "STORAGE", prefix != null ? prefix : "all",
+                "category=" + category + " kind=" + kind + " orphans=" + onlyOrphans + " page=" + page);
+
+        List<AdminStorageObjectView> reconciled = reconcileStorage(prefix);
+
+        // ── base filter (category + orphan + search, but NOT kind) ─────────────
+        // Kind chips must show per-kind totals within the current context, so counts
+        // are computed over this base — before the active kind filter is applied.
+        String q = search == null ? "" : search.trim().toLowerCase();
+        Stream<AdminStorageObjectView> stream = reconciled.stream();
+        if (category != null && !category.isBlank() && !category.equalsIgnoreCase("all")) {
+            String c = category.trim().toLowerCase();
+            stream = stream.filter(o -> c.equals(o.getCategory()));
+        }
+        if (onlyOrphans) stream = stream.filter(AdminStorageObjectView::isOrphan);
+        if (!q.isEmpty()) {
+            stream = stream.filter(o ->
+                    contains(o.getKey(), q) || contains(o.getFileName(), q)
+                            || contains(o.getSenderUsername(), q) || contains(o.getSenderName(), q)
+                            || contains(o.getChatName(), q));
+        }
+        List<AdminStorageObjectView> base = stream.collect(Collectors.toList());
+
+        // ── counts over the base set (storage-accurate, kind-independent) ──────
+        AdminStorageListResponse.Counts counts =
+                AdminStorageListResponse.Counts.builder()
+                        .all(base.size())
+                        .image(base.stream().filter(o -> "image".equals(o.getKind())).count())
+                        .video(base.stream().filter(o -> "video".equals(o.getKind())).count())
+                        .voice(base.stream().filter(o -> "voice".equals(o.getKind())).count())
+                        .audio(base.stream().filter(o -> "audio".equals(o.getKind())).count())
+                        .file(base.stream().filter(o -> "file".equals(o.getKind())).count())
+                        .linked(base.stream().filter(AdminStorageObjectView::isLinked).count())
+                        .orphan(base.stream().filter(AdminStorageObjectView::isOrphan).count())
+                        .bytes(base.stream().mapToLong(AdminStorageObjectView::getSize).sum())
+                        .build();
+
+        // ── apply the active kind filter for the page itself ───────────────────
+        List<AdminStorageObjectView> filtered = base;
+        if (kind != null && !kind.isBlank() && !kind.equalsIgnoreCase("all")) {
+            String k = kind.trim().toLowerCase();
+            filtered = base.stream().filter(o -> k.equals(o.getKind())).collect(Collectors.toList());
+        }
+
+        // ── sort ────────────────────────────────────────────────────────────────
+        Comparator<AdminStorageObjectView> cmp = switch (sort == null ? "newest" : sort) {
+            case "oldest" -> Comparator.comparing(
+                    AdminStorageObjectView::getLastModified,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "largest" -> Comparator.comparingLong(AdminStorageObjectView::getSize).reversed();
+            case "smallest" -> Comparator.comparingLong(AdminStorageObjectView::getSize);
+            case "name" -> Comparator.comparing(
+                    o -> o.getFileName() != null ? o.getFileName() : o.getKey(),
+                    String.CASE_INSENSITIVE_ORDER);
+            default -> Comparator.comparing( // newest
+                    AdminStorageObjectView::getLastModified,
+                    Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
+        };
+        filtered.sort(cmp);
+
+        // ── paginate ──────────────────────────────────────────────────────────
+        int p = Math.max(0, page);
+        int s = Math.clamp(size, 1, 200);
+        int from = Math.min(p * s, filtered.size());
+        int to = Math.min(from + s, filtered.size());
+        List<AdminStorageObjectView> pageItems = filtered.subList(from, to);
+
+        return AdminStorageListResponse.builder()
+                .items(pageItems)
+                .counts(counts)
+                .page(p)
+                .size(s)
+                .total(filtered.size())
+                .hasNext(to < filtered.size())
+                .build();
+    }
+
+    /**
+     * Delete a stored object by key (validated against path traversal), clear the reconcile
+     * cache, and record a DELETE_STORAGE_OBJECT audit entry.
+     *
+     * @param key           the storage key (must pass {@link MediaKeys#isSafeKey})
+     * @param adminUsername acting admin, recorded in the audit log
+     * @throws com.neo.chat.exception.BadRequestException if the key is null or unsafe (TM_071)
+     */
+    @Override
+    @Transactional
+    public void deleteStorageObject(String key, String adminUsername) {
+        if (!MediaKeys.isSafeKey(key)) {
+            throw new BadRequestException("Invalid object key", "TM_071");
+        }
+        String reference = storageProperties.getMediaRoot() + "/" + key;
+        mediaStorage.delete(reference);
+        storageCache.clear(); // reconcile is now stale
+        audit(adminUsername, "DELETE_STORAGE_OBJECT", "STORAGE", key, "reference=" + reference);
+    }
+
+    // ── Media-ownership analytics (media_assets ledger) ───────────────────────
+
+    /**
+     * Media-ownership analytics over the {@code media_assets} ledger (totals, attribution,
+     * per-context/type buckets, top uploaders, recent uploads, and an uploads series). Records a
+     * VIEW_MEDIA_STATS audit entry; served from the Redis cache with a 20s TTL.
+     *
+     * @param range         preset range key (null defaults to "30d")
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the media-ownership snapshot
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminMediaOwnershipResponse getMediaOwnership(
+            String range, String adminUsername) {
+        audit(adminUsername, "VIEW_MEDIA_STATS", "MEDIA", range != null ? range : "30d", null);
+        String key = genKey("media:" + (range == null ? "30d" : range));
+        return cached(key, 20, AdminMediaOwnershipResponse.class,
+                () -> computeMediaOwnership(range));
+    }
+
+    /**
+     * Compute media-ownership analytics live: SQL aggregates by context/type, top stranger-media
+     * uploaders (grouped in SQL then batch-loaded for names/avatars), recent uploads, and the
+     * range's uploads timeseries.
+     */
+    private AdminMediaOwnershipResponse computeMediaOwnership(String range) {
+        long total = mediaAssetRepository.count();
+        long unattributed = mediaAssetRepository.countByOwnerIsNull();
+
+        List<AdminMediaOwnershipResponse.Bucket> byContext =
+                mediaAssetRepository.aggregateByContext().stream()
+                        .map(r -> bucket(String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
+                        .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                        .collect(Collectors.toList());
+        List<AdminMediaOwnershipResponse.Bucket> byType =
+                mediaAssetRepository.aggregateByType().stream()
+                        .map(r -> bucket(r[0] == null ? "unknown" : String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
+                        .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                        .collect(Collectors.toList());
+
+        // Top uploaders — group in SQL, then batch-load the users for names/avatars.
+        List<Object[]> rows = mediaAssetRepository.topUploaders(
+                MediaContext.STRANGER, PageRequest.of(0, 10));
+        List<Long> ownerIds = rows.stream().map(r -> ((Number) r[0]).longValue()).collect(Collectors.toList());
+        Map<Long, User> owners = userRepository.findAllById(ownerIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u, (a, _) -> a));
+        List<AdminMediaOwnershipResponse.UploaderStat> topUploaders = rows.stream()
+                .map(r -> {
+                    User u = owners.get(((Number) r[0]).longValue());
+                    return AdminMediaOwnershipResponse.UploaderStat.builder()
+                            .id(u != null && u.getUuid() != null ? u.getUuid().toString() : null)
+                            .username(u != null ? u.getUsername() : null)
+                            .name(u != null ? u.getName() : null)
+                            .avatar(u != null ? u.getProfileImage() : null)
+                            .count(((Number) r[1]).longValue())
+                            .bytes(((Number) r[2]).longValue())
+                            .strangerCount(((Number) r[3]).longValue())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        List<AdminMediaOwnershipResponse.RecentUpload> recent =
+                mediaAssetRepository.recentWithOwner(PageRequest.of(0, 16)).stream()
+                        .map(this::toRecentUpload)
+                        .collect(Collectors.toList());
+
+        RangeSpec spec = resolveRange(range);
+        List<AdminTimeseriesPoint> series =
+                bucketize(mediaAssetRepository.findUploadTimesSince(spec.since()), spec);
+
+        return AdminMediaOwnershipResponse.builder()
+                .totalAssets(total)
+                .totalBytes(mediaAssetRepository.sumBytes())
+                .attributedAssets(total - unattributed)
+                .unattributedAssets(unattributed)
+                .uploaderCount(mediaAssetRepository.countDistinctOwners())
+                .strangerAssets(mediaAssetRepository.countByContext(MediaContext.STRANGER))
+                .strangerBytes(mediaAssetRepository.sumBytesByContext(MediaContext.STRANGER))
+                .lobbyAssets(mediaAssetRepository.countByContext(MediaContext.LOBBY))
+                .conversationAssets(mediaAssetRepository.countByContext(MediaContext.CONVERSATION))
+                .byContext(byContext)
+                .byType(byType)
+                .topUploaders(topUploaders)
+                .recent(recent)
+                .range(range == null ? "30d" : range)
+                .granularity(spec.granularity())
+                .uploadsSeries(series)
+                .build();
+    }
+
+    /**
+     * Paginated media uploaded by a user (from the {@code media_assets} ledger), newest first,
+     * with per-context buckets and byte totals. Records a VIEW_USER_MEDIA audit entry.
+     *
+     * @param userUuid      the owner's uuid
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..100)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the media list with totals, buckets, and pagination flags
+     * @throws com.neo.chat.exception.NotFoundException if the user is unknown (TM_064)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AdminMediaListResponse getUserMedia(
+            String userUuid, int page, int size, String adminUsername) {
+        User user = requireUser(userUuid);
+        audit(adminUsername, "VIEW_USER_MEDIA", "MEDIA", userUuid, "page=" + page);
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
+        Page<MediaAsset> result =
+                mediaAssetRepository.findByOwner_IdOrderByCreatedAtDesc(user.getId(), pageable);
+        List<AdminMediaOwnershipResponse.Bucket> byContext =
+                mediaAssetRepository.aggregateByContextForOwner(user.getId()).stream()
+                        .map(r -> bucket(String.valueOf(r[0]), (Number) r[1], (Number) r[2]))
+                        .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                        .collect(Collectors.toList());
+        return AdminMediaListResponse.builder()
+                .items(result.getContent().stream().map(this::toMediaAssetView).collect(Collectors.toList()))
+                .total(mediaAssetRepository.countByOwner_Id(user.getId()))
+                .totalBytes(mediaAssetRepository.sumBytesByOwner(user.getId()))
+                .byContext(byContext)
+                .page(result.getNumber())
+                .size(result.getSize())
+                .hasNext(result.hasNext())
+                .build();
+    }
+
+    /**
+     * Paginated media of a chat, sourced from {@link MessageAttachment} (authoritative for a
+     * persisted conversation, unlike the newer ledger) with file refs decrypted per chat. Records
+     * a VIEW_CHAT_MEDIA audit entry; runs read-write for decryption and the audit row.
+     *
+     * @param chatUuid      the chat's uuid
+     * @param page          zero-based page index (clamped to ≥ 0)
+     * @param size          page size (clamped to 1..100)
+     * @param adminUsername acting admin, recorded in the audit log
+     * @return the media list with totals, byte sum, and pagination flags
+     * @throws com.neo.chat.exception.NotFoundException if the chat is unknown (TM_121)
+     */
+    @Override
+    @Transactional // NOT readOnly: decrypts file refs + writes a VIEW audit row
+    public AdminMediaListResponse getChatMedia(
+            String chatUuid, int page, int size, String adminUsername) {
+        // Source from MessageAttachment (the authoritative, always-populated media of a
+        // persisted conversation) rather than the media_assets ledger — the ledger only
+        // covers post-feature uploads and would leave this panel empty for older chats.
+        Chat chat = chatRepository.findByUuidWithMembers(parseUuid(chatUuid, "Chat not found", "TM_121"))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        audit(adminUsername, "VIEW_CHAT_MEDIA", "MEDIA", chatUuid, "page=" + page);
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 100));
+        Page<MessageAttachment> result = attachmentRepository.findByChatForAdmin(chat.getId(), pageable);
+        List<AdminMediaAssetView> items = result.getContent().stream()
+                .map(a -> toChatMediaView(a, chat))
+                .collect(Collectors.toList());
+        return AdminMediaListResponse.builder()
+                .items(items)
+                .total(attachmentRepository.countByChatForAdmin(chat.getId()))
+                .totalBytes(attachmentRepository.sumFileSizeByChat(chat.getId()))
+                .byContext(List.of())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .hasNext(result.hasNext())
+                .build();
+    }
+
+    /**
+     * Map a chat's {@link MessageAttachment} to the shared media-asset view (owner = sender).
+     */
+    private AdminMediaAssetView toChatMediaView(
+            MessageAttachment a, Chat chat) {
+        Message m = a.getMessage();
+        Long chatId = chat.getId();
+        User sender = m != null ? m.getSender() : null;
+        String ref = safeDecrypt(chatId, a.getFileUrl());
+        String name = safeDecrypt(chatId, a.getFileName());
+        String key = MediaKeys.key(ref, storageProperties.getMediaRoot());
+        boolean stranger = chat.getChatType() == ChatType.STRANGER;
+        return AdminMediaAssetView.builder()
+                .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
+                .key(key)
+                .reference(ref)
+                .url(mediaServeUrl(ref))
+                .kind(kindForLinked(m != null ? m.getMessageType() : null, a.getMimeType(), name, key != null ? key : ""))
+                .context(MediaContext.CONVERSATION.name())
+                .contextId(chat.getUuid() != null ? chat.getUuid().toString() : null)
+                .uploadType(m != null && m.getMessageType() != null ? m.getMessageType().name() : null)
+                .contentType(a.getMimeType())
+                .fileSize(a.getFileSize() != null ? a.getFileSize() : 0L)
+                .originalFileName(name)
+                .strangerMode(stranger)
+                .uploadedAt(a.getCreatedAt() != null ? a.getCreatedAt().toString() : null)
+                .ownerId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
+                .ownerUsername(sender != null ? sender.getUsername() : null)
+                .ownerName(sender != null ? sender.getName() : null)
+                .ownerAvatar(sender != null ? sender.getProfileImage() : null)
+                .build();
+    }
+
+    // ── media_assets mappers ──────────────────────────────────────────────────
+
+    private static AdminMediaOwnershipResponse.Bucket bucket(
+            String label, Number count, Number bytes) {
+        return AdminMediaOwnershipResponse.Bucket.builder()
+                .label(label)
+                .count(count != null ? count.longValue() : 0L)
+                .bytes(bytes != null ? bytes.longValue() : 0L)
+                .build();
+    }
+
+    /**
+     * Serve URL for a stored reference (same shape the storage gallery uses).
+     */
+    private static String mediaServeUrl(String reference) {
+        if (reference == null) return null;
+        return "/api/v1/uploads/media?path=" + URLEncoder.encode(
+                reference, StandardCharsets.UTF_8);
+    }
+
+    private AdminMediaOwnershipResponse.RecentUpload toRecentUpload(
+            MediaAsset m) {
+        User o = m.getOwner();
+        boolean stranger = m.getContext() == MediaContext.STRANGER;
+        return AdminMediaOwnershipResponse.RecentUpload.builder()
+                .key(m.getStorageKey())
+                .reference(m.getReference())
+                .url(mediaServeUrl(m.getReference()))
+                .kind(mediaKind(m.getUploadType(), m.getContentType(), m.getStorageKey()))
+                .context(m.getContext() != null ? m.getContext().name() : null)
+                .uploadType(m.getUploadType())
+                .contentType(m.getContentType())
+                .fileSize(m.getFileSize() != null ? m.getFileSize() : 0L)
+                .strangerMode(stranger)
+                .uploadedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                .ownerId(o != null && o.getUuid() != null ? o.getUuid().toString() : null)
+                .ownerUsername(o != null ? o.getUsername() : null)
+                .ownerName(o != null ? o.getName() : null)
+                .ownerAvatar(o != null ? o.getProfileImage() : null)
+                .build();
+    }
+
+    private AdminMediaAssetView toMediaAssetView(
+            MediaAsset m) {
+        User o = m.getOwner();
+        boolean stranger = m.getContext() == MediaContext.STRANGER;
+        return AdminMediaAssetView.builder()
+                .id(m.getUuid() != null ? m.getUuid().toString() : String.valueOf(m.getId()))
+                .key(m.getStorageKey())
+                .reference(m.getReference())
+                .url(mediaServeUrl(m.getReference()))
+                .kind(mediaKind(m.getUploadType(), m.getContentType(), m.getStorageKey()))
+                .context(m.getContext() != null ? m.getContext().name() : null)
+                .contextId(m.getContextId())
+                .uploadType(m.getUploadType())
+                .contentType(m.getContentType())
+                .fileSize(m.getFileSize() != null ? m.getFileSize() : 0L)
+                .originalFileName(m.getOriginalFileName())
+                .strangerMode(stranger)
+                .uploadedAt(m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                .ownerId(o != null && o.getUuid() != null ? o.getUuid().toString() : null)
+                .ownerUsername(o != null ? o.getUsername() : null)
+                .ownerName(o != null ? o.getName() : null)
+                .ownerAvatar(o != null ? o.getProfileImage() : null)
+                .build();
+    }
+
+    /**
+     * Coarse media kind from the upload type / mime / key — image/video/audio/file.
+     */
+    private static String mediaKind(String uploadType, String contentType, String key) {
+        String t = uploadType != null ? uploadType.toLowerCase() : "";
+        if (t.equals("image") || t.equals("video") || t.equals("audio")) return t;
+        if (t.equals("voice")) return "audio";
+        return kindOf(key != null ? key : "", contentType);
+    }
+
+    /**
+     * List + DB-reconcile a prefix, TTL-cached (OCI ListObjects is expensive).
+     */
+    private List<AdminStorageObjectView> reconcileStorage(String prefix) {
+        String cacheKey = prefix == null ? "" : prefix;
+        StorageSnapshot cached = storageCache.get(cacheKey);
+        long now = System.currentTimeMillis();
+        if (cached != null && now - cached.builtAtMs() < STORAGE_CACHE_TTL_MS) {
+            return cached.objects();
+        }
+
+        String mediaRoot = storageProperties.getMediaRoot();
+
+        // Reference maps built from every chat attachment (fileUrl decrypted per chat).
+        // key → attachment for enrichment; a separate set of thumbnail keys so a video's
+        // poster frame doesn't show up as its own tile.
+        Map<String, MessageAttachment> byKey = new HashMap<>();
+        Set<String> thumbKeys = new HashSet<>();
+        for (MessageAttachment a : attachmentRepository.findAll()) {
+            try {
+                Message m = a.getMessage();
+                Long chatId = m != null && m.getChat() != null ? m.getChat().getId() : null;
+                String fileRef = messageCryptoService.decrypt(chatId, a.getFileUrl());
+                String k = MediaKeys.key(fileRef, mediaRoot);
+                if (k != null) byKey.putIfAbsent(k, a);
+                if (a.getThumbnailUrl() != null) {
+                    String tk = MediaKeys.key(
+                            messageCryptoService.decrypt(chatId, a.getThumbnailUrl()), mediaRoot);
+                    if (tk != null) thumbKeys.add(tk);
+                }
+            } catch (RuntimeException ignored) { /* skip un-decryptable row */ }
+        }
+
+        List<MediaStorage.StoredObject> stored = mediaStorage.list(prefix);
+
+        // Admin-only upload-ownership rows — the authoritative owner for objects that
+        // never became a chat attachment (stranger & lobby media). Bulk-loaded by key.
+        Map<String, MediaAsset> assetByKey = new HashMap<>();
+        List<String> objectKeys = stored.stream().map(MediaStorage.StoredObject::key).collect(Collectors.toList());
+        for (int i = 0; i < objectKeys.size(); i += 1000) { // chunk the IN-list
+            List<String> chunk = objectKeys.subList(i, Math.min(i + 1000, objectKeys.size()));
+            for (MediaAsset ma : mediaAssetRepository.findByStorageKeyIn(chunk)) {
+                assetByKey.putIfAbsent(ma.getStorageKey(), ma);
+            }
+        }
+        // Per-reconcile cache for the legacy owner-in-path fallback (uuid → User).
+        Map<String, User> userByUuid = new HashMap<>();
+
+        List<AdminStorageObjectView> out = new ArrayList<>(stored.size());
+        for (MediaStorage.StoredObject o : stored) {
+            String key = o.key();
+            if (thumbKeys.contains(key)) continue; // fold thumbnails into their parent
+            String cat = categoryOf(key);
+            MessageAttachment att = byKey.get(key);
+            boolean linked = att != null;
+            boolean orphan = !linked && CHAT_MEDIA_CATEGORIES.contains(cat);
+
+            AdminStorageObjectView.AdminStorageObjectViewBuilder b = AdminStorageObjectView.builder()
+                    .key(key)
+                    .reference(o.reference())
+                    .url("/api/v1/uploads/media?path=" + URLEncoder.encode(
+                            o.reference(), StandardCharsets.UTF_8))
+                    .category(cat)
+                    .size(o.size())
+                    .contentType(o.contentType())
+                    .lastModified(o.lastModified() != null ? o.lastModified().toString() : null)
+                    .linked(linked)
+                    .orphan(orphan);
+
+            if (att != null) {
+                Message m = att.getMessage();
+                Chat chat = m != null ? m.getChat() : null;
+                Long chatId = chat != null ? chat.getId() : null;
+                User sender = m != null ? m.getSender() : null;
+                String decryptedName = safeDecrypt(chatId, att.getFileName());
+
+                // Receivers = everyone in the chat other than the sender.
+                List<AdminStorageObjectView.SharedUser> receivers =
+                        chat == null || chat.getMembers() == null ? List.of()
+                                : chat.getMembers().stream()
+                                  .map(ChatMember::getUser)
+                                  .filter(mu -> mu != null && (sender == null || !mu.getId().equals(sender.getId())))
+                                  .map(mu -> AdminStorageObjectView.SharedUser.builder()
+                                             .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                                             .username(mu.getUsername())
+                                             .name(mu.getName())
+                                             .avatar(mu.getProfileImage())
+                                             .build())
+                                  .collect(Collectors.toList());
+
+                // DB is authoritative for linked attachments — classify by message type +
+                // mimeType + name (so a voice note's .webm isn't mistaken for a video).
+                b.kind(kindForLinked(m != null ? m.getMessageType() : null, att.getMimeType(), decryptedName, key))
+                        .attachmentId(att.getUuid() != null ? att.getUuid().toString() : String.valueOf(att.getId()))
+                        .messageId(m != null && m.getUuid() != null ? m.getUuid().toString() : null)
+                        .chatId(chat != null && chat.getUuid() != null ? chat.getUuid().toString() : null)
+                        .chatName(chat != null ? chat.getName() : null)
+                        .chatType(chat != null && chat.getChatType() != null ? chat.getChatType().name() : null)
+                        .strangerMode(chat != null && chat.getChatType() == ChatType.STRANGER)
+                        .ownerSource("MESSAGE_ATTACHMENT")
+                        .senderId(sender != null && sender.getUuid() != null ? sender.getUuid().toString() : null)
+                        .senderUsername(sender != null ? sender.getUsername() : null)
+                        .senderName(sender != null ? sender.getName() : null)
+                        .senderAvatar(sender != null ? sender.getProfileImage() : null)
+                        .receivers(receivers)
+                        .fileName(decryptedName)
+                        .mimeType(att.getMimeType())
+                        .duration(att.getDuration())
+                        .fileSize(att.getFileSize() != null ? att.getFileSize() : 0L)
+                        .thumbnailUrl(att.getThumbnailUrl() != null ? safeDecrypt(chatId, att.getThumbnailUrl()) : null)
+                        // Rich message context — the message this file was sent in.
+                        .caption(m != null && m.getContent() != null ? safeDecrypt(chatId, m.getContent()) : null)
+                        .messageType(m != null && m.getMessageType() != null ? m.getMessageType().name() : null)
+                        .forwarded(m != null && m.isForwarded())
+                        .edited(m != null && m.isEdited())
+                        .moderationStatus(m != null && m.getModerationStatus() != null ? m.getModerationStatus().name() : null)
+                        .reactionCount(m != null && m.getReactions() != null ? m.getReactions().size() : 0)
+                        .selfDestructSeconds(m != null ? m.getSelfDestructSeconds() : null)
+                        .selfDestructExpired(m != null && m.isSelfDestructExpired())
+                        .sentAt(m != null && m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                        .createdAt(att.getCreatedAt() != null ? att.getCreatedAt().toString() : null)
+                        .updatedAt(att.getUpdatedAt() != null ? att.getUpdatedAt().toString() : null)
+                        .deleted(m != null && m.isDeleted());
+            } else {
+                // Orphan / non-chat object — best-effort classify from the extension.
+                b.kind(kindOf(key, o.contentType()));
+                enrichOrphanOwner(b, key, cat, assetByKey.get(key), userByUuid);
+            }
+            out.add(b.build());
+        }
+
+        storageCache.put(cacheKey, new StorageSnapshot(now, out));
+        return out;
+    }
+
+    /**
+     * Owner-in-path storage categories: the 2nd key segment is the uploader's User.uuid.
+     */
+    private static final Set<String> OWNER_IN_PATH_CATEGORIES = Set.of("lobby", "profiles", "posts", "stories");
+
+    /**
+     * Attribute an orphan object (no chat attachment) to its uploader. Priority:
+     * <ol>
+     *   <li>the admin-only {@link com.neo.chat.domain.MediaAsset} upload record;</li>
+     *   <li>legacy fallback — the owner {@code User.uuid} embedded in the storage path
+     *       ({@code lobby|profiles|posts|stories/<uuid>/…});</li>
+     *   <li>otherwise UNRECORDED (a legacy anonymous {@code strangers/} upload has no
+     *       owner anywhere — flagged as stranger mode so the UI can say so).</li>
+     * </ol>
+     */
+    private void enrichOrphanOwner(AdminStorageObjectView.AdminStorageObjectViewBuilder b,
+                                   String key, String category,
+                                   MediaAsset asset,
+                                   Map<String, User> userByUuid) {
+        if (asset != null) {
+            User owner = asset.getOwner();
+            boolean anon = asset.getContext() != null && asset.getContext().isAnonymousToPeer();
+            b.ownerSource("UPLOAD_RECORD")
+                    .strangerMode(anon)
+                    .chatType(asset.getContext() != null ? asset.getContext().name() : null)
+                    .chatId(asset.getContextId())
+                    .uploadedAt(asset.getCreatedAt() != null ? asset.getCreatedAt().toString() : null)
+                    .fileName(asset.getOriginalFileName())
+                    .mimeType(asset.getContentType())
+                    .messageType(asset.getUploadType() != null ? asset.getUploadType().toUpperCase() : null)
+                    .fileSize(asset.getFileSize() != null ? asset.getFileSize() : 0L);
+            applyOwner(b, owner);
+            return;
+        }
+
+        // Legacy fallback: owner UUID sits in the path for these categories.
+        if (OWNER_IN_PATH_CATEGORIES.contains(category)) {
+            String uuid = segment(key, 1);
+            User owner = lookupUser(uuid, userByUuid);
+            if (owner != null) {
+                b.ownerSource("STORAGE_PATH").strangerMode(false);
+                applyOwner(b, owner);
+                return;
+            }
+        }
+
+        // Truly anonymous legacy stranger upload (or an unattributable file): no owner
+        // was ever recorded and the path carries none.
+        if ("strangers".equals(category)) {
+            b.ownerSource("UNRECORDED").strangerMode(true);
+        }
+    }
+
+    private void applyOwner(AdminStorageObjectView.AdminStorageObjectViewBuilder b, User owner) {
+        if (owner == null) return;
+        b.senderId(owner.getUuid() != null ? owner.getUuid().toString() : null)
+                .senderUsername(owner.getUsername())
+                .senderName(owner.getName())
+                .senderAvatar(owner.getProfileImage());
+    }
+
+    /**
+     * UUID → User with a per-reconcile cache; null on missing/invalid uuid.
+     */
+    private User lookupUser(String uuid, Map<String, User> cache) {
+        if (uuid == null || uuid.isBlank()) return null;
+        if (cache.containsKey(uuid)) return cache.get(uuid);
+        User u = null;
+        try {
+            u = userRepository.findByUuid(UUID.fromString(uuid)).orElse(null);
+        } catch (RuntimeException ignored) { /* not an uuid (IllegalArgumentException) / lookup fail */ }
+        cache.put(uuid, u);
+        return u;
+    }
+
+    /**
+     * The nth {@code /}-separated segment of a key, or null.
+     */
+    private static String segment(String key, int index) {
+        if (key == null) return null;
+        String[] parts = key.split("/");
+        return index >= 0 && index < parts.length ? parts[index] : null;
+    }
+
+    /**
+     * Decrypt a chat-scoped value, falling back to the raw value on any decryption failure
+     * (so a legacy plaintext or un-decryptable field never breaks the admin view).
+     */
+    private String safeDecrypt(Long chatId, String value) {
+        try {
+            return messageCryptoService.decrypt(chatId, value);
+        } catch (RuntimeException e) {
+            return value;
+        }
+    }
+
+    private static boolean contains(String haystack, String needleLower) {
+        return haystack != null && haystack.toLowerCase().contains(needleLower);
+    }
+
+    /**
+     * The top-level storage category (first path segment) of a key, or "other" if unrecognized.
+     */
+    private static String categoryOf(String key) {
+        int slash = key.indexOf('/');
+        String top = slash > 0 ? key.substring(0, slash) : key;
+        return switch (top) {
+            case "conversations", "lobby", "strangers", "profiles", "posts", "stories" -> top;
+            default -> "other";
+        };
+    }
+
+    /**
+     * Coarse media kind (image/video/audio/file) inferred from content type, then key extension.
+     */
+    private static String kindOf(String key, String contentType) {
+        String ct = contentType != null ? contentType.toLowerCase() : "";
+        if (ct.startsWith("image/")) return "image";
+        if (ct.startsWith("video/")) return "video";
+        if (ct.startsWith("audio/")) return "audio";
+        String k = key.toLowerCase();
+        if (k.matches(".*\\.(png|jpe?g|gif|webp|avif|bmp|svg|heic|heif)$")) return "image";
+        if (k.matches(".*\\.(mp4|webm|mov|m4v|ogv)$")) return "video";
+        if (k.matches(".*\\.(mp3|m4a|aac|ogg|wav|opus)$")) return "audio";
+        return "file";
+    }
+
+    /**
+     * Authoritative kind for a LINKED attachment. Distinguishes a recorded VOICE note
+     * from an uploaded AUDIO file (both are {@code MessageType.AUDIO}) — voice notes are
+     * sent as {@code voice-message-*.webm}, and {@code .webm} otherwise reads as video,
+     * so classify on message type + mime + name rather than extension alone.
+     */
+    private static String kindForLinked(MessageType type, String mimeType,
+                                        String fileName, String key) {
+        String mt = mimeType != null ? mimeType.toLowerCase() : "";
+        String fn = fileName != null ? fileName.toLowerCase() : "";
+        boolean isAudioKind = type == MessageType.AUDIO || mt.startsWith("audio/");
+        if (isAudioKind) {
+            boolean voice = fn.contains("voice-message") || fn.startsWith("voice") || fn.startsWith("ptt")
+                    || mt.equals("audio/webm") || mt.equals("audio/ogg") || mt.equals("audio/opus");
+            return voice ? "voice" : "audio";
+        }
+        if (type == MessageType.VIDEO || mt.startsWith("video/")) return "video";
+        if (type == MessageType.IMAGE || mt.startsWith("image/")) return "image";
+        if (type == MessageType.DOCUMENT) return "file";
+        return kindOf(key, mimeType);
+    }
+
+    // ── mappers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Map a user to the admin list/detail view, resolving presence from the online/idle sets.
+     *
+     * @param detail when true, include the heavier profile fields (bio/occupation/education/interests)
+     */
+    private AdminUserView toView(User u, Set<String> online, Set<String> away, boolean detail) {
+        String presence = online.contains(u.getUsername()) ? "online"
+                : away.contains(u.getUsername()) ? "idle" : "offline";
+        return AdminUserView.builder()
+                .id(u.getUuid() != null ? u.getUuid().toString() : null)
+                .username(u.getUsername())
+                .name(u.getName())
+                .email(u.getEmail())
+                .mobileNumber(u.getMobileNumber())
+                .avatar(u.getProfileImage())
+                .bio(detail ? u.getBio() : null)
+                .age(u.getAge())
+                .gender(u.getGender())
+                .country(u.getCountry())
+                .city(u.getCity())
+                .lastLocation(u.getLastLocation())
+                .lastLoginIp(u.getLastLoginIp())
+                .lastLocationAt(u.getLastLocationAt() != null ? u.getLastLocationAt().toString() : null)
+                .occupation(detail ? u.getOccupation() : null)
+                .education(detail ? u.getEducation() : null)
+                .interests(detail && u.getInterests() != null
+                        ? u.getInterests().stream().map(Enum::name).collect(Collectors.toSet()) : null)
+                .roles(u.getRoles() != null ? u.getRoles().stream().map(Role::getName).collect(Collectors.toList()) : null)
+                .verified(u.isVerified())
+                .guest(u.isGuest())
+                .deleted(u.isDeleted())
+                .banned(u.isBanned())
+                .hasGoogleLinked(u.getGoogleId() != null && !u.getGoogleId().isBlank())
+                .presence(presence)
+                .createdAt(u.getCreatedAt() != null ? u.getCreatedAt().toString() : null)
+                .lastSeenAt(u.getPresenceLastSeenAt() != null ? u.getPresenceLastSeenAt().toString() : null)
+                .deletionRequestedAt(u.getDeletionRequestedAt() != null ? u.getDeletionRequestedAt().toString() : null)
+                .totalUnreadCount(u.getTotalUnreadCount())
+                .build();
+    }
+
+    /**
+     * Map a chat to its admin view: members, a derived name from member names when unnamed, and a
+     * short decrypted preview of the latest non-deleted message (media messages labeled by type).
+     */
+    private AdminChatView toChatView(Chat chat) {
+        List<AdminChatView.Member> members = chat.getMembers() == null ? List.of()
+                : chat.getMembers().stream()
+                  .map(ChatMember::getUser)
+                  .filter(Objects::nonNull)
+                  .map(mu -> AdminChatView.Member.builder()
+                             .id(mu.getUuid() != null ? mu.getUuid().toString() : null)
+                             .username(mu.getUsername())
+                             .name(mu.getName())
+                             .avatar(mu.getProfileImage())
+                             .build())
+                  .collect(Collectors.toList());
+        String name = chat.getName();
+        if (name == null || name.isBlank()) {
+            name = members.stream().map(AdminChatView.Member::getName)
+                    .filter(Objects::nonNull).collect(Collectors.joining(", "));
+        }
+
+        // Latest (non-deleted) message → a short, decrypted preview + its sender.
+        Message last = messageRepository
+                .findFirstByChatAndIsDeletedFalseOrderByCreatedAtDesc(chat).orElse(null);
+        String preview = null;
+        String lastSender = null;
+        String lastAt = chat.getUpdatedAt() != null ? chat.getUpdatedAt().toString() : null;
+        if (last != null) {
+            String decrypted = last.getContent() != null ? safeDecrypt(chat.getId(), last.getContent()) : null;
+            if (decrypted != null && !decrypted.isBlank()) {
+                preview = decrypted.length() > 140 ? decrypted.substring(0, 140) + "…" : decrypted;
+            } else if (last.getMessageType() != null
+                    && last.getMessageType() != MessageType.TEXT) {
+                // Media-only message — label by type (IMAGE / VIDEO / VOICE / …).
+                preview = last.getMessageType().name();
+            }
+            lastSender = last.getSender() != null ? last.getSender().getUsername() : null;
+            if (last.getCreatedAt() != null) lastAt = last.getCreatedAt().toString();
+        }
+
+        return AdminChatView.builder()
+                .id(chat.getUuid() != null ? chat.getUuid().toString() : null)
+                .type(chat.getChatType() != null ? chat.getChatType().name() : null)
+                .name(name)
+                .members(members)
+                .messageCount(messageRepository.countByChat(chat))
+                .createdAt(chat.getCreatedAt() != null ? chat.getCreatedAt().toString() : null)
+                .lastMessageAt(lastAt)
+                .lastMessagePreview(preview)
+                .lastMessageSender(lastSender)
+                .deleted(chat.isDeleted())
+                .build();
+    }
+}

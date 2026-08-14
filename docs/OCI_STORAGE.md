@@ -10,7 +10,7 @@ frontend are all identical. Only where the bytes physically live changes.
 
 ## How it's wired
 
-`MediaStorage` (in `com.chat.talkMe.storage`) has two implementations, selected by
+`MediaStorage` (in `com.neo.chat.storage`) has two implementations, selected by
 `storage.provider`:
 
 - `LocalMediaStorage` — filesystem (default / when `storage.provider` is unset or `local`).

@@ -38,7 +38,7 @@ threshold (line ≥ 85%, branch ≥ 80%) is a gap to close.
   use fixed UUIDs/ids.
 
 Build & run: `cd TalkMe && ./gradlew test`. Batch run:
-`./gradlew test --tests "com.chat.talkMe.service.impl.*"`.
+`./gradlew test --tests "com.neo.chat.service.impl.*"`.
 
 ---
 

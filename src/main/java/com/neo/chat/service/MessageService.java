@@ -1,0 +1,85 @@
+package com.neo.chat.service;
+
+import com.neo.chat.domain.Chat;
+import com.neo.chat.domain.MessageAttachment;
+import com.neo.chat.domain.User;
+import com.neo.chat.dto.request.ReactToMessageRequest;
+import com.neo.chat.dto.request.SendMessageRequest;
+import com.neo.chat.dto.response.MessagePageResponse;
+import com.neo.chat.dto.response.MessageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * Chat message lifecycle: send, edit, delete, pin/star, react, search, and self-destruct media.
+ */
+public interface MessageService {
+    MessageResponse sendMessage(String chatUuid, SendMessageRequest request, User currentUser);
+
+    /**
+     * Edit a text message's content. Sender-only; re-moderated; sets isEdited + broadcasts.
+     */
+    MessageResponse editMessage(String chatUuid, String messageUuid, String content, User currentUser);
+
+    /**
+     * Release the messages that were held pending explicit-content consent in a
+     * 1:1 chat (marks them RELEASED and delivers them to the recipient through the
+     * normal durable broadcast pipeline). Called when consent is granted.
+     */
+    void releaseHeldMessages(Chat chat);
+
+
+    /**
+     * Persists a SYSTEM message (group event like "X added Y") authored by
+     * {@code actor} and broadcasts it to the chat like a normal message so it
+     * appears inline. {@code contentJson} is the serialized system-event payload.
+     */
+    void sendSystemMessage(String chatUuid, User actor, String contentJson, User currentUser);
+
+    /**
+     * Pin or unpin a message (authz enforced by the caller). Broadcasts the change.
+     */
+    MessageResponse setMessagePinned(String chatUuid, String messageUuid, boolean pinned, User currentUser);
+
+    /**
+     * Star / unstar (save) a message for the current user.
+     */
+    void setMessageStarred(String chatUuid, String messageUuid, boolean starred, User currentUser);
+
+    /**
+     * The current user's starred (saved) messages, newest-first.
+     */
+    List<MessageResponse> getStarredMessages(User currentUser, int limit);
+
+    MessagePageResponse getMessages(String chatUuid, Long cursor, int limit, User currentUser);
+
+    List<MessageResponse> getMessagesAfter(String chatUuid, Long afterSequence, User currentUser);
+
+    Page<MessageResponse> searchMessages(String chatUuid, String query, Pageable pageable, User currentUser);
+
+    void deleteMessage(String chatUuid, String messageUuid, User currentUser);
+
+    MessageAttachment getAttachment(String attachmentUuid);
+
+    /**
+     * Receiver opens a self-destruct media → arm the timer (idempotent, receiver-only).
+     */
+    MessageResponse revealSelfDestruct(String chatUuid, String messageUuid, User currentUser);
+
+    /**
+     * Receiver finished viewing → destroy the media now (file + attachment, broadcast).
+     */
+    void consumeSelfDestruct(String chatUuid, String messageUuid, User currentUser);
+
+    /**
+     * Backstop reaper: destroy every armed self-destruct media whose deadline has passed.
+     */
+    int reapExpiredSelfDestruct(Instant now);
+
+    MessageResponse reactToMessage(String chatUuid, String messageUuid, ReactToMessageRequest request, User currentUser);
+
+    MessageResponse removeReaction(String chatUuid, String messageUuid, String emoji, User currentUser);
+}

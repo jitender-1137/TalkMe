@@ -1,0 +1,928 @@
+package com.neo.chat.service.impl;
+
+import com.neo.chat.cache.BlockCache;
+import com.neo.chat.cache.MemberCountCache;
+import com.neo.chat.cache.UserSettingsCache;
+import com.neo.chat.crypto.ChatKeyService;
+import com.neo.chat.crypto.MessageCryptoService;
+import com.neo.chat.domain.Chat;
+import com.neo.chat.domain.ChatMember;
+import com.neo.chat.domain.ChatSettings;
+import com.neo.chat.domain.Message;
+import com.neo.chat.domain.OutboxEvent;
+import com.neo.chat.domain.User;
+import com.neo.chat.dto.request.CreateChatRequest;
+import com.neo.chat.dto.response.AuthUserResponse;
+import com.neo.chat.dto.response.ChatKeyResponse;
+import com.neo.chat.dto.response.ChatResponse;
+import com.neo.chat.dto.response.GroupInfoResponse;
+import com.neo.chat.dto.response.MessageResponse;
+import com.neo.chat.enums.ChatType;
+import com.neo.chat.enums.MemberRole;
+import com.neo.chat.event.StatusUpdateEvent;
+import com.neo.chat.exception.ForbiddenException;
+import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.mapper.ChatMapper;
+import com.neo.chat.mapper.MessageMapper;
+import com.neo.chat.mapper.UserMapper;
+import com.neo.chat.repository.ChatMemberRepository;
+import com.neo.chat.repository.ChatRepository;
+import com.neo.chat.repository.FriendRepository;
+import com.neo.chat.repository.MessageReadReceiptRepository;
+import com.neo.chat.repository.MessageRepository;
+import com.neo.chat.repository.OutboxEventRepository;
+import com.neo.chat.repository.UserRepository;
+import com.neo.chat.service.ChatService;
+import com.neo.chat.service.PresenceService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * Default {@link ChatService} implementation: creates/lists/fetches conversations, manages per-member
+ * state (archive/mute/pin/clear/delete, manual unread), and drives read/delivered receipts.
+ * <p>
+ * Receipt changes are broadcast over the transactional outbox (persist-then-publish, re-driven by the
+ * outbox poller) and honor Ghost-mode privacy (a ghost recipient's receipts stay invisible to senders).
+ * Uses {@link MemberCountCache}/{@link UserSettingsCache}/{@link BlockCache} to avoid N+1 reads and
+ * {@link SimpMessagingTemplate} for WebSocket chat events.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ChatServiceImpl implements ChatService {
+
+    private final ChatRepository chatRepository;
+    private final ChatMemberRepository chatMemberRepository;
+    private final MemberCountCache memberCountCache;
+    private final UserSettingsCache userSettingsCache;
+    private final BlockCache blockCache;
+    private final UserRepository userRepository;
+    private final MessageRepository messageRepository;
+    private final MessageReadReceiptRepository readReceiptRepository;
+    private final UserMapper userMapper;
+    private final MessageMapper messageMapper;
+    private final ChatMapper chatMapper;
+    private final PresenceService presenceService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final FriendRepository friendRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private final ObjectMapper objectMapper;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ChatKeyService chatKeyService;
+    private final MessageCryptoService messageCryptoService;
+
+    /**
+     * Re-loads the user as a JPA-managed entity so lazy associations are reachable; returns the
+     * argument unchanged when it is null or not yet persisted (no id).
+     *
+     * @param user the (possibly detached) user
+     * @return the managed entity, or the original when it can't be loaded
+     */
+    private User ensureManagedUser(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getId() == null) {
+            return user;
+        }
+        return userRepository.findById(user.getId()).orElse(user);
+    }
+
+    /**
+     * Creates a chat. With a recipientId, creates (or reuses/reopens) a 1:1 PRIVATE chat and notifies the
+     * recipient via WebSocket; otherwise creates a legacy GROUP chat with the caller as owner. Reusing an
+     * existing active 1:1 leaves the caller's pin/archive/cleared state untouched.
+     *
+     * @param request     recipientId for 1:1, or name + memberIds for a group
+     * @param currentUser the authenticated creator
+     * @return the created or reused chat as seen by the creator
+     * @throws com.neo.chat.exception.NotFoundException TM_064 when the recipient user does not exist
+     */
+    @Override
+    @Transactional
+    public ChatResponse createChat(CreateChatRequest request, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        if (request.getRecipientId() != null) {
+            // Private Chat
+            User recipient = userRepository.findByUuid(UUID.fromString(request.getRecipientId()))
+                    .orElseThrow(() -> new NotFoundException("Recipient user not found", "TM_064"));
+
+            // Check if private chat already exists between these users (active or deleted)
+            List<Chat> existingChats = chatRepository.findPrivateChatBetweenUsers(managedUser.getId(), recipient.getId());
+            if (!existingChats.isEmpty()) {
+                // Reuse the existing 1:1 chat instead of minting a new id. Prefer an
+                // ACTIVE chat (deterministic — the query has no ordering); only fall
+                // back to a deleted one, which we then reopen. This is the path hit
+                // when B messages A from the feed / profile explorer.
+                Chat chat = existingChats.stream()
+                        .filter(c -> !c.isDeleted())
+                        .findFirst()
+                        .orElse(existingChats.getFirst());
+
+                if (chat.isDeleted()) {
+                    // Reopen a previously-deleted conversation as a FRESH chat:
+                    // undelete the chat + members and stamp clearedAt = now so the
+                    // old (deleted) messages never resurface for either side.
+                    Instant reopenedAt = Instant.now();
+                    chat.setDeleted(false);
+                    chatRepository.save(chat);
+                    for (ChatMember m : chat.getMembers()) {
+                        m.setDeleted(false);
+                        m.setPinned(false);
+                        m.setArchived(false);
+                        m.setClearedAt(reopenedAt);
+                        chatMemberRepository.save(m);
+                    }
+                }
+                // An ACTIVE chat is returned untouched — reusing it must NOT reset
+                // the user's pin / archive / cleared state.
+
+                // Send user chat event to the recipient so their frontend can fetch it and subscribe
+                try {
+                    Map<String, Object> eventWrapper = new HashMap<>();
+                    eventWrapper.put("event", "chat_created");
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("chatId", chat.getUuid().toString());
+                    eventWrapper.put("payload", payload);
+                    messagingTemplate.convertAndSendToUser(recipient.getUsername(), "/queue/chats", eventWrapper);
+                } catch (Exception e) {
+                    log.error("Failed to send chat_created WS event to recipient", e);
+                }
+
+                return mapToChatResponse(chat, managedUser);
+            }
+
+            Chat chat = Chat.builder()
+                    .chatType(ChatType.PRIVATE)
+                    .build();
+            chat = chatRepository.save(chat);
+
+            ChatMember memberSelf = ChatMember.builder()
+                    .chat(chat)
+                    .user(managedUser)
+                    .isAdmin(true)
+                    .joinedAt(Instant.now())
+                    .build();
+
+            ChatMember memberOther = ChatMember.builder()
+                    .chat(chat)
+                    .user(recipient)
+                    .isAdmin(false)
+                    .joinedAt(Instant.now())
+                    .build();
+
+            chatMemberRepository.save(memberSelf);
+            chatMemberRepository.save(memberOther);
+
+            chat.getMembers().add(memberSelf);
+            chat.getMembers().add(memberOther);
+
+            // Send user chat event to the recipient so their frontend can fetch it and subscribe
+            try {
+                Map<String, Object> eventWrapper = new HashMap<>();
+                eventWrapper.put("event", "chat_created");
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("chatId", chat.getUuid().toString());
+                eventWrapper.put("payload", payload);
+                messagingTemplate.convertAndSendToUser(recipient.getUsername(), "/queue/chats", eventWrapper);
+            } catch (Exception e) {
+                log.error("Failed to send chat_created WS event to recipient", e);
+            }
+
+            return mapToChatResponse(chat, managedUser);
+        } else {
+            // Group Chat (legacy path — new groups should use GroupService.createGroup)
+            Chat chat = Chat.builder()
+                    .name(request.getName())
+                    .chatType(ChatType.GROUP)
+                    .ownerId(managedUser.getId())
+                    .build();
+            chat = chatRepository.save(chat);
+
+            ChatMember adminMember = ChatMember.builder()
+                    .chat(chat)
+                    .user(managedUser)
+                    .joinedAt(Instant.now())
+                    .build();
+            adminMember.setRole(MemberRole.OWNER);
+            chatMemberRepository.save(adminMember);
+            chat.getMembers().add(adminMember);
+
+            if (request.getMemberIds() != null) {
+                for (String memberUuid : request.getMemberIds()) {
+                    User user = userRepository.findByUuid(UUID.fromString(memberUuid)).orElse(null);
+                    if (user != null && !user.getId().equals(managedUser.getId())) {
+                        ChatMember groupMember = ChatMember.builder()
+                                .chat(chat)
+                                .user(user)
+                                .joinedAt(Instant.now())
+                                .build();
+                        groupMember.setRole(MemberRole.MEMBER);
+                        chatMemberRepository.save(groupMember);
+                        chat.getMembers().add(groupMember);
+                    }
+                }
+            }
+
+            return mapToChatResponse(chat, managedUser);
+        }
+    }
+
+    /**
+     * Lists the user's conversations, hiding empty 1:1 chats, de-duplicating multiple 1:1 rows to the same
+     * peer (keeping the one with the newest last message), and sorting pinned-first then by recency.
+     *
+     * @param currentUser the authenticated viewer
+     * @return the viewer's visible chats, ordered for the chat list
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ChatResponse> getChats(User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        List<Chat> chats = chatRepository.findChatsByUser(managedUser);
+
+        Map<Long, ChatResponse> privateChatMap = new HashMap<>();
+        List<ChatResponse> uniqueChats = new ArrayList<>();
+
+        for (Chat chat : chats) {
+            ChatResponse resp = mapToChatResponse(chat, managedUser);
+
+            boolean isMultiParty = chat.isMultiParty();
+
+            // Filter out 1:1 chats that have no messages (e.g. cleared). Multi-party
+            // chats (group/channel/room) are always shown once joined.
+            if (!isMultiParty && resp.getLastMessage() == null) {
+                continue;
+            }
+
+            if (!isMultiParty) {
+                ChatMember memberOther = chat.getMembers().stream()
+                        .filter(m -> !m.getUser().getId().equals(managedUser.getId()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (memberOther != null) {
+                    Long otherUserId = memberOther.getUser().getId();
+                    if (privateChatMap.containsKey(otherUserId)) {
+                        ChatResponse existing = privateChatMap.get(otherUserId);
+                        String t1 = resp.getLastMessage() != null ? resp.getLastMessage().getCreatedAt() : "";
+                        String t2 = existing.getLastMessage() != null ? existing.getLastMessage().getCreatedAt() : "";
+                        if (t1.compareTo(t2) > 0) {
+                            privateChatMap.put(otherUserId, resp);
+                        }
+                    } else {
+                        privateChatMap.put(otherUserId, resp);
+                    }
+                } else {
+                    uniqueChats.add(resp);
+                }
+            } else {
+                uniqueChats.add(resp);
+            }
+        }
+
+        uniqueChats.addAll(privateChatMap.values());
+
+        return uniqueChats.stream()
+                .sorted(Comparator.comparing(ChatResponse::isPinned, Comparator.reverseOrder())
+                        .thenComparing((c1, c2) -> {
+                            String t1 = c1.getLastMessage() != null ? c1.getLastMessage().getCreatedAt() : "";
+                            String t2 = c2.getLastMessage() != null ? c2.getLastMessage().getCreatedAt() : "";
+                            return t2.compareTo(t1);
+                        }))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Fetches a single chat by UUID, enforcing that the caller is a participant.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated viewer
+     * @return the chat as seen by the viewer
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ChatResponse getChatByUuid(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Only a participant may read a chat — otherwise any authenticated user could
+        // fetch another conversation's participant PII + last-message preview by UUID.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+        return mapToChatResponse(chat, managedUser);
+    }
+
+    /**
+     * Returns the per-chat AES-256-GCM key for an authorized participant, or a disabled response when
+     * message encryption is not active.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated viewer
+     * @return the base64 key (with algo/version) when enabled, else {@code enabled=false}
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public ChatKeyResponse getChatKey(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Only a participant of this chat may fetch its key.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        if (!messageCryptoService.isEnabled()) {
+            return ChatKeyResponse.builder().enabled(false).build();
+        }
+        return ChatKeyResponse.builder()
+                .enabled(true)
+                .key(chatKeyService.getRawKeyBase64(chat.getId()))
+                .algo("AES-256-GCM")
+                .version(1)
+                .build();
+    }
+
+    /**
+     * Sets the archived flag on the caller's membership of the chat (per-user state).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @param archive     true to archive, false to unarchive
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public void archiveChat(String uuid, User currentUser, boolean archive) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        member.setArchived(archive);
+        chatMemberRepository.save(member);
+    }
+
+    /**
+     * Sets the muted flag on the caller's membership of the chat (per-user state).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @param mute        true to mute, false to unmute
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public void muteChat(String uuid, User currentUser, boolean mute) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        member.setMuted(mute);
+        chatMemberRepository.save(member);
+    }
+
+    /**
+     * Sets the pinned flag on the caller's membership of the chat (per-user state).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @param pin         true to pin, false to unpin
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public void pinChat(String uuid, User currentUser, boolean pin) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        member.setPinned(pin);
+        chatMemberRepository.save(member);
+    }
+
+    /**
+     * Clears the chat for the caller only by stamping their membership {@code clearedAt = now}, so older
+     * messages no longer surface for them (other members are unaffected).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public void clearChat(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        member.setClearedAt(Instant.now());
+        chatMemberRepository.save(member);
+
+        log.info("Clear chat requested for chat: {}", uuid);
+    }
+
+    /**
+     * Deletes the chat. Physically removes all messages (cascading to receipts/reactions/attachments), then
+     * soft-deletes the chat and every membership and broadcasts a {@code chat_deleted} WebSocket event. For
+     * a multi-party chat this deletes it for everyone, so only the owner may do it.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.neo.chat.exception.NotFoundException  TM_121 when the chat is missing,
+     *                                                      TM_141 when the caller is not a member
+     * @throws com.neo.chat.exception.ForbiddenException TM_291 when a non-owner tries to delete a group
+     */
+    @Override
+    @Transactional
+    public void deleteChat(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        // For a group/channel/room, deleting removes it for EVERYONE — only the
+        // owner may do that. (1:1 chats keep the existing per-user delete behavior.)
+        if (chat.isMultiParty() && member.getRole() != MemberRole.OWNER) {
+            throw new ForbiddenException(
+                    "Only the group owner can delete the group", "TM_291");
+        }
+
+        // Delete all messages in the chat from the database (cascading deletes for read receipts, reactions, and attachments)
+        List<Message> messages = messageRepository.findByChat(chat);
+        messageRepository.deleteAll(messages);
+
+        // Mark chat and all its members as deleted, and unpin/unarchive them
+        chat.setDeleted(true);
+        chatRepository.save(chat);
+
+        for (ChatMember m : chat.getMembers()) {
+            m.setDeleted(true);
+            m.setPinned(false);
+            m.setArchived(false);
+            chatMemberRepository.save(m);
+        }
+
+        // Broadcast WS event: chat_deleted to all subscribers of the chat messages topic and other members' personal queues
+        try {
+            Map<String, Object> eventWrapper = new HashMap<>();
+            eventWrapper.put("event", "chat_deleted");
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("chatId", uuid);
+
+            eventWrapper.put("payload", payload);
+
+            // 1. Send to chat topic
+            messagingTemplate.convertAndSend("/topic/chat/" + uuid + "/messages", (Object) eventWrapper);
+
+            // 2. Send to other members' personal user queue
+            for (ChatMember memberObj : chat.getMembers()) {
+                User memberUser = memberObj.getUser();
+                if (memberUser != null && !memberUser.getId().equals(currentUser.getId())) {
+                    messagingTemplate.convertAndSendToUser(
+                            memberUser.getUsername(),
+                            "/queue/chats",
+                            eventWrapper
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send chat_deleted WS event", e);
+        }
+    }
+
+    /**
+     * Forces the caller's "manually unread" flag on, so the chat shows an unread badge even with no
+     * genuinely-unread messages (cleared when they next read the chat).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public void markUnread(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+        if (!member.isManuallyUnread()) {
+            member.setManuallyUnread(true);
+            chatMemberRepository.save(member);
+        }
+    }
+
+    /**
+     * Marks the chat read for the caller: clears any manual-unread flag, then for multi-party chats advances
+     * the member's forward-only read watermark, or for 1:1 chats bulk-updates/inserts READ receipts and
+     * publishes a READ status event via the transactional outbox (broadcast after commit).
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Transactional
+    public void markRead(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Membership guard — otherwise any user with a chat UUID could forge READ
+        // receipts (which then broadcast to the real participants).
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        // Opening/reading the chat clears any manual "unread" flag.
+        chatMemberRepository.findByChatAndUser(chat, managedUser).ifPresent(m -> {
+            if (m.isManuallyUnread()) {
+                m.setManuallyUnread(false);
+                chatMemberRepository.save(m);
+            }
+        });
+
+        Instant now = Instant.now();
+
+        // Multi-party chats use the watermark model (no per-message receipts): advance
+        // this member's lastReadMessageId to the latest message. Cheaper and correct
+        // for N members. "Seen by" is derived from watermarks (deferred feature).
+        if (chat.isMultiParty()) {
+            // Atomic, forward-only watermark advance — see advanceReadWatermark. Avoids
+            // the optimistic-lock race when two mark-read calls (join + chat-open on an
+            // invitation link) hit the same ChatMember row concurrently.
+            long maxId = messageRepository.findMaxMessageId(chat);
+            chatMemberRepository.advanceReadWatermark(chat, managedUser, maxId);
+            return;
+        }
+
+        // Step 1: Bulk-update all existing non-READ receipts for this user in this chat
+        int updatedCount = readReceiptRepository.bulkMarkAsRead(chat, managedUser.getId(), now);
+
+        // Step 2: Atomically create READ receipts for messages that have no receipt yet.
+        int insertedCount = readReceiptRepository.insertMissingReceipts(
+                chat.getId(), managedUser.getId(), "READ", now, now, now);
+
+        boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
+
+        if (hasUpdates) {
+            // Guaranteed delivery via the transactional outbox: persist a status row in
+            // THIS transaction, then broadcast after commit (StatusBroadcastListener).
+            // If the broadcast is lost, the outbox poller re-drives it. The unread
+            // recompute now runs in the delivery handler (idempotent, from the DB).
+            StatusUpdateEvent event = StatusUpdateEvent.builder()
+                    .eventKey(UUID.randomUUID().toString())
+                    .chatUuid(uuid)
+                    .eventName(StatusUpdateEvent.READ)
+                    .actorUuid(managedUser.getUuid().toString())
+                    .actorUserId(managedUser.getId())
+                    .build();
+            persistStatusOutbox(event);
+            applicationEventPublisher.publishEvent(event);
+        }
+    }
+
+    /**
+     * Marks the chat delivered for the caller: bulk-updates SENT receipts to DELIVERED (never downgrading
+     * READ), inserts DELIVERED receipts for messages lacking one, and publishes a DELIVERED status event via
+     * the transactional outbox. Ghost recipients are handled downstream by the delivery handler.
+     *
+     * @param uuid        the chat UUID
+     * @param currentUser the authenticated member
+     * @throws com.neo.chat.exception.NotFoundException TM_121 when the chat is missing,
+     *                                                     TM_141 when the caller is not a member
+     */
+    @Override
+    @Transactional
+    public void markDelivered(String uuid, User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
+                .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // Membership guard — prevent forging DELIVERED receipts for a chat you're not in.
+        chatMemberRepository.findByChatAndUser(chat, managedUser)
+                .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
+
+        Instant now = Instant.now();
+
+        // Step 1: Bulk-update all SENT receipts to DELIVERED (do NOT downgrade READ)
+        int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
+
+        // Step 2: Atomically create DELIVERED receipts for messages that have no receipt yet.
+        int insertedCount = readReceiptRepository.insertMissingReceipts(
+                chat.getId(), managedUser.getId(), "DELIVERED", null, now, now);
+
+        boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
+
+        if (hasUpdates) {
+            // Guaranteed delivery via the transactional outbox (see markRead).
+            StatusUpdateEvent event = StatusUpdateEvent.builder()
+                    .eventKey(UUID.randomUUID().toString())
+                    .chatUuid(uuid)
+                    .eventName(StatusUpdateEvent.DELIVERED)
+                    .actorUuid(managedUser.getUuid().toString())
+                    // actorUserId lets the delivery handler suppress the receipt when the
+                    // recipient (this user) is in Ghost mode — was missing, so ghost
+                    // "delivered" still leaked to the sender.
+                    .actorUserId(managedUser.getId())
+                    .build();
+            persistStatusOutbox(event);
+            applicationEventPublisher.publishEvent(event);
+        }
+    }
+
+    /**
+     * Persists a status-change outbox row in the caller's transaction, so it commits
+     * atomically with the receipt update. {@code StatusBroadcastListener} delivers it
+     * after commit; {@code OutboxPublisherJob} re-drives it if that delivery is lost.
+     */
+    private void persistStatusOutbox(StatusUpdateEvent event) {
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            OutboxEvent row = OutboxEvent.builder()
+                    .eventKey(event.getEventKey())
+                    .eventType(StatusUpdateEvent.EVENT_TYPE)
+                    .payload(payload)
+                    .status(OutboxEvent.STATUS_PENDING)
+                    .attempts(0)
+                    .createdAt(Instant.now())
+                    .build();
+            outboxEventRepository.save(row);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to persist status outbox event", e);
+        }
+    }
+
+    /**
+     * Marks every one of the caller's chats delivered (used on connect/reconnect): per chat, bulk-updates
+     * SENT receipts to DELIVERED and inserts missing ones. A Ghost caller still records delivery but the
+     * outbound {@code messages_delivered} broadcast is suppressed so senders never learn of it.
+     *
+     * @param currentUser the authenticated recipient
+     */
+    @Override
+    @Transactional
+    public void markAllChatsDelivered(User currentUser) {
+        User managedUser = ensureManagedUser(currentUser);
+        List<Chat> chats = chatRepository.findChatsByUser(managedUser);
+        Instant now = Instant.now();
+
+        // Ghost recipient: still record delivery (their unread tracking needs it) but
+        // NEVER tell the senders — suppress the outbound "delivered" broadcast.
+        boolean ghost = presenceService != null && presenceService.isGhost(managedUser);
+
+        for (Chat chat : chats) {
+            // Step 1: Bulk-update all SENT receipts to DELIVERED
+            int updatedCount = readReceiptRepository.bulkMarkAsDelivered(chat, managedUser.getId(), now);
+
+            // Step 2: Atomically create DELIVERED receipts for messages without any receipt
+            int insertedCount = readReceiptRepository.insertMissingReceipts(
+                    chat.getId(), managedUser.getId(), "DELIVERED", null, now, now);
+
+            boolean hasUpdates = updatedCount > 0 || insertedCount > 0;
+
+            if (hasUpdates && !ghost) {
+                try {
+                    Map<String, Object> eventWrapper = new HashMap<>();
+                    eventWrapper.put("event", "messages_delivered");
+
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("chatId", chat.getUuid().toString());
+                    payload.put("deliveredBy", managedUser.getUuid().toString());
+
+                    eventWrapper.put("payload", payload);
+                    messagingTemplate.convertAndSend("/topic/chat/" + chat.getUuid().toString() + "/messages", (Object) eventWrapper);
+                } catch (Exception e) {
+                    log.error("WebSocket messages_delivered broadcast failed for chat: {}", chat.getUuid(), e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Ids of this chat's members (other than the viewer) who are in Ghost mode.
+     */
+    private Set<Long> ghostMemberIds(Chat chat, User viewer) {
+        List<User> others = chat.getMembers().stream()
+                .map(ChatMember::getUser)
+                .filter(u -> u != null && !u.getId().equals(viewer.getId()))
+                .collect(Collectors.toList());
+        return presenceService.getGhostUserIds(others);
+    }
+
+    /**
+     * Sender-visible status ignoring receipts from Ghost recipients (those cap at SENT).
+     */
+    private String resolveStatusExcludingGhosts(Message m, Set<Long> ghostIds) {
+        if (m.getReadReceipts() == null || m.getReadReceipts().isEmpty()) return "SENT";
+        boolean delivered = false;
+        for (var rec : m.getReadReceipts()) {
+            Long uid = rec.getUser().getId();
+            if (uid.equals(m.getSender().getId())) continue;
+            if (ghostIds.contains(uid)) continue; // ghost recipient → invisible to sender
+            if ("READ".equals(rec.getStatus())) return "READ";
+            if ("DELIVERED".equals(rec.getStatus())) delivered = true;
+        }
+        return delivered ? "DELIVERED" : "SENT";
+    }
+
+    /**
+     * Maps a chat to its viewer-relative DTO: per-member flags, the last visible message (respecting the
+     * viewer's clearedAt/leftAt window and Ghost status caps), 1:1 peer info (presence, last-seen, friend
+     * and block state, with masking when the peer blocked the viewer) or group metadata, and the unread
+     * count (watermark model for multi-party, receipt scan for 1:1, plus the manual-unread override).
+     *
+     * @param chat        the chat entity (with members loaded)
+     * @param currentUser the viewer
+     * @return the assembled chat response
+     */
+    private ChatResponse mapToChatResponse(Chat chat, User currentUser) {
+        ChatMember memberSelf = chat.getMembers().stream()
+                .filter(m -> m.getUser().getId().equals(currentUser.getId()))
+                .findFirst()
+                .orElse(null);
+
+        ChatResponse response = chatMapper.toChatResponse(chat);
+
+        if (memberSelf != null) {
+            response.setMuted(memberSelf.isMuted());
+            response.setArchived(memberSelf.isArchived());
+            response.setPinned(memberSelf.isPinned());
+        }
+
+        // Last Message — capped to the viewer's visible window: after clearedAt (if the
+        // chat was cleared) AND at/before leftAt (a former member must keep seeing the
+        // last message from BEFORE they left, never messages sent after their exit).
+        Instant previewClearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+        Instant previewLeftAt = memberSelf != null ? memberSelf.getLeftAt() : null;
+        List<Message> lastList = messageRepository.findLastVisibleMessage(
+                chat, previewClearedAt, previewLeftAt, PageRequest.of(0, 1));
+        Message lastMessage = lastList.isEmpty() ? null : lastList.getFirst();
+
+        if (lastMessage != null) {
+            MessageResponse lastMessageDto = messageMapper.toMessageResponse(lastMessage);
+            // Ghost recipients must not reveal delivered/seen to the sender — including
+            // the chat-list preview ticks. For the viewer's OWN last message, recompute
+            // the status ignoring receipts from any ghost member (caps at SENT).
+            if (presenceService != null
+                    && lastMessage.getSender().getId().equals(currentUser.getId())) {
+                Set<Long> ghostIds = ghostMemberIds(chat, currentUser);
+                if (!ghostIds.isEmpty()) {
+                    lastMessageDto.setStatus(resolveStatusExcludingGhosts(lastMessage, ghostIds));
+                }
+            }
+            response.setLastMessage(lastMessageDto);
+        }
+
+        // Set dynamic properties based on ChatType
+        if (chat.getChatType() == ChatType.PRIVATE || chat.getChatType() == ChatType.STRANGER) {
+            // Find the other member
+            ChatMember memberOther = chat.getMembers().stream()
+                    .filter(m -> !m.getUser().getId().equals(currentUser.getId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (memberOther != null) {
+                User otherUser = memberOther.getUser();
+                response.setName(otherUser.getName());
+                AuthUserResponse otherUserDto = userMapper.toAuthUserResponse(otherUser);
+                if (presenceService != null) {
+                    otherUserDto.setPresence(presenceService.getStatus(otherUser).name().toLowerCase());
+                    // Apparent last-seen: null for Invisible / Hide-last-seen (privacy
+                    // rule centralized in PresenceService) so the conversation list never
+                    // leaks a hidden last-seen.
+                    Instant lastSeen = presenceService.getApparentLastSeen(otherUser);
+                    otherUserDto.setLastSeen(lastSeen != null ? lastSeen.toString() : null);
+                }
+                otherUserDto.setMessagingFriendsOnly(userSettingsCache.isMessagingFriendsOnly(otherUser));
+                response.setOtherUser(otherUserDto);
+                // Avatar mappings
+                response.setAvatar(null);
+
+                // Friendship Check
+                boolean isFriend = friendRepository.findByUserAndFriend(currentUser, otherUser)
+                        .map(f -> !f.isDeleted())
+                        .orElse(false);
+                response.setFriend(isFriend);
+
+                // Blocking Check (cached per-user blocked set — avoids 2 DB hits per 1:1 chat).
+                boolean isBlockedByMe = blockCache.hasBlocked(currentUser, otherUser.getId());
+                boolean hasBlockedMe = blockCache.hasBlocked(otherUser, currentUser.getId());
+                response.setBlockedByMe(isBlockedByMe);
+                response.setHasBlockedMe(hasBlockedMe);
+
+                // Mask user data if they blocked current user
+                if (hasBlockedMe) {
+                    otherUserDto.setAvatar(null);
+                    otherUserDto.setPresence("offline");
+                    otherUserDto.setLastSeen(null);
+                }
+            }
+        } else {
+            // Multi-party (GROUP / CHANNEL / ROOM)
+            response.setName(chat.getName());
+            response.setAvatar(chat.getImageUrl());
+            response.setGroup(buildGroupInfo(chat, memberSelf));
+        }
+
+        // Calculate dynamic unread count.
+        long unreadCount;
+        if (chat.isMultiParty() && (memberSelf == null || memberSelf.getLeftAt() != null)) {
+            // Non-member (discovery preview) or former member → nothing unread.
+            unreadCount = 0;
+        } else if (chat.isMultiParty()) {
+            // Watermark model: cheaper than the per-message read-receipt scan and
+            // correct for N members.
+            Long watermark = memberSelf != null ? memberSelf.getLastReadMessageId() : null;
+            Instant clearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+            unreadCount = messageRepository.countUnreadForWatermark(
+                    chat, currentUser.getId(), watermark != null ? watermark : 0L, clearedAt);
+        } else {
+            unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
+        }
+        // "Mark as unread" from the chat list — force the badge on even with no
+        // genuinely-unread messages. Cleared when the user opens/reads the chat.
+        if (unreadCount == 0 && memberSelf != null && memberSelf.isManuallyUnread()) {
+            unreadCount = 1;
+        }
+        response.setUnreadCount((int) unreadCount);
+        response.setTypingUsers(new ArrayList<>());
+
+        return response;
+    }
+
+    /**
+     * Builds the group/channel/room metadata block for a multi-party chat.
+     */
+    private GroupInfoResponse buildGroupInfo(Chat chat, ChatMember memberSelf) {
+        ChatSettings s = chat.getSettings() != null ? chat.getSettings() : ChatSettings.builder().build();
+
+        String ownerUuid = null;
+        if (chat.getOwnerId() != null) {
+            ownerUuid = userRepository.findById(chat.getOwnerId())
+                    .map(u -> u.getUuid().toString())
+                    .orElse(null);
+        }
+
+        String pinnedMessageId = messageRepository.findFirstByChatAndPinnedTrueOrderByPinnedAtDesc(chat)
+                .map(m -> m.getUuid().toString())
+                .orElse(null);
+
+        return GroupInfoResponse.builder()
+                .subtype(chat.getChatType().name().toLowerCase())
+                .visibility(chat.getVisibility().name())
+                .joinPolicy(chat.getJoinPolicy().name())
+                .allowExplicitContent(chat.isAllowExplicitContent())
+                .allowNonFriends(chat.isAllowNonFriends())
+                .memberLimit(chat.getMemberLimit())
+                .memberCount(memberCountCache.get(chat))
+                .description(chat.getDescription())
+                .imageUrl(chat.getImageUrl())
+                .publicUsername(chat.getSlug())
+                .category(chat.getCategory())
+                .tags(chat.getTags() == null ? List.of()
+                        : chat.getTags().stream().map(Enum::name).collect(Collectors.toList()))
+                .ownerId(ownerUuid)
+                .myRole(memberSelf != null ? memberSelf.getRole().name() : null)
+                .active(memberSelf != null && memberSelf.getLeftAt() == null)
+                .pinnedMessageId(pinnedMessageId)
+                .whoCanSend(s.getWhoCanSend().name())
+                .whoCanAddMembers(s.getWhoCanAddMembers().name())
+                .whoCanEditInfo(s.getWhoCanEditInfo().name())
+                .whoCanPin(s.getWhoCanPin().name())
+                .slowModeSeconds(s.getSlowModeSeconds())
+                .build();
+    }
+}

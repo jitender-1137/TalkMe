@@ -1,0 +1,57 @@
+package com.neo.chat.controller;
+
+import com.neo.chat.dto.response.ResponseDto;
+import com.neo.chat.dto.response.SleepRoomResponse;
+import com.neo.chat.dto.response.SuccessResponseDto;
+import com.neo.chat.security.CustomUserDetails;
+import com.neo.chat.service.SleepRoomService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * Sleep companion rooms (features #26/#27). Every route is gated by the SLEEP_ROOMS feature. A
+ * sleep room is a public ROOM in SLEEP_COMPANION mode: low-stimulation, ambient, and non-recorded.
+ */
+@RestController
+@RequestMapping("/sleep-rooms")
+@RequiredArgsConstructor
+public class SleepRoomController {
+
+    private final SleepRoomService sleepRoomService;
+
+    /**
+     * Create a sleep companion room (public ROOM in SLEEP_COMPANION mode) owned by the caller.
+     *
+     * @param userDetails the authenticated caller (becomes the room owner)
+     * @param name        optional room name
+     * @return the created sleep room in a success envelope (message "Sleep room created", TM_994)
+     */
+    @PostMapping
+    @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
+    public ResponseEntity<ResponseDto<SleepRoomResponse>> create(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(value = "name", required = false) String name) {
+        SleepRoomResponse room = sleepRoomService.createSleepRoom(userDetails.getUser(), name);
+        return ResponseEntity.ok(SuccessResponseDto.success(room, "Sleep room created", "TM_994"));
+    }
+
+    /**
+     * List active sleep companion rooms.
+     *
+     * @return the active sleep rooms in a success envelope
+     */
+    @GetMapping
+    @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
+    public ResponseEntity<ResponseDto<List<SleepRoomResponse>>> list() {
+        return ResponseEntity.ok(SuccessResponseDto.success(sleepRoomService.listSleepRooms()));
+    }
+}

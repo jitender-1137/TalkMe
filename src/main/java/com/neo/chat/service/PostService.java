@@ -1,0 +1,62 @@
+package com.neo.chat.service;
+
+import com.neo.chat.domain.User;
+import com.neo.chat.dto.request.PostCommentRequest;
+import com.neo.chat.dto.request.PostRequest;
+import com.neo.chat.dto.response.AuthUserResponse;
+import com.neo.chat.dto.response.PostCommentResponse;
+import com.neo.chat.dto.response.PostResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.time.Instant;
+
+/**
+ * Feed posts: create/read/update/delete, likes, comments/replies, bookmarks, polls, and expiry.
+ */
+public interface PostService {
+    PostResponse createPost(PostRequest request, User currentUser);
+
+    PostResponse votePoll(String postUuid, String optionUuid, User currentUser);
+
+    PostResponse getPost(String postUuid, User currentUser);
+
+    PostResponse getPostByShortCode(String shortCode, User currentUser);
+
+    PostResponse updatePost(String postUuid, PostRequest request, User currentUser);
+
+    Page<PostResponse> getFeed(Pageable pageable, User currentUser);
+
+    Page<PostResponse> getProfileFeed(String userUuid, Pageable pageable, User currentUser);
+
+    void deletePost(String postUuid, User currentUser);
+
+    /**
+     * Soft-delete temporary posts whose TTL has elapsed; returns how many were reaped.
+     */
+    int reapExpiredPosts(Instant now);
+
+    void likePost(String postUuid, User currentUser);
+
+    void unlikePost(String postUuid, User currentUser);
+
+    Page<AuthUserResponse> getPostLikes(String postUuid, Pageable pageable, User currentUser);
+
+    PostCommentResponse addComment(String postUuid, PostCommentRequest request, User currentUser);
+
+    PostCommentResponse editComment(String postUuid, String commentUuid, PostCommentRequest request, User currentUser);
+
+    void deleteComment(String postUuid, String commentUuid, User currentUser);
+
+    void likeComment(String postUuid, String commentUuid, User currentUser);
+
+    void unlikeComment(String postUuid, String commentUuid, User currentUser);
+
+    void bookmarkPost(String postUuid, User currentUser);
+
+    void unbookmarkPost(String postUuid, User currentUser);
+
+    Page<PostCommentResponse> getComments(String postUuid, Pageable pageable, User currentUser);
+
+    Page<PostCommentResponse> getReplies(String postUuid, String commentUuid, Pageable pageable, User currentUser);
+}

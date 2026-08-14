@@ -1,0 +1,12 @@
+package com.neo.chat.service;
+
+/**
+ * Server-side Cloudflare Turnstile CAPTCHA verification.
+ */
+public interface CaptchaService {
+    /**
+     * Verify a Cloudflare Turnstile token. Returns true if the request is a
+     * verified human (or if CAPTCHA is disabled). Fails closed on errors.
+     */
+    boolean verify(String token, String remoteIp);
+}

@@ -1,14 +1,21 @@
-# Behind the reverse proxy (Nginx Proxy Manager) TLS is terminated at the proxy and
-# requests reach this backend over plain http (http://<host>:8080). Honor the
-# X-Forwarded-Proto/Host headers the proxy sends so Spring builds correct absolute
-# URLs — critically the OAuth2 redirect_uri as https://talkme.fun/login/oauth2/code/google
-# (NOT http://…), which must byte-match the Authorised redirect URI in Google or the
-# flow fails with redirect_uri_mismatch. Applies to every profile (prod runs on 8080).
-# Safe locally: with no proxy there are no X-Forwarded-* headers, so the real request
-# is used unchanged. Assumes the backend port is reachable only via the proxy.
+# =============================================================================
+# NeoChatHub (TalkMe) — single, unified configuration.
+#
+# This file merges the former application.yml + application-{local,dev,prod}.yml
+# into ONE profile-less config. EVERY environment-specific value is externalized
+# to an environment variable with NO inline default — supply them via .env (see
+# .env.example1 for the full key list and example values). Values left as plain
+# literals below are fixed framework/tuning constants, not per-environment knobs.
+#
+# .env is autoloaded via spring.config.import below (KEY=VALUE properties).
+# =============================================================================
+
+# Behind the reverse proxy (Nginx Proxy Manager) TLS terminates at the proxy and
+# requests reach this backend over plain http. Honor X-Forwarded-Proto/Host so
+# Spring builds correct absolute URLs (critically the OAuth2 redirect_uri).
 server:
   address: 0.0.0.0
-  port: 8080
+  port: ${SERVER_PORT}
   forward-headers-strategy: framework
   servlet:
     context-path: /
@@ -16,46 +23,93 @@ server:
 spring:
   config:
     import: optional:file:.env[.properties]
-  profiles:
-    active: ${ACTIVE_PROFILE:local}
   application:
-    name: talkMe
-  # Jackson: an ABSENT or null JSON primitive (e.g. the optional boolean flags `allowDownload` /
-  # `forwarded` on SendMessageRequest, which a text-only message never sends) deserializes to its
-  # default (false / 0) instead of throwing. Jackson 3 defaults this strict; the app's DTOs rely on
-  # the lenient behavior across every optional primitive field.
+    name: NeoChatHub
+
+  # Jackson: an ABSENT/null JSON primitive deserializes to its default instead of
+  # throwing (the app's optional primitive DTO fields rely on this lenient behavior).
   jackson:
     deserialization:
       fail-on-null-for-primitives: false
-  # Upload size cap — applies to EVERY profile (local/dev/prod) unless overridden.
-  # This is the GLOBAL multipart limit, so it must be the LARGEST allowed media:
-  # videos = 30MB. The stricter per-type image cap (2MB) is enforced in
-  # UploadController; anything over 30MB is rejected with HTTP 413.
+
+  # GLOBAL multipart cap — must be the LARGEST allowed media (videos = 30MB). The
+  # stricter per-type image cap is enforced in UploadController.
   servlet:
     multipart:
       max-file-size: 30MB
       max-request-size: 35MB
+
   data:
     web:
       pageable:
         serialization-mode: via-dto
-  # NOTE: SMTP connection (spring.mail.*) is the final fallback in the mail chain
-  # (Resend → Brevo → SMTP) and is environment-specific, so it lives in the profile
-  # files (application-{local,dev,prod}.yml). Local points at Mailpit; prod at the
-  # real relay. JavaMailSender is injected via ObjectProvider, so the app still boots
-  # in any profile that omits it.
-  # RabbitMQ CONNECTION (host/port/credentials) is environment-specific → set per
-  # profile (application-{local,dev,prod}.yml). The publishing/consume TUNING below is
-  # shared across all environments.
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      enabled: ${REDIS_ENABLED}
+      # Command timeout — raise for a remote/WAN Redis so reapers don't trip.
+      timeout: ${REDIS_TIMEOUT_MS}
+      lettuce:
+        shutdown-timeout: 200ms
+
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL}
+      minimum-idle: ${DB_MIN_IDLE}
+      idle-timeout: 300000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: ${DATABASE_SCHEMA}
+        # Batch lazy association loads (avoid N+1 when mapping pages to DTOs).
+        default_batch_fetch_size: 50
+        jdbc:
+          batch_size: 30
+          order_inserts: true
+          order_updates: true
+          batch_versioned_data: true
+        query:
+          fail_on_pagination_over_collection_fetch: true
+
+  # SMTP — final fallback after the Resend/Brevo HTTP APIs.
+  mail:
+    host: ${MAIL_SMTP_HOST}
+    port: ${MAIL_SMTP_PORT}
+    username: ${MAIL_SMTP_USERNAME}
+    password: ${MAIL_SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS}
+        connecttimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
+
+  # RabbitMQ CONNECTION (used only when the broker relay / AMQP events are enabled).
+  # The publishing/consume TUNING below is shared across every environment.
   rabbitmq:
-    # Treat a publishing as accepted only after the broker confirms it (lets the
-    # producer fall back to a direct broadcast if RabbitMQ is unreachable).
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
     publisher-confirm-type: correlated
     publisher-returns: true
     listener:
       simple:
         acknowledge-mode: auto
-        # Failed deliveries dead-letter instead of requeueing forever (no poison loop).
         default-requeue-rejected: false
         prefetch: 20
         retry:
@@ -64,29 +118,19 @@ spring:
           max-attempts: 4
           multiplier: 2.0
           max-interval: 10000ms
-  jpa:
-    properties:
-      hibernate:
-        # Batch lazy association loads: when a page of messages is mapped to DTOs,
-        # their senders/receipts/reactions/attachments are fetched in grouped IN
-        # queries (≈ size per round-trip) instead of one query per row (N+1).
-        default_batch_fetch_size: 50
-        jdbc:
-          # Group multi-row writes within a transaction into batched round-trips.
-          batch_size: 30
-          # Sort statements so same-table writes batch together instead of
-          # alternating tables and breaking the batch.
-          order_inserts: true
-          order_updates: true
-          # Required for batching to apply to @Version (optimistic-lock) entities,
-          # which every entity is (BaseEntity has @Version).
-          batch_versioned_data: true
-        # Fail fast in dev if a query accidentally pages in memory.
-        query:
-          fail_on_pagination_over_collection_fetch: true
 
-# Observability. Endpoints live under /actuator (outside /api, so reachable);
-# RESTRICT /actuator to an internal network / scrape user in production.
+  # Google social login (OAuth2 / OIDC). INACTIVE until client id + secret are set.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: ${GOOGLE_OAUTH_SCOPES}
+            redirect-uri: "{baseUrl}/login/oauth2/code/google"
+
+# Observability. Endpoints under /actuator; RESTRICT to an internal network in prod.
 management:
   endpoints:
     web:
@@ -98,220 +142,232 @@ management:
         enabled: true
       show-details: when_authorized
   health:
-    # Only health check RabbitMQ when we actually use it; otherwise readiness
-    # probes would keep failing to connect on hosts without RabbitMQ.
     rabbit:
-      enabled: ${BROKER_AMQP_EVENTS_ENABLED:false}
-    # Mail is sent primarily via HTTP APIs (Resend/Brevo); SMTP is only a fallback, so
-    # a refused SMTP connection (e.g. no local mail server) must NOT mark the whole app
-    # DOWN. Off by default; set MANAGEMENT_HEALTH_MAIL=true to re-enable the check.
+      enabled: ${BROKER_AMQP_EVENTS_ENABLED}
     mail:
-      enabled: ${MANAGEMENT_HEALTH_MAIL:false}
+      enabled: ${MANAGEMENT_HEALTH_MAIL}
   metrics:
     tags:
       application: talkMe
   tracing:
-    # Sample 10% of traces by default; set TRACING_SAMPLING=0 to disable export
-    # (e.g. dev with no OTLP collector running).
     sampling:
-      probability: ${TRACING_SAMPLING:0.1}
+      probability: ${TRACING_SAMPLING}
   otlp:
     tracing:
-      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+      endpoint: ${OTLP_TRACING_ENDPOINT}
 
-# NOTE: session base-auth creds (auth.username/password) are environment-specific
-# and live per profile (application-{local,dev,prod}.yml).
+# Session base-auth credentials.
+auth:
+  username: ${AUTH_USERNAME}
+  password: ${AUTH_PASSWORD}
 
-# ── Feature kill-switches (Tier-1 global) for the Late-Night Social ecosystem ──
-# Per-user entitlement + self-toggle live in the DB (user_feature_grants); this is the
-# platform-wide master switch per feature. A key omitted here falls back to
-# enabled-by-default. Keys are FeatureKey wire-names (lowercase). Emergency-disable a
-# feature everywhere by flipping its env var — no deploy needed.
+# ── Feature kill-switches (Tier-1 global) ────────────────────────────────────
 features:
-  enabled-by-default: ${FEATURES_ENABLED_BY_DEFAULT:true}
-  # When true, Flirt Mode skips the email-verified requirement (unverified users can
-  # flirt). The 18+ age/consent gate is NOT relaxed. Default false = verification required.
-  allow-non-verified-flirt-mode: ${FEATURE_ALLOW_NON_VERIFIED_FLIRT_MODE:true}
+  enabled-by-default: ${FEATURES_ENABLED_BY_DEFAULT}
+  allow-non-verified-flirt-mode: ${FEATURE_ALLOW_NON_VERIFIED_FLIRT_MODE}
   flags:
-    # Live multi-party audio/video is deferred (Phase 6) — stays OFF until infra exists.
-    live_audio: ${FEATURE_LIVE_AUDIO:false}
-    # Adult surface — global switch (still additionally gated per-user by age+consent).
-    flirt_lobby: ${FEATURE_FLIRT_LOBBY:true}
-    midnight_events: ${FEATURE_MIDNIGHT_EVENTS:true}
-    # Advertising — THE single master switch for all ads, controlled ONLY here (no UI).
-    # ON by default so every user currently sees ads; set FEATURE_ADS=false to go dark
-    # platform-wide. Per-user exemption is the User.adsFree flag (a future Premium tier
-    # sets it → those users see no ads). See docs/ADS_INTEGRATION_DESIGN.md.
-    ads: ${FEATURE_ADS:false}
+    live_audio: ${FEATURE_LIVE_AUDIO}
+    flirt_lobby: ${FEATURE_FLIRT_LOBBY}
+    midnight_events: ${FEATURE_MIDNIGHT_EVENTS}
+    ads: ${FEATURE_ADS}
 
-# ── Advertising customization (ads.*) ──────────────────────────────────────────
-# Everything the client's <AdSlot> reads. The on/off gate is features.flags.ads above;
-# this is pure customization (provider, cadence, caps, house creatives), overridable
-# per-env via the shown env vars — no deploy to retune. csp-domains stays EMPTY unless
-# a real network is enabled, so the emitted CSP is unchanged by default.
+# ── Advertising customization (on/off gate is features.flags.ads above) ──────
 ads:
-  provider: ${ADS_PROVIDER:}       # adsense | adsterra (global default; per-surface override below)
-  label: ${ADS_LABEL:Sponsored}
-  ad-choices-url: ${ADS_ADCHOICES_URL:}
-  client-id: ${ADS_CLIENT_ID:}             # e.g. AdSense ca-pub-XXXXXXXX
-  script-url: ${ADS_SCRIPT_URL:}           # global adsterra zone loader (native banner)
-  # Site-wide Adsterra formats — ONE script each for the whole app (NOT per placement).
-  popunder-script-url: ${ADS_POPUNDER_URL:}    # Adsterra Popunder loader (pop-under tab on click)
-  social-bar-script-url: ${ADS_SOCIALBAR_URL:} # Adsterra Social Bar loader (floating widget)
-  frequency-cap-per-session: ${ADS_FREQ_CAP:30}
-  csp-domains: ${ADS_CSP_DOMAINS:}         # comma-list, e.g. https://pagead2.googlesyndication.com
-  # Each placement may override `provider` and `script-url` to run a DIFFERENT network
-  # than the global one (e.g. AdSense on feed/explore + Adsterra on reels at the same
-  # time). Empty override = inherit the global ads.provider / ads.script-url above.
-  # Per placement: override provider/script-url to mix networks; pick the Adsterra
-  # `format` (native | banner) and, for banner, its width/height so it fits the space.
+  provider: ${ADS_PROVIDER}
+  label: ${ADS_LABEL}
+  ad-choices-url: ${ADS_ADCHOICES_URL}
+  client-id: ${ADS_CLIENT_ID}
+  script-url: ${ADS_SCRIPT_URL}
+  popunder-script-url: ${ADS_POPUNDER_URL}
+  social-bar-script-url: ${ADS_SOCIALBAR_URL}
+  frequency-cap-per-session: ${ADS_FREQ_CAP}
+  csp-domains: ${ADS_CSP_DOMAINS}
   placements:
     feed:
-      enabled: ${ADS_FEED_ENABLED:true}
-      every-n: ${ADS_FEED_EVERY_N:6}
-      max-per-session: ${ADS_FEED_MAX:12}
-      unit-id: ${ADS_FEED_UNIT:}
-      provider: ${ADS_FEED_PROVIDER:}        # blank = inherit global; or adsense|adsterra
-      script-url: ${ADS_FEED_SCRIPT_URL:}    # per-surface adsterra zone script
-      format: ${ADS_FEED_FORMAT:native}      # native | banner (adsterra)
-      width: ${ADS_FEED_WIDTH:0}             # banner width px (e.g. 336)
-      height: ${ADS_FEED_HEIGHT:0}           # banner height px (e.g. 280)
+      enabled: ${ADS_FEED_ENABLED}
+      every-n: ${ADS_FEED_EVERY_N}
+      max-per-session: ${ADS_FEED_MAX}
+      unit-id: ${ADS_FEED_UNIT}
+      provider: ${ADS_FEED_PROVIDER}
+      script-url: ${ADS_FEED_SCRIPT_URL}
+      format: ${ADS_FEED_FORMAT}
+      width: ${ADS_FEED_WIDTH}
+      height: ${ADS_FEED_HEIGHT}
     explore:
-      enabled: ${ADS_EXPLORE_ENABLED:true}
-      every-n: ${ADS_EXPLORE_EVERY_N:12}
-      max-per-session: ${ADS_EXPLORE_MAX:12}
-      unit-id: ${ADS_EXPLORE_UNIT:}
-      provider: ${ADS_EXPLORE_PROVIDER:}
-      script-url: ${ADS_EXPLORE_SCRIPT_URL:}
-      format: ${ADS_EXPLORE_FORMAT:native}
-      width: ${ADS_EXPLORE_WIDTH:0}
-      height: ${ADS_EXPLORE_HEIGHT:0}
+      enabled: ${ADS_EXPLORE_ENABLED}
+      every-n: ${ADS_EXPLORE_EVERY_N}
+      max-per-session: ${ADS_EXPLORE_MAX}
+      unit-id: ${ADS_EXPLORE_UNIT}
+      provider: ${ADS_EXPLORE_PROVIDER}
+      script-url: ${ADS_EXPLORE_SCRIPT_URL}
+      format: ${ADS_EXPLORE_FORMAT}
+      width: ${ADS_EXPLORE_WIDTH}
+      height: ${ADS_EXPLORE_HEIGHT}
     reels:
-      enabled: ${ADS_REELS_ENABLED:true}
-      every-n: ${ADS_REELS_EVERY_N:8}
-      max-per-session: ${ADS_REELS_MAX:10}
-      unit-id: ${ADS_REELS_UNIT:}
-      provider: ${ADS_REELS_PROVIDER:}
-      script-url: ${ADS_REELS_SCRIPT_URL:}
-      format: ${ADS_REELS_FORMAT:native}
-      width: ${ADS_REELS_WIDTH:0}
-      height: ${ADS_REELS_HEIGHT:0}
+      enabled: ${ADS_REELS_ENABLED}
+      every-n: ${ADS_REELS_EVERY_N}
+      max-per-session: ${ADS_REELS_MAX}
+      unit-id: ${ADS_REELS_UNIT}
+      provider: ${ADS_REELS_PROVIDER}
+      script-url: ${ADS_REELS_SCRIPT_URL}
+      format: ${ADS_REELS_FORMAT}
+      width: ${ADS_REELS_WIDTH}
+      height: ${ADS_REELS_HEIGHT}
     stories:
-      enabled: ${ADS_STORIES_ENABLED:false} # intimate surface — opt-in
-      every-n: ${ADS_STORIES_EVERY_N:6}
-      max-per-session: ${ADS_STORIES_MAX:6}
-      unit-id: ${ADS_STORIES_UNIT:}
-      provider: ${ADS_STORIES_PROVIDER:}
-      script-url: ${ADS_STORIES_SCRIPT_URL:}
-      format: ${ADS_STORIES_FORMAT:native}
-      width: ${ADS_STORIES_WIDTH:0}
-      height: ${ADS_STORIES_HEIGHT:0}
+      enabled: ${ADS_STORIES_ENABLED}
+      every-n: ${ADS_STORIES_EVERY_N}
+      max-per-session: ${ADS_STORIES_MAX}
+      unit-id: ${ADS_STORIES_UNIT}
+      provider: ${ADS_STORIES_PROVIDER}
+      script-url: ${ADS_STORIES_SCRIPT_URL}
+      format: ${ADS_STORIES_FORMAT}
+      width: ${ADS_STORIES_WIDTH}
+      height: ${ADS_STORIES_HEIGHT}
 
 app:
-  # Instant Translation (Phase 7). Primary = Azure AI Translator (F0 free tier = 2M chars/month);
-  # fallback = MyMemory (keyless) when Azure errors or its monthly quota is exhausted. Stateless:
-  # the client sends already-decrypted plaintext, nothing is stored. With no Azure key AND MyMemory
-  # unreachable the service fails open (returns the text unchanged).
+  frontend-base-url: ${FRONTEND_BASE_URL}
+  # Instant Translation — Azure primary, MyMemory (keyless) fallback; fails open.
   translation:
-    enabled: ${TRANSLATION_ENABLED:true}
-    daily-cap-per-user: ${TRANSLATION_DAILY_CAP:200}
-    azure-key: ${AZURE_TRANSLATOR_KEY:}
-    azure-region: ${AZURE_TRANSLATOR_REGION:}               # e.g. eastus (blank for a Global resource)
-    azure-url: ${AZURE_TRANSLATOR_URL:https://api.cognitive.microsofttranslator.com/translate}
-    mymemory-url: ${MYMEMORY_URL:https://api.mymemory.translated.net/get}
-  # Live A/V (Phase 6) — deferred token seam. Stays OFF until enabled AND LiveKit creds are
-  # supplied; ALSO requires the per-user LIVE_AUDIO entitlement (features.flags.live_audio,
-  # itself default-off). STOMP keeps app state; LiveKit only carries media.
+    enabled: ${TRANSLATION_ENABLED}
+    daily-cap-per-user: ${TRANSLATION_DAILY_CAP}
+    azure-key: ${AZURE_TRANSLATOR_KEY}
+    azure-region: ${AZURE_TRANSLATOR_REGION}
+    azure-url: ${AZURE_TRANSLATOR_URL}
+    mymemory-url: ${MYMEMORY_URL}
+  # Live A/V (deferred) — OFF until enabled AND LiveKit creds supplied.
   live-audio:
-    enabled: ${LIVE_AUDIO_ENABLED:false}
-    ws-url: ${LIVEKIT_WS_URL:}
-    api-key: ${LIVEKIT_API_KEY:}
-    api-secret: ${LIVEKIT_API_SECRET:}
-    token-ttl-seconds: ${LIVEKIT_TOKEN_TTL:3600}
+    enabled: ${LIVE_AUDIO_ENABLED}
+    ws-url: ${LIVEKIT_WS_URL}
+    api-key: ${LIVEKIT_API_KEY}
+    api-secret: ${LIVEKIT_API_SECRET}
+    token-ttl-seconds: ${LIVEKIT_TOKEN_TTL}
   geo:
-    # Default ON for local dev: when the client IP is local/private (localhost),
-    # geolocate the server's own public IP so country detection still works.
-    # Deployed profiles (prod/dev) override this to false — there real client IPs
-    # arrive via proxy headers and a private IP would be a misconfiguration.
-    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP:true}
-  # User-level consent versions (18+, community guidelines, flirt lobby). Bumping a
-  # version re-prompts everyone whose stored acceptance is now stale.
+    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP}
   consent:
-    age18-plus-version: ${CONSENT_AGE_VERSION:2026-07}
-    community-guidelines-version: ${CONSENT_GUIDELINES_VERSION:2026-07}
-    flirt-lobby-version: ${CONSENT_FLIRT_VERSION:2026-07}
+    age18-plus-version: ${CONSENT_AGE_VERSION}
+    community-guidelines-version: ${CONSENT_GUIDELINES_VERSION}
+    flirt-lobby-version: ${CONSENT_FLIRT_VERSION}
   cookie:
-    secure: ${COOKIE_SECURE:false}
-    same-site: ${COOKIE_SAME_SITE:Lax}
-  # NOTE: STOMP broker relay (app.broker.*) and the public web-app URL
-  # (app.frontend-base-url) are environment-specific → set per profile
-  # (application-{local,dev,prod}.yml). Broker relay stays OFF unless a profile/env
-  # enables it and RabbitMQ (STOMP plugin on :61613) is reachable, else the relay
-  # throws "Message broker not active" on every /topic broadcast.
-  #
-  # Transactional email, three-link chain: Resend (HTTP, free ~100/day) → Brevo
-  # (HTTP, free ~300/day) → SMTP (JavaMailSender). Only the SHARED, non-secret
-  # defaults live here — the environment-specific switches (app.mail.enabled,
-  # app.mail.from, provider API keys, app.mail.smtp.enabled and spring.mail.*) are
-  # set per profile in application-{local,dev,prod}.yml. When a profile leaves mail
-  # off / keys empty, EmailServiceImpl logs the link instead of sending.
+    secure: ${COOKIE_SECURE}
+    same-site: ${COOKIE_SAME_SITE}
+  # Transactional email chain: Resend (HTTP) → Brevo (HTTP) → SMTP (spring.mail.*).
   mail:
-    timeout-ms: ${MAIL_TIMEOUT_MS:10000}
-    # Deliverability gate (EmailServiceImpl): when true, TRANSACTIONAL emails (login
-    # alerts, unread digests, password-changed, support) go ONLY to verified addresses.
-    # Verification/welcome/reset and announcements are exempt. Saves provider quota.
-    require-verification: ${MAIL_REQUIRE_VERIFICATION:true}
-    # Extra disposable/temp email domains to block, on top of the bundled
-    # disposable-email-domains.txt (comma-separated, e.g. "foo.com,bar.net").
-    disposable-domains: ${MAIL_DISPOSABLE_DOMAINS:}
+    enabled: ${MAIL_ENABLED}
+    from: ${MAIL_FROM}
+    timeout-ms: ${MAIL_TIMEOUT_MS}
+    require-verification: ${MAIL_REQUIRE_VERIFICATION}
+    disposable-domains: ${MAIL_DISPOSABLE_DOMAINS}
     resend:
-      daily-limit: ${RESEND_DAILY_LIMIT:100}
+      api-key: ${RESEND_API_KEY}
+      daily-limit: ${RESEND_DAILY_LIMIT}
     brevo:
-      daily-limit: ${BREVO_DAILY_LIMIT:300}
-    # Branding for all transactional email templates (EmailTemplates). Shared across
-    # environments; the visual palette lives in MailTheme (app.mail.theme.*).
+      api-key: ${BREVO_API_KEY}
+      daily-limit: ${BREVO_DAILY_LIMIT}
+    smtp:
+      enabled: ${MAIL_SMTP_ENABLED}
     brand:
-      name: ${MAIL_BRAND_NAME:NeoChatHub}
-      tagline: ${MAIL_BRAND_TAGLINE:Meet new people. Chat. Connect.}
-      support-email: ${MAIL_SUPPORT_EMAIL:support@neochathub.com}
-    # Daily "you have unread messages" digest (UnreadDigestReaper → UnreadDigestService).
-    # Runs at cron/zone below; per-user dedup via user.lastUnreadDigestMessageId means the
-    # same still-unread messages are never mailed twice. Respects app.mail.enabled and the
-    # per-user emailUnreadMessages opt-out.
+      name: ${MAIL_BRAND_NAME}
+      tagline: ${MAIL_BRAND_TAGLINE}
+      support-email: ${MAIL_SUPPORT_EMAIL}
     unread-digest:
-      enabled: ${UNREAD_DIGEST_ENABLED:true}
-      cron: ${UNREAD_DIGEST_CRON:0 0 21 * * *}
-      zone: ${UNREAD_DIGEST_ZONE:Asia/Kolkata}
-      max-previews: ${UNREAD_DIGEST_MAX_PREVIEWS:5}
+      enabled: ${UNREAD_DIGEST_ENABLED}
+      cron: ${UNREAD_DIGEST_CRON}
+      zone: ${UNREAD_DIGEST_ZONE}
+      max-previews: ${UNREAD_DIGEST_MAX_PREVIEWS}
+  # STOMP broker relay — OFF unless enabled AND RabbitMQ STOMP plugin reachable.
+  broker:
+    relay-enabled: ${BROKER_RELAY_ENABLED}
+    relay-host: ${BROKER_RELAY_HOST}
+    relay-port: ${BROKER_RELAY_PORT}
+    relay-login: ${BROKER_RELAY_LOGIN}
+    relay-passcode: ${BROKER_RELAY_PASSCODE}
+    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED}
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS}
+    allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept,X-Request-Id
+    exposed-headers: Set-Cookie,X-Request-Id
+    allow-credentials: true
   auth:
-    # Password-reset token lifetime and the account-deletion recovery window.
-    password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN:30}
-    account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS:30}
-    # Email-verification link lifetime (sent at signup; welcome email follows on verify).
-    email-verification-token-ttl-minutes: ${EMAIL_VERIFY_TTL_MIN:1440}
-  # Per-conversation message encryption (AES-256-GCM). Each chat gets one data key,
-  # stored wrapped by the master key below and handed to authorized participants to
-  # encrypt/decrypt client-side. Server-mediated (NOT end-to-end): the server can
-  # decrypt for push/email previews. Text content + media PATHS are encrypted at rest.
+    password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN}
+    account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS}
+    email-verification-token-ttl-minutes: ${EMAIL_VERIFY_TTL_MIN}
+  # Per-conversation message encryption (AES-256-GCM). Stays OFF until master-key set.
+  # ⚠️ Losing/rotating master-key makes all encrypted messages unrecoverable — back it up.
   crypto:
     chat-encryption:
-      # Master switch. Even when true, encryption stays OFF until master-key is set.
-      enabled: ${CHAT_ENCRYPTION_ENABLED:true}
-    # Base64 of 32 random bytes (AES-256). Generate: `openssl rand -base64 32`.
-    # Keep OUT of the database/VCS — supply via env/secret. Blank ⇒ encryption disabled
-    # (messages stored plaintext), so existing deploys are unaffected until you set it.
-    # ⚠️ Losing/rotating this key makes every wrapped chat key — and thus all encrypted
-    # messages — unrecoverable. Back it up.
-    #Generate BY - `echo -n "REPLACE_WITH_CUSTOM_NAME" | openssl dgst -sha256 -binary | base64`
-    master-key: ${CRYPTO_MASTER_KEY:}
-  # SuperAdmin bootstrap: comma-separated emails of accounts granted ROLE_SUPER_ADMIN
-  # on boot (SuperAdminSeeder). The account must already exist (sign up first). There
-  # is no public promote endpoint — elevation happens only via this trusted list.
+      enabled: ${CHAT_ENCRYPTION_ENABLED}
+    master-key: ${CRYPTO_MASTER_KEY}
+  # SuperAdmin bootstrap — comma-separated emails granted ROLE_SUPER_ADMIN on boot.
   super-admin:
-    emails: ${SUPER_ADMIN_EMAILS:}
+    emails: ${SUPER_ADMIN_EMAILS}
 
-# Media storage. `media-root` is the single root shared by the OCI object keys and the
-# instance/VM disk (reference shape <media-root>/<key>). Provider defaults to the local
-# filesystem; the prod profile overrides it to OCI. See com.chat.talkMe.storage.
+# WebSocket allowed origins (comma-separated; '*' only for local).
+websocket:
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS}
+
+security:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-expiration-ms: 900000        # 15 minutes
+    refresh-token-expiration-ms: 2592000000   # 30 days
+    guest-refresh-token-expiration-ms: 604800000  # 7 days
+  rate-limit:
+    capacity: ${RATE_LIMIT_CAPACITY}
+    refill-tokens: ${RATE_LIMIT_REFILL}
+    refill-period-seconds: 1
+  # Cloudflare Turnstile.
+  captcha:
+    enabled: ${CAPTCHA_ENABLED}
+    secret-key: ${TURNSTILE_SECRET_KEY}
+
+# Web Push (VAPID).
+webpush:
+  enabled: ${WEBPUSH_ENABLED}
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY}
+    private-key: ${VAPID_PRIVATE_KEY}
+    subject: ${VAPID_SUBJECT}
+
+# Content moderation — word-lists + NSFW sidecar.
+moderation:
+  enabled: ${MODERATION_ENABLED}
+  nsfw:
+    enabled: ${NSFW_ENABLED}
+    base-url: ${NSFW_BASE_URL}
+
+# Media storage. media-root is the shared root for OCI object keys + local disk.
 storage:
-  media-root: ${FILE_BASE_DIR:/media}
+  provider: ${STORAGE_PROVIDER}
+  media-root: ${FILE_BASE_DIR}
+  local:
+    directory: ${FILE_BASE_DIR}
+  oci:
+    namespace: ${OCI_NAMESPACE}
+    region: ${OCI_REGION}
+    bucket: ${OCI_BUCKET}
+    config-file: ${OCI_CONFIG_FILE}
+    config-profile: ${OCI_CONFIG_PROFILE}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT}
+    com.neo.chat: ${LOG_LEVEL_APP}
+    org.springframework.security: ${LOG_LEVEL_SPRING_SECURITY}
+    org.hibernate: ${LOG_LEVEL_HIBERNATE}
+  # ── File logging + daily/size rolling ──────────────────────────────────────
+  # Writes to ${LOGGING_FILE_NAME}; rolls daily and at max-file-size, keeping
+  # max-history days up to total-size-cap. Path/name are env-driven (no defaults).
+  file:
+    path: ${LOGGING_FILE_PATH}
+    name: ${LOGGING_FILE_NAME}
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOGGING_FILE_PATH}/neochathub-%d{yyyy-MM-dd}.%i.log
+      max-file-size: 10MB
+      total-size-cap: 1GB
+      max-history: 90
+      clean-history-on-start: false
+
+  pattern:
+    level: "%5p [requestId=%X{requestId}]"

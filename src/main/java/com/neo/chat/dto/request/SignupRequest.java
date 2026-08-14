@@ -1,0 +1,58 @@
+package com.neo.chat.dto.request;
+
+import com.neo.chat.validator.ValidAge;
+import com.neo.chat.validator.ValidGender;
+import com.neo.chat.validator.ValidPassword;
+import com.neo.chat.validator.ValidUsername;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true) // tolerate client-only fields (e.g. confirmPassword)
+public class SignupRequest {
+
+    @NotBlank(message = "Name is required")
+    @Size(max = 100, message = "Name must be at most 100 characters")
+    private String name;
+
+    @NotBlank(message = "Username is required")
+    @ValidUsername
+    private String username;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email format is invalid")
+    private String email;
+
+    @NotBlank(message = "Password is required")
+    @ValidPassword
+    private String password;
+
+    @ValidAge
+    private int age;
+
+    @ValidGender
+    private String gender;
+
+    /**
+     * Cloudflare Turnstile token (verified server-side).
+     */
+    private String captchaToken;
+
+    /**
+     * Honeypot — must stay empty; bots tend to fill every field.
+     */
+    private String website;
+
+    /**
+     * Optional: the username of whoever invited this user (from their /@username link).
+     */
+    @Size(max = 50, message = "Invalid referrer")
+    private String referredByUsername;
+}

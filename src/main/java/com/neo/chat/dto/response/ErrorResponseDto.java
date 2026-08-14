@@ -1,0 +1,13 @@
+package com.neo.chat.dto.response;
+
+import java.time.Instant;
+
+public class ErrorResponseDto extends ResponseDto<Void> {
+    public ErrorResponseDto(String message, String messageCode, Object errors) {
+        super(false, message, messageCode, null, errors, Instant.now().toString());
+    }
+
+    public ErrorResponseDto(String message, String messageCode) {
+        this(message, messageCode, null);
+    }
+}
