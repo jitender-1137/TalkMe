@@ -165,6 +165,10 @@ auth:
 features:
   enabled-by-default: ${FEATURES_ENABLED_BY_DEFAULT}
   allow-non-verified-flirt-mode: ${FEATURE_ALLOW_NON_VERIFIED_FLIRT_MODE}
+  # Global email-verification gate. false (default) = ALL users (verified or unverified) can use
+  # every feature; true = features that require verification are limited to verified users.
+  # (The 18+ age-verification gate is separate and unaffected.)
+  require-verified: ${FEATURE_REQUIRE_VERIFIED:false}
   flags:
     live_audio: ${FEATURE_LIVE_AUDIO}
     flirt_lobby: ${FEATURE_FLIRT_LOBBY}

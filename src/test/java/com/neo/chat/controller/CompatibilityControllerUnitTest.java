@@ -7,6 +7,7 @@ import com.neo.chat.exception.GlobalExceptionHandler;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.CompatibilityService;
+import com.neo.chat.service.WingmanService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,12 +26,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -60,6 +63,8 @@ class CompatibilityControllerUnitTest {
     @Mock
     private CompatibilityService compatibilityService;
     @Mock
+    private WingmanService wingmanService;
+    @Mock
     private UserRepository userRepository;
 
     private MockMvc mockMvc;
@@ -75,7 +80,7 @@ class CompatibilityControllerUnitTest {
     @BeforeEach
     void setUp() {
         CompatibilityController controller =
-                new CompatibilityController(compatibilityService, userRepository);
+                new CompatibilityController(compatibilityService, wingmanService, userRepository);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -173,6 +178,58 @@ class CompatibilityControllerUnitTest {
             mockMvc.perform(get(BASE + "/" + OTHER_UUID))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.overall").value(0));
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /match/compatibility/{userUuid}/starters")
+    class Starters {
+
+        @Test
+        void shouldReturnCompatibilityAndIcebreakers() throws Exception {
+            when(userRepository.findByUuid(any())).thenReturn(Optional.of(otherUser));
+            when(compatibilityService.score(testUser, otherUser)).thenReturn(score(77));
+            when(wingmanService.icebreakers(eq(testUser), eq(otherUser), eq(5)))
+                    .thenReturn(List.of("What's the best photo you've ever taken?", "Coffee or tea?"));
+
+            mockMvc.perform(get(BASE + "/" + OTHER_UUID + "/starters"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.messageCode").value("TM_000"))
+                    .andExpect(jsonPath("$.data.compatibility.overall").value(77))
+                    .andExpect(jsonPath("$.data.compatibility.bucket").value("HIGH"))
+                    .andExpect(jsonPath("$.data.icebreakers.length()").value(2))
+                    .andExpect(jsonPath("$.data.icebreakers[0]")
+                            .value("What's the best photo you've ever taken?"));
+
+            // Both collaborators are called for the same caller/target pair, capped at 5 starters.
+            ArgumentCaptor<UUID> uuid = ArgumentCaptor.forClass(UUID.class);
+            verify(userRepository).findByUuid(uuid.capture());
+            assertThat(uuid.getValue()).isEqualTo(UUID.fromString(OTHER_UUID));
+            verify(compatibilityService).score(testUser, otherUser);
+            verify(wingmanService).icebreakers(testUser, otherUser, 5);
+        }
+
+        @Test
+        void shouldReturn400AndSkipLookupWhenUuidMalformed() throws Exception {
+            mockMvc.perform(get(BASE + "/not-a-uuid/starters"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.messageCode").value("TM_INVALID_UUID"));
+
+            verifyNoInteractions(userRepository, compatibilityService, wingmanService);
+        }
+
+        @Test
+        void shouldReturn404WhenUserNotFound() throws Exception {
+            when(userRepository.findByUuid(any())).thenReturn(Optional.empty());
+
+            mockMvc.perform(get(BASE + "/" + OTHER_UUID + "/starters"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.messageCode").value("TM_024"));
+
+            verify(userRepository).findByUuid(any());
+            verify(compatibilityService, never()).score(any(), any());
+            verify(wingmanService, never()).icebreakers(any(), any(), org.mockito.ArgumentMatchers.anyInt());
         }
     }
 }

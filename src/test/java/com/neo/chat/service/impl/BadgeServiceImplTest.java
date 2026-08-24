@@ -4,6 +4,7 @@ import com.neo.chat.domain.BadgeEndorsement;
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserBadge;
 import com.neo.chat.dto.response.BadgeResponse;
+import com.neo.chat.dto.response.HelpfulScoreResponse;
 import com.neo.chat.enums.BadgeType;
 import com.neo.chat.enums.ReputationEventType;
 import com.neo.chat.exception.BadRequestException;
@@ -144,6 +145,70 @@ class BadgeServiceImplTest {
             when(userRepository.findByUuid(uuid)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.listBadges(uuid.toString()))
+                    .isInstanceOfSatisfying(NotFoundException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_404"));
+        }
+    }
+
+    // ── getHelpfulScore ──────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("getHelpfulScore")
+    class GetHelpfulScore {
+
+        @Test
+        @DisplayName("sums distinct-endorser counts across traits, breaks down per trait, lists earned")
+        void aggregatesAcrossTraitsIncludingNewTypes() {
+            UUID uuid = UUID.randomUUID();
+            User user = newUser(1L, uuid);
+            when(userRepository.findByUuid(uuid)).thenReturn(Optional.of(user));
+            Instant awarded = Instant.parse("2026-01-02T03:04:05Z");
+            when(userBadgeRepository.findByUser(user)).thenReturn(List.of(
+                    badge(user, BadgeType.HELPFUL, 5, awarded),          // earned
+                    badge(user, BadgeType.GREAT_TEACHER, 3, awarded),    // earned (new enum value)
+                    badge(user, BadgeType.RELIABLE, 2, null)));          // not earned (new enum value)
+
+            HelpfulScoreResponse res = service.getHelpfulScore(uuid.toString());
+
+            assertThat(res.getTotal()).isEqualTo(10);
+            assertThat(res.getByTrait())
+                    .containsEntry("HELPFUL", 5)
+                    .containsEntry("GREAT_TEACHER", 3)
+                    .containsEntry("RELIABLE", 2)
+                    .hasSize(3);
+            assertThat(res.getEarnedBadges()).containsExactly("HELPFUL", "GREAT_TEACHER");
+        }
+
+        @Test
+        @DisplayName("no badges → zero total, empty breakdown, no earned badges")
+        void emptyWhenNoBadges() {
+            UUID uuid = UUID.randomUUID();
+            User user = newUser(1L, uuid);
+            when(userRepository.findByUuid(uuid)).thenReturn(Optional.of(user));
+            when(userBadgeRepository.findByUser(user)).thenReturn(List.of());
+
+            HelpfulScoreResponse res = service.getHelpfulScore(uuid.toString());
+
+            assertThat(res.getTotal()).isZero();
+            assertThat(res.getByTrait()).isEmpty();
+            assertThat(res.getEarnedBadges()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("malformed uuid → BadRequestException TM_922")
+        void invalidUuid() {
+            assertThatThrownBy(() -> service.getHelpfulScore("not-a-uuid"))
+                    .isInstanceOfSatisfying(BadRequestException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_922"));
+        }
+
+        @Test
+        @DisplayName("unknown user → NotFoundException TM_404")
+        void userNotFound() {
+            UUID uuid = UUID.randomUUID();
+            when(userRepository.findByUuid(uuid)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getHelpfulScore(uuid.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_404"));
         }

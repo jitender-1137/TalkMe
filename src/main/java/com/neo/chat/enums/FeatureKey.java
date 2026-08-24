@@ -80,6 +80,19 @@ public enum FeatureKey {
     FLIRT_MODE(null, true, true, null, true),
     SPEED_DATING(null, true, true, null, true),
 
+    // ── Phase 8: Connect — "find the right person to talk to" ──
+    TALK_NOW(null, false, false, null, true),          // intent + availability matching
+    SKILL_EXCHANGE(null, false, false, null, true),    // peer-to-peer teach/learn matching
+    KNOWLEDGE_NETWORK(null, false, false, null, true), // experience tags + "ask someone who's done it"
+    // ── Phase 8b: Connect rooms, communities & local ──
+    TOPIC_ROOMS(null, false, false, null, true),       // "third place" topic rooms
+    LANGUAGE_ROOMS(null, false, false, null, true),    // language-practice rooms
+    STUDY_ROOMS(null, false, false, null, true),       // Pomodoro study rooms
+    ADVICE_ROOMS(null, false, false, null, true),      // anonymous advice / peer opinions
+    LOCAL_DISCOVERY(null, false, false, null, true),   // people near me (city + interest + availability)
+    TRAVEL_COMPANION(null, false, false, null, true),  // destination + date-range matching
+    COMMUNITY_HELP(null, false, false, null, true),    // real-time local help feed
+
     // ── Phase 6: Live A/V (deferred; default global-off via config) ──
     LIVE_AUDIO(null, true, false, null, true),
 

@@ -2,6 +2,7 @@ package com.neo.chat.controller;
 
 import com.neo.chat.dto.request.EndorseBadgeRequest;
 import com.neo.chat.dto.response.BadgeResponse;
+import com.neo.chat.dto.response.HelpfulScoreResponse;
 import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
@@ -44,6 +45,21 @@ public class BadgeController {
             @PathVariable("userUuid") String userUuid) {
         List<BadgeResponse> badges = badgeService.listBadges(userUuid);
         return ResponseEntity.ok(SuccessResponseDto.success(badges));
+    }
+
+    /**
+     * A user's aggregate "helpfulness" score, derived from their peer-endorsement badges:
+     * total distinct-endorser count across all traits, a per-trait breakdown, and earned badges.
+     *
+     * @param userUuid the target user's UUID
+     * @return the aggregate {@link HelpfulScoreResponse} for that user
+     */
+    @GetMapping("/{userUuid}/helpful-score")
+    @PreAuthorize("@featureGuard.check('BADGES')")
+    public ResponseEntity<ResponseDto<HelpfulScoreResponse>> getHelpfulScore(
+            @PathVariable("userUuid") String userUuid) {
+        HelpfulScoreResponse score = badgeService.getHelpfulScore(userUuid);
+        return ResponseEntity.ok(SuccessResponseDto.success(score));
     }
 
     /**

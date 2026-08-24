@@ -4,6 +4,7 @@ import com.neo.chat.domain.BadgeEndorsement;
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserBadge;
 import com.neo.chat.dto.response.BadgeResponse;
+import com.neo.chat.dto.response.HelpfulScoreResponse;
 import com.neo.chat.enums.BadgeType;
 import com.neo.chat.enums.ReputationEventType;
 import com.neo.chat.exception.BadRequestException;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -66,6 +69,45 @@ public class BadgeServiceImpl implements BadgeService {
             out.add(toResponse(badge));
         }
         return out;
+    }
+
+    /**
+     * Aggregate "helpfulness" reputation for a user, computed purely over the existing
+     * {@code UserBadge} rows (feature #30) — no new entity. Each row's {@code endorsementCount}
+     * is the distinct-endorser count for that trait; {@code total} sums those across all traits,
+     * {@code byTrait} is the per-trait breakdown, and {@code earnedBadges} lists the traits whose
+     * endorsements have crossed the award threshold. Purely decorative — never gates a feature.
+     *
+     * @param userUuid the target user's uuid
+     * @return the aggregate {@link HelpfulScoreResponse}
+     * @throws com.neo.chat.exception.BadRequestException if the uuid is malformed (TM_922)
+     * @throws com.neo.chat.exception.NotFoundException   if no such user (TM_404)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public HelpfulScoreResponse getHelpfulScore(String userUuid) {
+        User user = resolveUser(userUuid);
+
+        int total = 0;
+        // Insertion-ordered so the breakdown is deterministic (follows the persisted row order).
+        Map<String, Integer> byTrait = new LinkedHashMap<>();
+        List<String> earnedBadges = new ArrayList<>();
+
+        for (UserBadge badge : userBadgeRepository.findByUser(user)) {
+            String trait = badge.getBadgeType().name();
+            int count = badge.getEndorsementCount();
+            total += count;
+            byTrait.put(trait, count);
+            if (badge.getAwardedAt() != null) {
+                earnedBadges.add(trait);
+            }
+        }
+
+        return HelpfulScoreResponse.builder()
+                .total(total)
+                .byTrait(byTrait)
+                .earnedBadges(earnedBadges)
+                .build();
     }
 
     /**

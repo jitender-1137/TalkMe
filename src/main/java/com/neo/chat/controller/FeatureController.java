@@ -41,6 +41,8 @@ public class FeatureController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         FeatureAccessResponse res = FeatureAccessResponse.builder()
                 .features(featureAccessService.effectiveWireNames(userDetails.getUser()))
+                .lockedFeatures(featureAccessService.verificationLockedWireNames(userDetails.getUser()))
+                .verificationRequired(featureAccessService.isVerificationRequired())
                 .build();
         return ResponseEntity.ok(SuccessResponseDto.success(res));
     }
@@ -67,6 +69,8 @@ public class FeatureController {
         featureAccessService.setSelfPreference(userDetails.getUser(), fk, enabled);
         FeatureAccessResponse res = FeatureAccessResponse.builder()
                 .features(featureAccessService.effectiveWireNames(userDetails.getUser()))
+                .lockedFeatures(featureAccessService.verificationLockedWireNames(userDetails.getUser()))
+                .verificationRequired(featureAccessService.isVerificationRequired())
                 .build();
         return ResponseEntity.ok(SuccessResponseDto.success(res, "Feature preference updated", "TM_066"));
     }

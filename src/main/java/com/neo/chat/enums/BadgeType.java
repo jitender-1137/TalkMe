@@ -15,6 +15,8 @@ public enum BadgeType {
     FUNNY("Funny"),
     CONVERSATION_STARTER("Conversation Starter"),
     HELPFUL("Helpful"),
+    GREAT_TEACHER("Great Teacher"),
+    RELIABLE("Reliable"),
     ACTIVE_NIGHT_OWL("Active Night Owl"),
     COMMUNITY_FAVOURITE("Community Favourite");
 

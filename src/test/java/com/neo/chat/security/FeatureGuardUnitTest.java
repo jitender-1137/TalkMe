@@ -3,6 +3,7 @@ package com.neo.chat.security;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.enums.FeatureKey;
+import com.neo.chat.exception.VerificationRequiredException;
 import com.neo.chat.service.FeatureAccessService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -87,10 +89,23 @@ class FeatureGuardUnitTest {
 
     @Test
     void shouldReturnFalseWhenServiceDeniesAccess() {
-        authenticateAsUser();
+        User user = authenticateAsUser();
         when(featureAccessService.hasAccess(any(), any())).thenReturn(false);
+        when(featureAccessService.isVerificationLocked(user, FeatureKey.NIGHT_OWL)).thenReturn(false);
 
         assertThat(guard.check("night_owl")).isFalse();
+    }
+
+    @Test
+    void shouldThrowVerificationRequiredWhenLockedPendingVerification() {
+        User user = authenticateAsUser();
+        when(featureAccessService.hasAccess(user, FeatureKey.FLIRT_LOBBY)).thenReturn(false);
+        when(featureAccessService.isVerificationLocked(user, FeatureKey.FLIRT_LOBBY)).thenReturn(true);
+
+        // A direct/bypass call gets an actionable, secure denial — not a bare Access Denied.
+        assertThatThrownBy(() -> guard.check("flirt_lobby"))
+                .isInstanceOfSatisfying(VerificationRequiredException.class,
+                        ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_VERIFY_REQUIRED"));
     }
 
     @Test

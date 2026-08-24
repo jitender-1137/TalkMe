@@ -6,6 +6,7 @@ import com.neo.chat.dto.response.CompatibilityScore;
 import com.neo.chat.enums.ConversationEnergy;
 import com.neo.chat.enums.Interest;
 import com.neo.chat.enums.Language;
+import com.neo.chat.enums.LookingForTag;
 import com.neo.chat.enums.Mood;
 import com.neo.chat.enums.PersonalityTrait;
 import org.hibernate.collection.spi.PersistentMap;
@@ -590,6 +591,132 @@ class CompatibilityServiceImplTest {
             u.setConversationEnergy(ConversationEnergy.FRIENDLY);
             u.setMood(Mood.FLIRT);
             return u;
+        }
+    }
+
+    @Nested
+    @DisplayName("commonalities (itemized things in common)")
+    class Commonalities {
+
+        @Test
+        @DisplayName("nothing shared → empty list (never null)")
+        void nothingShared() {
+            assertThat(score(user(), user()).getCommonalities()).isNotNull().isEmpty();
+        }
+
+        @Test
+        @DisplayName("shared interests are itemized by prettified name")
+        void sharedInterests() {
+            User a = user();
+            User b = user();
+            a.setInterests(EnumSet.of(Interest.MUSIC, Interest.ART, Interest.SPORTS));
+            b.setInterests(EnumSet.of(Interest.MUSIC, Interest.ART, Interest.CODING));
+            assertThat(score(a, b).getCommonalities()).contains("Music", "Art").doesNotContain("Sports");
+        }
+
+        @Test
+        @DisplayName("shared languages are itemized")
+        void sharedLanguages() {
+            User a = user();
+            User b = user();
+            a.setLanguages(EnumSet.of(Language.EN, Language.ES));
+            b.setLanguages(EnumSet.of(Language.EN, Language.FR));
+            assertThat(score(a, b).getCommonalities()).contains("En").doesNotContain("Es", "Fr");
+        }
+
+        @Test
+        @DisplayName("shared lookingFor tags are itemized")
+        void sharedLookingFor() {
+            User a = user();
+            User b = user();
+            a.setLookingFor(EnumSet.of(LookingForTag.FRIENDS, LookingForTag.LONG_TERM));
+            b.setLookingFor(EnumSet.of(LookingForTag.FRIENDS, LookingForTag.GAMING));
+            assertThat(score(a, b).getCommonalities()).contains("Friends").doesNotContain("Long term", "Gaming");
+        }
+
+        @Test
+        @DisplayName("same country is a commonality; different country is not")
+        void sameCountry() {
+            User a = user();
+            User b = user();
+            a.setCountry("US");
+            b.setCountry("us");
+            assertThat(score(a, b).getCommonalities()).contains("US");
+
+            User c = user();
+            User d = user();
+            c.setCountry("US");
+            d.setCountry("CA");
+            assertThat(score(c, d).getCommonalities()).doesNotContain("US", "CA");
+        }
+
+        @Test
+        @DisplayName("identical mood/energy add affinity labels")
+        void identicalMoodEnergy() {
+            User a = user();
+            User b = user();
+            a.setMood(Mood.FLIRT);
+            b.setMood(Mood.FLIRT);
+            a.setConversationEnergy(ConversationEnergy.FRIENDLY);
+            b.setConversationEnergy(ConversationEnergy.FRIENDLY);
+            assertThat(score(a, b).getCommonalities()).contains("Flirt mood", "Friendly energy");
+        }
+
+        @Test
+        @DisplayName("same-cluster mood and same-group energy still count as commonalities")
+        void adjacentMoodEnergy() {
+            User a = user();
+            User b = user();
+            a.setMood(Mood.FLIRT);
+            b.setMood(Mood.ROMANTIC);            // same mood cluster → fMood 0.8
+            a.setConversationEnergy(ConversationEnergy.FRIENDLY);
+            b.setConversationEnergy(ConversationEnergy.FUNNY); // same energy group → fEnergy 0.6
+            assertThat(score(a, b).getCommonalities()).contains("Flirt mood", "Friendly energy");
+        }
+
+        @Test
+        @DisplayName("cross-cluster mood and cross-group energy are not commonalities")
+        void mismatchedMoodEnergy() {
+            User a = user();
+            User b = user();
+            a.setMood(Mood.FLIRT);
+            b.setMood(Mood.GAMING);              // cross cluster → fMood 0.3
+            a.setConversationEnergy(ConversationEnergy.FRIENDLY);
+            b.setConversationEnergy(ConversationEnergy.ROMANTIC); // cross group → fEnergy 0.25
+            assertThat(score(a, b).getCommonalities()).doesNotContain("Flirt mood", "Friendly energy");
+        }
+
+        @Test
+        @DisplayName("null mood/energy add nothing (neutral 0.5 below thresholds)")
+        void nullMoodEnergy() {
+            User a = user();
+            a.setMood(Mood.FLIRT);
+            a.setConversationEnergy(ConversationEnergy.FRIENDLY);
+            // b leaves mood/energy null → moodScore/energyScore return 0.5, below thresholds
+            assertThat(score(a, user()).getCommonalities()).doesNotContain("Flirt mood", "Friendly energy");
+        }
+
+        @Test
+        @DisplayName("fully aligned profiles surface every category (7+ things in common)")
+        void fullyAligned() {
+            User a = user();
+            User b = user();
+            a.setInterests(EnumSet.of(Interest.MUSIC, Interest.ART));
+            b.setInterests(EnumSet.of(Interest.MUSIC, Interest.ART));
+            a.setLanguages(EnumSet.of(Language.EN, Language.ES));
+            b.setLanguages(EnumSet.of(Language.EN, Language.ES));
+            a.setLookingFor(EnumSet.of(LookingForTag.FRIENDS));
+            b.setLookingFor(EnumSet.of(LookingForTag.FRIENDS));
+            a.setCountry("US");
+            b.setCountry("US");
+            a.setMood(Mood.FLIRT);
+            b.setMood(Mood.FLIRT);
+            a.setConversationEnergy(ConversationEnergy.FRIENDLY);
+            b.setConversationEnergy(ConversationEnergy.FRIENDLY);
+
+            assertThat(score(a, b).getCommonalities())
+                    .contains("Music", "Art", "En", "Es", "Friends", "US", "Flirt mood", "Friendly energy")
+                    .hasSizeGreaterThanOrEqualTo(7);
         }
     }
 

@@ -16,4 +16,13 @@ import java.util.Set;
 @AllArgsConstructor
 public class FeatureAccessResponse {
     private Set<String> features;
+    /**
+     * Features shown-but-locked pending email verification (empty unless the global
+     * {@code features.require-verified} gate is on and the user is unverified).
+     */
+    private Set<String> lockedFeatures;
+    /**
+     * True when the global email-verification gate is on.
+     */
+    private boolean verificationRequired;
 }

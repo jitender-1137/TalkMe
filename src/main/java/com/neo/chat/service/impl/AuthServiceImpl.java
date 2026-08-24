@@ -1142,6 +1142,8 @@ public class AuthServiceImpl implements AuthService {
         featureAccessCache.evict(user.getId());
         AuthUserResponse authUser = userMapper.toAuthUserResponse(user);
         authUser.setFeatures(featureAccessService.effectiveWireNames(user));
+        authUser.setLockedFeatures(featureAccessService.verificationLockedWireNames(user));
+        authUser.setVerificationRequired(featureAccessService.isVerificationRequired());
 
         JwtTokensResponse jwtTokens = JwtTokensResponse.builder()
                 .accessToken(accessToken)
@@ -1181,6 +1183,8 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
         AuthUserResponse res = userMapper.toAuthUserResponse(user);
         res.setFeatures(featureAccessService.effectiveWireNames(user));
+        res.setLockedFeatures(featureAccessService.verificationLockedWireNames(user));
+        res.setVerificationRequired(featureAccessService.isVerificationRequired());
         return res;
     }
 
@@ -1298,6 +1302,8 @@ public class AuthServiceImpl implements AuthService {
         featureAccessCache.evict(user.getId());
         AuthUserResponse res = userMapper.toAuthUserResponse(user);
         res.setFeatures(featureAccessService.effectiveWireNames(user));
+        res.setLockedFeatures(featureAccessService.verificationLockedWireNames(user));
+        res.setVerificationRequired(featureAccessService.isVerificationRequired());
         return res;
     }
 }

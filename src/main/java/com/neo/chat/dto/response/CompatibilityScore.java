@@ -27,4 +27,11 @@ public class CompatibilityScore {
      * Coarse label for anonymous surfaces: "HIGH" | "MEDIUM" | "LOW".
      */
     private String bucket;
+    /**
+     * Concrete shared things between the two users — shared interest names, shared languages,
+     * shared "looking for" tags, the shared country, and a same/adjacent mood or energy label.
+     * Distinct from {@code highlights} (which is short human copy): this is the itemized list a
+     * UI can count ("You have 7 things in common"). Possibly empty, never null.
+     */
+    private List<String> commonalities;
 }

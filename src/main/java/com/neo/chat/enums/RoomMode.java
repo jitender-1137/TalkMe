@@ -17,12 +17,16 @@ package com.neo.chat.enums;
 public enum RoomMode {
     STANDARD,
     SLEEP_COMPANION,
-    LISTENING;
+    LISTENING,
+    // ── Phase 8: Connect rooms ──
+    TOPIC,             // a "third place" topic room (coffee/gaming/tech/…) — recorded like STANDARD
+    LANGUAGE_PRACTICE, // a language-exchange room (pairs a target language + native) — recorded
+    STUDY_POMODORO;    // a focus/study room driven by a shared Pomodoro timer — ephemeral (not recorded)
 
     /**
      * Modes whose messages must never be persisted/recorded.
      */
     public boolean isEphemeral() {
-        return this == SLEEP_COMPANION || this == LISTENING;
+        return this == SLEEP_COMPANION || this == LISTENING || this == STUDY_POMODORO;
     }
 }

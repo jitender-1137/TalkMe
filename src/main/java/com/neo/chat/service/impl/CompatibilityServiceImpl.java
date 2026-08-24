@@ -104,6 +104,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
         breakdown.put("mood", pct(fMood));
 
         List<String> highlights = buildHighlights(a, b, fLanguages, fAge, fEnergy, fMood, fTimezone);
+        List<String> commonalities = buildCommonalities(a, b, fEnergy, fMood, fTimezone);
 
         return CompatibilityScore.builder()
                 .overall(overall)
@@ -111,6 +112,7 @@ public class CompatibilityServiceImpl implements CompatibilityService {
                 .highlights(highlights)
                 .explanation(explain(overall, highlights))
                 .bucket(bucket(overall))
+                .commonalities(commonalities)
                 .build();
     }
 
@@ -313,6 +315,37 @@ public class CompatibilityServiceImpl implements CompatibilityService {
         }
         if (fAge >= 0.85) {
             out.add("You're close in age");
+        }
+        return out;
+    }
+
+    /**
+     * Builds the itemized list of concrete shared things (for the "things in common" count),
+     * reusing {@link #sharedNames(Set, Set, int)} for every enum-set category: shared interests,
+     * shared languages and shared "looking for" tags — plus the shared country (when equal) and a
+     * same/adjacent mood or energy label. Uncapped so the UI can count every commonality. Distinct
+     * from {@link #buildHighlights} copy; does not affect scoring.
+     *
+     * @param a         first user
+     * @param b         second user
+     * @param fEnergy   energy factor (>=0.6 ⇒ same/adjacent energy)
+     * @param fMood     mood factor (>=0.8 ⇒ same/adjacent mood)
+     * @param fTimezone timezone/country factor (>=1.0 ⇒ same country)
+     * @return ordered list of shared items (possibly empty, never null)
+     */
+    private List<String> buildCommonalities(User a, User b, double fEnergy, double fMood, double fTimezone) {
+        List<String> out = new ArrayList<>();
+        out.addAll(sharedNames(a.getInterests(), b.getInterests(), Integer.MAX_VALUE));
+        out.addAll(sharedNames(a.getLanguages(), b.getLanguages(), Integer.MAX_VALUE));
+        out.addAll(sharedNames(a.getLookingFor(), b.getLookingFor(), Integer.MAX_VALUE));
+        if (fTimezone >= 1.0 && a.getCountry() != null) {
+            out.add(a.getCountry());
+        }
+        if (fMood >= 0.8 && a.getMood() != null) {
+            out.add(prettify(a.getMood().name()) + " mood");
+        }
+        if (fEnergy >= 0.6 && a.getConversationEnergy() != null) {
+            out.add(prettify(a.getConversationEnergy().name()) + " energy");
         }
         return out;
     }

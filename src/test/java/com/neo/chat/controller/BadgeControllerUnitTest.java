@@ -4,6 +4,7 @@ import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.request.EndorseBadgeRequest;
 import com.neo.chat.dto.response.BadgeResponse;
+import com.neo.chat.dto.response.HelpfulScoreResponse;
 import com.neo.chat.enums.BadgeType;
 import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.ConflictException;
@@ -32,6 +33,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -247,6 +249,88 @@ class BadgeControllerUnitTest {
             when(badgeService.listBadges(any())).thenThrow(new RuntimeException("boom"));
 
             mockMvc.perform(get(BASE + "/{userUuid}", USER_UUID))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  GET /reputation/badges/{userUuid}/helpful-score
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("GET /{userUuid}/helpful-score")
+    class HelpfulScore {
+
+        @Test
+        void shouldReturn200WithAggregateScoreAndForwardUserUuid() throws Exception {
+            authenticate();
+            HelpfulScoreResponse score = HelpfulScoreResponse.builder()
+                    .total(10)
+                    .byTrait(Map.of("HELPFUL", 5, "GREAT_TEACHER", 3, "RELIABLE", 2))
+                    .earnedBadges(List.of("HELPFUL", "GREAT_TEACHER"))
+                    .build();
+            when(badgeService.getHelpfulScore(any())).thenReturn(score);
+
+            mockMvc.perform(get(BASE + "/{userUuid}/helpful-score", USER_UUID))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.messageCode").value(SUCCESS_CODE))
+                    .andExpect(jsonPath("$.data.total").value(10))
+                    .andExpect(jsonPath("$.data.byTrait.HELPFUL").value(5))
+                    .andExpect(jsonPath("$.data.byTrait.GREAT_TEACHER").value(3))
+                    .andExpect(jsonPath("$.data.byTrait.RELIABLE").value(2))
+                    .andExpect(jsonPath("$.data.earnedBadges", org.hamcrest.Matchers.contains(
+                            "HELPFUL", "GREAT_TEACHER")));
+
+            ArgumentCaptor<String> uuid = ArgumentCaptor.forClass(String.class);
+            verify(badgeService).getHelpfulScore(uuid.capture());
+            assertThat(uuid.getValue()).isEqualTo(USER_UUID);
+        }
+
+        @Test
+        void shouldReturn200WithZeroScoreWhenUserHasNoBadges() throws Exception {
+            authenticate();
+            HelpfulScoreResponse score = HelpfulScoreResponse.builder()
+                    .total(0).byTrait(Map.of()).earnedBadges(List.of()).build();
+            when(badgeService.getHelpfulScore(any())).thenReturn(score);
+
+            mockMvc.perform(get(BASE + "/{userUuid}/helpful-score", USER_UUID))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.total").value(0))
+                    .andExpect(jsonPath("$.data.earnedBadges").isEmpty());
+
+            verify(badgeService).getHelpfulScore(USER_UUID);
+        }
+
+        @Test
+        void shouldReturn404WhenUserNotFound() throws Exception {
+            authenticate();
+            when(badgeService.getHelpfulScore(any()))
+                    .thenThrow(new NotFoundException("User not found", "TM_064"));
+
+            mockMvc.perform(get(BASE + "/{userUuid}/helpful-score", USER_UUID))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.messageCode").value("TM_064"));
+        }
+
+        @Test
+        void shouldReturn400WhenServiceRejectsUuidFormat() throws Exception {
+            authenticate();
+            when(badgeService.getHelpfulScore(any()))
+                    .thenThrow(new BadRequestException("Invalid user id", "TM_922"));
+
+            mockMvc.perform(get(BASE + "/{userUuid}/helpful-score", "not-a-uuid"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.messageCode").value("TM_922"));
+        }
+
+        @Test
+        void shouldReturn500OnUnexpectedServiceError() throws Exception {
+            authenticate();
+            when(badgeService.getHelpfulScore(any())).thenThrow(new RuntimeException("boom"));
+
+            mockMvc.perform(get(BASE + "/{userUuid}/helpful-score", USER_UUID))
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
         }

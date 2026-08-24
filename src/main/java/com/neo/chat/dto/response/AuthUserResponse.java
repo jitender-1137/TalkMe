@@ -74,4 +74,14 @@ public class AuthUserResponse {
      * so third-party views (post likes, story viewers, chat peers) never leak entitlements.
      */
     private Set<String> features;
+    /**
+     * Features the user cannot use yet ONLY because they're unverified while the global
+     * {@code features.require-verified} gate is on. The client shows these (labels/buttons) but
+     * blocks use with a "verify your email first" prompt. Empty when the gate is off/verified.
+     */
+    private Set<String> lockedFeatures;
+    /**
+     * True when the global email-verification gate ({@code features.require-verified}) is on.
+     */
+    private boolean verificationRequired;
 }

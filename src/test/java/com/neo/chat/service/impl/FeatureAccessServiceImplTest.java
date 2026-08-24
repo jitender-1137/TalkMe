@@ -192,12 +192,23 @@ class FeatureAccessServiceImplTest {
         }
 
         @Test
-        @DisplayName("requiresVerified feature + unverified user → false")
+        @DisplayName("require-verified ON + requiresVerified feature + unverified user → false")
         void requiresVerifiedFailsWhenUnverified() {
+            when(featureFlags.isRequireVerified()).thenReturn(true); // enforce the global gate
             user.setVerified(false);
             when(grantRepository.findByUser(user)).thenReturn(List.of());
 
             assertThat(service.hasAccess(user, FeatureKey.FLIRT_LOBBY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("require-verified OFF (default) → unverified user still gets a requiresVerified feature")
+        void requiresVerifiedBypassedWhenGlobalFlagOff() {
+            // featureFlags.isRequireVerified() defaults to false (flag off) → verified gate bypassed.
+            user.setVerified(false);
+            when(grantRepository.findByUser(user)).thenReturn(List.of());
+
+            assertThat(service.hasAccess(user, FeatureKey.FLIRT_LOBBY)).isTrue();
         }
 
         @Test
@@ -207,6 +218,41 @@ class FeatureAccessServiceImplTest {
             when(ageVerificationService.isAgeVerified(user)).thenReturn(false);
 
             assertThat(service.hasAccess(user, FeatureKey.FLIRT_LOBBY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("require-verified OFF → no verification-locked features (nothing to show-but-lock)")
+        void lockedEmptyWhenFlagOff() {
+            user.setVerified(false); // flag off (mock default) → gate bypassed → nothing locked
+            assertThat(service.verificationLockedKeys(user)).isEmpty();
+            assertThat(service.isVerificationRequired()).isFalse();
+        }
+
+        @Test
+        @DisplayName("require-verified ON + verified user → nothing locked")
+        void lockedEmptyWhenVerified() {
+            when(featureFlags.isRequireVerified()).thenReturn(true);
+            user.setVerified(true);
+            assertThat(service.verificationLockedKeys(user)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("require-verified ON + unverified → email-only-gated features are locked, others are not")
+        void lockedWhenFlagOnAndUnverified() {
+            when(featureFlags.isRequireVerified()).thenReturn(true);
+            when(featureFlags.isAllowNonVerifiedFlirtMode()).thenReturn(false);
+            when(grantRepository.findByUser(user)).thenReturn(List.of());
+            when(ageVerificationService.isAgeVerified(user)).thenReturn(true); // isolate the email gate
+            user.setVerified(false);
+
+            Set<FeatureKey> locked = service.verificationLockedKeys(user);
+
+            // LIVE_AUDIO requires verification (not just age) → shown-but-locked.
+            assertThat(locked).contains(FeatureKey.LIVE_AUDIO);
+            // A non-verification-gated feature is never in the locked set (it's simply usable).
+            assertThat(locked).doesNotContain(FeatureKey.NIGHT_OWL, FeatureKey.MOOD_ENERGY);
+            // Locked features are, by definition, NOT currently usable.
+            assertThat(service.hasAccess(user, FeatureKey.LIVE_AUDIO)).isFalse();
         }
 
         @Test
@@ -282,6 +328,7 @@ class FeatureAccessServiceImplTest {
         @Test
         @DisplayName("unverified user → adult features dropped, non-gated ones retained")
         void unverifiedDropsAdultFeatures() {
+            when(featureFlags.isRequireVerified()).thenReturn(true); // enforce the verified gate
             user.setVerified(false);
             when(grantRepository.findByUser(user)).thenReturn(List.of());
 

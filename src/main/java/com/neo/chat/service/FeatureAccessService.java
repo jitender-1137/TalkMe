@@ -31,6 +31,30 @@ public interface FeatureAccessService {
     Set<String> effectiveWireNames(User user);
 
     /**
+     * Feature keys blocked right now solely because the user is unverified while the global
+     * {@code features.require-verified} gate is on (accessible-if-verified minus accessible-now).
+     * Empty when the gate is off or the user is verified. The client shows these but blocks use.
+     */
+    Set<FeatureKey> verificationLockedKeys(User user);
+
+    /**
+     * Wire names of {@link #verificationLockedKeys} — the "locked pending verification" payload.
+     */
+    Set<String> verificationLockedWireNames(User user);
+
+    /**
+     * True when {@code key} is blocked for {@code user} right now solely because they're unverified
+     * (the global gate is on). Lets the guard return an actionable "verify your email" denial
+     * instead of a generic 403 for a direct/bypass API call.
+     */
+    boolean isVerificationLocked(User user, FeatureKey key);
+
+    /**
+     * True when the global {@code features.require-verified} gate is on.
+     */
+    boolean isVerificationRequired();
+
+    /**
      * Tier-3 self-toggle. {@code enabled=false} records a SELF DENY (opting out of an
      * otherwise-entitled feature); {@code enabled=true} clears it. Never grants a
      * feature the user isn't otherwise entitled to.

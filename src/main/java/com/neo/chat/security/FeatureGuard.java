@@ -1,6 +1,7 @@
 package com.neo.chat.security;
 
 import com.neo.chat.enums.FeatureKey;
+import com.neo.chat.exception.VerificationRequiredException;
 import com.neo.chat.service.FeatureAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -27,12 +28,23 @@ public class FeatureGuard {
      *
      * @param key the wire form of the feature key (resolved via {@code FeatureKey.fromWire})
      * @return {@code true} if the current user has access to the resolved feature
+     * @throws VerificationRequiredException when access is denied SOLELY because the global
+     *         {@code features.require-verified} gate is on and the user is unverified — so a
+     *         direct/bypass API call gets an actionable {@code TM_VERIFY_REQUIRED} 403 rather than
+     *         a bare Access Denied. Other denials return {@code false} (generic 403).
      */
     public boolean check(String key) {
         FeatureKey fk = FeatureKey.fromWire(key);
         if (fk == null) return false;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails cud)) return false;
-        return featureAccessService.hasAccess(cud.getUser(), fk);
+        var user = cud.getUser();
+        if (featureAccessService.hasAccess(user, fk)) return true;
+        // Denied. If the ONLY blocker is email verification, surface a specific, actionable error
+        // (server-side enforcement — this fires even when the client bypasses the hidden/locked UI).
+        if (featureAccessService.isVerificationLocked(user, fk)) {
+            throw new VerificationRequiredException();
+        }
+        return false;
     }
 }

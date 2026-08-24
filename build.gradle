@@ -1,3 +1,5 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.6'
@@ -36,7 +38,7 @@ tasks.named('bootJar') {
 // replaced — Spring's ${...} banner tokens use different delimiters and are left intact.
 tasks.named('processResources') {
     filesMatching('banner.txt') {
-        filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [appVersion: project.version.toString()])
+        filter(ReplaceTokens, tokens: [appVersion: project.version.toString()])
     }
 }
 
@@ -86,6 +88,7 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
+    runtimeOnly 'com.julien-dubois.bootui:bootui-spring-boot-starter:1.14.1'
     // Circuit breaker (core lib, used programmatically — Spring-Boot-version agnostic)
     implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     implementation 'io.github.resilience4j:resilience4j-micrometer:2.2.0'

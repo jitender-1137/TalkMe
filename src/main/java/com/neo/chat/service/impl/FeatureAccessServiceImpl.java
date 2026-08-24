@@ -96,6 +96,54 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     }
 
     /**
+     * Features the user cannot use RIGHT NOW solely because they haven't verified their email,
+     * i.e. keys that WOULD be accessible if verified but aren't in {@link #effectiveKeys}. Empty
+     * unless the global {@code features.require-verified} gate is on AND the user is unverified.
+     * The client shows these features (labels/buttons) but blocks use with a "verify first" prompt.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Set<FeatureKey> verificationLockedKeys(User user) {
+        if (user == null || !featureFlags.isRequireVerified() || user.isVerified()) {
+            return EnumSet.noneOf(FeatureKey.class);
+        }
+        List<UserFeatureGrant> grants = grantRepository.findByUser(user);
+        Instant now = Instant.now();
+        EnumSet<FeatureKey> locked = EnumSet.noneOf(FeatureKey.class);
+        for (FeatureKey key : FeatureKey.values()) {
+            if (resolve(user, key, grants, now, true) && !resolve(user, key, grants, now, false)) {
+                locked.add(key);
+            }
+        }
+        return locked;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<String> verificationLockedWireNames(User user) {
+        return verificationLockedKeys(user).stream()
+                .map(FeatureKey::wireName)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    @Override
+    public boolean isVerificationRequired() {
+        return featureFlags.isRequireVerified();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isVerificationLocked(User user, FeatureKey key) {
+        if (user == null || key == null || !featureFlags.isRequireVerified() || user.isVerified()) {
+            return false;
+        }
+        List<UserFeatureGrant> grants = grantRepository.findByUser(user);
+        Instant now = Instant.now();
+        // Accessible if verified, but not accessible now → blocked solely by the verified gate.
+        return resolve(user, key, grants, now, true) && !resolve(user, key, grants, now, false);
+    }
+
+    /**
      * Apply the user's own opt-in/opt-out: enabling clears any SELF DENY grant, disabling upserts
      * a SELF DENY grant. Evicts the user's access cache after commit.
      *
@@ -204,6 +252,16 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
      * @return whether access is granted
      */
     private boolean resolve(User user, FeatureKey key, List<UserFeatureGrant> grants, Instant now) {
+        return resolve(user, key, grants, now, false);
+    }
+
+    /**
+     * As {@link #resolve(User, FeatureKey, List, Instant)}, but when {@code assumeVerified} is true
+     * the email-verified gate is treated as satisfied. Used to compute the "accessible if the user
+     * verified their email" set for the show-but-locked UI (see {@code verificationLockedKeys}).
+     */
+    private boolean resolve(User user, FeatureKey key, List<UserFeatureGrant> grants, Instant now,
+                            boolean assumeVerified) {
         if (!featureFlags.isGloballyEnabled(key)) return false;
         // Per-user ad exemption: an ad-free user (the seam a future Premium tier flips)
         // NEVER sees ads — a HARD gate here (not just a rule) so not even an admin/cohort
@@ -211,7 +269,7 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
         // sees ads whenever advertising is globally on.
         if (key == FeatureKey.ADS && user.isAdsFree()) return false;
         // Sub-category roll-up: a child is only accessible if its parent is.
-        if (key.getParent() != null && !resolve(user, key.getParent(), grants, now)) return false;
+        if (key.getParent() != null && !resolve(user, key.getParent(), grants, now, assumeVerified)) return false;
 
         boolean adminDeny = anyGrant(grants, key, now,
                 g -> g.getScope() == GrantScope.ADMIN && g.getDecision() == GrantDecision.DENY);
@@ -221,7 +279,7 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
                 g -> (g.getScope() == GrantScope.ADMIN || g.getScope() == GrantScope.COHORT)
                         && g.getDecision() == GrantDecision.ALLOW);
 
-        boolean entitled = ruleEntitled(user, key) || allowGrant;
+        boolean entitled = ruleEntitled(user, key, assumeVerified) || allowGrant;
         if (!entitled) return false;
 
         boolean selfDeny = anyGrant(grants, key, now,
@@ -237,19 +295,24 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
      * @param key  the feature key
      * @return whether the user is entitled by rules alone (before grants)
      */
-    private boolean ruleEntitled(User user, FeatureKey key) {
+    private boolean ruleEntitled(User user, FeatureKey key, boolean assumeVerified) {
         if (key.getMinRole() != null && !hasRole(user, key.getMinRole())) return false;
-        if (key.isRequiresVerified() && !user.isVerified() && !verifiedGateBypassed(key)) return false;
+        if (key.isRequiresVerified() && !user.isVerified() && !assumeVerified && !verifiedGateBypassed(key)) return false;
         if (key.isRequiresAgeVerified() && !ageVerificationService.isAgeVerified(user)) return false;
         return key.isDefaultEntitled();
     }
 
     /**
-     * Config-driven relaxation of the email-verified gate. Currently only FLIRT_MODE, when
-     * {@code features.allow-non-verified-flirt-mode} is on, so unverified users can flirt.
-     * The 18+ age gate is never bypassed here.
+     * Config-driven relaxation of the email-verified gate.
+     * <p>
+     * Global switch first: when {@code features.require-verified} is {@code false} (the DEFAULT),
+     * the verified gate is bypassed for EVERY feature, so verified and unverified users alike can
+     * use all features. When {@code true}, the per-key {@code requiresVerified} gate is enforced,
+     * with the existing FLIRT_MODE-specific relaxation ({@code features.allow-non-verified-flirt-mode})
+     * still available. The 18+ age gate is never bypassed here.
      */
     private boolean verifiedGateBypassed(FeatureKey key) {
+        if (!featureFlags.isRequireVerified()) return true;
         return key == FeatureKey.FLIRT_MODE && featureFlags.isAllowNonVerifiedFlirtMode();
     }
 

@@ -46,6 +46,17 @@ public class FeatureFlags {
     private boolean allowNonVerifiedFlirtMode = false;
 
     /**
+     * Global email-verification gate. When {@code false} (the DEFAULT), the per-feature
+     * {@code requiresVerified} gate is relaxed platform-wide, so EVERY user — verified or
+     * unverified — can use all features. When {@code true}, the {@code requiresVerified}
+     * gate is enforced and only email-verified users can use features that require it.
+     * <p>
+     * The 18+ age-verification gate ({@code requiresAgeVerified}) is independent and is
+     * NOT affected by this flag. Bound from {@code features.require-verified}.
+     */
+    private boolean requireVerified = false;
+
+    /**
      * True when the feature (and all its ancestors) are globally enabled.
      */
     public boolean isGloballyEnabled(FeatureKey key) {

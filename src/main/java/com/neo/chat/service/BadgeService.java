@@ -2,6 +2,7 @@ package com.neo.chat.service;
 
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.BadgeResponse;
+import com.neo.chat.dto.response.HelpfulScoreResponse;
 import com.neo.chat.enums.BadgeType;
 
 import java.util.List;
@@ -23,4 +24,11 @@ public interface BadgeService {
      * Endorse a user for a trait; returns the resulting badge state for that trait.
      */
     BadgeResponse endorse(User endorser, String recipientUuid, BadgeType badgeType);
+
+    /**
+     * Aggregate "helpfulness" reputation for a user, derived purely from their existing
+     * peer-endorsement badges: the total distinct-endorser count across all traits, a per-trait
+     * breakdown, and the list of earned badge traits. Cosmetic only — never gates a feature.
+     */
+    HelpfulScoreResponse getHelpfulScore(String userUuid);
 }
