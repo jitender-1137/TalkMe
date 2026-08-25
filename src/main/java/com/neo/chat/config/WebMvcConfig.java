@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.HandlerTypePredicate;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
@@ -18,6 +19,7 @@ import org.springframework.web.servlet.resource.PathResourceResolver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Spring MVC web configuration. Prefixes every {@code @RestController} mapping with
@@ -58,6 +60,21 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/talkMe/**")
                 .addResourceLocations("file:" + uploadDir + "/");
 
+        // ── Next.js immutable build assets (/_next/static/**) ───────────────────
+        // Everything the Next.js export emits under /_next/static/ is CONTENT-HASHED
+        // (the chunk name changes whenever its bytes change), so a given URL can
+        // never serve different content. Mark it cacheable for a year and
+        // `immutable` so browsers (and any CDN/proxy) serve it straight from disk on
+        // every repeat visit — ZERO revalidation round-trips. This is the single
+        // biggest lever on cold-open latency: without it, each of the ~30 hashed
+        // chunks was re-validated over the network on every open.
+        // Registered BEFORE "/**" so the long-lived caching wins for these paths.
+        registry.addResourceHandler("/_next/static/**")
+                .addResourceLocations("classpath:/static/_next/static/")
+                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable())
+                .resourceChain(true)
+                .addResolver(new CachingSpaResourceResolver());
+
         // Bundled Next.js static export. The export emits "clean URL" pages as
         // <route>.html (e.g. /blog -> blog.html, /blog/<slug> -> blog/<slug>.html,
         // /welcome -> welcome.html, /app -> app.html). Spring's default handler
@@ -74,8 +91,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // distance too far back"). Caching means each entry is inflated at most once
         // (and inflation is serialized), so concurrent requests are served from
         // memory and never re-enter the jar inflater.
+        //
+        // Cache-Control: `no-cache` = the browser MAY store the file but must
+        // revalidate with the server before reuse. This is exactly right for the
+        // HTML shell (index.html / *.html) and other un-hashed root assets: a new
+        // deploy is picked up immediately (the revalidation is a cheap 304), while
+        // the heavy hashed chunks above still load from cache with no network at
+        // all. The service worker adds true offline fallback on top of this.
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/")
+                .setCacheControl(CacheControl.noCache())
                 .resourceChain(true)
                 .addResolver(new CachingSpaResourceResolver());
     }

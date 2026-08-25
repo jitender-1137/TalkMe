@@ -185,6 +185,12 @@ class AuthServiceImplTest {
             if (u.getUuid() == null) u.setUuid(UUID.randomUUID());
             return u;
         });
+        // refresh() now maps the user into its response (single-round-trip session
+        // restore), so any path that produces a user response needs a non-null
+        // AuthUserResponse. Lenient so login tests that stub these explicitly, and
+        // tests that never build a user response, are unaffected.
+        lenient().when(userMapper.toAuthUserResponse(any(User.class))).thenReturn(new AuthUserResponse());
+        lenient().when(featureAccessService.effectiveWireNames(any(User.class))).thenReturn(Set.of("chat"));
     }
 
     // ── Fixtures ────────────────────────────────────────────────────────────────

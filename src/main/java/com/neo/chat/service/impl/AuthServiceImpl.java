@@ -605,6 +605,10 @@ public class AuthServiceImpl implements AuthService {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshTokenStr)
                 .expiresIn(accessTokenExpirationMs / 1000)
+                // Include the user so a page-reload session restore is ONE round trip
+                // (see JwtTokensResponse.user). Same payload as GET /auth/me — built from
+                // the managed user we already hold (no extra DB read).
+                .user(toAuthUserResponse(user))
                 .build();
     }
 
@@ -1181,6 +1185,17 @@ public class AuthServiceImpl implements AuthService {
     public AuthUserResponse getCurrentUser(User currentUser) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        return toAuthUserResponse(user);
+    }
+
+    /**
+     * Maps an already-loaded {@link User} to the {@link AuthUserResponse} the client expects
+     * (profile + effective/locked features + verification flag), WITHOUT re-reading from the
+     * database. {@link #getCurrentUser} re-fetches first (its caller only holds a detached
+     * principal); {@code refresh} already holds the managed user from the refresh token, so it
+     * uses this directly to avoid a redundant query on the hot session-restore path.
+     */
+    private AuthUserResponse toAuthUserResponse(User user) {
         AuthUserResponse res = userMapper.toAuthUserResponse(user);
         res.setFeatures(featureAccessService.effectiveWireNames(user));
         res.setLockedFeatures(featureAccessService.verificationLockedWireNames(user));
