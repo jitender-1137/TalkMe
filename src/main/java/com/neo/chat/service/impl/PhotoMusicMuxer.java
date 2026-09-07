@@ -139,10 +139,14 @@ public class PhotoMusicMuxer {
      */
     private boolean runFfmpeg(Path image, Path audio, int start, int clip, Path output) {
         List<String> command = List.of(
-                ffmpeg.path(), "-y",
+                ffmpeg.path(), "-y", "-nostdin",
+                // SECURITY: restrict demuxer protocols to local file/pipe so a crafted image/audio
+                // container cannot make ffmpeg fetch remote/file segments (SSRF/LFI).
+                "-protocol_whitelist", "file,pipe",
                 "-loop", "1", "-i", image.toString(),
                 "-ss", String.valueOf(start), "-i", audio.toString(),
                 "-t", String.valueOf(clip),
+                "-map_metadata", "-1",
                 // libopenh264 (bundled, cross-platform, BSD) — libx264 is not in the
                 // bundled build. Produces standard H.264 (avc1) that plays on iOS.
                 // openh264 uses target bitrate, not -crf/-preset/-tune.
@@ -229,7 +233,8 @@ public class PhotoMusicMuxer {
         try {
             // `ffmpeg -i <audio>` with no output prints the media info then exits
             // non-zero ("no output file") — we only care about the printed Duration.
-            p = new ProcessBuilder(ffmpeg.path(), "-hide_banner", "-i", audio.toString())
+            p = new ProcessBuilder(ffmpeg.path(), "-hide_banner", "-nostdin",
+                    "-protocol_whitelist", "file,pipe", "-i", audio.toString())
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .start();
             final Process running = p;
@@ -273,7 +278,8 @@ public class PhotoMusicMuxer {
      * Falls back to {@code others/} when the image reference carries no derivable folder.
      */
     private String siblingKey(String imageRef, String newName) {
-        String imageKey = MediaKeys.key(imageRef, storageProperties.getMediaRoot());
+        String imageKey = MediaKeys.key(imageRef, storageProperties.getMediaRoot(),
+                storageProperties.getLegacyMediaRoots());
         if (imageKey == null) return "others/" + newName;
         int slash = imageKey.lastIndexOf('/');
         return slash >= 0 ? imageKey.substring(0, slash + 1) + newName : newName;

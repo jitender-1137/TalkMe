@@ -78,8 +78,9 @@ public class PushController {
      * @return an empty success response
      */
     @DeleteMapping("/subscribe")
-    public ResponseEntity<ResponseDto<Void>> unsubscribe(@RequestParam("endpoint") String endpoint) {
-        webPushService.removeSubscription(endpoint);
+    public ResponseEntity<ResponseDto<Void>> unsubscribe(@RequestParam("endpoint") String endpoint,
+                                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
+        webPushService.removeSubscription(userDetails.getUser(), endpoint);
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Push subscription removed", "TM_281"));
     }
 

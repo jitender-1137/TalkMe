@@ -1,6 +1,7 @@
 package com.neo.chat.security;
 
 import com.neo.chat.dto.response.ResponseDto;
+import com.neo.chat.util.ClientIp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -37,7 +38,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private final StringRedisTemplate redisTemplate;
     private final Environment env;
 
-    // Authenticated users: 300 req/min (chat apps are inherently chatty — sync, read receipts, typing)
+    // Authenticated users: 100 req/min (chat apps are inherently chatty — sync, read receipts, typing)
     private static final int AUTH_LIMIT = 100;
     // Anonymous / unauthenticated requests: 60 req/min (login, signup, etc.)
     private static final int ANON_LIMIT = 60;
@@ -69,7 +70,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // connection is authenticated at the STOMP CONNECT frame, and reconnects
         // would otherwise burn the HTTP quota.
         String path = request.getRequestURI();
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod()) || (path != null && path.contains("/ws"))) {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod()) || isWebSocketHandshake(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -127,22 +128,53 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Resolve the real client IP, respecting common reverse-proxy headers.
-     * Only trusts the first non-private entry so that a user cannot spoof the header.
+     * Exact match for the STOMP handshake endpoints ({@code /ws}, {@code /api/v1/ws} and their
+     * SockJS sub-paths). A previous {@code path.contains("/ws")} substring test also exempted any
+     * API route whose path merely contained "ws" (e.g. {@code /api/v1/follows},
+     * {@code /api/v1/profile-views}), silently disabling the limiter for those endpoints.
+     *
+     * @param path the request URI
+     * @return {@code true} only for the WebSocket handshake paths
+     */
+    static boolean isWebSocketHandshake(String path) {
+        if (path == null) return false;
+        return path.equals("/ws") || path.startsWith("/ws/")
+                || path.equals("/api/v1/ws") || path.startsWith("/api/v1/ws/");
+    }
+
+    /**
+     * Resolve the real client IP behind the reverse proxy.
+     *
+     * <p>SECURITY: the {@code X-Forwarded-For} header is a comma-separated list where every proxy
+     * <em>appends</em> the address it saw. The LEFTMOST entries are supplied by the client itself
+     * and are therefore attacker-controlled; only the RIGHTMOST {@code trustedProxyHops} entries
+     * were written by infrastructure we control. Reading the first entry (the previous behaviour)
+     * let a client rotate {@code X-Forwarded-For: <random>} on every request and get a fresh,
+     * unlimited rate-limit bucket — bypassing login/signup/guest throttling entirely. We now read
+     * the entry {@code trustedProxyHops} from the right (default 1 = a single reverse proxy such as
+     * Nginx Proxy Manager), so the value is the address the trusted proxy observed. With
+     * {@code app.security.trusted-proxy-hops=0} proxy headers are ignored and the TCP peer address
+     * is used (correct when the app is exposed directly).
      *
      * @param request the incoming HTTP request
-     * @return the first {@code X-Forwarded-For} entry, else {@code X-Real-IP}, else the remote addr
+     * @return the client IP as observed by the outermost trusted proxy, else {@code X-Real-IP},
+     * else the TCP peer address
      */
     private String resolveClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
+        return ClientIp.resolve(request, trustedProxyHops());
+    }
+
+    /**
+     * Number of trusted reverse-proxy hops in front of the app ({@code app.security.trusted-proxy-hops},
+     * default 1). Read through {@link Environment} so the filter's constructor signature is unchanged.
+     */
+    private int trustedProxyHops() {
+        try {
+            Integer v = env.getProperty("app.security.trusted-proxy-hops", Integer.class);
+            return v == null ? 1 : v;
+        } catch (Exception e) {
+            return 1;
         }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
-        }
-        return request.getRemoteAddr();
     }
 
     /**

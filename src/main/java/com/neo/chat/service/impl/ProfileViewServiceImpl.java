@@ -103,7 +103,7 @@ public class ProfileViewServiceImpl implements ProfileViewService {
             payload.put("viewer", userMapper.toAuthUserResponse(viewer));
             messagingTemplate.convertAndSendToUser(viewed.getUsername(), "/queue/profile-views", payload);
         } catch (Exception e) {
-            log.warn("[ProfileView] failed to notify {}", viewed.getUsername(), e);
+            log.warn("[ProfileView] failed to notify {}", viewed.getUuid(), e);
         }
     }
 

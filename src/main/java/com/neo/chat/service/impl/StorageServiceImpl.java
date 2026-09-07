@@ -72,10 +72,7 @@ public class StorageServiceImpl implements StorageService {
         String cleanSubdir = normalizeSubdir(subdir);
 
         String originalFileName = file.getOriginalFilename();
-        String extension = "";
-        if (originalFileName != null && originalFileName.contains(".")) {
-            extension = originalFileName.substring(originalFileName.lastIndexOf("."));
-        }
+        String extension = safeExtension(originalFileName);
 
         String contentType = file.getContentType();
         boolean isVideo = "video".equalsIgnoreCase(type)
@@ -110,6 +107,7 @@ public class StorageServiceImpl implements StorageService {
      * must never fail because compression failed.
      */
     private String storeCompressedVideo(MultipartFile file, String extension, String subdir) {
+        extension = safeExtension(extension);
         Path tempInput = null;
         Path compressed = null;
         try {
@@ -170,6 +168,35 @@ public class StorageServiceImpl implements StorageService {
     }
 
     /**
+     * A safe stored file extension. SECURITY: the original filename is client-controlled, so a
+     * scriptable extension ({@code .html}, {@code .svg}, {@code .xhtml}, {@code .js}, …) must never
+     * become the stored object's extension — the media serve endpoint derives the response
+     * Content-Type from it, and a text/html or image/svg+xml object on our origin is a stored-XSS
+     * primitive. Only a small allow-list of real media/document extensions is kept; anything else
+     * (including no extension) is stored as {@code .bin} (served as application/octet-stream).
+     *
+     * @param nameOrExt the original filename or an extension (with or without a leading dot)
+     * @return a safe extension beginning with '.', never a scriptable one
+     */
+    static String safeExtension(String nameOrExt) {
+        if (nameOrExt == null) return ".bin";
+        int dot = nameOrExt.lastIndexOf('.');
+        String ext = dot >= 0 ? nameOrExt.substring(dot + 1) : nameOrExt;
+        ext = ext.trim().toLowerCase(java.util.Locale.ROOT);
+        return SAFE_EXTENSIONS.contains(ext) ? "." + ext : ".bin";
+    }
+
+    private static final java.util.Set<String> SAFE_EXTENSIONS = java.util.Set.of(
+            // images
+            "jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif",
+            // video
+            "mp4", "mov", "webm", "mkv", "avi", "m4v", "3gp",
+            // audio
+            "mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac",
+            // documents
+            "pdf");
+
+    /**
      * Run ffmpeg to transcode {@code input} into a web-friendly MP4 at {@code output}.
      * Returns true only on a clean (exit code 0) completion within the timeout.
      */
@@ -179,8 +206,14 @@ public class StorageServiceImpl implements StorageService {
         // openh264 targets a bitrate rather than -crf/-preset; ~1.5 Mbps @ ≤720p is a
         // good size/quality balance. +faststart moves the moov atom up for instant play.
         List<String> command = List.of(
-                ffmpeg.path(), "-y",
+                ffmpeg.path(), "-y", "-nostdin",
+                // SECURITY: the input is attacker-supplied bytes. Restrict ffmpeg's demuxer to
+                // local file/pipe protocols so a crafted playlist (HLS/concat) cannot make ffmpeg
+                // fetch http(s)/file segments (SSRF / local-file read). Strip all input metadata
+                // (GPS/device/timestamps) from the transcoded output (privacy).
+                "-protocol_whitelist", "file,pipe",
                 "-i", input.toString(),
+                "-map_metadata", "-1",
                 "-vf", "scale=-2:'min(720,ih)'",
                 "-c:v", "libopenh264",
                 "-b:v", "1500k",

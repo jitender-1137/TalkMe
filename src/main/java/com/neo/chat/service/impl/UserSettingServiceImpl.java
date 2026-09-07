@@ -112,7 +112,7 @@ public class UserSettingServiceImpl implements UserSettingService {
 
         settings = userSettingRepository.save(settings);
         userSettingsCache.evict(currentUser.getId());
-        log.info("Settings updated successfully for user: {}", currentUser.getUsername());
+        log.info("Settings updated successfully for user: {}", currentUser.getUuid());
         return mapToResponse(settings);
     }
 
@@ -133,7 +133,7 @@ public class UserSettingServiceImpl implements UserSettingService {
         settings = userSettingRepository.save(settings);
         userSettingsCache.evict(currentUser.getId());
         log.info("Messaging privacy set to {} for user: {}",
-                settings.getMessagingPrivacy(), currentUser.getUsername());
+                settings.getMessagingPrivacy(), currentUser.getUuid());
         return mapToResponse(settings);
     }
 
@@ -154,7 +154,7 @@ public class UserSettingServiceImpl implements UserSettingService {
         settings = userSettingRepository.save(settings);
         userSettingsCache.evict(currentUser.getId());
         log.info("Group-add privacy set to {} for user: {}",
-                settings.getGroupAddPrivacy(), currentUser.getUsername());
+                settings.getGroupAddPrivacy(), currentUser.getUuid());
         return mapToResponse(settings);
     }
 

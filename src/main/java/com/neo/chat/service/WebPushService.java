@@ -13,7 +13,7 @@ public interface WebPushService {
     /**
      * Remove a subscription by endpoint (e.g. on logout / unsubscribe).
      */
-    void removeSubscription(String endpoint);
+    void removeSubscription(com.neo.chat.domain.User user, String endpoint);
 
     /**
      * Remove ALL push subscriptions for a user. Called on the single-device login

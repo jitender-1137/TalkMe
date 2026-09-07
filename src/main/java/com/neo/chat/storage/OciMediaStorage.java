@@ -1,6 +1,7 @@
 package com.neo.chat.storage;
 
 import com.neo.chat.exception.FileStorageException;
+import com.oracle.bmc.model.BmcException;
 import com.oracle.bmc.objectstorage.ObjectStorageClient;
 import com.oracle.bmc.objectstorage.model.ObjectSummary;
 import com.oracle.bmc.objectstorage.requests.DeleteObjectRequest;
@@ -77,7 +78,7 @@ public class OciMediaStorage implements MediaStorage {
                     .putObjectBody(body)
                     .build());
         } catch (IOException | RuntimeException e) {
-            throw new FileStorageException("OCI upload failed for " + key + ": " + e.getMessage());
+            throw new FileStorageException("OCI upload failed for " + key + ": " + conciseOciError(e));
         }
         // The reference shape the app persists: <media-root>/<key>.
         return props.getMediaRoot() + "/" + key;
@@ -94,7 +95,7 @@ public class OciMediaStorage implements MediaStorage {
      */
     @Override
     public Optional<MediaContent> open(String reference) {
-        String key = MediaKeys.key(reference, props.getMediaRoot());
+        String key = MediaKeys.key(reference, props.getMediaRoot(), props.getLegacyMediaRoots());
         if (key == null) return Optional.empty();
         try {
             GetObjectResponse resp = getObject(key);
@@ -114,9 +115,37 @@ public class OciMediaStorage implements MediaStorage {
             };
             return Optional.of(new MediaContent(resource, resp.getContentType(), len));
         } catch (RuntimeException e) {
-            log.warn("OCI open failed for {}: {}", key, e.getMessage());
+            // A 404/ObjectNotFound is EXPECTED, benign noise: media referenced in the DB
+            // whose bytes aren't in the bucket (not-yet-migrated / already-deleted files).
+            // Log it at DEBUG only — otherwise every miss dumps the OCI SDK's ~10-line
+            // "Troubleshooting Tips / contact Oracle support" block (from getMessage()) at
+            // WARN, flooding the log. Real failures (auth, 5xx, network) stay a one-line WARN.
+            if (isNotFound(e)) {
+                log.debug("OCI object not found: {}", key);
+            } else {
+                log.warn("OCI open failed for {}: {}", key, conciseOciError(e));
+            }
             return Optional.empty();
         }
+    }
+
+    /** True when the OCI error is a 404 / ObjectNotFound — an expected "missing media" case. */
+    private static boolean isNotFound(Throwable e) {
+        return e instanceof BmcException bmc
+                && (bmc.getStatusCode() == 404 || "ObjectNotFound".equals(bmc.getServiceCode()));
+    }
+
+    /**
+     * One-line OCI error summary for logs. {@link BmcException#getMessage()} embeds a
+     * multi-line troubleshooting block; we log just the HTTP status + service code (plus the
+     * opc-request-id, which is what Oracle support actually needs) instead.
+     */
+    private static String conciseOciError(Throwable e) {
+        if (e instanceof BmcException bmc) {
+            return "HTTP " + bmc.getStatusCode() + " " + bmc.getServiceCode()
+                    + " (opc-request-id: " + bmc.getOpcRequestId() + ")";
+        }
+        return e.getClass().getSimpleName() + ": " + e.getMessage();
     }
 
     /**
@@ -130,7 +159,7 @@ public class OciMediaStorage implements MediaStorage {
      */
     @Override
     public Optional<LocalFile> localCopy(String reference) {
-        String key = MediaKeys.key(reference, props.getMediaRoot());
+        String key = MediaKeys.key(reference, props.getMediaRoot(), props.getLegacyMediaRoots());
         if (key == null) return Optional.empty();
         Path tmp = null;
         try {
@@ -146,7 +175,11 @@ public class OciMediaStorage implements MediaStorage {
                     Files.deleteIfExists(tmp);
                 } catch (IOException ignored) { /* best-effort */ }
             }
-            log.warn("OCI download failed for {}: {}", reference, e.getMessage());
+            if (isNotFound(e)) {
+                log.debug("OCI object not found (download): {}", key);
+            } else {
+                log.warn("OCI download failed for {}: {}", reference, conciseOciError(e));
+            }
             return Optional.empty();
         }
     }
@@ -159,7 +192,7 @@ public class OciMediaStorage implements MediaStorage {
      */
     @Override
     public void delete(String reference) {
-        String key = MediaKeys.key(reference, props.getMediaRoot());
+        String key = MediaKeys.key(reference, props.getMediaRoot(), props.getLegacyMediaRoots());
         if (key == null) return;
         try {
             client.deleteObject(DeleteObjectRequest.builder()
@@ -168,7 +201,12 @@ public class OciMediaStorage implements MediaStorage {
                     .objectName(key)
                     .build());
         } catch (RuntimeException e) {
-            log.warn("OCI delete failed for {}: {}", key, e.getMessage());
+            // Deleting an object that's already gone is a no-op success, not a problem.
+            if (isNotFound(e)) {
+                log.debug("OCI object already absent (delete): {}", key);
+            } else {
+                log.warn("OCI delete failed for {}: {}", key, conciseOciError(e));
+            }
         }
     }
 
@@ -214,7 +252,7 @@ public class OciMediaStorage implements MediaStorage {
                 start = lo.getNextStartWith();
             } while (start != null && !start.isBlank());
         } catch (RuntimeException e) {
-            log.warn("OCI list failed for prefix {}: {}", prefix, e.getMessage());
+            log.warn("OCI list failed for prefix {}: {}", prefix, conciseOciError(e));
         }
         return out;
     }

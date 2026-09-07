@@ -88,7 +88,6 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
-    runtimeOnly 'com.julien-dubois.bootui:bootui-spring-boot-starter:1.14.1'
     // Circuit breaker (core lib, used programmatically — Spring-Boot-version agnostic)
     implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.2.0'
     implementation 'io.github.resilience4j:resilience4j-micrometer:2.2.0'
@@ -110,6 +109,8 @@ dependencies {
     runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:macosx-arm64'
     runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:linux-x86_64'
     runtimeOnly 'org.bytedeco:ffmpeg:7.1-1.5.11:linux-arm64'
+    // Groovy DSL (build.gradle)
+    runtimeOnly 'com.julien-dubois.bootui:bootui-spring-boot-starter:1.15.0'
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
@@ -357,3 +358,14 @@ tasks.register('copyFrontendResources', Copy) {
 processResources.dependsOn copyFrontendResources
 clean.dependsOn cleanStaticResources
 
+
+// Local `./gradlew bootRun` parity with .run/TalkMeApplication.run.xml. Bounds the JVM's
+// committed footprint so the dev JVM fits in free physical RAM instead of spilling to swap
+// (BootUI Memory Advisor MEM-FOOTPRINT-004) and runs with full C2 JIT (MEM-POOL-006).
+// Production uses deploy/start_script.sh, which carries its own tuned JAVA_OPTS.
+tasks.named('bootRun') {
+    // The Boot plugin adds -XX:TieredStopAtLevel=1 (optimizedLaunch) by default; turn it off so the
+    // dev JVM runs with full C2 JIT like production.
+    optimizedLaunch = false
+    jvmArgs = ['-Xms256m', '-Xmx768m', '-XX:+UseG1GC', '-XX:MaxRAMPercentage=50', '-XX:+ExitOnOutOfMemoryError']
+}

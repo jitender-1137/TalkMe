@@ -241,8 +241,9 @@ class PushControllerUnitTest {
 
         @Test
         void shouldReturn200AndForwardEndpointWhenUnsubscribing() throws Exception {
-            // No @AuthenticationPrincipal on this endpoint — not authenticated.
-            doNothing().when(webPushService).removeSubscription(any());
+            // Now owner-scoped: the authenticated caller is passed to the service.
+            authenticate();
+            doNothing().when(webPushService).removeSubscription(any(), any());
 
             mockMvc.perform(delete(BASE + "/subscribe").param("endpoint", "https://push.example/ep-1"))
                     .andExpect(status().isOk())
@@ -251,7 +252,7 @@ class PushControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_281"));
 
             ArgumentCaptor<String> endpoint = ArgumentCaptor.forClass(String.class);
-            verify(webPushService).removeSubscription(endpoint.capture());
+            verify(webPushService).removeSubscription(any(), endpoint.capture());
             assertThat(endpoint.getValue()).isEqualTo("https://push.example/ep-1");
         }
 

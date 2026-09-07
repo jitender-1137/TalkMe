@@ -13,6 +13,24 @@
 # Behind the reverse proxy (Nginx Proxy Manager) TLS terminates at the proxy and
 # requests reach this backend over plain http. Honor X-Forwarded-Proto/Host so
 # Spring builds correct absolute URLs (critically the OAuth2 redirect_uri).
+# BootUI — DEV-ONLY monitoring console at /bootui. It exposes internal app state, so it
+# MUST stay OFF in production: default OFF here, turned ON only via a LOCAL .env
+# (BOOTUI_ENABLED=ON). (BootUI is also dormant unless the dev/local profile — or
+# spring-boot-devtools — is active; run locally with SPRING_PROFILES_ACTIVE=dev if
+# enabling alone doesn't wake it.) NB /bootui/** is permitAll in SecurityConfig, so
+# never enable this on a public/prod host.
+bootui:
+  enabled: ${BOOTUI_ENABLED:OFF}
+  # BootUI's built-in filter rejects non-loopback callers (a good default). Reaching it over a
+  # remote IP / through a proxy needs this ON — but that exposes app internals (beans, mappings,
+  # metrics, env) to anyone who can reach the port. PREFER an SSH tunnel + localhost access; only
+  # set BOOTUI_ALLOW_NON_LOCALHOST=true on a firewalled/trusted host. Default false.
+  allow-non-localhost: ${BOOTUI_ALLOW_NON_LOCALHOST:false}
+  # BootUI MCP server (Streamable HTTP at /bootui/api/mcp) for AI-assistant diagnostics
+  # (memory_scan, spring_scan, get_exceptions, ...). Same dev-only caveat as BootUI itself:
+  # default OFF, turned ON only via a LOCAL .env (BOOTUI_MCP_ENABLED=ON).
+  mcp:
+    enabled: ${BOOTUI_MCP_ENABLED:OFF}
 server:
   address: 0.0.0.0
   port: ${SERVER_PORT}
@@ -48,6 +66,9 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: NeoChatHub
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE}
+
 
   # Jackson: an ABSENT/null JSON primitive deserializes to its default instead of
   # throwing (the app's optional primitive DTO fields rely on this lenient behavior).
@@ -66,6 +87,9 @@ spring:
     web:
       pageable:
         serialization-mode: via-dto
+        # Hard cap on ?size= for every Pageable endpoint (Spring default 2000). Prevents a
+        # single request from pulling thousands of rows (DoS / bulk scraping).
+        max-page-size: 200
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
@@ -83,12 +107,26 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: ${DB_MAX_POOL}
-      minimum-idle: ${DB_MIN_IDLE}
+      # Keep a warm floor of open connections at all times (default 2 if unset) so
+      # the pool never drains to zero while idle — the first request after a quiet
+      # period gets a ready connection instead of opening one on the hot path.
+      minimum-idle: ${DB_MIN_IDLE:2}
       idle-timeout: 300000
       max-lifetime: 1800000
+      # Ping idle connections every 2 min so the DB/firewall/NAT can't silently drop
+      # them during a long idle. Without this (Hikari default = disabled) the first
+      # open after the app has been quiet a while hits a dead connection → validation
+      # fail → synchronous reconnect → the slow "cold" open. Must be < max-lifetime.
+      keepalive-time: 120000
 
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    # Dialect is auto-detected from the Postgres driver — setting it explicitly only
+    # triggers Hibernate's HHH90000025 deprecation warning on every boot, so it's omitted.
+    # Pin the OSIV behaviour explicitly to the current default (true) purely to silence
+    # the startup "open-in-view is enabled by default" warning — behaviour is unchanged.
+    # (Switching to false is a possible future optimisation but risks LazyInitialization
+    # errors during view rendering, so it's deliberately NOT changed here.)
+    open-in-view: true
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -207,6 +245,7 @@ ads:
   script-url: ${ADS_SCRIPT_URL}
   popunder-script-url: ${ADS_POPUNDER_URL}
   social-bar-script-url: ${ADS_SOCIALBAR_URL}
+  preview: ${ADS_PREVIEW:false}
   frequency-cap-per-session: ${ADS_FREQ_CAP}
   csp-domains: ${ADS_CSP_DOMAINS}
   placements:
@@ -253,6 +292,16 @@ ads:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL}
+  security:
+    # Reverse proxies in front of the app. X-Forwarded-For entries appended by these hops are
+    # trusted; the client-supplied leading entries never are (see util.ClientIp). Prod = Nginx
+    # Proxy Manager = 1. Set 0 if the app is reached directly, 2 with a CDN in front of NPM.
+    trusted-proxy-hops: ${TRUSTED_PROXY_HOPS:1}
+    # Honour CF-Connecting-IP ONLY when Cloudflare proxies all traffic (else it is forgeable).
+    trust-cloudflare-header: ${TRUST_CLOUDFLARE_HEADER:false}
+    # Fail boot (enforce) / warn / off when a PUBLIC deployment (https origins) is missing the
+    # 'prod' profile or exposes BootUI beyond localhost. Guards against shipping a dev .env to prod.
+    production-hardening: ${PRODUCTION_HARDENING:warn}
   # Instant Translation — Azure primary, MyMemory (keyless) fallback; fails open.
   translation:
     enabled: ${TRANSLATION_ENABLED}
@@ -313,7 +362,7 @@ app:
     allowed-origins: ${ALLOWED_ORIGINS}
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept,X-Request-Id
-    exposed-headers: Set-Cookie,X-Request-Id
+    exposed-headers: Set-Cookie,X-Request-Id,Retry-After
     allow-credentials: true
   auth:
     password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN}
@@ -367,6 +416,11 @@ moderation:
 storage:
   provider: ${STORAGE_PROVIDER}
   media-root: ${FILE_BASE_DIR}
+  # PREVIOUS media-roots (comma-separated) still carried by old DB references. Object keys
+  # never include the root, so listing an old root here lets old media keep resolving after
+  # the root is renamed (e.g. /opt/media/talkMe → /opt/media/neochathub). Default covers the
+  # known talkMe→neochathub rename; override with LEGACY_MEDIA_ROOTS.
+  legacy-media-roots: ${LEGACY_MEDIA_ROOTS:/opt/media/talkMe}
   local:
     directory: ${FILE_BASE_DIR}
   oci:
@@ -382,6 +436,17 @@ logging:
     com.neo.chat: ${LOG_LEVEL_APP}
     org.springframework.security: ${LOG_LEVEL_SPRING_SECURITY}
     org.hibernate: ${LOG_LEVEL_HIBERNATE}
+    # ── Noise suppression (cosmetic, environment-agnostic) ─────────────────────
+    # Lettuce logs "Cannot apply TCP User Timeout options to channel type
+    # NioSocketChannel" on every Redis (re)connect when the native epoll/kqueue
+    # transport isn't on the classpath — harmless, so drop it to ERROR.
+    io.lettuce.core.ConnectionBuilder: error
+    # ddl-auto=update emits "constraint ... does not exist, skipping" (HHH000247)
+    # on every boot as it reconciles the schema — expected, not actionable.
+    org.hibernate.orm.jdbc.warn: error
+    # HHH90000025 dialect-deprecation chatter (also addressed by dropping the
+    # explicit spring.jpa.database-platform above).
+    org.hibernate.orm.deprecation: error
   # ── File logging + daily/size rolling ──────────────────────────────────────
   # Writes to ${LOGGING_FILE_NAME}; rolls daily and at max-file-size, keeping
   # max-history days up to total-size-cap. Path/name are env-driven (no defaults).
@@ -398,3 +463,17 @@ logging:
 
   pattern:
     level: "%5p [requestId=%X{requestId}]"
+
+---
+# ── Production overrides ─────────────────────────────────────────────────────
+# The OpenAPI document + Swagger UI enumerate every endpoint (including the admin API). They
+# were only auth-gated in prod, i.e. readable by any signed-in user. Turn them off entirely.
+spring:
+  config:
+    activate:
+      on-profile: prod
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

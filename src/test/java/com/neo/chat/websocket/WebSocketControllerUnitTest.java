@@ -316,6 +316,8 @@ class WebSocketControllerUnitTest {
         @Test
         void shouldDeliverToBothPartiesWhenRecipientOnline() {
             when(redisTemplate.opsForSet()).thenReturn(setOps);
+            when(setOps.isMember("lobby:users", "alice")).thenReturn(true);
+            when(setOps.isMember("lobby:users", "bob")).thenReturn(true);
             when(setOps.size("presence:sessions:bob")).thenReturn(2L); // recipient has live sockets
 
             controller.sendLobbyChatMessage(map("recipient", "bob", "content", "hi"), authPrincipal());
@@ -328,6 +330,8 @@ class WebSocketControllerUnitTest {
         @Test
         void shouldWebPushWhenRecipientBackgrounded() {
             when(redisTemplate.opsForSet()).thenReturn(setOps);
+            when(setOps.isMember("lobby:users", "alice")).thenReturn(true);
+            when(setOps.isMember("lobby:users", "bob")).thenReturn(true);
             when(setOps.size("presence:sessions:bob")).thenReturn(0L); // no live socket
             when(userRepository.findByUsername("bob")).thenReturn(Optional.of(testUser));
 
@@ -336,6 +340,18 @@ class WebSocketControllerUnitTest {
             verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/lobby-chat"), any(Object.class));
             verify(notificationDispatchService).onEphemeralMessage(
                     eq(testUser.getId()), eq("alice"), eq("hi"), eq("/#match/lobby"));
+        }
+
+        @Test
+        void shouldDropWhenRecipientNotInLobby() {
+            when(redisTemplate.opsForSet()).thenReturn(setOps);
+            when(setOps.isMember("lobby:users", "alice")).thenReturn(true);
+            when(setOps.isMember("lobby:users", "bob")).thenReturn(false); // target not in the lobby
+
+            controller.sendLobbyChatMessage(map("recipient", "bob", "content", "spam"), authPrincipal());
+
+            verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any(Object.class));
+            verifyNoInteractions(notificationDispatchService); // no push amplification to a non-lobby user
         }
 
         @Test
@@ -370,8 +386,20 @@ class WebSocketControllerUnitTest {
     class LobbyTyping {
         @Test
         void shouldRelayTypingToRecipient() {
+            when(redisTemplate.opsForSet()).thenReturn(setOps);
+            when(setOps.isMember("lobby:users", "alice")).thenReturn(true);
+            when(setOps.isMember("lobby:users", "bob")).thenReturn(true);
             controller.sendLobbyTypingStatus(map("recipient", "bob", "isTyping", true), authPrincipal());
             verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/lobby-typing"), any(Object.class));
+        }
+
+        @Test
+        void shouldDropTypingWhenRecipientNotInLobby() {
+            when(redisTemplate.opsForSet()).thenReturn(setOps);
+            when(setOps.isMember("lobby:users", "alice")).thenReturn(true);
+            when(setOps.isMember("lobby:users", "bob")).thenReturn(false);
+            controller.sendLobbyTypingStatus(map("recipient", "bob", "isTyping", true), authPrincipal());
+            verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any(Object.class));
         }
 
         @Test

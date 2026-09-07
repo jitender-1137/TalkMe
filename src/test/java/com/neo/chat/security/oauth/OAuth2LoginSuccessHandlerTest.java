@@ -61,13 +61,15 @@ class OAuth2LoginSuccessHandlerTest {
     private HttpServletResponse response;
     @Mock
     private RedirectStrategy redirectStrategy;
+    @Mock
+    private com.neo.chat.security.JwtTokenProvider tokenProvider;
 
     private OAuth2LoginSuccessHandler handler;
 
     @BeforeEach
     void setUp() {
         handler = new OAuth2LoginSuccessHandler(authService, googleProfileService,
-                authorizedClientServiceProvider);
+                authorizedClientServiceProvider, tokenProvider);
         ReflectionTestUtils.setField(handler, "cookieSecure", false);
         ReflectionTestUtils.setField(handler, "cookieSameSite", "Lax");
         ReflectionTestUtils.setField(handler, "frontendBaseUrl", "http://localhost:3000");

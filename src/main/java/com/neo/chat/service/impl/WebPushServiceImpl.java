@@ -38,6 +38,10 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class WebPushServiceImpl implements WebPushService {
 
+    /** Max push subscriptions retained per user; the oldest are evicted past this. */
+    private static final int MAX_SUBSCRIPTIONS_PER_USER = 20;
+
+
     private final PushSubscriptionRepository subscriptionRepository;
     private final PushService pushService;
     private final WebPushProperties properties;
@@ -64,8 +68,21 @@ public class WebPushServiceImpl implements WebPushService {
             throw new BadRequestException(
                     "Invalid push subscription endpoint", "TM_PUSH_ENDPOINT");
         }
-        PushSubscription sub = subscriptionRepository.findByEndpoint(request.getEndpoint())
-                .orElseGet(PushSubscription::new);
+        PushSubscription existing = subscriptionRepository.findByEndpoint(request.getEndpoint()).orElse(null);
+        if (existing == null) {
+            // NEW endpoint: cap the number of subscriptions a single account can register so one
+            // user can't create unbounded rows and fan the dispatcher out to thousands of targets.
+            List<PushSubscription> mine = subscriptionRepository.findByUser_Id(user.getId());
+            int overBy = (mine == null ? 0 : mine.size()) - (MAX_SUBSCRIPTIONS_PER_USER - 1);
+            if (mine != null && overBy > 0) {
+                mine.stream()
+                        .sorted(java.util.Comparator.comparing(
+                                PushSubscription::getId, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())))
+                        .limit(overBy)
+                        .forEach(old -> subscriptionRepository.deleteByEndpoint(old.getEndpoint()));
+            }
+        }
+        PushSubscription sub = existing != null ? existing : new PushSubscription();
         sub.setUser(user);
         sub.setEndpoint(request.getEndpoint());
         sub.setP256dh(request.getP256dh());
@@ -83,8 +100,12 @@ public class WebPushServiceImpl implements WebPushService {
      */
     @Override
     @Transactional
-    public void removeSubscription(String endpoint) {
-        subscriptionRepository.deleteByEndpoint(endpoint);
+    public void removeSubscription(User user, String endpoint) {
+        // Owner-scoped: a caller may only delete a subscription they own (prevents deleting another
+        // user's endpoint by guessing/observing it).
+        subscriptionRepository.findByEndpoint(endpoint)
+                .filter(s -> s.getUser() != null && user != null && user.getId().equals(s.getUser().getId()))
+                .ifPresent(s -> subscriptionRepository.deleteByEndpoint(endpoint));
     }
 
     /**

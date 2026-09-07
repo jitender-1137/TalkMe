@@ -152,23 +152,9 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
      * @return the best-guess client IP
      */
     private String resolveIp(HttpServletRequest request) {
-        // Correctly resolve client IP when behind Cloudflare, Nginx, Load balancers, Proxies
-        String ip = request.getHeader("CF-Connecting-IP");
-        if (ip != null && !ip.isBlank()) {
-            return ip.trim();
-        }
-
-        ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank()) {
-            return ip.split(",")[0].trim();
-        }
-
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank()) {
-            return ip.trim();
-        }
-
-        return request.getRemoteAddr();
+        // Proxy-aware resolution (trusted-hop aware; CF-Connecting-IP only when enabled) — the
+        // client-supplied first X-Forwarded-For hop is never trusted.
+        return com.neo.chat.util.ClientIp.resolve(request);
     }
 
     /**

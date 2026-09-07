@@ -51,6 +51,9 @@ public class User extends BaseEntity {
     @Column(name = "email", unique = true, length = 100)
     private String email;
 
+    // @JsonIgnore backstop: the entity is never serialized to clients today (DTOs are used),
+    // but this guarantees the bcrypt hash can never leak even if an entity is accidentally returned.
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @Column(name = "password_hash")
     private String passwordHash;
 

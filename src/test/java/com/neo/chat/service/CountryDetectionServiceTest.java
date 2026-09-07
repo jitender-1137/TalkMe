@@ -41,6 +41,8 @@ class CountryDetectionServiceTest {
 
     @BeforeEach
     void setUp() {
+        com.neo.chat.util.ClientIp.setTrustedProxyHops(1);
+        com.neo.chat.util.ClientIp.setTrustCloudflareHeader(false);
         MockitoAnnotations.openMocks(this);
         ReflectionTestUtils.setField(countryDetectionService, "restTemplate", mockRestTemplate);
         ReflectionTestUtils.setField(countryDetectionService, "proxyCountryHeader", "X-Country-Code");
@@ -174,7 +176,29 @@ class CountryDetectionServiceTest {
     // ── resolveIp precedence ──────────────────────────────────────────────────────
 
     @Test
-    void testResolveIp_prefersCfConnectingIp() {
+    void testResolveIp_prefersCfConnectingIpOnlyWhenTrustEnabled() {
+        // CF-Connecting-IP is forgeable unless Cloudflare fronts all traffic — trusted only
+        // when explicitly enabled (util.ClientIp / app.security.trust-cloudflare-header).
+        com.neo.chat.util.ClientIp.setTrustCloudflareHeader(true);
+        try {
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.addHeader("CF-Connecting-IP", "9.9.9.9");
+            request.addHeader("X-Forwarded-For", "1.1.1.1");
+            request.setRemoteAddr("2.2.2.2");
+            when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
+
+            CountryDetectionResult result = countryDetectionService.detectCountry(request);
+
+            assertEquals("9.9.9.9", result.getClientIp());
+        } finally {
+            com.neo.chat.util.ClientIp.setTrustCloudflareHeader(false);
+        }
+    }
+
+    @Test
+    void testResolveIp_cfConnectingIpIgnoredByDefault() {
+        // Default (no Cloudflare trust): CF-Connecting-IP is ignored; the proxy-appended
+        // X-Forwarded-For hop is used instead.
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("CF-Connecting-IP", "9.9.9.9");
         request.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -183,11 +207,13 @@ class CountryDetectionServiceTest {
 
         CountryDetectionResult result = countryDetectionService.detectCountry(request);
 
-        assertEquals("9.9.9.9", result.getClientIp());
+        assertEquals("1.1.1.1", result.getClientIp());
     }
 
     @Test
-    void testResolveIp_usesFirstXForwardedForEntry() {
+    void testResolveIp_usesProxyAppendedXForwardedForEntry() {
+        // Only the rightmost hop (appended by the single trusted proxy) is trusted; the
+        // client-supplied leading entries are ignored (spoofing defence).
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 9.9.9.9");
         request.setRemoteAddr("2.2.2.2");
@@ -195,7 +221,7 @@ class CountryDetectionServiceTest {
 
         CountryDetectionResult result = countryDetectionService.detectCountry(request);
 
-        assertEquals("1.2.3.4", result.getClientIp());
+        assertEquals("9.9.9.9", result.getClientIp());
     }
 
     @Test

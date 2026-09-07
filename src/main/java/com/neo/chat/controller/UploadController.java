@@ -1,5 +1,15 @@
 package com.neo.chat.controller;
 
+import com.neo.chat.domain.User;
+import com.neo.chat.repository.UserRepository;
+import com.neo.chat.security.JwtTokenProvider;
+import com.neo.chat.storage.MediaKeys;
+import com.neo.chat.storage.StorageProperties;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.dto.response.UploadResponse;
@@ -56,6 +66,9 @@ public class UploadController {
     private final ChatMemberRepository chatMemberRepository;
     private final ContentModerationService moderationService;
     private final MediaAssetService mediaAssetService;
+    private final StorageProperties storageProperties;
+    private final JwtTokenProvider tokenProvider;
+    private final UserRepository userRepository;
 
     /**
      * Upload categories whose images/videos must be CLEAN (publicly visible content).
@@ -150,14 +163,44 @@ public class UploadController {
 
     /**
      * Serve a stored media file by path via the active storage backend (traversal-guarded), forcing
-     * download + a locked-down CSP for scriptable types (SVG/HTML/XML). Returns 404 if not found and
-     * 500 on backend error.
+     * download + a locked-down CSP for scriptable types (SVG/HTML/XML).
      *
-     * @param path the media path relative to the storage root
-     * @return 200 with the file resource, 404 if missing, or 500 on error
+     * <p>AUTHORIZATION (this endpoint is {@code permitAll} at the security-rule level because
+     * browsers load {@code <img>/<video>} without an Authorization header):
+     * <ul>
+     *   <li>The viewer is identified from the Bearer token (SecurityContext) or, failing that, from
+     *       the HttpOnly {@code media_token} cookie issued at login (path-scoped to this endpoint).</li>
+     *   <li>{@code profiles/**} (avatars) are public — they appear on the public {@code /@username}
+     *       page and in emails.</li>
+     *   <li>{@code conversations/{chatUuid}/**} requires the viewer to be a member of that chat.</li>
+     *   <li>Everything else (posts, stories, lobby, strangers, others, legacy flat keys) requires an
+     *       authenticated, non-disabled viewer.</li>
+     * </ul>
+     * Returns 401 for an anonymous viewer of protected media, 403 for a non-member, 404 if the
+     * reference does not resolve, and 500 on backend error.
+     *
+     * @param path    the media reference (absolute stored path or object key)
+     * @param request the servlet request (Bearer principal / media cookie)
+     * @return 200 with the file resource, or the status codes above
      */
     @GetMapping("/media")
-    public ResponseEntity<Resource> getMedia(@RequestParam("path") String path) {
+    public ResponseEntity<Resource> getMedia(@RequestParam("path") String path, HttpServletRequest request) {
+        String[] catAndId = categoryAndChat(path);
+        String category = catAndId[0];
+
+        if (!"profiles".equals(category)) {
+            String viewer = resolveViewer(request);
+            if (viewer == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            if ("conversations".equals(category)) {
+                String chatUuid = catAndId[1];
+                if (chatUuid == null || !isChatMember(chatUuid, viewer)) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+                }
+            }
+        }
+
         try {
             // Delegate to the active storage backend (disk in local/dev, OCI bucket in
             // prod). The backend enforces the "under the media root" traversal guard, so
@@ -167,7 +210,9 @@ public class UploadController {
                         String contentType = mc.contentType() != null ? mc.contentType() : "application/octet-stream";
                         ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                                 .contentType(MediaType.parseMediaType(contentType))
-                                .header("X-Content-Type-Options", "nosniff");
+                                .header("X-Content-Type-Options", "nosniff")
+                                // Per-viewer authorization → never let a shared cache serve it to someone else.
+                                .header("Cache-Control", "private, max-age=3600");
                         // Neutralize scriptable types (SVG/HTML/XML): a stored file must
                         // not execute as a document on our own origin if opened directly.
                         // <img>/<video> ignore Content-Disposition, so display is unaffected;
@@ -185,6 +230,74 @@ public class UploadController {
                     .orElseGet(() -> ResponseEntity.notFound().build());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Best-effort extraction of the object's category (and, for conversation media, the chat uuid)
+     * from any reference form the frontend may send: an absolute stored path
+     * ({@code /media/conversations/<uuid>/f.jpg}, {@code /opt/media/...}), a bare object key
+     * ({@code conversations/<uuid>/f.jpg}), or a {@code ?path=} URL. Returns {@code [category, chatUuid]}
+     * where {@code chatUuid} is null unless the category is {@code conversations}. An unrecognised
+     * reference yields {@code ["", null]} → treated as protected (authenticated viewer required).
+     */
+    private static final Set<String> MEDIA_CATEGORIES = Set.of(
+            "conversations", "profiles", "posts", "stories", "lobby", "strangers", "others");
+
+    private String[] categoryAndChat(String reference) {
+        String abs = MediaKeys.absolutePath(reference);
+        String scan = abs != null ? abs : reference;
+        if (scan == null) return new String[]{"", null};
+        int q = scan.indexOf('?');
+        if (q >= 0) scan = scan.substring(0, q);
+        String[] parts = scan.split("/");
+        for (int i = 0; i < parts.length; i++) {
+            if (MEDIA_CATEGORIES.contains(parts[i])) {
+                String chat = ("conversations".equals(parts[i]) && i + 1 < parts.length && !parts[i + 1].isBlank())
+                        ? parts[i + 1] : null;
+                return new String[]{parts[i], chat};
+            }
+        }
+        return new String[]{"", null};
+    }
+
+    /**
+     * Identify the viewer: the authenticated Bearer principal if present, else the subject of a
+     * valid {@code media_token} cookie whose account is still enabled. Null when anonymous.
+     */
+    private String resolveViewer(HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof CustomUserDetails cud) {
+            return cud.getUsername();
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (Cookie c : cookies) {
+            if (AuthController.MEDIA_COOKIE.equals(c.getName())) {
+                String username = tokenProvider.parseMediaToken(c.getValue());
+                if (username == null) return null;
+                // A media cookie outlives a ban / deletion — re-check the account state.
+                return userRepository.findByUsername(username)
+                        .filter(u -> !u.isDeleted() && !u.isBanned())
+                        .map(User::getUsername)
+                        .orElse(null);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether {@code viewer} is a member of chat {@code chatUuid}. Fails closed on a bad uuid,
+     * a missing chat, or a lookup error.
+     */
+    private boolean isChatMember(String chatUuid, String viewer) {
+        try {
+            return chatRepository.findByUuidWithMembers(UUID.fromString(chatUuid))
+                    .map(chat -> chat.getMembers().stream()
+                            .anyMatch(m -> m.getUser() != null && viewer.equals(m.getUser().getUsername())))
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
         }
     }
 

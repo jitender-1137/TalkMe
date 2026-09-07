@@ -6,6 +6,7 @@ import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.repository.UserPresenceRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.PresenceService;
+import com.neo.chat.util.LogSanitizer;
 import com.neo.chat.websocket.PresenceNotification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -135,7 +136,7 @@ public class PresenceServiceImpl implements PresenceService {
             try {
                 presenceServiceHelper.persistOffline(user.getId(), status.name(), lastSeen);
             } catch (Exception e) {
-                log.warn("Persisting OFFLINE last-seen failed for {}", username, e);
+                log.warn("Persisting OFFLINE last-seen failed for {}", LogSanitizer.mask(username), e);
             }
         }
 
@@ -284,7 +285,7 @@ public class PresenceServiceImpl implements PresenceService {
         try {
             presenceServiceHelper.persistOffline(user.getId(), PresenceStatus.OFFLINE.name(), lastSeen);
         } catch (Exception e) {
-            log.warn("Persisting OFFLINE last-seen failed for {}", username, e);
+            log.warn("Persisting OFFLINE last-seen failed for {}", LogSanitizer.mask(username), e);
         }
         broadcastPresence(user, readFlags(user), PresenceStatus.OFFLINE, lastSeen);
     }
@@ -325,7 +326,7 @@ public class PresenceServiceImpl implements PresenceService {
         try {
             redisTemplate.opsForZSet().add(HEARTBEAT_ZSET, user.getUsername(), Instant.now().toEpochMilli());
         } catch (Exception e) {
-            log.warn("Failed to record heartbeat for {} (Redis unavailable/read-only)", user.getUsername(), e);
+            log.warn("Failed to record heartbeat for {} (Redis unavailable/read-only)", user.getUuid(), e);
         }
     }
 
@@ -375,8 +376,9 @@ public class PresenceServiceImpl implements PresenceService {
                 redisTemplate.delete("presence:sessions:" + username);
                 continue;
             }
+            // INFO is prod-visible → log the pseudonymous UUID, not the username (PII).
             log.info("[Presence] Heartbeat lost for {} (>{}s) — marking IDLE for {}m grace",
-                    username, timeout.toSeconds(), DISCONNECTED_IDLE_GRACE.toMinutes());
+                    user.getUuid(), timeout.toSeconds(), DISCONNECTED_IDLE_GRACE.toMinutes());
             markIdle(user, DISCONNECTED_IDLE_GRACE);
             // Clear any stale WebSocket session ids that never fired a disconnect.
             redisTemplate.delete("presence:sessions:" + username);
@@ -411,7 +413,7 @@ public class PresenceServiceImpl implements PresenceService {
             if (user == null) {
                 continue;
             }
-            log.info("[Presence] Idle grace expired for {} — marking OFFLINE", username);
+            log.info("[Presence] Idle grace expired for {} — marking OFFLINE", LogSanitizer.mask(username));
             // Preserve the real last-active time (frozen at background / disconnect),
             // instead of stamping the offline-flip moment.
             markOfflinePreservingLastSeen(user);
@@ -452,8 +454,9 @@ public class PresenceServiceImpl implements PresenceService {
             if (rawStatus(username) != PresenceStatus.ONLINE) {
                 continue;
             }
+            // INFO is prod-visible → log the pseudonymous UUID, not the username (PII).
             log.info("[Presence] Background online-grace elapsed for {} — marking IDLE for {}m grace",
-                    username, BACKGROUND_IDLE_GRACE.toMinutes());
+                    user.getUuid(), BACKGROUND_IDLE_GRACE.toMinutes());
             markIdlePreservingLastSeen(user, BACKGROUND_IDLE_GRACE);
             reaped++;
         }
@@ -485,7 +488,7 @@ public class PresenceServiceImpl implements PresenceService {
             try {
                 return PresenceStatus.valueOf(statusStr);
             } catch (Exception e) {
-                log.warn("Failed to parse cached status {} for user {}", statusStr, username);
+                log.warn("Failed to parse cached status {} for user {}", statusStr, LogSanitizer.mask(username));
             }
         }
 
@@ -511,7 +514,7 @@ public class PresenceServiceImpl implements PresenceService {
             redisTemplate.opsForHash().putAll(redisKey, presenceMap);
             redisTemplate.expire(redisKey, CACHE_TTL);
         } catch (Exception e) {
-            log.warn("Failed to warm presence cache for {} (Redis unavailable/read-only) — serving DB value", username, e);
+            log.warn("Failed to warm presence cache for {} (Redis unavailable/read-only) — serving DB value", LogSanitizer.mask(username), e);
         }
 
         if (userPresence.isInvisibleModeEnabled()) {
@@ -958,7 +961,7 @@ public class PresenceServiceImpl implements PresenceService {
             // e.g. "Message broker not active" when the STOMP relay can't reach
             // RabbitMQ. Presence is best-effort — never let it break the connect/
             // disconnect lifecycle (which runs this on the WS event thread).
-            log.warn("Presence broadcast skipped for {} ({})", user.getUsername(), e.getMessage());
+            log.warn("Presence broadcast skipped for {} ({})", user.getUuid(), e.getMessage());
         }
     }
 }

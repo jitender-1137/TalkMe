@@ -4,6 +4,7 @@ import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.MessageResponse;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.NotificationDispatchService;
+import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -78,7 +79,7 @@ public class MessageBroadcaster {
                             event.getSenderName(), event.getSenderProfileImage());
                 }
             } catch (Exception e) {
-                log.error("Notification dispatch failed for user {}", username, e);
+                log.error("Notification dispatch failed for user {}", LogSanitizer.mask(username), e);
             }
         }
     }

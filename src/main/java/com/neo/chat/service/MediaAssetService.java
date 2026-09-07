@@ -45,7 +45,8 @@ public class MediaAssetService {
     public void record(String reference, User owner, String uploadType,
                        String originalFileName, String contentType, Long fileSize) {
         try {
-            String key = MediaKeys.key(reference, storageProperties.getMediaRoot());
+            String key = MediaKeys.key(reference, storageProperties.getMediaRoot(),
+                    storageProperties.getLegacyMediaRoots());
             if (key == null) {
                 log.debug("[MediaAsset] skip record — unresolvable key for ref {}", reference);
                 return;

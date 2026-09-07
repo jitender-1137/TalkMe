@@ -77,6 +77,13 @@ class MessageMapperTest {
         return r;
     }
 
+    private MessageReadReceipt receiptAt(User user, String status, Instant deliveredAt, Instant readAt) {
+        MessageReadReceipt r = MessageReadReceipt.builder()
+                .user(user).status(status).deliveredAt(deliveredAt).readAt(readAt).build();
+        r.setUuid(UUID.randomUUID());
+        return r;
+    }
+
     @Nested
     @DisplayName("toMessageResponse")
     class ToMessageResponse {
@@ -300,6 +307,73 @@ class MessageMapperTest {
             m.setReadReceipts(List.of(receipt(sender, "READ")));
 
             assertThat(mapper.resolveMessageStatus(m)).isEqualTo("SENT");
+        }
+    }
+
+    @Nested
+    @DisplayName("resolveDeliveredAt / resolveReadAt")
+    class ResolveDeliveryTimestamps {
+
+        private final Instant DELIVERED = Instant.parse("2026-07-30T10:01:00Z");
+        private final Instant READ = Instant.parse("2026-07-30T10:05:00Z");
+
+        @Test
+        @DisplayName("both null when there are no read receipts")
+        void shouldBeNullWhenNoReceipts() {
+            Message m = baseMessage(user(1L, "alice", "Alice", null));
+            m.setReadReceipts(null);
+            assertThat(mapper.resolveDeliveredAt(m)).isNull();
+            assertThat(mapper.resolveReadAt(m)).isNull();
+        }
+
+        @Test
+        @DisplayName("delivered-only receipt → deliveredAt set, readAt null")
+        void shouldResolveDeliveredOnly() {
+            User sender = user(1L, "alice", "Alice", null);
+            Message m = baseMessage(sender);
+            m.setReadReceipts(List.of(
+                    receiptAt(user(2L, "bob", "Bob", null), "DELIVERED", DELIVERED, null)));
+
+            assertThat(mapper.resolveDeliveredAt(m)).isEqualTo(DELIVERED.toString());
+            assertThat(mapper.resolveReadAt(m)).isNull();
+        }
+
+        @Test
+        @DisplayName("read receipt → both deliveredAt and readAt set")
+        void shouldResolveReadAndDelivered() {
+            User sender = user(1L, "alice", "Alice", null);
+            Message m = baseMessage(sender);
+            m.setReadReceipts(List.of(
+                    receiptAt(user(2L, "bob", "Bob", null), "READ", DELIVERED, READ)));
+
+            assertThat(mapper.resolveDeliveredAt(m)).isEqualTo(DELIVERED.toString());
+            assertThat(mapper.resolveReadAt(m)).isEqualTo(READ.toString());
+        }
+
+        @Test
+        @DisplayName("ignores the sender's own receipt")
+        void shouldIgnoreSendersOwnReceipt() {
+            User sender = user(1L, "alice", "Alice", null);
+            Message m = baseMessage(sender);
+            m.setReadReceipts(List.of(receiptAt(sender, "READ", DELIVERED, READ)));
+
+            assertThat(mapper.resolveDeliveredAt(m)).isNull();
+            assertThat(mapper.resolveReadAt(m)).isNull();
+        }
+
+        @Test
+        @DisplayName("latest instant wins across multiple recipient receipts")
+        void shouldTakeLatestAcrossReceipts() {
+            User sender = user(1L, "alice", "Alice", null);
+            Message m = baseMessage(sender);
+            Instant laterRead = READ.plusSeconds(120);
+            Instant laterDelivered = DELIVERED.plusSeconds(30);
+            m.setReadReceipts(List.of(
+                    receiptAt(user(2L, "bob", "Bob", null), "READ", DELIVERED, READ),
+                    receiptAt(user(3L, "carol", "Carol", null), "READ", laterDelivered, laterRead)));
+
+            assertThat(mapper.resolveDeliveredAt(m)).isEqualTo(laterDelivered.toString());
+            assertThat(mapper.resolveReadAt(m)).isEqualTo(laterRead.toString());
         }
     }
 

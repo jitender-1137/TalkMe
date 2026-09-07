@@ -39,6 +39,7 @@ public class AdsController {
         AdsConfigResponse res = AdsConfigResponse.builder()
                 // Single source of truth for "are ads on at all": the global kill-switch.
                 .enabled(featureFlags.isGloballyEnabled(FeatureKey.ADS))
+                .preview(adsProperties.isPreview())
                 .provider(adsProperties.getProvider())
                 .label(adsProperties.getLabel())
                 .adChoicesUrl(adsProperties.getAdChoicesUrl())

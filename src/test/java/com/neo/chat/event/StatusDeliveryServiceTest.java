@@ -199,6 +199,23 @@ class StatusDeliveryServiceTest {
         }
 
         @Test
+        @DisplayName("recompute DEADLOCK (CannotAcquireLockException) is swallowed — delivery still completes")
+        void recomputeDeadlockSwallowed() {
+            User actor = actor(7L);
+            when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
+            when(presenceService.isGhost(actor)).thenReturn(false);
+            doThrow(new org.springframework.dao.CannotAcquireLockException("deadlock detected"))
+                    .when(notificationDispatchService).recomputeUnread(actor);
+
+            // Must NOT throw — otherwise the outbox delivery / status broadcast transaction is failed
+            // and the row loops on re-drive (the exact production symptom).
+            service.deliverOnce(read(7L, "evk-r"));
+
+            verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-2/messages"), any(Object.class));
+            verify(outboxRepo).markPublished(eq("evk-r"), any());
+        }
+
+        @Test
         @DisplayName("unread recompute failure is swallowed (broadcast + markPublished still complete)")
         void recomputeFailureSwallowed() {
             User actor = actor(7L);

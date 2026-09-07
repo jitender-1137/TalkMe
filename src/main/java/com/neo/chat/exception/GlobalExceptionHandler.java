@@ -58,7 +58,15 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ServiceException.class)
     public ResponseEntity<ResponseDto<Void>> handleServiceException(ServiceException ex) {
-        log.error("ServiceException occurred: [Code: {}] {}", ex.getMessageCode(), ex.getMessage());
+        // A ServiceException carries an HTTP status. A 4xx is a CLIENT error (bad id, wrong
+        // password, validation) — expected, attacker-triggerable at will, and must NOT flood the
+        // ERROR log (which pages ops). Log 4xx at WARN and reserve ERROR for genuine 5xx faults.
+        if (ex.getStatus() >= 500) {
+            log.error("ServiceException occurred: [Code: {}] {}", ex.getMessageCode(), ex.getMessage());
+        } else {
+            log.warn("ServiceException [Code: {}] {} (status {})",
+                    ex.getMessageCode(), ex.getMessage(), ex.getStatus());
+        }
         String localizedMessage = getLocalizedMessage(ex.getMessageCode(), ex.getMessage());
         ResponseDto<Void> response = ResponseDto.error(localizedMessage, ex.getMessageCode(), ex.getErrors());
         return ResponseEntity.status(ex.getStatus()).body(response);
@@ -83,7 +91,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ResponseDto<Void>> handleValidationException(MethodArgumentNotValidException ex) {
-        log.error("Validation error occurred");
+        log.warn("Validation error occurred"); // client 400 — not an ERROR-level event
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -115,9 +123,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ResponseDto<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.error("IllegalArgumentException occurred: {}", ex.getMessage());
+        log.warn("IllegalArgumentException occurred: {}", ex.getMessage());
         String messageCode = "TM_071";
-        String defaultMsg = ex.getMessage();
+        // SECURITY: never echo the raw exception message to the client — internal messages
+        // (e.g. BCrypt's "rawPassword cannot be null") would leak. Return a generic 400.
+        String defaultMsg = "Invalid request.";
         if (ex.getMessage() != null && ex.getMessage().contains("Invalid UUID string")) {
             messageCode = "TM_INVALID_UUID";
             defaultMsg = "Invalid ID format provided";
@@ -125,6 +135,18 @@ public class GlobalExceptionHandler {
         String localizedMessage = getLocalizedMessage(messageCode, defaultMsg);
         ResponseDto<Void> response = ResponseDto.error(localizedMessage, messageCode);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Catches a DB uniqueness/constraint violation (e.g. a username/email inserted concurrently)
+     * and returns a generic 409 instead of a 500 that would leak the SQL/constraint name.
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ResponseDto<Void>> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.warn("DataIntegrityViolationException: {}", ex.getMostSpecificCause().getMessage());
+        ResponseDto<Void> response = ResponseDto.error(
+                getLocalizedMessage("TM_048", "This value is already in use."), "TM_048");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
     /**

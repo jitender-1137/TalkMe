@@ -9,6 +9,7 @@ import com.neo.chat.enums.ReputationEventType;
 import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.ForbiddenException;
 import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.repository.ChatFlirtModeRepository;
 import com.neo.chat.repository.ChatMemberRepository;
 import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.GameSessionRepository;
@@ -37,6 +38,7 @@ public class GameServiceImpl implements GameService {
     private final ReputationRecorder reputationRecorder;
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
+    private final ChatFlirtModeRepository chatFlirtModeRepository;
 
     /**
      * IDOR guard: assert the caller is a member of the chat the game runs in.
@@ -57,6 +59,24 @@ public class GameServiceImpl implements GameService {
         }
         if (!member) {
             throw new ForbiddenException("You are not a member of this chat", "TM_103");
+        }
+    }
+
+    /**
+     * Guard for the flirty/spicy decks: require Flirt Mode to be ACTIVE (both participants opted in)
+     * on this chat. Called only after {@link #requireChatMember}, so the uuid is known valid.
+     *
+     * @param chatId uuid string of the chat
+     * @throws BadRequestException if Flirt Mode is not active for both participants of the chat
+     */
+    private void requireFlirtActive(String chatId) {
+        boolean active = chatRepository.findByUuid(UUID.fromString(chatId))
+                .flatMap(chatFlirtModeRepository::findByChat)
+                .map(row -> row.isActive())
+                .orElse(false);
+        if (!active) {
+            throw new BadRequestException(
+                    "Turn on Flirt Mode together to play spicy games", "TM_835");
         }
     }
 
@@ -84,6 +104,12 @@ public class GameServiceImpl implements GameService {
             throw new BadRequestException("No prompts available for this game", "TM_400");
         }
         requireChatMember(user, chatId);
+        // Flirty/spicy decks are gated behind ACTIVE Flirt Mode (mutual, 18+, verified). This is a
+        // server-side guard — a client can never start one by skipping the UI, and disabling Flirt
+        // Mode mid-session simply prevents starting the next spicy game.
+        if (gameType.isAdult()) {
+            requireFlirtActive(chatId);
+        }
 
         // Only one live game per chat — retire any existing non-ended session first.
         gameSessionRepository.findFirstByChatIdAndStateNotOrderByIdDesc(chatId, GameState.ENDED)

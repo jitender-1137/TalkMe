@@ -736,6 +736,27 @@ public class MessageServiceImpl implements MessageService {
         MessageResponse r = messageMapper.toMessageResponse(m);
         if (!ghostIds.isEmpty()) {
             r.setStatus(resolveStatusExcludingGhosts(m, ghostIds));
+            // The mapper's deliveredAt/readAt include ALL recipients; recompute them here
+            // excluding ghost recipients so a ghost's delivery/read time never leaks to the
+            // sender via the "Message info" ladder (mirrors resolveStatusExcludingGhosts).
+            Instant delivered = null;
+            Instant read = null;
+            if (m.getReadReceipts() != null) {
+                for (var rec : m.getReadReceipts()) {
+                    Long uid = rec.getUser().getId();
+                    if (uid.equals(m.getSender().getId()) || ghostIds.contains(uid)) {
+                        continue;
+                    }
+                    if (rec.getDeliveredAt() != null && (delivered == null || rec.getDeliveredAt().isAfter(delivered))) {
+                        delivered = rec.getDeliveredAt();
+                    }
+                    if (rec.getReadAt() != null && (read == null || rec.getReadAt().isAfter(read))) {
+                        read = rec.getReadAt();
+                    }
+                }
+            }
+            r.setDeliveredAt(delivered != null ? delivered.toString() : null);
+            r.setReadAt(read != null ? read.toString() : null);
         }
         return r;
     }

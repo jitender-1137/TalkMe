@@ -2242,7 +2242,8 @@ public class AdminServiceImpl implements AdminService {
         User sender = m != null ? m.getSender() : null;
         String ref = safeDecrypt(chatId, a.getFileUrl());
         String name = safeDecrypt(chatId, a.getFileName());
-        String key = MediaKeys.key(ref, storageProperties.getMediaRoot());
+        String key = MediaKeys.key(ref, storageProperties.getMediaRoot(),
+                storageProperties.getLegacyMediaRoots());
         boolean stranger = chat.getChatType() == ChatType.STRANGER;
         return AdminMediaAssetView.builder()
                 .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
@@ -2365,11 +2366,12 @@ public class AdminServiceImpl implements AdminService {
                 Message m = a.getMessage();
                 Long chatId = m != null && m.getChat() != null ? m.getChat().getId() : null;
                 String fileRef = messageCryptoService.decrypt(chatId, a.getFileUrl());
-                String k = MediaKeys.key(fileRef, mediaRoot);
+                String k = MediaKeys.key(fileRef, mediaRoot, storageProperties.getLegacyMediaRoots());
                 if (k != null) byKey.putIfAbsent(k, a);
                 if (a.getThumbnailUrl() != null) {
                     String tk = MediaKeys.key(
-                            messageCryptoService.decrypt(chatId, a.getThumbnailUrl()), mediaRoot);
+                            messageCryptoService.decrypt(chatId, a.getThumbnailUrl()), mediaRoot,
+                            storageProperties.getLegacyMediaRoots());
                     if (tk != null) thumbKeys.add(tk);
                 }
             } catch (RuntimeException ignored) { /* skip un-decryptable row */ }

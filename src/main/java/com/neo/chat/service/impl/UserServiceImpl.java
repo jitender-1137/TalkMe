@@ -344,6 +344,10 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
 
+        // Verify the REAL content is an image (magic bytes), not just a client label — the avatar
+        // is embedded across the app and on the public /@username page.
+        com.neo.chat.util.UploadValidator.validate(file, "image");
+
         // Profile photos are publicly visible — reject NSFW before storing.
         if (moderationService.moderateUpload(file).explicit()) {
             throw new ContentModerationException(
@@ -369,7 +373,7 @@ public class UserServiceImpl implements UserService {
                         user.getUuid().toString(),
                         avatarUrl);
             } catch (Exception e) {
-                log.warn("Failed to notify friends of profile-photo change for {}", user.getUsername(), e);
+                log.warn("Failed to notify friends of profile-photo change for {}", user.getUuid(), e);
             }
         }
 
@@ -584,17 +588,19 @@ public class UserServiceImpl implements UserService {
         Pageable pageable = PageRequest.of(page, limit, Sort.by("name").ascending());
 
         Specification<User> spec = (root, _, cb) -> {
-            String pattern = "%" + query.toLowerCase() + "%";
+            String pattern = "%" + escapeLike(query.toLowerCase()) + "%";
             List<Predicate> predicate = new ArrayList<>();
             predicate.add(cb.notEqual(root.get("id"), currentUser.getId()));
             // Never surface soft-deleted / deletion-requested accounts (both carry
             // isDeleted=true) or guest sessions in people search / discover.
             predicate.add(cb.equal(root.get("isDeleted"), false));
             predicate.add(cb.equal(root.get("isGuest"), false));
+            // Match only public identifiers — NOT email. Matching the private email column turned
+            // people-search into an email-enumeration oracle (a hit confirms the address exists).
+            // LIKE metacharacters are escaped so "%"/"_" can't broaden the match.
             predicate.add(cb.or(
-                    cb.like(cb.lower(root.get("username")), pattern),
-                    cb.like(cb.lower(root.get("name")), pattern),
-                    cb.like(cb.lower(root.get("email")), pattern)));
+                    cb.like(cb.lower(root.get("username")), pattern, '\\'),
+                    cb.like(cb.lower(root.get("name")), pattern, '\\')));
             return cb.and(predicate.toArray(new Predicate[0]));
         };
 
@@ -733,7 +739,25 @@ public class UserServiceImpl implements UserService {
      * @param currentUser the viewer (maybe null)
      * @param targetUser  the user being described
      */
+    /**
+     * Escape SQL LIKE metacharacters so a user-supplied search term is matched literally
+     * (a raw "%"/"_" would otherwise broaden the match / enable enumeration). Use with an
+     * explicit ESCAPE '\\' clause on the like() call.
+     */
+    private static String escapeLike(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
     private void populatePresenceAndBlockStatus(UserResponse response, User currentUser, User targetUser) {
+        // PRIVACY: this DTO is the PEER-facing projection. Never expose another user's PII
+        // (mobile number, role list) to anyone but the account owner — otherwise any authenticated
+        // user could bulk-harvest phone numbers via /users/{id}, /users/search, friends and lobby.
+        boolean isSelf = currentUser != null && currentUser.getId().equals(targetUser.getId());
+        if (!isSelf) {
+            response.setPhone(null);
+            response.setRoles(null);
+        }
         boolean isBlocked = false;
         if (currentUser != null) {
             isBlocked = blockUserRepository.existsByUserAndBlocked(currentUser, targetUser)

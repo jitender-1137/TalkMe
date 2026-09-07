@@ -35,7 +35,9 @@ public class FrameExtractor {
             Path pattern = dir.resolve(UUID.randomUUID() + "-%03d.jpg");
             // One frame every few seconds, capped at FRAME_COUNT, scaled small for speed.
             List<String> cmd = List.of(
-                    ffmpeg.path(), "-y",
+                    ffmpeg.path(), "-y", "-nostdin",
+                    // SECURITY: local protocols only — the video is untrusted user bytes.
+                    "-protocol_whitelist", "file,pipe",
                     "-i", video.toString(),
                     "-vf", "fps=1/2,scale=224:-1",
                     "-frames:v", String.valueOf(FRAME_COUNT),

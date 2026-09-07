@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -119,7 +120,7 @@ class StorageServiceImplTest {
         }
 
         @Test
-        @DisplayName("filename without an extension → key has no extension suffix")
+        @DisplayName("filename without an extension → key gets the neutral .bin suffix")
         void noExtension() throws IOException {
             streams("x".getBytes());
             when(file.getOriginalFilename()).thenReturn("noext");
@@ -130,7 +131,25 @@ class StorageServiceImplTest {
 
             ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
             verify(mediaStorage).store(any(Path.class), key.capture(), eq("application/octet-stream"));
-            assertThat(key.getValue()).doesNotContain(".");
+            assertThat(key.getValue()).endsWith(".bin");
+        }
+
+        @Test
+        @DisplayName("scriptable client extension (.html/.svg) is neutralized to .bin")
+        void scriptableExtensionNeutralized() throws IOException {
+            for (String name : java.util.List.of("evil.html", "x.svg", "a.xhtml", "b.js")) {
+                streams("x".getBytes());
+                when(file.getOriginalFilename()).thenReturn(name);
+                when(file.getContentType()).thenReturn("image/png");
+                stubStore();
+
+                service.storeFile(file, "image");
+
+                ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+                verify(mediaStorage, atLeastOnce()).store(any(Path.class), key.capture(), any());
+                assertThat(key.getValue()).endsWith(".bin");
+                org.mockito.Mockito.reset(mediaStorage);
+            }
         }
 
         @Test
@@ -284,10 +303,10 @@ class StorageServiceImplTest {
         }
 
         @Test
-        @DisplayName("video with no filename extension → temp staged as .tmp (line 91), original stored")
+        @DisplayName("video with no filename extension → original stored under a neutral .bin key")
         void videoWithoutExtension() throws IOException {
-            // originalFilename has no dot → extension is empty → storeCompressedVideo's temp-file
-            // name falls back to ".tmp" (line 91). ffmpeg unavailable → original bytes stored.
+            // originalFilename has no dot → extension neutralized to .bin. ffmpeg unavailable →
+            // original bytes stored (not transcoded).
             streams("v".getBytes());
             when(file.getOriginalFilename()).thenReturn("clipnoext");
             when(file.getContentType()).thenReturn("video/mp4");
@@ -298,8 +317,7 @@ class StorageServiceImplTest {
 
             ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
             verify(mediaStorage).store(any(Path.class), key.capture(), eq("video/mp4"));
-            // empty extension → uuid-only key, no dot suffix
-            assertThat(key.getValue()).doesNotContain(".");
+            assertThat(key.getValue()).endsWith(".bin");
         }
     }
 }

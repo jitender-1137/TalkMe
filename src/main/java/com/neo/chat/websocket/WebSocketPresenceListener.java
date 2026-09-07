@@ -62,7 +62,8 @@ public class WebSocketPresenceListener {
         String sessionId = headerAccessor.getSessionId();
         String username = user.getUsername();
 
-        log.info("WebSocket session CONNECTED: session={}, user={}", sessionId, username);
+        // DEBUG: high-frequency connect churn + username (PII) — kept out of prod INFO.
+        log.debug("WebSocket session CONNECTED: session={}, user={}", sessionId, username);
 
         if (sessionId != null) {
             String sessionsKey = SESSIONS_KEY_PREFIX + username;
@@ -78,7 +79,8 @@ public class WebSocketPresenceListener {
         try {
             disconnectHandlerService.cancelDisconnect(username);
         } catch (Exception e) {
-            log.error("Failed to cancel pending match disconnect on reconnect for {}", username, e);
+            // ERROR is prod-visible → log the pseudonymous UUID, not the username.
+            log.error("Failed to cancel pending match disconnect on reconnect for {}", user.getUuid(), e);
         }
     }
 
@@ -106,7 +108,8 @@ public class WebSocketPresenceListener {
         String sessionId = headerAccessor.getSessionId();
         String username = user.getUsername();
 
-        log.info("WebSocket session DISCONNECTED: session={}, user={}", sessionId, username);
+        // DEBUG: high-frequency disconnect churn + username (PII) — kept out of prod INFO.
+        log.debug("WebSocket session DISCONNECTED: session={}, user={}", sessionId, username);
 
         boolean isLastSession = true;
         if (sessionId != null) {

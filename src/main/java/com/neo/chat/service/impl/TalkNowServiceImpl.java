@@ -12,6 +12,7 @@ import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.CompatibilityService;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.service.TalkNowService;
+import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -77,7 +78,7 @@ public class TalkNowServiceImpl implements TalkNowService {
         try {
             redis.opsForHash().delete(HASH_KEY, user.getUsername());
         } catch (Exception e) {
-            log.warn("Talk Now cancel failed for {}: {}", user.getUsername(), e.getMessage());
+            log.warn("Talk Now cancel failed for {}: {}", user.getUuid(), e.getMessage());
         }
     }
 
@@ -308,7 +309,7 @@ public class TalkNowServiceImpl implements TalkNowService {
             redis.opsForHash().put(HASH_KEY, username, objectMapper.writeValueAsString(entry));
             redis.expire(HASH_KEY, KEY_GC_TTL);
         } catch (Exception e) {
-            log.warn("Talk Now declare failed for {}: {}", username, e.getMessage());
+            log.warn("Talk Now declare failed for {}: {}", LogSanitizer.mask(username), e.getMessage());
         }
     }
 

@@ -274,7 +274,7 @@ public class PostServiceImpl implements PostService {
             }
         }
 
-        log.info("Post created successfully by {}", currentUser.getUsername());
+        log.info("Post created successfully by {}", currentUser.getUuid());
 
         // Instagram-style: tell the author's whole network (followers + following) that
         // they shared a new post. Best-effort — a notification failure must not fail the
@@ -288,7 +288,7 @@ public class PostServiceImpl implements PostService {
                     post.getUuid().toString(),
                     firstThumb(post));
         } catch (Exception e) {
-            log.warn("Failed to fan out new-post notification for {}", currentUser.getUsername(), e);
+            log.warn("Failed to fan out new-post notification for {}", currentUser.getUuid(), e);
         }
 
         return mapToPostResponse(post, currentUser);
@@ -468,7 +468,7 @@ public class PostServiceImpl implements PostService {
             post.setCaption(request.getCaption());
         }
         post = postRepository.save(post);
-        log.info("Post {} caption updated by {}", postUuid, currentUser.getUsername());
+        log.info("Post {} caption updated by {}", postUuid, currentUser.getUuid());
         return mapToPostResponse(post, currentUser);
     }
 

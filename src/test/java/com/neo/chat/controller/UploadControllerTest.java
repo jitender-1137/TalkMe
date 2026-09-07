@@ -234,8 +234,10 @@ public class UploadControllerTest {
     void testGetMediaSuccess() throws Exception {
         // The media backend only serves files UNDER its configured media root
         // (storage.media-root = ./build/test-media in the test profile); the traversal guard
-        // rejects anything outside it. Write the fixture there and request it by absolute path.
-        tempTestFilePath = Paths.get("build/test-media/temp-test-file.txt").toAbsolutePath();
+        // rejects anything outside it. Write the fixture under profiles/ (public — avatars are
+        // shown on the public /@username page) so no viewer auth is required, and request it by
+        // absolute path.
+        tempTestFilePath = Paths.get("build/test-media/profiles/tester/temp-test-file.txt").toAbsolutePath();
         Files.createDirectories(tempTestFilePath.getParent());
         Files.writeString(tempTestFilePath, "Media file test contents.");
 
@@ -250,8 +252,10 @@ public class UploadControllerTest {
      */
     @Test
     void testGetMediaNotFound() throws Exception {
+        // profiles/ is the public (no-auth) media category; the file does not exist → 404
+        // (proves authorization does not mask a genuine "not found").
         mockMvc.perform(get("/api/v1/uploads/media")
-                        .param("path", "test-uploads/non-existent-file.txt"))
+                        .param("path", "profiles/tester/non-existent-file.txt"))
                 .andExpect(status().isNotFound());
     }
 }

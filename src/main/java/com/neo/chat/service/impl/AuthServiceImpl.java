@@ -25,6 +25,7 @@ import com.neo.chat.exception.ConflictException;
 import com.neo.chat.exception.ContentModerationException;
 import com.neo.chat.exception.ForbiddenException;
 import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.exception.TooManyRequestsException;
 import com.neo.chat.exception.UnauthorizedException;
 import com.neo.chat.mapper.SessionMapper;
 import com.neo.chat.mapper.UserMapper;
@@ -43,6 +44,7 @@ import com.neo.chat.service.LoginAttemptService;
 import com.neo.chat.service.PwnedPasswordService;
 import com.neo.chat.service.ReputationRecorder;
 import com.neo.chat.service.WebPushService;
+import com.neo.chat.util.LogSanitizer;
 import com.neo.chat.util.ProfileCompletion;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -208,7 +210,7 @@ public class AuthServiceImpl implements AuthService {
                 user.setDeleted(false);
                 user.setDeletionRequestedAt(null);
                 userRepository.save(user);
-                log.info("Account '{}' restored on login (was pending deletion)", user.getUsername());
+                log.info("Account '{}' restored on login (was pending deletion)", user.getUuid());
             } else {
                 throw new UnauthorizedException("This account has been deleted.", "TM_024");
             }
@@ -222,7 +224,7 @@ public class AuthServiceImpl implements AuthService {
         try {
             detection = countryDetectionService.detectCountry(httpRequest);
         } catch (Exception e) {
-            log.warn("Location detection on login failed for {}: {}", identifier, e.getMessage());
+            log.warn("Location detection on login failed for {}: {}", user.getUuid(), e.getMessage());
             detection = null;
         }
 
@@ -234,7 +236,7 @@ public class AuthServiceImpl implements AuthService {
                 user.setCountry(detected);
                 userRepository.save(user);
                 log.info("Backfilled country '{}' for {} on login (source: {}, IP: {})",
-                        detected, identifier, detection.getSource(), detection.getClientIp());
+                        detected, user.getUuid(), detection.getSource(), detection.getClientIp());
             }
         }
 
@@ -268,6 +270,15 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("TM_047");
+        }
+
+        // Username uniqueness is CASE-INSENSITIVE (every lookup is findByUsernameIgnoreCase). The
+        // DB constraint is case-sensitive, so without this check "alice" and "Alice" could both
+        // register — and then findByUsernameIgnoreCase returns two rows and throws on every login
+        // for either account (targeted lockout). Reject the collision up-front.
+        String requestedUsername = request.getUsername() == null ? "" : request.getUsername().trim();
+        if (userRepository.existsByUsernameIgnoreCase(requestedUsername)) {
+            throw new ConflictException("This username is already taken.", "TM_048");
         }
 
         // Reject passwords known to appear in public breaches (HIBP k-anonymity).
@@ -310,8 +321,8 @@ public class AuthServiceImpl implements AuthService {
 
         user = userRepository.save(user);
         log.info("User registered successfully: {}. Country detected: {} (Source: {}, IP: {}){}",
-                username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp(),
-                referrer != null ? " | invited by " + referrer.getUsername() : "");
+                user.getUuid(), detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp(),
+                referrer != null ? " | invited by " + referrer.getUuid() : "");
 
         // Send the verification email first. The welcome email is sent later, only once
         // the address is actually confirmed via verifyEmail().
@@ -351,6 +362,13 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, HttpServletRequest httpRequest) {
+        // ABUSE GUARD: cap guest-account creation per client IP per day. Each guest login inserts a
+        // permanent users/session/refresh row, so an unbounded loop bloats the DB and inflates
+        // stats. Fail-OPEN if Redis is unavailable.
+        if (!guestCreationAllowed(com.neo.chat.util.ClientIp.resolve(httpRequest))) {
+            throw new TooManyRequestsException(
+                    "Too many guest sessions from this network today. Please try again later or sign up.", "TM_007");
+        }
         String username = "guest_" + UUID.randomUUID().toString().substring(0, 8);
         Role guestRole = getOrCreateRole("ROLE_GUEST");
 
@@ -369,7 +387,7 @@ public class AuthServiceImpl implements AuthService {
 
         guest = userRepository.save(guest);
         log.info("Guest user logged in: {}. Country detected: {} (Source: {}, IP: {})",
-                username, detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
+                guest.getUuid(), detectionResult.getCountry(), detectionResult.getSource(), detectionResult.getClientIp());
 
         return generateLoginResponse(guest, userAgent, detectionResult);
     }
@@ -410,8 +428,33 @@ public class AuthServiceImpl implements AuthService {
         if (info.getProviderId() != null && !info.getProviderId().isBlank()) {
             user = userRepository.findByGoogleId(info.getProviderId()).orElse(null);
         }
-        if (user == null && oauthEmail != null) {
-            user = userRepository.findByEmailIgnoreCase(oauthEmail).orElse(null);
+        // SECURITY (account pre-hijacking, CWE-1390): only fall back to email-matching when GOOGLE
+        // asserts the email is verified — an unverified IdP email must never be trusted to claim a
+        // local account.
+        if (user == null && oauthEmail != null && info.isEmailVerified()) {
+            User byEmail = userRepository.findByEmailIgnoreCase(oauthEmail).orElse(null);
+            if (byEmail != null) {
+                if (byEmail.isVerified() || byEmail.getGoogleId() != null) {
+                    // The local owner already proved control of this address (verified their email
+                    // or previously linked Google) → safe to link the Google identity.
+                    user = byEmail;
+                } else {
+                    // An UNVERIFIED local shell owns this address. It may be a pre-registration made
+                    // by an attacker who never verified it, so we must not silently hand the Google
+                    // user an account whose password someone else set. Reclaim the shell for the
+                    // verified Google owner: clear the (attacker-chosen) password and revoke any
+                    // outstanding tokens/sessions so the pre-registrant loses all access.
+                    log.warn("OAuth: verified Google email {} claimed an UNVERIFIED local account {} — "
+                            + "resetting its password and revoking tokens (possible pre-registration).",
+                            LogSanitizer.mask(info.getEmail()), byEmail.getUuid());
+                    byEmail.setPasswordHash(null);
+                    byEmail.setVerified(true);
+                    userRepository.save(byEmail);
+                    refreshTokenRepository.revokeAllUserTokens(byEmail);
+                    sessionRepository.deleteByUser(byEmail);
+                    user = byEmail;
+                }
+            }
         }
 
         if (user == null) {
@@ -436,7 +479,7 @@ public class AuthServiceImpl implements AuthService {
                 user = userRepository.save(newUser);
                 newlyProvisioned = true;
                 log.info("New Google user provisioned: {} (email: {}, country: {}, source: {})",
-                        user.getUsername(), info.getEmail(), detection.getCountry(), detection.getSource());
+                        user.getUuid(), LogSanitizer.mask(info.getEmail()), detection.getCountry(), detection.getSource());
             } catch (DataIntegrityViolationException e) {
                 // Concurrent first-login for the same identity: the unique google_id/
                 // email constraint rejected the duplicate. Reuse the row that won the
@@ -446,7 +489,7 @@ public class AuthServiceImpl implements AuthService {
                                 ? userRepository.findByEmailIgnoreCase(oauthEmail)
                                 : Optional.empty())
                         .orElseThrow(() -> e);
-                log.info("Reused existing Google user after create race: {}", user.getUsername());
+                log.info("Reused existing Google user after create race: {}", user.getUuid());
             }
         } else {
             // 3. Existing account → link + backfill any fields we don't already have.
@@ -522,10 +565,44 @@ public class AuthServiceImpl implements AuthService {
             base = base.substring(0, 40);
         }
         String candidate = base;
-        while (userRepository.existsByUsername(candidate)) {
+        // Case-insensitive to match every username lookup (findByUsernameIgnoreCase) and the
+        // signup uniqueness check — a case-only collision would otherwise be allowed here.
+        while (userRepository.existsByUsernameIgnoreCase(candidate)) {
             candidate = base + "_" + Integer.toHexString(SECURE_RANDOM.nextInt(0x10000));
         }
         return candidate;
+    }
+
+    /** Grace window in which a just-rotated (revoked) refresh token is still honored by following
+     *  its replacement chain, so concurrent refreshes from a fast reload / multiple tabs are not
+     *  logged out. Outside this window a revoked token is treated as a real supersession. */
+    private static final long REFRESH_REUSE_GRACE_SECONDS = 30L;
+
+    /**
+     * Follows a revoked token's {@code replacedByToken} chain to the current ACTIVE (non-revoked,
+     * non-expired) token, taking a write lock on each step so it serializes with any concurrent
+     * rotation. Returns {@code null} when the token was revoked longer ago than
+     * {@link #REFRESH_REUSE_GRACE_SECONDS} (a genuine supersession, not a race) or the chain does
+     * not lead to a live token.
+     *
+     * @param revoked the presented, already-revoked token
+     * @return the current active replacement token, or {@code null} if none within the grace window
+     */
+    private RefreshToken resolveActiveReplacement(RefreshToken revoked) {
+        Instant revokedAt = revoked.getUpdatedAt();
+        if (revokedAt == null || revokedAt.isBefore(Instant.now().minusSeconds(REFRESH_REUSE_GRACE_SECONDS))) {
+            return null; // outside the grace window → treat as a real logout
+        }
+        RefreshToken cur = revoked;
+        for (int i = 0; i < 50; i++) { // depth guard against a broken/cyclic chain
+            String next = cur.getReplacedByToken();
+            if (next == null || next.isBlank()) return null;
+            RefreshToken nextTok = refreshTokenRepository.findByTokenForUpdate(next).orElse(null);
+            if (nextTok == null) return null;
+            if (!nextTok.isRevoked() && !nextTok.isExpired()) return nextTok;
+            cur = nextTok;
+        }
+        return null;
     }
 
     /**
@@ -545,10 +622,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public JwtTokensResponse refresh(String tokenStr, String userAgent, String ip) {
-        RefreshToken token = refreshTokenRepository.findByToken(tokenStr)
+        // PESSIMISTIC lock: serialize concurrent refreshes of this token (fast reload / multiple
+        // tabs sharing one cookie) so they don't collide on the optimistic version and log the user
+        // out — see resolveActiveReplacement below.
+        RefreshToken token = refreshTokenRepository.findByTokenForUpdate(tokenStr)
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token", "TM_026"));
 
         User user = token.getUser();
+
+        // A banned or soft-deleted account must not be able to mint fresh access tokens. Login
+        // and the HTTP/WS auth gates already block them, but refresh only checked the token
+        // state — so a banned user's client could refresh indefinitely and keep a live token.
+        if (user.isBanned() || user.isDeleted()) {
+            throw new UnauthorizedException("Account is not available. Please contact support.", "TM_026");
+        }
 
         // Single-device policy: a revoked token means this device was superseded —
         // either the user signed in on another device (which revokes prior tokens),
@@ -557,16 +644,43 @@ public class AuthServiceImpl implements AuthService {
         // page. We deliberately DO NOT revoke all sessions here: that would also
         // log out the device that currently holds the valid token (and turned a
         // benign refresh race into a logout storm).
-        if (token.isRevoked() || token.isExpired()) {
+        // A genuinely expired token is a real logout — the client must re-authenticate.
+        if (token.isExpired()) {
             throw new UnauthorizedException(
-                    "Session expired or signed in on another device. Please log in again.", "TM_026");
+                    "Session expired. Please log in again.", "TM_026");
+        }
+        // A REVOKED token usually means a concurrent refresh (fast reload / another tab) already
+        // rotated it a moment ago. Within a short grace window, follow the rotation chain to the
+        // current ACTIVE token and re-issue a fresh access token bound to it, re-setting the cookie
+        // to that active token so this lagging client catches up — but WITHOUT rotating again.
+        // Rotating on every duplicate would extend the chain one link per request; under a rapid
+        // reload burst (many requests still holding the original cookie) that blows past the
+        // chain-depth guard and logs the user out. Not rotating lets all the duplicate in-flight
+        // requests converge on the same active token. Outside the window it is a genuine
+        // supersession (e.g. signed in on another device) → reject, which is a real logout.
+        if (token.isRevoked()) {
+            RefreshToken active = resolveActiveReplacement(token);
+            if (active == null) {
+                throw new UnauthorizedException(
+                        "Session expired or signed in on another device. Please log in again.", "TM_026");
+            }
+            String graceAccessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest(),
+                    user.getUuid() != null ? user.getUuid().toString() : null);
+            touchSession(user, ip, userAgent);
+            return JwtTokensResponse.builder()
+                    .accessToken(graceAccessToken)
+                    .refreshToken(active.getToken())
+                    .expiresIn(accessTokenExpirationMs / 1000)
+                    .user(toAuthUserResponse(user))
+                    .build();
         }
 
         // Invalidate old token and replace
         token.setRevoked(true);
 
         // Generate new access token
-        String newAccessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest());
+        String newAccessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest(),
+                user.getUuid() != null ? user.getUuid().toString() : null);
 
         // Generate rotated refresh token
         long expiryMs = user.isGuest() ? guestRefreshTokenExpirationMs : refreshTokenExpirationMs;
@@ -592,14 +706,7 @@ public class AuthServiceImpl implements AuthService {
         }
         refreshTokenRepository.save(newRefreshToken);
 
-        // Update session active timestamp
-        List<Session> sessions = sessionRepository.findByUserAndIsDeletedFalse(user);
-        for (Session session : sessions) {
-            if (ip.equals(session.getIpAddress()) && userAgent.equals(session.getUserAgent())) {
-                session.setLastActiveAt(Instant.now());
-                sessionRepository.save(session);
-            }
-        }
+        touchSession(user, ip, userAgent);
 
         return JwtTokensResponse.builder()
                 .accessToken(newAccessToken)
@@ -610,6 +717,24 @@ public class AuthServiceImpl implements AuthService {
                 // the managed user we already hold (no extra DB read).
                 .user(toAuthUserResponse(user))
                 .build();
+    }
+
+    /**
+     * Bumps the last-active timestamp of the session matching this caller's IP + User-Agent.
+     * A no-op when no session matches (e.g. a refresh from a device whose session row was pruned).
+     *
+     * @param user      the token owner
+     * @param ip        the caller IP
+     * @param userAgent the caller User-Agent
+     */
+    private void touchSession(User user, String ip, String userAgent) {
+        List<Session> sessions = sessionRepository.findByUserAndIsDeletedFalse(user);
+        for (Session session : sessions) {
+            if (ip.equals(session.getIpAddress()) && userAgent.equals(session.getUserAgent())) {
+                session.setLastActiveAt(Instant.now());
+                sessionRepository.save(session);
+            }
+        }
     }
 
     /**
@@ -624,7 +749,7 @@ public class AuthServiceImpl implements AuthService {
         if (token != null) {
             token.setRevoked(true);
             refreshTokenRepository.save(token);
-            log.info("Logout successful for user: {}", token.getUser().getUsername());
+            log.info("Logout successful for user: {}", token.getUser().getUuid());
         }
     }
 
@@ -700,8 +825,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Per-recipient cooldown (anti-bombing). Silent return keeps anti-enumeration.
-        if (!mailCooldownOk("pwreset", user.getEmail())) {
-            log.info("Password reset for user '{}' suppressed — cooldown active", user.getUsername());
+        if (!mailCooldownOk("pwreset", user.getEmail()) || !mailDailyCapOk("pwreset", user.getEmail())) {
+            log.info("Password reset for user '{}' suppressed — cooldown active", user.getUuid());
             return;
         }
 
@@ -715,7 +840,7 @@ public class AuthServiceImpl implements AuthService {
 
         String resetLink = frontendBaseUrl.replaceAll("/+$", "") + "/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetLink, passwordResetTtlMinutes);
-        log.info("Password reset requested for user '{}'", user.getUsername());
+        log.info("Password reset requested for user '{}'", user.getUuid());
     }
 
     /**
@@ -759,7 +884,7 @@ public class AuthServiceImpl implements AuthService {
 
         // Revoke all sessions/tokens — a reset should sign the user out everywhere.
         refreshTokenRepository.revokeAllUserTokens(user);
-        log.info("Password reset completed for user '{}'", user.getUsername());
+        log.info("Password reset completed for user '{}'", user.getUuid());
     }
 
     /**
@@ -795,7 +920,7 @@ public class AuthServiceImpl implements AuthService {
 
         // Idempotent: re-verifying an already-verified account is a no-op (no duplicate welcome).
         if (user.isVerified()) {
-            log.info("Email already verified for user '{}'", user.getUsername());
+            log.info("Email already verified for user '{}'", user.getUuid());
             return;
         }
 
@@ -803,7 +928,7 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
         // Verification unlocks verified-gated features — drop the stale entitlement cache.
         featureAccessCache.evict(user.getId());
-        log.info("Email verified for user '{}'", user.getUsername());
+        log.info("Email verified for user '{}'", user.getUuid());
 
         // Now — and only now — send the welcome email.
         String openLink = frontendBaseUrl.replaceAll("/+$", "") + "/";
@@ -837,8 +962,8 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
         // Per-recipient cooldown so a signup + rapid "resend" can't email-bomb an address.
-        if (!mailCooldownOk("verify", user.getEmail())) {
-            log.info("Verification email for user '{}' suppressed — cooldown active", user.getUsername());
+        if (!mailCooldownOk("verify", user.getEmail()) || !mailDailyCapOk("verify", user.getEmail())) {
+            log.info("Verification email for user '{}' suppressed — cooldown active", user.getUuid());
             return;
         }
         String token = generateSecureToken();
@@ -848,7 +973,7 @@ public class AuthServiceImpl implements AuthService {
                 Duration.ofMinutes(emailVerificationTtlMinutes));
         String verifyLink = frontendBaseUrl.replaceAll("/+$", "") + "/verify-email?token=" + token;
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), verifyLink, emailVerificationTtlMinutes);
-        log.info("Verification email sent for user '{}'", user.getUsername());
+        log.info("Verification email sent for user '{}'", user.getUuid());
     }
 
     /**
@@ -878,7 +1003,7 @@ public class AuthServiceImpl implements AuthService {
             String secureLink = frontendBaseUrl.replaceAll("/+$", "") + "/forgot-password";
             emailService.sendLoginAlertEmail(user.getEmail(), user.getName(), device, location, ip, when, secureLink);
         } catch (Exception e) {
-            log.warn("Login-alert email skipped for '{}': {}", user.getUsername(), e.getMessage());
+            log.warn("Login-alert email skipped for '{}': {}", user.getUuid(), e.getMessage());
         }
     }
 
@@ -978,7 +1103,7 @@ public class AuthServiceImpl implements AuthService {
         // Sign the user out everywhere — no device should keep a working session.
         refreshTokenRepository.revokeAllUserTokens(user);
         log.info("Account '{}' scheduled for deletion (recoverable for {} days)",
-                user.getUsername(), accountDeletionWindowDays);
+                user.getUuid(), accountDeletionWindowDays);
     }
 
     /**
@@ -1077,6 +1202,55 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /** Max guest accounts created per client IP per rolling 24h. */
+    private static final int GUEST_CREATE_CAP_PER_IP = 20;
+
+    /**
+     * Per-IP daily cap on guest-account creation. Fail-OPEN if Redis is down.
+     *
+     * @param ip resolved client IP
+     * @return true if still under the daily cap
+     */
+    private boolean guestCreationAllowed(String ip) {
+        if (ip == null || ip.isBlank()) return true;
+        try {
+            String key = "guest:create:ip:" + ip;
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1L) {
+                redisTemplate.expire(key, Duration.ofHours(24));
+            }
+            return count == null || count <= GUEST_CREATE_CAP_PER_IP;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /** Max transactional emails of one type to a single recipient per rolling 24h. */
+    private static final int MAIL_DAILY_CAP_PER_RECIPIENT = 5;
+
+    /**
+     * Per-recipient DAILY cap for a transactional-mail type (on top of the 60s cooldown). Stops an
+     * attacker from mail-bombing a victim address (or burning the shared provider quota) by
+     * repeatedly triggering forgot-password / resend-verification. Fail-OPEN if Redis is down.
+     *
+     * @param type  mail type ("pwreset" | "verify")
+     * @param email recipient address
+     * @return true if still under the daily cap
+     */
+    private boolean mailDailyCapOk(String type, String email) {
+        if (email == null || email.isBlank()) return true;
+        try {
+            String key = "mail:daily:" + type + ":" + hashToken(email.trim().toLowerCase());
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1L) {
+                redisTemplate.expire(key, Duration.ofHours(24));
+            }
+            return count == null || count <= MAIL_DAILY_CAP_PER_RECIPIENT;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
     /**
      * Finalizes a successful authentication: enforces the single-device policy by revoking all
      * prior refresh tokens and clearing the superseded device's push subscriptions (best-effort),
@@ -1106,7 +1280,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Generate Token pair
-        String accessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest());
+        String accessToken = tokenProvider.generateToken(user.getUsername(), user.isGuest(),
+                user.getUuid() != null ? user.getUuid().toString() : null);
         String refreshTokenStr = UUID.randomUUID().toString();
 
         long expiryMs = user.isGuest() ? guestRefreshTokenExpirationMs : refreshTokenExpirationMs;
@@ -1311,7 +1486,7 @@ public class AuthServiceImpl implements AuthService {
             reputationRecorder.record(user.getId(),
                     ReputationEventType.PROFILE_COMPLETED, String.valueOf(user.getId()));
         }
-        log.info("User profile updated successfully for: {}", user.getUsername());
+        log.info("User profile updated successfully for: {}", user.getUuid());
         // Age (and later verification) can change entitlement — evict so the returned
         // feature set is recomputed fresh rather than served from a stale cache.
         featureAccessCache.evict(user.getId());

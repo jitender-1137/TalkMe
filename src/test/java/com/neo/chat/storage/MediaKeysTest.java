@@ -4,6 +4,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -112,6 +114,57 @@ class MediaKeysTest {
         @DisplayName("resulting key that would traverse upward → null")
         void unsafeResult() {
             assertThat(MediaKeys.key("/media/../secret", ROOT)).isNull();
+        }
+
+        // ── Root-rename recovery (talkMe → neochathub) ──────────────────────────
+        // Object keys never contain the root, so a reference written under a PREVIOUS root points
+        // at the same object once the old root is stripped.
+
+        @Test
+        @DisplayName("legacy root strips a renamed-root FLAT file (real old DB ref)")
+        void legacyRootFlatFile() {
+            // The exact shape of an old DB reference: /opt/media/talkMe/<uuid>.jpeg
+            assertThat(MediaKeys.key(
+                    "/opt/media/talkMe/65e4e1de-1ed4-4aa2-8189-d092c6e42155.jpeg",
+                    "/opt/media/neochathub",
+                    List.of("/opt/media/talkMe")))
+                    .isEqualTo("65e4e1de-1ed4-4aa2-8189-d092c6e42155.jpeg");
+        }
+
+        @Test
+        @DisplayName("legacy root strips a renamed-root category file")
+        void legacyRootCategoryFile() {
+            assertThat(MediaKeys.key(
+                    "/opt/media/talkMe/conversations/cid/a.jpg",
+                    "/opt/media/neochathub",
+                    List.of("/opt/media/talkMe")))
+                    .isEqualTo("conversations/cid/a.jpg");
+        }
+
+        @Test
+        @DisplayName("legacy root also resolves via the ?path= serve URL form")
+        void legacyRootViaPathParam() {
+            String ref = "/api/v1/uploads/media?path=%2Fopt%2Fmedia%2FtalkMe%2F65e4e1de.jpeg";
+            assertThat(MediaKeys.key(ref, "/opt/media/neochathub", List.of("/opt/media/talkMe")))
+                    .isEqualTo("65e4e1de.jpeg");
+        }
+
+        @Test
+        @DisplayName("category net recovers a renamed-root category file even with NO legacy configured")
+        void categoryNetWithoutLegacy() {
+            assertThat(MediaKeys.key(
+                    "/opt/media/talkMe/conversations/cid/a.jpg", "/opt/media/neochathub"))
+                    .isEqualTo("conversations/cid/a.jpg");
+        }
+
+        @Test
+        @DisplayName("the current root still wins (new refs unaffected by legacy roots)")
+        void currentRootFastPath() {
+            assertThat(MediaKeys.key(
+                    "/opt/media/neochathub/posts/uid/a.jpg",
+                    "/opt/media/neochathub",
+                    List.of("/opt/media/talkMe")))
+                    .isEqualTo("posts/uid/a.jpg");
         }
     }
 

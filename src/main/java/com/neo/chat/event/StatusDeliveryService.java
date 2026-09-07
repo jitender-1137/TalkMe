@@ -111,6 +111,13 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
         if (StatusUpdateEvent.READ.equals(event.getEventName()) && actor != null) {
             try {
                 notificationDispatchService.recomputeUnread(actor);
+            } catch (org.springframework.dao.CannotAcquireLockException e) {
+                // Expected under concurrency: the hot users.total_unread_count counter lost a DB
+                // deadlock. recomputeUnread runs in its OWN (REQUIRES_NEW) transaction, so only that
+                // inner tx rolled back — this delivery/outbox transaction is intact and commits.
+                // The badge is idempotent and refreshes on the next event, so log concisely (no stack).
+                log.warn("[status] Unread recompute skipped for user {} — lock contention: {}",
+                        event.getActorUserId(), e.getMostSpecificCause().getMessage());
             } catch (Exception e) {
                 log.warn("[status] Unread recompute failed for user {}", event.getActorUserId(), e);
             }

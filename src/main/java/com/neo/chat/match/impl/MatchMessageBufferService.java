@@ -1,6 +1,7 @@
 package com.neo.chat.match.impl;
 
 import com.neo.chat.match.MatchServerEvent;
+import com.neo.chat.util.LogSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +52,7 @@ public class MatchMessageBufferService {
             redisTemplate.opsForList().trim(key, -MAX_BUFFERED, -1);
             redisTemplate.expire(key, BUFFER_TTL);
         } catch (Exception e) {
-            log.warn("[MatchBuffer] failed to buffer event for {}", recipient, e);
+            log.warn("[MatchBuffer] failed to buffer event for {}", LogSanitizer.mask(recipient), e);
         }
     }
 
@@ -73,12 +74,12 @@ public class MatchMessageBufferService {
                     MatchServerEvent event = objectMapper.readValue(json, MatchServerEvent.class);
                     messagingTemplate.convertAndSendToUser(username, "/queue/match", event);
                 } catch (Exception e) {
-                    log.warn("[MatchBuffer] failed to replay one event for {}", username, e);
+                    log.warn("[MatchBuffer] failed to replay one event for {}", LogSanitizer.mask(username), e);
                 }
             }
-            log.info("[MatchBuffer] flushed {} buffered event(s) to {}", items.size(), username);
+            log.info("[MatchBuffer] flushed {} buffered event(s) to {}", items.size(), LogSanitizer.mask(username));
         } catch (Exception e) {
-            log.warn("[MatchBuffer] flush failed for {}", username, e);
+            log.warn("[MatchBuffer] flush failed for {}", LogSanitizer.mask(username), e);
         }
     }
 }

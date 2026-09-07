@@ -108,7 +108,7 @@ public class FriendServiceImpl implements FriendService {
             payload.put("event", eventType);
             messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/friends", payload);
         } catch (Exception e) {
-            log.error("Failed to broadcast friend event to user {}", user.getUsername(), e);
+            log.error("Failed to broadcast friend event to user {}", user.getUuid(), e);
         }
     }
 
@@ -157,14 +157,14 @@ public class FriendServiceImpl implements FriendService {
                 // it means they unfriended. We can reuse the request by setting it to PENDING.
                 existingRequest.setStatus(FriendRequestStatus.PENDING);
                 existingRequest = friendRequestRepository.save(existingRequest);
-                log.info("Friend request re-sent (was accepted before unfriending) from {} to {}", currentUser.getUsername(), receiver.getUsername());
+                log.info("Friend request re-sent (was accepted before unfriending) from {} to {}", currentUser.getUuid(), receiver.getUuid());
                 broadcastFriendEvent(receiver, "friend_request_received");
                 return friendRequestMapper.toResponse(existingRequest);
             } else {
                 // If it was PENDING, REJECTED, or CANCELLED, update to PENDING and update timestamp
                 existingRequest.setStatus(FriendRequestStatus.PENDING);
                 existingRequest = friendRequestRepository.save(existingRequest);
-                log.info("Friend request re-sent/updated from {} to {}", currentUser.getUsername(), receiver.getUsername());
+                log.info("Friend request re-sent/updated from {} to {}", currentUser.getUuid(), receiver.getUuid());
                 broadcastFriendEvent(receiver, "friend_request_received");
                 return friendRequestMapper.toResponse(existingRequest);
             }
@@ -201,7 +201,7 @@ public class FriendServiceImpl implements FriendService {
             request.setStatus(FriendRequestStatus.PENDING);
             request = friendRequestRepository.save(request);
         }
-        log.info("Friend request sent from {} to {}", currentUser.getUsername(), receiver.getUsername());
+        log.info("Friend request sent from {} to {}", currentUser.getUuid(), receiver.getUuid());
         broadcastFriendEvent(receiver, "friend_request_received");
 
         return friendRequestMapper.toResponse(request);
@@ -243,7 +243,7 @@ public class FriendServiceImpl implements FriendService {
         broadcastFriendEvent(request.getSender(), "friend_request_accepted");
         broadcastFriendEvent(request.getReceiver(), "friend_request_accepted");
 
-        log.info("Friend request accepted between {} and {}", request.getSender().getUsername(), request.getReceiver().getUsername());
+        log.info("Friend request accepted between {} and {}", request.getSender().getUuid(), request.getReceiver().getUuid());
     }
 
     /**

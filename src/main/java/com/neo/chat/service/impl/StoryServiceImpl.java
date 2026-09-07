@@ -97,11 +97,21 @@ public class StoryServiceImpl implements StoryService {
             if (!featureAccessService.hasAccess(currentUser, FeatureKey.VOICE_STATUS)) {
                 throw new FeatureLockedException();
             }
+            // SECURITY: the clip must be an uploaded reference, never an external URL.
+            if (com.neo.chat.util.MediaReferences.isExternalUrl(mediaUrl)) {
+                throw new BadRequestException("A voice status must be an uploaded audio clip.", "TM_232");
+            }
             if (!AudioValidator.hasAudioExtension(mediaUrl)) {
                 throw new BadRequestException(
                         "A voice status must be an audio clip", "TM_232");
             }
         } else {
+            // SECURITY: the image/video must be an internal storage reference from the upload
+            // endpoint, never an external URL (viewer-IP leak / post-publication content swap /
+            // moderation bypass — external media is never NSFW-scanned).
+            if (com.neo.chat.util.MediaReferences.isExternalUrl(mediaUrl)) {
+                throw new BadRequestException("Story media must be an uploaded file.", "TM_232");
+            }
             // Photo + music story → merge into an autoplaying video (Instagram-style) so
             // the sound plays with the story like a video. Skip if the media is already a
             // video; fall back to the plain image if muxing is unavailable.
@@ -130,7 +140,7 @@ public class StoryServiceImpl implements StoryService {
                 .build();
 
         story = storyRepository.save(story);
-        log.info("Story posted successfully by {}", currentUser.getUsername());
+        log.info("Story posted successfully by {}", currentUser.getUuid());
 
         // Instagram-style: tell the author's whole network (followers + following) they
         // posted a new story. Best-effort — never fails the story creation.
@@ -143,7 +153,7 @@ public class StoryServiceImpl implements StoryService {
                     story.getUuid().toString(),
                     story.getMediaUrl());
         } catch (Exception e) {
-            log.warn("Failed to fan out new-story notification for {}", currentUser.getUsername(), e);
+            log.warn("Failed to fan out new-story notification for {}", currentUser.getUuid(), e);
         }
 
         return mapToStoryResponse(story, currentUser);

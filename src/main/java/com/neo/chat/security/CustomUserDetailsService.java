@@ -56,4 +56,19 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + id));
         return new CustomUserDetails(user);
     }
+
+    /**
+     * Loads a user by immutable uuid. Used to resolve an access token's {@code uid} claim so a
+     * token never re-binds to a different account after a username is freed and re-registered.
+     *
+     * @param uuid the user's immutable uuid
+     * @return the wrapped user details
+     * @throws org.springframework.security.core.userdetails.UsernameNotFoundException if none matches
+     */
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUuid(java.util.UUID uuid) {
+        User user = userRepository.findByUuid(uuid)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with uuid: " + uuid));
+        return new CustomUserDetails(user);
+    }
 }

@@ -111,7 +111,7 @@ class StoryServiceImplTest {
     private Story story(PostAudience audience, StoryKind kind, User user) {
         Story s = Story.builder()
                 .user(user)
-                .mediaUrl("https://cdn/x.png")
+                .mediaUrl("stories/u/x.png")
                 .caption("hi")
                 .audience(audience)
                 .kind(kind)
@@ -141,7 +141,7 @@ class StoryServiceImplTest {
 
         private StoryRequest visualRequest() {
             StoryRequest r = new StoryRequest();
-            r.setMediaUrl("https://cdn/pic.png");
+            r.setMediaUrl("stories/u/pic.png");
             r.setCaption("nice sunset");
             return r;
         }
@@ -159,7 +159,7 @@ class StoryServiceImplTest {
             verify(storyRepository).save(saved.capture());
             assertThat(saved.getValue().getAudience()).isEqualTo(PostAudience.EVERYONE);
             assertThat(saved.getValue().getKind()).isEqualTo(StoryKind.VISUAL);
-            assertThat(saved.getValue().getMediaUrl()).isEqualTo("https://cdn/pic.png");
+            assertThat(saved.getValue().getMediaUrl()).isEqualTo("stories/u/pic.png");
             assertThat(saved.getValue().getUser()).isEqualTo(owner);
             assertThat(saved.getValue().getExpiresAt()).isAfter(Instant.now());
             verify(notificationService).notifyFollowersAndFollowing(eq(owner), anyString(), anyString(),
@@ -190,7 +190,7 @@ class StoryServiceImplTest {
             r.setAudio(AudioTrackDto.builder().audioUrl("https://cdn/song.mp3")
                     .audioStartSec(5).audioClipSeconds(20).build());
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
-            when(photoMusicMuxer.muxPhotoWithMusic("https://cdn/pic.png", "https://cdn/song.mp3", 5, 20))
+            when(photoMusicMuxer.muxPhotoWithMusic("stories/u/pic.png", "https://cdn/song.mp3", 5, 20))
                     .thenReturn("https://cdn/merged.mp4");
             stubSaveEchoesWithUuid();
 
@@ -207,7 +207,7 @@ class StoryServiceImplTest {
             StoryRequest r = visualRequest();
             r.setAudio(AudioTrackDto.builder().audioUrl("https://cdn/song.mp3").build());
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
-            when(photoMusicMuxer.muxPhotoWithMusic(eq("https://cdn/pic.png"), eq("https://cdn/song.mp3"), anyInt(), anyInt()))
+            when(photoMusicMuxer.muxPhotoWithMusic(eq("stories/u/pic.png"), eq("https://cdn/song.mp3"), anyInt(), anyInt()))
                     .thenReturn(null);
             stubSaveEchoesWithUuid();
 
@@ -215,7 +215,7 @@ class StoryServiceImplTest {
 
             ArgumentCaptor<Story> saved = ArgumentCaptor.forClass(Story.class);
             verify(storyRepository).save(saved.capture());
-            assertThat(saved.getValue().getMediaUrl()).isEqualTo("https://cdn/pic.png");
+            assertThat(saved.getValue().getMediaUrl()).isEqualTo("stories/u/pic.png");
         }
 
         /**
@@ -226,7 +226,7 @@ class StoryServiceImplTest {
         @DisplayName("media already an mp4 → muxing is skipped")
         void alreadyVideoSkipsMux() {
             StoryRequest r = new StoryRequest();
-            r.setMediaUrl("https://cdn/clip.mp4");
+            r.setMediaUrl("stories/u/clip.mp4");
             r.setCaption("clip");
             r.setAudio(AudioTrackDto.builder().audioUrl("https://cdn/song.mp3").build());
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
@@ -255,7 +255,7 @@ class StoryServiceImplTest {
         void voiceStatus() {
             StoryRequest r = new StoryRequest();
             r.setKind("voice");
-            r.setMediaUrl("https://cdn/note.m4a");
+            r.setMediaUrl("stories/u/note.m4a");
             r.setCaption("hey");
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
             when(featureAccessService.hasAccess(owner, FeatureKey.VOICE_STATUS)).thenReturn(true);
@@ -266,7 +266,7 @@ class StoryServiceImplTest {
             ArgumentCaptor<Story> saved = ArgumentCaptor.forClass(Story.class);
             verify(storyRepository).save(saved.capture());
             assertThat(saved.getValue().getKind()).isEqualTo(StoryKind.VOICE);
-            assertThat(saved.getValue().getMediaUrl()).isEqualTo("https://cdn/note.m4a");
+            assertThat(saved.getValue().getMediaUrl()).isEqualTo("stories/u/note.m4a");
             verify(photoMusicMuxer, never()).muxPhotoWithMusic(anyString(), anyString(), anyInt(), anyInt());
         }
 
@@ -304,7 +304,7 @@ class StoryServiceImplTest {
         void voiceLocked() {
             StoryRequest r = new StoryRequest();
             r.setKind("VOICE");
-            r.setMediaUrl("https://cdn/note.m4a");
+            r.setMediaUrl("stories/u/note.m4a");
             r.setCaption("hey");
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
             when(featureAccessService.hasAccess(owner, FeatureKey.VOICE_STATUS)).thenReturn(false);
@@ -320,7 +320,7 @@ class StoryServiceImplTest {
         void voiceNonAudio() {
             StoryRequest r = new StoryRequest();
             r.setKind("VOICE");
-            r.setMediaUrl("https://cdn/pic.png");
+            r.setMediaUrl("stories/u/pic.png");
             r.setCaption("hey");
             when(moderationService.moderateText(anyString())).thenReturn(ModerationResult.clean());
             when(featureAccessService.hasAccess(owner, FeatureKey.VOICE_STATUS)).thenReturn(true);

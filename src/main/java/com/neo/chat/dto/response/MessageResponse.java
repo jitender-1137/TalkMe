@@ -23,7 +23,11 @@ public class MessageResponse {
     private boolean starred; // whether the CURRENT user has starred (saved) this message
     private String content;
     private String messageType; // MessageType enum representation
-    private String createdAt;
+    private String createdAt; // sent time (message creation)
+    // Recipient delivery/read instants (ISO-8601), for the sender's "Message info" ladder.
+    // Null until the message reaches that state; ghost recipients are excluded (privacy).
+    private String deliveredAt; // when it reached the recipient (DELIVERED)
+    private String readAt;      // when the recipient opened it (READ)
     private boolean isEdited;
     // Force the JSON key to "isForwarded" (Lombok's is-getter would otherwise emit "forwarded").
     @JsonProperty("isForwarded")

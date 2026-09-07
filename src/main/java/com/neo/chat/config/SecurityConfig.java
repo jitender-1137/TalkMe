@@ -177,8 +177,28 @@ public class SecurityConfig {
                     // so anonymous callers see only UP/DOWN); metrics, Prometheus, info and the
                     // rest require authentication. authenticated() — not hasRole("ADMIN") — because
                     // no user is ever granted ROLE_ADMIN, so admin-only would lock out everyone.
+                    // SECURITY: metrics/prometheus/info expose request-URI templates, JVM, pool and
+                    // cache internals. "authenticated()" let ANY signed-in user (guests included)
+                    // read them; restrict to SUPER_ADMIN (operators scrape with an admin token or
+                    // from a management port bound to localhost).
                     auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                            .requestMatchers("/actuator/**").authenticated();
+                            .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN");
+
+                    // BootUI (dev-only monitoring console: beans, env, mappings, metrics). It is
+                    // CSRF-exempt and used to be permitAll in every profile — if it was ever enabled
+                    // on a prod host it exposed application internals to the internet. Public only
+                    // outside prod; in prod it requires SUPER_ADMIN (effectively disabled).
+                    if (docsPublic) {
+                        auth.requestMatchers("/bootui/**").permitAll();
+                    } else {
+                        auth.requestMatchers("/bootui/**").hasRole("SUPER_ADMIN");
+                    }
+
+                    // The legacy "/talkMe/**" static handler exposed the ENTIRE media root (every
+                    // user's private chat media, avatars, view-once files) unauthenticated. The
+                    // handler is removed from WebMvcConfig; deny the path outright so a future
+                    // resource handler cannot silently reintroduce the leak.
+                    auth.requestMatchers("/talkMe/**", "/media/**").denyAll();
 
                     // Swagger / OpenAPI docs. In prod: locked down (not public). In dev/local:
                     // reachable. The root-path UI (/swagger-ui.html + static assets) and the
@@ -242,6 +262,7 @@ public class SecurityConfig {
      */
     private String[] unSecured() {
         return new String[]{
+                // NOTE: "/bootui/**" is deliberately NOT here — it is profile-gated above.
                 // Pre-login auth flows. NOTE: guest/anonymous signup is NOT a separate
                 // endpoint — it is folded into POST /auth/login (isGuest:true in the body),
                 // so it is already public here.
@@ -257,10 +278,11 @@ public class SecurityConfig {
                 // WebSocket handshake: auth happens on the STOMP CONNECT frame (token in
                 // the frame), not the HTTP handshake, so the handshake must be public.
                 "/api/v1/ws/**", "/ws/**",
-                // Media serve: browsers load <img>/<video> src with no Authorization
-                // header, so this must stay public. It currently lacks per-file
-                // authorization — see the follow-up note; that is a controller-level fix,
-                // not solvable via a security rule.
+                // Media serve: browsers load <img>/<video> src with no Authorization header, so
+                // the security rule must stay permitAll. Authorization is enforced INSIDE
+                // UploadController.getMedia: Bearer token OR the HttpOnly, path-scoped
+                // media_token cookie issued at login, plus per-object rules (conversation media
+                // requires chat membership; only profile photos are public).
                 "/api/v1/uploads/media", "/uploads/media",
                 // Public brand assets (email logo) — must load without an auth header
                 // so email clients can fetch them. Static PNG from the jar, no PII.

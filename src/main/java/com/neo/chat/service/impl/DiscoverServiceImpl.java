@@ -48,6 +48,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DiscoverServiceImpl implements DiscoverService {
 
+    /** Escape SQL LIKE metacharacters (see UserServiceImpl.escapeLike). */
+    private static String escapeLike(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+
     private final UserRepository userRepository;
     private final DiscoverLikeRepository discoverLikeRepository;
     private final FriendRepository friendRepository;
@@ -140,11 +147,12 @@ public class DiscoverServiceImpl implements DiscoverService {
 
             // Search query filter
             if (query != null && !query.isBlank()) {
-                String pattern = "%" + query.toLowerCase() + "%";
+                // Match only public identifiers — NOT the private email column (enumeration
+                // oracle). Escape LIKE metacharacters and match literally.
+                String pattern = "%" + escapeLike(query.toLowerCase()) + "%";
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("username")), pattern),
-                        cb.like(cb.lower(root.get("name")), pattern),
-                        cb.like(cb.lower(root.get("email")), pattern)
+                        cb.like(cb.lower(root.get("username")), pattern, '\\'),
+                        cb.like(cb.lower(root.get("name")), pattern, '\\')
                 ));
             }
 

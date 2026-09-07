@@ -2,6 +2,8 @@ package com.neo.chat.storage;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Parsing helpers shared by the {@link MediaStorage} implementations. Consolidates
@@ -35,16 +37,69 @@ public final class MediaKeys {
     }
 
     /**
+     * Top-level media categories (see {@code UploadController.resolveSubdivide}). Used as a
+     * last-resort net to recover the key from a reference written under an <em>unconfigured</em>
+     * previous root — object keys always begin {@code <category>/…} (except a few legacy flat
+     * files, which the configured legacy-root strip handles).
+     */
+    private static final Set<String> CATEGORIES = Set.of(
+            "conversations", "profiles", "posts", "stories", "lobby", "strangers", "others");
+
+    /**
      * The object key (path under {@code mediaRoot}) for a reference, or null if unsafe/unknown.
      */
     public static String key(String reference, String mediaRoot) {
+        return key(reference, mediaRoot, List.of());
+    }
+
+    /**
+     * The object key for a reference, tolerant of a renamed media-root. Object keys never contain
+     * the root (see {@code MediaStorage.store}), so a reference written under a PREVIOUS root points
+     * at the same object once that root is stripped. Resolution order: strip the current root; else
+     * strip the first matching {@code legacyRoots} entry; else recover from a known category segment;
+     * else fall back to the bare path (leading slash removed).
+     *
+     * @param reference   the stored reference (raw {@code <root>/<key>} or a {@code ?path=} URL)
+     * @param mediaRoot   the current media-root
+     * @param legacyRoots previously-used media-roots to also strip (may be empty/null)
+     * @return the safe object key, or null if unsafe/unknown
+     */
+    public static String key(String reference, String mediaRoot, List<String> legacyRoots) {
         String abs = absolutePath(reference);
         if (abs == null) return null;
-        String rootPrefix = mediaRoot.endsWith("/") ? mediaRoot : mediaRoot + "/";
-        String key = abs.startsWith(rootPrefix)
-                ? abs.substring(rootPrefix.length())
-                : (abs.startsWith("/") ? abs.substring(1) : abs);
+
+        String key = stripRoot(abs, mediaRoot);
+        if (key == null && legacyRoots != null) {
+            for (String legacy : legacyRoots) {
+                key = stripRoot(abs, legacy);
+                if (key != null) break;
+            }
+        }
+        if (key == null) key = keyFromCategory(abs);
+        if (key == null) key = abs.startsWith("/") ? abs.substring(1) : abs;
+
         return isSafeKey(key) ? key : null;
+    }
+
+    /** The path under {@code root} (root prefix removed), or null if {@code abs} isn't under it. */
+    private static String stripRoot(String abs, String root) {
+        if (root == null || root.isBlank()) return null;
+        String rootPrefix = root.endsWith("/") ? root : root + "/";
+        return abs.startsWith(rootPrefix) ? abs.substring(rootPrefix.length()) : null;
+    }
+
+    /**
+     * Recover a key from the first known {@code <category>/} segment in {@code abs}, so a
+     * category-foldered reference under an unrecognised old root still resolves. Null when no
+     * category segment is present.
+     */
+    private static String keyFromCategory(String abs) {
+        int best = -1;
+        for (String cat : CATEGORIES) {
+            int i = abs.indexOf("/" + cat + "/");
+            if (i >= 0 && (best < 0 || i < best)) best = i;
+        }
+        return best >= 0 ? abs.substring(best + 1) : null;
     }
 
     /**

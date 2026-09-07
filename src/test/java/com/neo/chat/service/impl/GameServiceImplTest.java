@@ -1,6 +1,7 @@
 package com.neo.chat.service.impl;
 
 import com.neo.chat.domain.Chat;
+import com.neo.chat.domain.ChatFlirtMode;
 import com.neo.chat.domain.ChatMember;
 import com.neo.chat.domain.GameSession;
 import com.neo.chat.domain.User;
@@ -11,6 +12,7 @@ import com.neo.chat.enums.ReputationEventType;
 import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.ForbiddenException;
 import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.repository.ChatFlirtModeRepository;
 import com.neo.chat.repository.ChatMemberRepository;
 import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.GameSessionRepository;
@@ -58,6 +60,8 @@ class GameServiceImplTest {
     private ChatRepository chatRepository;
     @Mock
     private ChatMemberRepository chatMemberRepository;
+    @Mock
+    private ChatFlirtModeRepository chatFlirtModeRepository;
 
     private GameServiceImpl service;
     private User user;
@@ -66,7 +70,7 @@ class GameServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new GameServiceImpl(gameSessionRepository, reputationRecorder,
-                chatRepository, chatMemberRepository);
+                chatRepository, chatMemberRepository, chatFlirtModeRepository);
         user = User.builder().username("alice").name("Alice").build();
         user.setId(7L);
         user.setUuid(UUID.randomUUID());
@@ -156,6 +160,48 @@ class GameServiceImplTest {
                     .isInstanceOfSatisfying(ForbiddenException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_103"));
             verify(gameSessionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("spicy game with Flirt Mode NOT active → BadRequest TM_835, nothing saved")
+        void spicyBlockedWhenFlirtInactive() {
+            stubMember();
+            when(chatFlirtModeRepository.findByChat(chat)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.start(user, CHAT_ID, GameType.FLIRTY_TRUTH_OR_DARE))
+                    .isInstanceOfSatisfying(BadRequestException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_835"));
+            verify(gameSessionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("spicy game with a flirt row present but inactive → BadRequest TM_835")
+        void spicyBlockedWhenFlirtRowInactive() {
+            stubMember();
+            when(chatFlirtModeRepository.findByChat(chat))
+                    .thenReturn(Optional.of(ChatFlirtMode.builder().active(false).build()));
+
+            assertThatThrownBy(() -> service.start(user, CHAT_ID, GameType.SPICY_WOULD_YOU_RATHER))
+                    .isInstanceOfSatisfying(BadRequestException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_835"));
+            verify(gameSessionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("spicy game with Flirt Mode active → creates the session")
+        void spicyAllowedWhenFlirtActive() {
+            stubMember();
+            when(chatFlirtModeRepository.findByChat(chat))
+                    .thenReturn(Optional.of(ChatFlirtMode.builder().active(true).build()));
+            when(gameSessionRepository.findFirstByChatIdAndStateNotOrderByIdDesc(CHAT_ID, GameState.ENDED))
+                    .thenReturn(Optional.empty());
+            stubSaveEcho();
+
+            GameSessionResponse res = service.start(user, CHAT_ID, GameType.TRUTH_ABOUT_US);
+
+            assertThat(res.getGameType()).isEqualTo(GameType.TRUTH_ABOUT_US.name());
+            verify(reputationRecorder).record(user.getId(), ReputationEventType.CONVERSATION_STARTED,
+                    "game:" + CHAT_ID);
         }
 
         @Test

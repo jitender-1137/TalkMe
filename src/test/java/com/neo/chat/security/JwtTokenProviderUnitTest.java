@@ -38,8 +38,10 @@ class JwtTokenProviderUnitTest {
     }
 
     private static User user(String username, boolean guest) {
-        return User.builder().username(username).email(username + "@e.com").name("N")
+        User u = User.builder().username(username).email(username + "@e.com").name("N")
                 .isGuest(guest).roles(Set.of(Role.builder().name("ROLE_USER").build())).build();
+        u.setUuid(java.util.UUID.randomUUID());
+        return u;
     }
 
     // ── generate / parse ─────────────────────────────────────────────────────
@@ -63,6 +65,29 @@ class JwtTokenProviderUnitTest {
 
             assertThat(provider.getUsernameFromToken(token)).isEqualTo("bob");
             assertThat(provider.validateToken(token)).isTrue();
+        }
+
+        @Test
+        void shouldEmbedAndReadUuidClaim() {
+            String uuid = java.util.UUID.randomUUID().toString();
+            String token = provider.generateToken("alice", false, uuid);
+            assertThat(provider.getUserUuidFromToken(token)).isEqualTo(uuid);
+            assertThat(provider.getUsernameFromToken(token)).isEqualTo("alice");
+        }
+
+        @Test
+        void legacyTokenWithoutUuidReturnsNullUid() {
+            String token = provider.generateToken("alice", false); // 2-arg → no uid claim
+            assertThat(provider.getUserUuidFromToken(token)).isNull();
+        }
+
+        @Test
+        void generateFromAuthenticationEmbedsTheUsersUuid() {
+            CustomUserDetails cud = new CustomUserDetails(user("bob", true));
+            Authentication auth = new UsernamePasswordAuthenticationToken(cud, null, cud.getAuthorities());
+            String token = provider.generateToken(auth);
+            assertThat(provider.getUserUuidFromToken(token))
+                    .isEqualTo(cud.getUser().getUuid().toString());
         }
 
         @Test

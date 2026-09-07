@@ -1,6 +1,7 @@
 package com.neo.chat.websocket;
 
 import com.neo.chat.util.BackgroundTaskErrors;
+import com.neo.chat.util.LogSanitizer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +73,7 @@ public class LobbyDisconnectReaper {
                     payload.put("action", "LEAVE");
                     payload.put("username", username);
                     messagingTemplate.convertAndSend("/topic/lobby", (Object) payload);
-                    log.info("Lobby grace expired — removed {} and broadcast LEAVE", username);
+                    log.info("Lobby grace expired — removed {} and broadcast LEAVE", LogSanitizer.mask(username));
                 }
             }
         } catch (Exception e) {

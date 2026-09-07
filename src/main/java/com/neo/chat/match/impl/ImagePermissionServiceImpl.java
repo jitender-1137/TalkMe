@@ -5,6 +5,7 @@ import com.neo.chat.match.MatchServerEvent;
 import com.neo.chat.match.MatchSession;
 import com.neo.chat.match.SessionService;
 import lombok.RequiredArgsConstructor;
+import com.neo.chat.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,7 @@ public class ImagePermissionServiceImpl implements ImagePermissionService {
                 .build();
 
         messagingTemplate.convertAndSendToUser(recipient, "/queue/match", event);
-        log.info("Forwarded IMAGE_REQUEST from {} to {}", requester, recipient);
+        log.info("Forwarded IMAGE_REQUEST from {} to {}", LogSanitizer.mask(requester), LogSanitizer.mask(recipient));
     }
 
     /**

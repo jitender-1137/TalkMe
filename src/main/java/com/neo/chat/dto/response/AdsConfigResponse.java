@@ -24,6 +24,8 @@ public class AdsConfigResponse {
      * Master on/off — equal to the global {@code ads} feature kill-switch state.
      */
     private boolean enabled;
+    /** Dev/preview placeholder mode (see AdsProperties#preview). */
+    private boolean preview;
     private String provider;
     private String label;
     private String adChoicesUrl;

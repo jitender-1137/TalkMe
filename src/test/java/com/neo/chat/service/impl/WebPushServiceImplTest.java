@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -207,11 +208,28 @@ class WebPushServiceImplTest {
     class RemoveSubscription {
 
         @Test
-        @DisplayName("delegates to deleteByEndpoint")
-        void delegates() {
-            service.removeSubscription("https://x/y");
+        @DisplayName("owner-scoped: deletes only when the caller owns the endpoint")
+        void ownerScopedDelete() {
+            User owner = new User(); owner.setId(7L);
+            PushSubscription sub = new PushSubscription(); sub.setUser(owner); sub.setEndpoint("https://x/y");
+            when(subscriptionRepository.findByEndpoint("https://x/y")).thenReturn(Optional.of(sub));
+
+            service.removeSubscription(owner, "https://x/y");
 
             verify(subscriptionRepository).deleteByEndpoint("https://x/y");
+        }
+
+        @Test
+        @DisplayName("does NOT delete another user's subscription")
+        void doesNotDeleteOthers() {
+            User owner = new User(); owner.setId(7L);
+            User attacker = new User(); attacker.setId(9L);
+            PushSubscription sub = new PushSubscription(); sub.setUser(owner); sub.setEndpoint("https://x/y");
+            when(subscriptionRepository.findByEndpoint("https://x/y")).thenReturn(Optional.of(sub));
+
+            service.removeSubscription(attacker, "https://x/y");
+
+            verify(subscriptionRepository, never()).deleteByEndpoint(anyString());
         }
     }
 

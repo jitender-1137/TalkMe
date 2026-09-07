@@ -313,7 +313,7 @@ public class GroupServiceImpl implements GroupService {
                                 currentUser,
                                 chat.getImageUrl());
                     } catch (Exception e) {
-                        log.warn("Failed to notify {} of being added to group {}", u.getUsername(), chatUuid, e);
+                        log.warn("Failed to notify {} of being added to group {}", u.getUuid(), chatUuid, e);
                     }
                 }
             }
@@ -712,7 +712,7 @@ public class GroupServiceImpl implements GroupService {
                 // The notification (below) is the reliable channel; a chat-message failure
                 // (e.g. recipient is friends-only) must not abort the invite.
                 log.warn("Group-invite chat message not delivered from {} to {}: {}",
-                        inviter.getUsername(), invitee.getUsername(), e.getMessage());
+                        inviter.getUuid(), invitee.getUuid(), e.getMessage());
             }
 
             notificationService.createNotification(
@@ -724,7 +724,7 @@ public class GroupServiceImpl implements GroupService {
                     inviter,
                     chat.getImageUrl());
         } catch (Exception e) {
-            log.warn("Failed to send group invite for chat {} to {}", chat.getUuid(), invitee.getUsername(), e);
+            log.warn("Failed to send group invite for chat {} to {}", chat.getUuid(), invitee.getUuid(), e);
         }
     }
 

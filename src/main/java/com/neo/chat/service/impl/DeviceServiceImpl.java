@@ -46,7 +46,7 @@ public class DeviceServiceImpl implements DeviceService {
             device.setDeviceType(request.getDeviceType());
             device.setOsVersion(request.getOsVersion());
             deviceRepository.save(device);
-            log.info("Updated existing device token ownership to user: {}", currentUser.getUsername());
+            log.info("Updated existing device token ownership to user: {}", currentUser.getUuid());
         } else {
             Device device = Device.builder()
                     .user(currentUser)
@@ -55,7 +55,7 @@ public class DeviceServiceImpl implements DeviceService {
                     .osVersion(request.getOsVersion())
                     .build();
             deviceRepository.save(device);
-            log.info("Registered new device token for user: {}", currentUser.getUsername());
+            log.info("Registered new device token for user: {}", currentUser.getUuid());
         }
     }
 
@@ -78,7 +78,7 @@ public class DeviceServiceImpl implements DeviceService {
             deviceRepository.delete(device);
             log.info("Successfully unregistered device token: {}", deviceToken);
         } else {
-            log.warn("User {} tried to unregister device token owned by another user", currentUser.getUsername());
+            log.warn("User {} tried to unregister device token owned by another user", currentUser.getUuid());
             throw new ForbiddenException("Cannot unregister device of another user", "TM_029");
         }
     }

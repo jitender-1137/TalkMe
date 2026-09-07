@@ -8,6 +8,7 @@ import com.neo.chat.match.MatchSession;
 import com.neo.chat.match.RevealService;
 import com.neo.chat.match.SessionService;
 import com.neo.chat.repository.UserRepository;
+import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -76,7 +77,7 @@ public class RevealServiceImpl implements RevealService {
                 return;
             }
             send(peer, "REVEAL_REQUEST_RECEIVED", Map.of("channel", channel.name()));
-            log.info("Reveal request {} from {} to peer", channel, requester);
+            log.info("Reveal request {} from {} to peer", channel, LogSanitizer.mask(requester));
         }
     }
 

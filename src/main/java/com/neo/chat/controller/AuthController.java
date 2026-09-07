@@ -23,6 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import com.neo.chat.util.ClientIp;
+import com.neo.chat.security.JwtTokenProvider;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,6 +48,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -58,6 +64,26 @@ public class AuthController {
 
     private final AuthService authService;
     private final CaptchaService captchaService;
+    private final JwtTokenProvider tokenProvider;
+
+    /**
+     * Bean Validation for the dynamically-routed /auth/login body: it is parsed by hand (guest vs
+     * credential flow share one endpoint), so {@code @Valid} never runs — validate explicitly.
+     */
+    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
+
+    /** Cookie carrying the media-read token; scoped to the media serve endpoint only. */
+    public static final String MEDIA_COOKIE = "media_token";
+    /** Path scope of {@link #MEDIA_COOKIE} — never sent to any other endpoint. */
+    public static final String MEDIA_COOKIE_PATH = "/api/v1/uploads/media";
+
+    private <T> void validate(T dto) {
+        Set<ConstraintViolation<T>> violations = VALIDATOR.validate(dto);
+        if (!violations.isEmpty()) {
+            String msg = violations.stream().map(ConstraintViolation::getMessage).sorted().findFirst().orElse("Invalid request");
+            throw new BadRequestException(msg, "TM_002");
+        }
+    }
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
@@ -78,6 +104,32 @@ public class AuthController {
 
     @Value("${app.cookie.same-site:Lax}")
     private String cookieSameSite;
+
+    private void setAuthCookies(HttpServletResponse response, JwtTokensResponse tokens, boolean isGuest) {
+        setAuthCookies(response, tokens.getRefreshToken(), isGuest);
+        // 3. Media-read cookie (HttpOnly, Path-scoped to the media endpoint). Lets <img>/<video>
+        //    loads authenticate without a header; rejected by the access-token path.
+        String username = null;
+        try {
+            username = tokens.getAccessToken() != null ? tokenProvider.getUsernameFromToken(tokens.getAccessToken()) : null;
+        } catch (Exception ignored) {
+            // no media cookie if the access token cannot be read
+        }
+        if (username != null) {
+            long maxAge = isGuest ? 7 * 24 * 60 * 60 : 30 * 24 * 60 * 60;
+            String mediaToken = tokenProvider.generateMediaToken(username, maxAge * 1000L);
+            if (mediaToken != null) {
+                ResponseCookie mediaCookie = ResponseCookie.from(MEDIA_COOKIE, mediaToken)
+                        .httpOnly(true)
+                        .secure(cookieSecure)
+                        .path(MEDIA_COOKIE_PATH)
+                        .maxAge(maxAge)
+                        .sameSite(cookieSameSite)
+                        .build();
+                response.addHeader(HttpHeaders.SET_COOKIE, mediaCookie.toString());
+            }
+        }
+    }
 
     private void setAuthCookies(HttpServletResponse response, String refreshToken, boolean isGuest) {
         long refreshMaxAge = isGuest ? 7 * 24 * 60 * 60 : 30 * 24 * 60 * 60; // seconds
@@ -106,6 +158,15 @@ public class AuthController {
     }
 
     private void clearAuthCookies(HttpServletResponse response) {
+        ResponseCookie mediaCookie = ResponseCookie.from(MEDIA_COOKIE, "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path(MEDIA_COOKIE_PATH)
+                .maxAge(0)
+                .sameSite(cookieSameSite)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, mediaCookie.toString());
+
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
                 .secure(cookieSecure)
@@ -127,11 +188,9 @@ public class AuthController {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        // Proxy-aware: reads the entry written by the trusted proxy, never the client-supplied
+        // first hop (which would let an attacker reset the brute-force / CAPTCHA IP buckets).
+        return ClientIp.resolve(request);
     }
 
     /**
@@ -157,7 +216,7 @@ public class AuthController {
 
         LoginResponse loginResponse = authService.signup(request, userAgent, httpRequest);
 
-        setAuthCookies(httpResponse, loginResponse.getTokens().getRefreshToken(), false);
+        setAuthCookies(httpResponse, loginResponse.getTokens(), false);
 
         return ResponseEntity.ok(SuccessResponseDto.success(loginResponse, "User Registered Successfully", "TM_001"));
     }
@@ -200,14 +259,16 @@ public class AuthController {
         if (bodyRaw.contains("\"isGuest\":true") || bodyRaw.contains("\"isGuest\": true")) {
             // Guest login flow
             GuestLoginRequest request = mapper.convertValue(parsed, GuestLoginRequest.class);
+            validate(request); // @NotBlank name, @ValidAge, @ValidGender — previously never enforced
             LoginResponse response = authService.loginAsGuest(request, userAgent, httpRequest);
-            setAuthCookies(httpResponse, response.getTokens().getRefreshToken(), true);
+            setAuthCookies(httpResponse, response.getTokens(), true);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         } else {
             // Standard credentials login
             LoginRequest request = mapper.convertValue(parsed, LoginRequest.class);
+            validate(request); // @NotBlank identifier/password — avoids a null-password 400 with an internal message
             LoginResponse response = authService.login(request, userAgent, ip, httpRequest);
-            setAuthCookies(httpResponse, response.getTokens().getRefreshToken(), false);
+            setAuthCookies(httpResponse, response.getTokens(), false);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         }
     }
@@ -246,7 +307,7 @@ public class AuthController {
         JwtTokensResponse tokensResponse = authService.refresh(refreshToken, userAgent, ip);
 
         // Rotate cookies with the new refresh token
-        setAuthCookies(httpResponse, tokensResponse.getRefreshToken(), false);
+        setAuthCookies(httpResponse, tokensResponse, false);
 
         return ResponseEntity.ok(SuccessResponseDto.success(tokensResponse, "Token Refreshed Successfully", "TM_023"));
     }

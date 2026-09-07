@@ -255,7 +255,7 @@ public class StudyRoomServiceImpl implements StudyRoomService {
         stamp(state, now);
         broadcast(roomUuid, "pomodoro_started", state);
         log.info("Pomodoro started for study room {} by {} (focus={}m, break={}m)",
-                roomUuid, user.getUsername(), focus, brk);
+                roomUuid, user.getUuid(), focus, brk);
         return state;
     }
 

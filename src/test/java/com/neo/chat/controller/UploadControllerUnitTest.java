@@ -98,6 +98,12 @@ class UploadControllerUnitTest {
     private ContentModerationService moderationService;
     @Mock
     private MediaAssetService mediaAssetService;
+    @Mock
+    private com.neo.chat.storage.StorageProperties storageProperties;
+    @Mock
+    private com.neo.chat.security.JwtTokenProvider tokenProvider;
+    @Mock
+    private com.neo.chat.repository.UserRepository userRepository;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -106,7 +112,9 @@ class UploadControllerUnitTest {
     void setUp() {
         UploadController controller = new UploadController(
                 storageService, mediaStorage, chatRepository, chatMemberRepository, moderationService,
-                mediaAssetService);
+                mediaAssetService, storageProperties, tokenProvider, userRepository);
+        org.mockito.Mockito.lenient().when(storageProperties.getMediaRoot()).thenReturn("/media");
+        org.mockito.Mockito.lenient().when(storageProperties.getLegacyMediaRoots()).thenReturn(java.util.List.of());
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -614,13 +622,121 @@ class UploadControllerUnitTest {
     @DisplayName("GET /uploads/media")
     class GetMedia {
 
+        private static final String CHAT_UUID = "22222222-2222-2222-2222-222222222222";
+
+        /** Authenticate the MockMvc request as {@code testUser} via the SecurityContext (Bearer path). */
+        private void asTestUser() {
+            CustomUserDetails cud = new CustomUserDetails(testUser);
+            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                            cud, null, cud.getAuthorities()));
+        }
+
+        @org.junit.jupiter.api.AfterEach
+        void clearAuth() {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+
+        private com.neo.chat.domain.Chat chatWith(User... members) {
+            java.util.List<com.neo.chat.domain.ChatMember> ms = new java.util.ArrayList<>();
+            for (User u : members) ms.add(com.neo.chat.domain.ChatMember.builder().user(u).build());
+            return com.neo.chat.domain.Chat.builder().members(ms).build();
+        }
+
         @Test
-        void shouldReturn200WithBodyAndNosniffForNormalMedia() throws Exception {
+        void anonymousRequestForProtectedMediaIs401AndNeverOpensStorage() throws Exception {
+            mockMvc.perform(get(MEDIA).param("path", "/media/others/rand.png"))
+                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(get(MEDIA).param("path", "/media/conversations/" + CHAT_UUID + "/rand.png"))
+                    .andExpect(status().isUnauthorized());
+            verifyNoInteractions(mediaStorage);
+        }
+
+        @Test
+        void profilePhotosArePublic() throws Exception {
             byte[] body = pngBytes();
-            when(mediaStorage.open(eq("conversations/x/rand.png"))).thenReturn(Optional.of(
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", body.length)));
 
-            mockMvc.perform(get(MEDIA).param("path", "conversations/x/rand.png"))
+            mockMvc.perform(get(MEDIA).param("path", "/media/profiles/" + USER_UUID + "/a.png"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "private, max-age=3600"));
+        }
+
+        @Test
+        void conversationMediaRequiresMembership() throws Exception {
+            asTestUser();
+            User other = User.builder().username("bob").build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chatWith(other)));
+
+            mockMvc.perform(get(MEDIA).param("path", "/media/conversations/" + CHAT_UUID + "/rand.png"))
+                    .andExpect(status().isForbidden());
+            verifyNoInteractions(mediaStorage);
+        }
+
+        @Test
+        void conversationMediaServedToMember() throws Exception {
+            asTestUser();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chatWith(testUser)));
+            byte[] body = pngBytes();
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", body.length)));
+
+            mockMvc.perform(get(MEDIA).param("path", "/media/conversations/" + CHAT_UUID + "/rand.png"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void conversationMediaWithMalformedChatIdIsForbidden() throws Exception {
+            asTestUser();
+            mockMvc.perform(get(MEDIA).param("path", "/media/conversations/not-a-uuid/rand.png"))
+                    .andExpect(status().isForbidden());
+            verifyNoInteractions(mediaStorage);
+        }
+
+        @Test
+        void mediaCookieAuthenticatesTheViewer() throws Exception {
+            when(tokenProvider.parseMediaToken("mt")).thenReturn("testuser");
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            byte[] body = pngBytes();
+            when(mediaStorage.open(any())).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", body.length)));
+
+            mockMvc.perform(get(MEDIA).param("path", "/media/others/rand.png")
+                            .cookie(new jakarta.servlet.http.Cookie(AuthController.MEDIA_COOKIE, "mt")))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void mediaCookieOfBannedUserIsRejected() throws Exception {
+            testUser.setBanned(true);
+            when(tokenProvider.parseMediaToken("mt")).thenReturn("testuser");
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+
+            mockMvc.perform(get(MEDIA).param("path", "/media/others/rand.png")
+                            .cookie(new jakarta.servlet.http.Cookie(AuthController.MEDIA_COOKIE, "mt")))
+                    .andExpect(status().isUnauthorized());
+            verifyNoInteractions(mediaStorage);
+        }
+
+        @Test
+        void invalidMediaCookieIsRejected() throws Exception {
+            when(tokenProvider.parseMediaToken("bad")).thenReturn(null);
+            mockMvc.perform(get(MEDIA).param("path", "/media/others/rand.png")
+                            .cookie(new jakarta.servlet.http.Cookie(AuthController.MEDIA_COOKIE, "bad")))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void shouldReturn200WithBodyAndNosniffForNormalMedia() throws Exception {
+            asTestUser();
+            byte[] body = pngBytes();
+            when(mediaStorage.open(eq("others/rand.png"))).thenReturn(Optional.of(
+                    new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", body.length)));
+
+            mockMvc.perform(get(MEDIA).param("path", "others/rand.png"))
                     .andExpect(status().isOk())
                     .andExpect(header().string("Content-Type", "image/png"))
                     .andExpect(header().string("X-Content-Type-Options", "nosniff"))
@@ -629,6 +745,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldSandboxScriptableSvg() throws Exception {
+            asTestUser();
             byte[] body = "<svg/>".getBytes(StandardCharsets.UTF_8);
             when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "image/svg+xml", body.length)));
@@ -642,6 +759,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldReturn404WhenReferenceNotResolvable() throws Exception {
+            asTestUser();
             when(mediaStorage.open(any())).thenReturn(Optional.empty());
 
             mockMvc.perform(get(MEDIA).param("path", "missing/x.png"))
@@ -650,6 +768,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldReturn500WhenStorageOpenThrows() throws Exception {
+            asTestUser();
             // The controller wraps open() in try/catch and maps any failure to a 500 with no body.
             when(mediaStorage.open(any())).thenThrow(new RuntimeException("bucket unreachable"));
 
@@ -669,6 +788,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldDefaultToOctetStreamWhenContentTypeNull() throws Exception {
+            asTestUser();
             // mc.contentType() == null → the ternary falls back to "application/octet-stream"; the type
             // is not scriptable so no Content-Disposition/CSP is added.
             byte[] body = pngBytes();
@@ -684,6 +804,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldSandboxScriptableHtml() throws Exception {
+            asTestUser();
             // contentType contains "html" → the scriptable-types guard adds attachment + sandbox CSP.
             byte[] body = "<h1>x</h1>".getBytes(StandardCharsets.UTF_8);
             when(mediaStorage.open(any())).thenReturn(Optional.of(
@@ -697,6 +818,7 @@ class UploadControllerUnitTest {
 
         @Test
         void shouldSandboxScriptableXml() throws Exception {
+            asTestUser();
             // contentType contains "xml" → scriptable-types guard fires (svg/html both false first).
             byte[] body = "<root/>".getBytes(StandardCharsets.UTF_8);
             when(mediaStorage.open(any())).thenReturn(Optional.of(
@@ -711,6 +833,7 @@ class UploadControllerUnitTest {
         @Test
         void shouldOmitContentLengthWhenNegative() throws Exception {
             // mc.contentLength() < 0 → the controller skips builder.contentLength(...); the body still streams.
+            asTestUser();
             byte[] body = pngBytes();
             when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", -1)));

@@ -27,4 +27,20 @@ public interface FlirtModeService {
      * Opt {@code me} out of flirt mode on this chat (upsert), recompute active, notify both.
      */
     FlirtModeResponse disable(User me, String chatUuid);
+
+    /**
+     * Send a playful "blow a kiss" to the other participant of a 1:1 chat: a live, ephemeral
+     * {@code flirt_kiss} event pushed to their {@code /user/queue/flirt-mode} that triggers a
+     * full-screen heart animation. Requires Flirt Mode to be ACTIVE (both opted in); nothing is
+     * persisted. Membership-guarded and PRIVATE-only, like every other flirt-mode operation.
+     *
+     * @param me       the authenticated sender (must be a chat member)
+     * @param chatUuid the UUID of the PRIVATE chat
+     * @throws com.neo.chat.exception.BadRequestException if the id is malformed, the chat is not a
+     *                                                       1:1 PRIVATE chat, or Flirt Mode is not
+     *                                                       active for both participants
+     * @throws com.neo.chat.exception.NotFoundException   if no chat matches the UUID
+     * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
+     */
+    void sendKiss(User me, String chatUuid);
 }

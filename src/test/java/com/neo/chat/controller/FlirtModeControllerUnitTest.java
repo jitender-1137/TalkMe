@@ -34,6 +34,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -489,6 +490,97 @@ class FlirtModeControllerUnitTest {
         @Test
         void shouldReturn500AndNotCallServiceWhenUnauthenticated() throws Exception {
             mockMvc.perform(post(BASE + "/disable"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
+            verifyNoInteractions(flirtModeService);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    //  POST /chats/{chatUuid}/flirt-mode/kiss  -> sendKiss (live "blow a kiss")
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("POST /chats/{chatUuid}/flirt-mode/kiss")
+    class Kiss {
+
+        @Test
+        void shouldReturn200AndForwardArgs() throws Exception {
+            authenticate();
+            // sendKiss is void — no stub needed for the happy path.
+
+            mockMvc.perform(post(BASE + "/kiss"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.messageCode").value("TM_836"))
+                    .andExpect(jsonPath("$.message").value("Kiss sent"));
+
+            ArgumentCaptor<String> chatUuid = ArgumentCaptor.forClass(String.class);
+            verify(flirtModeService).sendKiss(eq(testUser), chatUuid.capture());
+            assertThat(chatUuid.getValue()).isEqualTo(CHAT_ID);
+            // A kiss must never itself toggle or read consent.
+            verify(flirtModeService, never()).enable(any(), any());
+            verify(flirtModeService, never()).disable(any(), any());
+            verify(flirtModeService, never()).getState(any(), any());
+        }
+
+        @Test
+        void shouldReturn400WhenFlirtNotActive() throws Exception {
+            authenticate();
+            doThrow(new BadRequestException("Flirt Mode must be active for both of you to blow a kiss", "TM_834"))
+                    .when(flirtModeService).sendKiss(any(), any());
+
+            mockMvc.perform(post(BASE + "/kiss"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.messageCode").value("TM_834"));
+        }
+
+        @Test
+        void shouldReturn400WhenChatNotPrivate() throws Exception {
+            authenticate();
+            doThrow(new BadRequestException("Flirt mode is only available on 1:1 chats", "TM_830"))
+                    .when(flirtModeService).sendKiss(any(), any());
+
+            mockMvc.perform(post(BASE + "/kiss"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.messageCode").value("TM_830"));
+        }
+
+        @Test
+        void shouldReturn403WhenNotAMember() throws Exception {
+            authenticate();
+            doThrow(new ForbiddenException("You are not a member of this chat", "TM_103"))
+                    .when(flirtModeService).sendKiss(any(), any());
+
+            mockMvc.perform(post(BASE + "/kiss"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.messageCode").value("TM_103"));
+        }
+
+        @Test
+        void shouldReturn404WhenChatNotFound() throws Exception {
+            authenticate();
+            doThrow(new NotFoundException("Chat not found", "TM_101"))
+                    .when(flirtModeService).sendKiss(any(), any());
+
+            mockMvc.perform(post(BASE + "/kiss"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.messageCode").value("TM_101"));
+        }
+
+        @Test
+        void shouldReturn500OnUnexpectedServiceError() throws Exception {
+            authenticate();
+            doThrow(new RuntimeException("boom")).when(flirtModeService).sendKiss(any(), any());
+
+            mockMvc.perform(post(BASE + "/kiss"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
+        }
+
+        @Test
+        void shouldReturn500AndNotCallServiceWhenUnauthenticated() throws Exception {
+            mockMvc.perform(post(BASE + "/kiss"))
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
             verifyNoInteractions(flirtModeService);

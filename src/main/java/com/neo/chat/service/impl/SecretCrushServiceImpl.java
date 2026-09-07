@@ -272,7 +272,7 @@ public class SecretCrushServiceImpl implements SecretCrushService {
                     partner.getProfileImage()
             );
         } catch (Exception e) {
-            log.warn("[SecretCrush] failed to persist match notification for {}", recipient.getUsername(), e);
+            log.warn("[SecretCrush] failed to persist match notification for {}", recipient.getUuid(), e);
         }
         try {
             Map<String, Object> payload = new HashMap<>();
@@ -281,7 +281,7 @@ public class SecretCrushServiceImpl implements SecretCrushService {
             payload.put("partner", entry(partner, true, null));
             messagingTemplate.convertAndSendToUser(recipient.getUsername(), "/queue/secret-crush", payload);
         } catch (Exception e) {
-            log.warn("[SecretCrush] failed to push match event to {}", recipient.getUsername(), e);
+            log.warn("[SecretCrush] failed to push match event to {}", recipient.getUuid(), e);
         }
     }
 

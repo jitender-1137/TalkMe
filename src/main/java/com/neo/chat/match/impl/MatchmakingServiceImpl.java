@@ -21,6 +21,7 @@ import com.neo.chat.match.SessionService;
 import com.neo.chat.match.WaitingQueueService;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.CompatibilityService;
+import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -96,10 +97,10 @@ public class MatchmakingServiceImpl implements MatchmakingService {
     @Override
     public void startMatching(String username, MatchStartRequest filters) {
         log.info("User {} requested to start matching (mode={})",
-                username, filters != null ? filters.getMode() : "QUICK");
+                LogSanitizer.mask(username), filters != null ? filters.getMode() : "QUICK");
 
         if (sessionService.getSessionByUser(username).isPresent()) {
-            log.warn("User {} already has an active session, ignoring start", username);
+            log.warn("User {} already has an active session, ignoring start", LogSanitizer.mask(username));
             return;
         }
         User me = userRepository.findByUsername(username).orElse(null);
@@ -119,7 +120,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
 
         if (peerOpt.isPresent()) {
             String peer = peerOpt.get();
-            log.info("Match found! Host={}, Peer={}, mode={}", username, peer, snapshot.getMode());
+            log.info("Match found! Host={}, Peer={}, mode={}", me.getUuid(), LogSanitizer.mask(peer), snapshot.getMode());
             matchPreferenceService.delete(peer);
 
             MatchSession session = sessionService.createSession(username, peer);
@@ -165,7 +166,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      */
     @Override
     public void cancelMatching(String username) {
-        log.info("User {} requested to cancel matchmaking", username);
+        log.info("User {} requested to cancel matchmaking", LogSanitizer.mask(username));
         waitingQueueService.dequeue(username);
         matchPreferenceService.delete(username);
         redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY, username);
@@ -187,7 +188,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      */
     @Override
     public void handleExit(String username) {
-        log.info("User {} requested to exit matchmaking chat / cancel search", username);
+        log.info("User {} requested to exit matchmaking chat / cancel search", LogSanitizer.mask(username));
         waitingQueueService.dequeue(username);
         matchPreferenceService.delete(username);
         redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY, username);
@@ -206,7 +207,7 @@ public class MatchmakingServiceImpl implements MatchmakingService {
      */
     @Override
     public void handleNewChat(String username) {
-        log.info("User {} requested a new matchmaking chat", username);
+        log.info("User {} requested a new matchmaking chat", LogSanitizer.mask(username));
         sessionService.getSessionByUser(username).ifPresent(session ->
                 sessionCleanupService.cleanupSession(session.getId(), "NEW_CHAT"));
         // Re-enqueue via the blind path (client re-sends filters on an explicit new search).

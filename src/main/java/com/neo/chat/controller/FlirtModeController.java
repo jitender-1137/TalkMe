@@ -93,4 +93,28 @@ public class FlirtModeController {
         FlirtModeResponse response = flirtModeService.disable(userDetails.getUser(), chatUuid);
         return ResponseEntity.ok(SuccessResponseDto.success(response, "Flirt mode disabled", "TM_833"));
     }
+
+    /**
+     * Blows a playful kiss to the other participant: a live, ephemeral {@code flirt_kiss} event
+     * (full-screen heart animation) delivered over WebSocket. Requires Flirt Mode ACTIVE for both;
+     * nothing is persisted.
+     *
+     * @param chatUuid    the UUID of the PRIVATE chat
+     * @param userDetails the authenticated caller, who must be a member of the chat
+     * @return 200 with success code TM_836
+     * @throws com.neo.chat.exception.BadRequestException if the id is malformed, the chat is not a
+     *                                                       1:1 PRIVATE chat, or Flirt Mode is not
+     *                                                       active for both participants
+     * @throws com.neo.chat.exception.NotFoundException   if no chat matches the UUID
+     * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
+     */
+    @PostMapping("/{chatUuid}/flirt-mode/kiss")
+    @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
+    public ResponseEntity<ResponseDto<Void>> kiss(
+            @PathVariable String chatUuid,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        flirtModeService.sendKiss(userDetails.getUser(), chatUuid);
+        ResponseDto<Void> body = ResponseDto.success(null, "Kiss sent", "TM_836");
+        return ResponseEntity.ok(body);
+    }
 }

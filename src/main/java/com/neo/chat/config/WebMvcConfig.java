@@ -2,7 +2,6 @@ package com.neo.chat.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -23,16 +22,12 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Spring MVC web configuration. Prefixes every {@code @RestController} mapping with
- * {@code /api/v1} (see {@link #configurePathMatch}), serves user-uploaded files from the
- * local storage directory, and serves the bundled Next.js static export with an in-memory
+ * {@code /api/v1} (see {@link #configurePathMatch}) and serves the bundled Next.js static export with an in-memory
  * caching resolver that maps clean URLs to {@code .html} files, falls back to
  * {@code index.html} for SPA routes, and avoids concurrent fat-jar inflation corruption.
  */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
-
-    @Value("${storage.local.directory}")
-    private String uploadDir;
 
     /**
      * Primary {@link ObjectMapper} bean (plain Jackson 2 mapper).
@@ -46,8 +41,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     }
 
     /**
-     * Registers two resource handlers: {@code /talkMe/**} → the local upload directory
-     * (matched first, being more specific), and {@code /**} → {@code classpath:/static/}
+     * Registers the static resource handlers: {@code /_next/static/**} (immutable, long-cached)
+     * and {@code /**} → {@code classpath:/static/}
      * served through {@link CachingSpaResourceResolver} for clean-URL/SPA routing plus
      * in-memory caching. API routes are unaffected (handled by controllers under {@code /api/v1}).
      *
@@ -55,10 +50,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // User-uploaded files. More specific pattern than "/**" below, so it is
-        // matched first.
-        registry.addResourceHandler("/talkMe/**")
-                .addResourceLocations("file:" + uploadDir + "/");
+        // SECURITY: the former "/talkMe/**" -> file:<upload dir> handler is GONE. It served the
+        // whole media root (private chat media, avatars, view-once files) to anonymous callers
+        // and rendered uploaded HTML/SVG inline on this origin. All media goes through
+        // UploadController.getMedia, which authorizes per object. SecurityConfig also denies
+        // /talkMe/** so it can never be reintroduced by accident.
 
         // ── Next.js immutable build assets (/_next/static/**) ───────────────────
         // Everything the Next.js export emits under /_next/static/ is CONTENT-HASHED
@@ -254,6 +250,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {
-        configurer.addPathPrefix("/api/v1", HandlerTypePredicate.forAnnotation(RestController.class));
+        // Prefix ONLY this app's own @RestControllers. Scoping to the base package is essential:
+        // an unscoped forAnnotation(RestController.class) also rewrites THIRD-PARTY starters'
+        // controllers (BootUI at /bootui/api/**, springdoc at /v3/api-docs), shifting them under
+        // /api/v1/... so their own frontends 404. Restricting to com.neo.chat keeps every app API
+        // under /api/v1 while leaving those libraries at their native paths.
+        configurer.addPathPrefix("/api/v1",
+                HandlerTypePredicate.forAnnotation(RestController.class)
+                        .and(HandlerTypePredicate.forBasePackage("com.neo.chat")));
     }
 }

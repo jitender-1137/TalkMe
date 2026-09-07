@@ -53,7 +53,9 @@ public class JwtTokenProvider {
     public String generateToken(Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         assert userDetails != null;
-        return generateToken(userDetails.getUsername(), userDetails.isGuest());
+        String uuid = userDetails.getUser() != null && userDetails.getUser().getUuid() != null
+                ? userDetails.getUser().getUuid().toString() : null;
+        return generateToken(userDetails.getUsername(), userDetails.isGuest(), uuid);
     }
 
     /**
@@ -65,11 +67,33 @@ public class JwtTokenProvider {
      * @return the compact, signed JWT string
      */
     public String generateToken(String username, boolean isGuest) {
+        return generateToken(username, isGuest, null);
+    }
+
+    /**
+     * Generates a signed access token bound to the user's IMMUTABLE uuid ({@code uid} claim) in
+     * addition to the (mutable) username subject.
+     *
+     * <p>SECURITY: resolving the request principal by username alone is unsafe — a username can be
+     * freed by a rename and re-registered by another account, so a still-valid token whose subject
+     * is the old name would then authenticate as a DIFFERENT user (account takeover). The access
+     * path (see {@link com.neo.chat.security.JwtAuthenticationFilter}) resolves by {@code uid} when
+     * present, which never changes, closing that window.
+     *
+     * @param username subject (username) to embed, for display/logging
+     * @param isGuest  whether the account is a guest account
+     * @param uuid     the user's immutable uuid (may be null only for legacy call sites)
+     * @return the compact, signed JWT string
+     */
+    public String generateToken(String username, boolean isGuest, String uuid) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("isGuest", isGuest);
+        if (uuid != null) {
+            claims.put("uid", uuid);
+        }
 
         return Jwts.builder()
                 .claims(claims)
@@ -98,6 +122,20 @@ public class JwtTokenProvider {
     }
 
     /**
+     * Returns the immutable user uuid embedded in an access token ({@code uid} claim), or
+     * {@code null} for a legacy token that predates uuid-binding (the caller then falls back to the
+     * username subject).
+     *
+     * @param token a signed JWT
+     * @return the {@code uid} claim, or {@code null} if absent
+     * @throws io.jsonwebtoken.JwtException if the token is malformed/expired/bad-signature
+     */
+    public String getUserUuidFromToken(String token) {
+        Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        return claims.get("uid", String.class);
+    }
+
+    /**
      * Validates a token for use as an access credential: verifies the signature and rejects
      * delivery-ack tokens (those carrying the push-delivery {@code purpose} claim) so they cannot
      * be replayed as Bearer credentials. Expiry is logged at DEBUG (routine); other failures at WARN.
@@ -109,12 +147,11 @@ public class JwtTokenProvider {
     public boolean validateToken(String token) {
         try {
             Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
-            // SECURITY: the access-token path must reject narrowly-scoped tokens that
-            // happen to be signed with the same key (e.g. push-delivery ack tokens).
-            // Without this, such a token — which is embedded in push payloads and
-            // lives for days — could be replayed as a Bearer credential and grant
-            // full account access over HTTP and WebSocket.
-            return !DELIVERY_PURPOSE.equals(claims.get("purpose", String.class));
+            // SECURITY: the access-token path must reject EVERY narrowly-scoped token that
+            // happens to be signed with the same key (push-delivery ack tokens, media-read
+            // cookie tokens, and any future purpose). Such tokens live for days; replaying one
+            // as a Bearer credential would grant full account access over HTTP and WebSocket.
+            return claims.get("purpose") == null;
         } catch (ExpiredJwtException ex) {
             // An expired access token is a NORMAL, expected condition — the client
             // refreshes via its refresh-token cookie. Log at DEBUG so routine expiry
@@ -157,6 +194,51 @@ public class JwtTokenProvider {
                 .expiration(new Date(now.getTime() + DELIVERY_TOKEN_TTL_MS))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
+    }
+
+    // ── Media-read cookie tokens ─────────────────────────────────────────────────
+    // Browsers load <img>/<video> without an Authorization header, so the media serve
+    // endpoint authenticates the viewer from an HttpOnly cookie scoped (Path) to that
+    // endpoint alone. The token only proves "who is viewing"; per-object authorization
+    // (chat membership etc.) is enforced by the controller.
+    private static final String MEDIA_PURPOSE = "media-read";
+
+    /**
+     * Generates a media-read token for the given user, valid for {@code ttlMs}. It is rejected by
+     * {@link #validateToken} and can only be consumed via {@link #parseMediaToken}.
+     *
+     * @param username subject
+     * @param ttlMs    lifetime in milliseconds (aligned with the refresh cookie)
+     * @return compact signed JWT
+     */
+    public String generateMediaToken(String username, long ttlMs) {
+        Date now = new Date();
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("purpose", MEDIA_PURPOSE);
+        return Jwts.builder()
+                .claims(claims)
+                .subject(username)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + ttlMs))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+    }
+
+    /**
+     * Verify a media-read token and return its subject (username), or {@code null} if it is
+     * invalid, expired, or not a media-read token.
+     */
+    public String parseMediaToken(String token) {
+        try {
+            Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+            if (!MEDIA_PURPOSE.equals(claims.get("purpose", String.class))) {
+                return null;
+            }
+            return claims.getSubject();
+        } catch (Exception ex) {
+            log.debug("Media token rejected: {}", ex.getMessage());
+            return null;
+        }
     }
 
     /**

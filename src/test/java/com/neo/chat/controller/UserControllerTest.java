@@ -239,11 +239,13 @@ public class UserControllerTest {
 
     @Test
     void testUploadAvatarSuccess() throws Exception {
+        // Real JPEG magic bytes (0xFFD8FF …) so the avatar's magic-byte validation passes.
+        byte[] jpeg = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16, 'J', 'F', 'I', 'F'};
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "avatar.jpg",
                 MediaType.IMAGE_JPEG_VALUE,
-                "some-image-bytes".getBytes()
+                jpeg
         );
 
         // Moderation is stubbed clean in setUp. uploadAvatar calls the 3-arg

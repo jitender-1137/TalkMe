@@ -314,7 +314,8 @@ class RateLimitingFilterUnitTest {
     class ClientIdentification {
 
         @Test
-        void shouldKeyOnFirstHopOfForwardedForHeader() throws Exception {
+        void shouldKeyOnLastHopOfForwardedForHeader_ignoringClientSuppliedEntries() throws Exception {
+            // "203.0.113.7" was supplied by the client; the trusted proxy appended "70.41.3.18".
             enableRateLimiting();
             stubIncrement(1L);
             MockHttpServletRequest req = apiGet();
@@ -324,7 +325,80 @@ class RateLimitingFilterUnitTest {
 
             ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
             verify(valueOps).increment(key.capture());
-            assertThat(key.getValue()).isEqualTo("rate:limit:ip:203.0.113.7");
+            assertThat(key.getValue()).isEqualTo("rate:limit:ip:70.41.3.18");
+        }
+
+        @Test
+        void spoofedForwardedForPrefixCannotEscapeTheBucket() throws Exception {
+            // Two requests from the same real peer with different forged leading entries must share a key.
+            enableRateLimiting();
+            stubIncrement(1L);
+            MockHttpServletRequest a = apiGet();
+            a.addHeader("X-Forwarded-For", "1.1.1.1, 70.41.3.18");
+            MockHttpServletRequest b = apiGet();
+            b.addHeader("X-Forwarded-For", "2.2.2.2, 9.9.9.9, 70.41.3.18");
+
+            filter.doFilterInternal(a, new MockHttpServletResponse(), filterChain);
+            filter.doFilterInternal(b, new MockHttpServletResponse(), filterChain);
+
+            verify(valueOps, times(2)).increment("rate:limit:ip:70.41.3.18");
+        }
+
+        @Test
+        void shouldHonourConfiguredTrustedProxyHops() throws Exception {
+            // CDN + reverse proxy: two trusted hops → the client is the 2nd entry from the right.
+            enableRateLimiting();
+            when(env.getProperty("app.security.trusted-proxy-hops", Integer.class)).thenReturn(2);
+            stubIncrement(1L);
+            MockHttpServletRequest req = apiGet();
+            req.addHeader("X-Forwarded-For", "203.0.113.7, 70.41.3.18, 10.0.0.5");
+
+            filter.doFilterInternal(req, new MockHttpServletResponse(), filterChain);
+
+            ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+            verify(valueOps).increment(key.capture());
+            assertThat(key.getValue()).isEqualTo("rate:limit:ip:70.41.3.18");
+        }
+
+        @Test
+        void zeroTrustedHopsIgnoresProxyHeadersEntirely() throws Exception {
+            enableRateLimiting();
+            when(env.getProperty("app.security.trusted-proxy-hops", Integer.class)).thenReturn(0);
+            stubIncrement(1L);
+            MockHttpServletRequest req = apiGet();
+            req.addHeader("X-Forwarded-For", "203.0.113.7");
+            req.addHeader("X-Real-IP", "198.51.100.9");
+            req.setRemoteAddr("10.9.8.7");
+
+            filter.doFilterInternal(req, new MockHttpServletResponse(), filterChain);
+
+            ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+            verify(valueOps).increment(key.capture());
+            assertThat(key.getValue()).isEqualTo("rate:limit:ip:10.9.8.7");
+        }
+
+        @Test
+        void apiPathsMerelyContainingWsAreStillRateLimited() throws Exception {
+            enableRateLimiting();
+            stubIncrement(1L);
+            for (String p : List.of("/api/v1/follows", "/api/v1/profile-views", "/api/v1/wsx")) {
+                MockHttpServletRequest req = new MockHttpServletRequest("GET", p);
+                req.setRemoteAddr("127.0.0.1");
+                filter.doFilterInternal(req, new MockHttpServletResponse(), filterChain);
+            }
+            verify(valueOps, times(3)).increment(anyString());
+        }
+
+        @Test
+        void webSocketHandshakePathsAreExempt() throws Exception {
+            enableRateLimiting();
+            for (String p : List.of("/ws", "/ws/info", "/api/v1/ws", "/api/v1/ws/123/abc/websocket")) {
+                MockHttpServletRequest req = new MockHttpServletRequest("GET", p);
+                req.setRemoteAddr("127.0.0.1");
+                filter.doFilterInternal(req, new MockHttpServletResponse(), filterChain);
+            }
+            verifyNoInteractions(redisTemplate);
+            verify(filterChain, times(4)).doFilter(any(), any());
         }
 
         @Test
@@ -367,6 +441,7 @@ class RateLimitingFilterUnitTest {
             verify(valueOps).increment(key.capture());
             assertThat(key.getValue()).isEqualTo("rate:limit:user:alice");
         }
+
 
         @Test
         void shouldGiveAuthenticatedUsersTheHigherLimit() throws Exception {

@@ -366,6 +366,16 @@ class NotificationDispatchServiceImplTest {
         }
 
         @Test
+        @DisplayName("runs in its OWN transaction (REQUIRES_NEW) so a deadlock can't poison the caller")
+        void recomputeIsRequiresNew() throws NoSuchMethodException {
+            var m = NotificationDispatchServiceImpl.class.getMethod("recomputeUnread", User.class);
+            var tx = m.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            assertThat(tx).isNotNull();
+            assertThat(tx.propagation())
+                    .isEqualTo(org.springframework.transaction.annotation.Propagation.REQUIRES_NEW);
+        }
+
+        @Test
         @DisplayName("broadcast failure is swallowed — count still persisted and returned")
         void broadcastFailureSwallowed() {
             User u = recipient(7L, "bob", 0);

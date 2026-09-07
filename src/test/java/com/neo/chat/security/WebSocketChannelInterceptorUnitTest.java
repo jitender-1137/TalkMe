@@ -159,6 +159,27 @@ class WebSocketChannelInterceptorUnitTest {
         }
 
         @Test
+        @DisplayName("banned account with a valid token is rejected on CONNECT")
+        void bannedAccountRejectedOnConnect() {
+            interceptor = newInterceptor();
+            User alice = user("alice");
+            alice.setBanned(true);
+            CustomUserDetails cud = new CustomUserDetails(alice);
+            when(tokenProvider.validateToken("good")).thenReturn(true);
+            when(tokenProvider.getUsernameFromToken("good")).thenReturn("alice");
+            when(userDetailsService.loadUserByUsername("alice")).thenReturn(cud);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+            accessor.addNativeHeader("Authorization", "Bearer good");
+            Message<byte[]> msg = message(accessor);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("account disabled");
+            assertThat(accessor.getUser()).isNull();
+        }
+
+        @Test
         @DisplayName("missing Authorization header is rejected")
         void missingTokenRejected() {
             interceptor = newInterceptor();
@@ -281,6 +302,82 @@ class WebSocketChannelInterceptorUnitTest {
 
             assertThat(result).isSameAs(msg);
             verifyNoInteractions(chatRepository);
+        }
+
+        @Test
+        @DisplayName("public broadcast topics (/topic/lobby, /topic/presence/{u}, /topic/match/online) pass")
+        void publicTopicsPass() {
+            interceptor = newInterceptor();
+            for (String dest : List.of("/topic/lobby", "/topic/presence/bob", "/topic/match/online",
+                    "/topic/city/mumbai", "/topic/listener/bob")) {
+                StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+                accessor.setDestination(dest);
+                accessor.setUser(authFor(user("alice")));
+                Message<byte[]> msg = message(accessor);
+
+                assertThat(interceptor.preSend(msg, channel)).isSameAs(msg);
+            }
+            verifyNoInteractions(chatRepository);
+        }
+
+        @Test
+        @DisplayName("broker-relay internal topics (user registry / unresolved user dest) are rejected")
+        void relayInternalTopicsRejected() {
+            interceptor = newInterceptor();
+            for (String dest : List.of("/topic/user-registry", "/topic/unresolved-user-dest")) {
+                StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+                accessor.setDestination(dest);
+                accessor.setUser(authFor(user("alice")));
+                Message<byte[]> msg = message(accessor);
+
+                assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                        .isInstanceOf(AccessDeniedException.class);
+            }
+        }
+
+        @Test
+        @DisplayName("raw /queue/** and unknown-prefix destinations are rejected")
+        void rawQueueAndUnknownPrefixRejected() {
+            interceptor = newInterceptor();
+            for (String dest : List.of("/queue/lobby-chat-usersess-2", "/app/lobby/join", "/exchange/amq.topic/x", "lobby")) {
+                StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+                accessor.setDestination(dest);
+                accessor.setUser(authFor(user("alice")));
+                Message<byte[]> msg = message(accessor);
+
+                assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                        .isInstanceOf(AccessDeniedException.class);
+            }
+            verifyNoInteractions(chatRepository);
+        }
+
+        @Test
+        @DisplayName("/user/{other}/queue/** (not the /user/queue/ form) is rejected")
+        void userPrefixedOtherUserQueueRejected() {
+            interceptor = newInterceptor();
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+            accessor.setDestination("/user/bob/queue/notifications");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        @DisplayName("chat topic lookup failure fails CLOSED on SUBSCRIBE")
+        void chatLookupErrorFailsClosed() {
+            interceptor = newInterceptor();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenThrow(new RuntimeException("db down"));
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("could not be verified");
         }
 
         @Test
@@ -474,20 +571,130 @@ class WebSocketChannelInterceptorUnitTest {
         }
 
         @Test
-        @DisplayName("non-call payload to a chat destination passes without a friendship check")
-        void nonCallPayloadPasses() {
+        @DisplayName("non-call payload published straight to a chat topic is REJECTED (message forgery)")
+        void nonCallPayloadToChatTopicRejected() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
 
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
             accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
             accessor.setUser(authFor(user("alice")));
-            Message<byte[]> msg = message(accessor, "{\"content\":\"hi\"}".getBytes(StandardCharsets.UTF_8));
+            // A forged "message_received" event — the broker would fan this out to every member.
+            Message<byte[]> msg = message(accessor,
+                    "{\"event\":\"message_received\",\"payload\":{\"content\":\"hi\"}}".getBytes(StandardCharsets.UTF_8));
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("call signalling");
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        @Test
+        @DisplayName("SEND to /app/** passes with no chat lookup (handlers authorize themselves)")
+        void sendToAppDestinationPasses() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/app/chat/" + CHAT_UUID + "/typing");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, "true".getBytes(StandardCharsets.UTF_8));
 
             Message<?> result = interceptor.preSend(msg, channel);
 
             assertThat(result).isSameAs(msg);
             verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        @Test
+        @DisplayName("SEND to another user's private queue (/user/{other}/queue/**) is rejected")
+        void sendToOtherUsersQueueRejected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/user/bob/queue/match");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor,
+                    "{\"event\":\"MATCH_FOUND\"}".getBytes(StandardCharsets.UTF_8));
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("not allowed");
+            verifyNoInteractions(chatRepository, friendRepository);
+        }
+
+        @Test
+        @DisplayName("SEND to a raw /queue/** destination is rejected")
+        void sendToRawQueueRejected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/queue/notifications-usersess-9");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, "{}".getBytes(StandardCharsets.UTF_8));
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        @DisplayName("SEND to /topic/presence/{user} (presence spoofing) is rejected")
+        void sendToPresenceTopicRejected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/presence/bob");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor,
+                    "{\"username\":\"bob\",\"status\":\"OFFLINE\"}".getBytes(StandardCharsets.UTF_8));
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        @DisplayName("SEND to /topic/lobby (fake JOIN/LEAVE) is rejected")
+        void sendToLobbyTopicRejected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/lobby");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor,
+                    "{\"action\":\"LEAVE\",\"username\":\"bob\"}".getBytes(StandardCharsets.UTF_8));
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+
+        @Test
+        @DisplayName("call event from a user who is NOT a member of the chat is rejected")
+        void callFromNonMemberRejected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            User bob = user("bob");
+            User carol = user("carol");
+            Chat chat = Chat.builder().chatType(ChatType.PRIVATE)
+                    .members(List.of(
+                            ChatMember.builder().user(bob).build(),
+                            ChatMember.builder().user(carol).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice"))); // alice is not a member
+            Message<byte[]> msg = message(accessor, CALL_PAYLOAD);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Not a member");
+            verifyNoInteractions(friendRepository);
         }
 
         @Test
@@ -508,17 +715,17 @@ class WebSocketChannelInterceptorUnitTest {
         }
 
         @Test
-        @DisplayName("unauthenticated SEND skips flood + friendship checks and passes")
-        void unauthenticatedSendPasses() {
+        @DisplayName("unauthenticated SEND is rejected before any flood / chat lookup")
+        void unauthenticatedSendRejected() {
             interceptor = newInterceptor();
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
             accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
-            // no principal → usernameOrNull returns null
+            // no principal → requireUsername rejects
             Message<byte[]> msg = message(accessor, CALL_PAYLOAD);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Unauthenticated");
             verifyNoInteractions(redisTemplate, chatRepository, friendRepository);
         }
     }
@@ -610,9 +817,9 @@ class WebSocketChannelInterceptorUnitTest {
             when(valueOps.increment(anyString())).thenReturn(null);
 
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
-            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setDestination("/app/presence/heartbeat");
             accessor.setUser(authFor(user("alice")));
-            Message<byte[]> msg = message(accessor, "{\"content\":\"hi\"}".getBytes(StandardCharsets.UTF_8));
+            Message<byte[]> msg = message(accessor, "{}".getBytes(StandardCharsets.UTF_8));
 
             Message<?> result = interceptor.preSend(msg, channel);
 
@@ -623,23 +830,23 @@ class WebSocketChannelInterceptorUnitTest {
         // ---- SEND destination shape (line 125 compound guard) ----
 
         @Test
-        @DisplayName("SEND with no destination passes the flood guard and returns")
-        void sendNullDestinationPasses() {
+        @DisplayName("SEND with no destination passes the flood guard and is then rejected")
+        void sendNullDestinationRejected() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
             accessor.setUser(authFor(user("alice")));
             Message<byte[]> msg = message(accessor, CALL);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("without a destination");
             verifyNoInteractions(chatRepository, friendRepository);
         }
 
         @Test
-        @DisplayName("SEND to a non-chat destination is not friendship-checked")
-        void sendNonChatDestinationPasses() {
+        @DisplayName("SEND to a non-chat broker topic is rejected without a chat lookup")
+        void sendNonChatDestinationRejected() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
@@ -647,15 +854,14 @@ class WebSocketChannelInterceptorUnitTest {
             accessor.setUser(authFor(user("alice")));
             Message<byte[]> msg = message(accessor, CALL);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
             verifyNoInteractions(chatRepository, friendRepository);
         }
 
         @Test
-        @DisplayName("SEND to a chat destination that is not '/messages' is not friendship-checked")
-        void sendNonMessagesDestinationPasses() {
+        @DisplayName("SEND to a chat topic other than '/messages' (e.g. /typing) is rejected")
+        void sendNonMessagesChatTopicRejected() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
@@ -663,9 +869,8 @@ class WebSocketChannelInterceptorUnitTest {
             accessor.setUser(authFor(user("alice")));
             Message<byte[]> msg = message(accessor, CALL);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
             verifyNoInteractions(chatRepository, friendRepository);
         }
 
@@ -676,19 +881,25 @@ class WebSocketChannelInterceptorUnitTest {
         void stringPayloadHandled() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
+            User alice = user("alice");
+            Chat chat = Chat.builder().chatType(ChatType.GROUP)
+                    .members(List.of(ChatMember.builder().user(alice).build()))
+                    .build();
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenReturn(Optional.of(chat));
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
             accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
-            accessor.setUser(authFor(user("alice")));
-            Message<?> msg = messageWith(accessor, "{\"content\":\"hi\"}");
+            accessor.setUser(authFor(alice));
+            Message<?> msg = messageWith(accessor, "{\"event\":\"call_offer\"}");
 
             Message<?> result = interceptor.preSend(msg, channel);
 
             assertThat(result).isSameAs(msg);
-            verifyNoInteractions(chatRepository, friendRepository);
+            verify(chatRepository).findByUuidWithMembers(UUID.fromString(CHAT_UUID));
         }
 
         @Test
-        @DisplayName("payload that is neither byte[] nor String is treated as empty")
+        @DisplayName("payload that is neither byte[] nor String is treated as empty (not a call → rejected)")
         void otherPayloadTypeHandled() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
@@ -697,9 +908,8 @@ class WebSocketChannelInterceptorUnitTest {
             accessor.setUser(authFor(user("alice")));
             Message<?> msg = messageWith(accessor, Integer.valueOf(42));
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
             verifyNoInteractions(chatRepository, friendRepository);
         }
 
@@ -737,25 +947,24 @@ class WebSocketChannelInterceptorUnitTest {
         // ---- call-event principal shape (lines 140 / 142 / usernameOrNull 199) ----
 
         @Test
-        @DisplayName("call event whose principal is not a UserDetails is skipped (no chat lookup)")
+        @DisplayName("SEND whose principal is not a UserDetails is rejected as unauthenticated (no chat lookup)")
         void callPrincipalNotUserDetails() {
             interceptor = newInterceptor();
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
             accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
-            // principal present but not a UserDetails → usernameOrNull returns null, call gate skips
+            // principal present but not a UserDetails → usernameOrNull returns null → rejected
             accessor.setUser(new UsernamePasswordAuthenticationToken("plain-principal", null));
             Message<byte[]> msg = message(accessor, CALL);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class);
             verifyNoInteractions(redisTemplate, chatRepository, friendRepository);
         }
 
         // ---- call-event chat/membership branches (lines 148 / 150 / 161) ----
 
         @Test
-        @DisplayName("call event to a chat that no longer exists is skipped")
+        @DisplayName("call event to a chat that does not exist is rejected")
         void callChatNotFound() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
@@ -767,10 +976,45 @@ class WebSocketChannelInterceptorUnitTest {
             accessor.setUser(authFor(user("alice")));
             Message<byte[]> msg = message(accessor, CALL);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Chat not found");
             verifyNoInteractions(friendRepository);
+        }
+
+        @Test
+        @DisplayName("chat lookup failure during SEND authorization fails CLOSED")
+        void callChatLookupErrorFailsClosed() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+                    .thenThrow(new RuntimeException("db down"));
+
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/" + CHAT_UUID + "/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("could not be verified");
+            verifyNoInteractions(friendRepository);
+        }
+
+        @Test
+        @DisplayName("call event to a chat topic with an invalid UUID is rejected")
+        void callInvalidUuidRejected() {
+            interceptor = newInterceptor();
+            stubRedisCount(5L);
+            StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+            accessor.setDestination("/topic/chat/not-a-uuid/messages");
+            accessor.setUser(authFor(user("alice")));
+            Message<byte[]> msg = message(accessor, CALL);
+
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Invalid chat id");
+            verifyNoInteractions(chatRepository, friendRepository);
         }
 
         @Test
@@ -800,7 +1044,7 @@ class WebSocketChannelInterceptorUnitTest {
         }
 
         @Test
-        @DisplayName("call event where the sender is not a chat member (sender==null) skips the gate")
+        @DisplayName("call event where the sender is not a chat member (sender==null) is rejected")
         void callSenderNotMember() {
             interceptor = newInterceptor();
             stubRedisCount(5L);
@@ -819,9 +1063,9 @@ class WebSocketChannelInterceptorUnitTest {
             accessor.setUser(authFor(user("alice"))); // alice is not a member
             Message<byte[]> msg = message(accessor, CALL);
 
-            Message<?> result = interceptor.preSend(msg, channel);
-
-            assertThat(result).isSameAs(msg);
+            assertThatThrownBy(() -> interceptor.preSend(msg, channel))
+                    .isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Not a member");
             verifyNoInteractions(friendRepository);
         }
 

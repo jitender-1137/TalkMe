@@ -7,6 +7,7 @@ import com.neo.chat.match.OnlineCountPublisher;
 import com.neo.chat.match.SessionCleanupService;
 import com.neo.chat.match.SessionService;
 import com.neo.chat.match.WaitingQueueService;
+import com.neo.chat.util.LogSanitizer;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +73,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
      */
     @Override
     public void handleDisconnect(String username) {
-        log.info("Handling websocket disconnect for user {}", username);
+        log.info("Handling websocket disconnect for user {}", LogSanitizer.mask(username));
 
         // 1. Remove waiting user from queue
         waitingQueueService.dequeue(username);
@@ -99,12 +100,12 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
             try {
                 messagingTemplate.convertAndSendToUser(stranger, "/queue/match", event);
             } catch (Exception e) {
-                log.error("Failed to send disconnect notification to stranger {}", stranger, e);
+                log.error("Failed to send disconnect notification to stranger {}", LogSanitizer.mask(stranger), e);
             }
 
             // Remove stranger from active users
             redisTemplate.opsForSet().remove("matchmaking:active_users", stranger);
-            log.info("Cleaned up match session {} due to disconnect of {}", session.getId(), username);
+            log.info("Cleaned up match session {} due to disconnect of {}", session.getId(), LogSanitizer.mask(username));
         });
 
         // Broadcast updated online count over WebSocket
@@ -137,13 +138,13 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
             redisTemplate.opsForZSet().add(MATCH_RECONNECTING_NOTIFY_ZSET, username,
                     now + RECONNECT_NOTIFY_DELAY.toMillis());
             log.info("User {} dropped mid-match — holding session {} for {}s; peer notice deferred {}s",
-                    username, session.getId(), MATCH_DISCONNECT_GRACE.toSeconds(),
+                    LogSanitizer.mask(username), session.getId(), MATCH_DISCONNECT_GRACE.toSeconds(),
                     RECONNECT_NOTIFY_DELAY.toSeconds());
         } else if (Boolean.TRUE.equals(redisTemplate.opsForSet().isMember("matchmaking:active_users", username))) {
             // Still searching (no peer yet) — preserve their queue spot for the grace.
             redisTemplate.opsForZSet().add(MATCH_DISCONNECT_ZSET, username, deadline);
             log.info("User {} dropped while searching — holding queue spot for {}s",
-                    username, MATCH_DISCONNECT_GRACE.toSeconds());
+                    LogSanitizer.mask(username), MATCH_DISCONNECT_GRACE.toSeconds());
         }
     }
 
@@ -165,7 +166,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         Long noticePending = redisTemplate.opsForZSet().remove(MATCH_RECONNECTING_NOTIFY_ZSET, username);
         if (noticePending != null && noticePending > 0) {
             log.info("User {} reconnected within {}s — peer never notified; silent resume",
-                    username, RECONNECT_NOTIFY_DELAY.toSeconds());
+                    LogSanitizer.mask(username), RECONNECT_NOTIFY_DELAY.toSeconds());
             return;
         }
         // The notice had already fired — tell the peer they're back.
@@ -173,7 +174,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
             String stranger = session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
             notifyStranger(stranger, "STRANGER_RECONNECTED", session.getId());
             log.info("User {} reconnected within grace — session {} resumed; peer notified RECONNECTED",
-                    username, session.getId());
+                    LogSanitizer.mask(username), session.getId());
         });
     }
 
@@ -206,7 +207,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
                     String stranger = session.getUserA().equals(username) ? session.getUserB() : session.getUserA();
                     notifyStranger(stranger, "STRANGER_RECONNECTING", session.getId());
                     log.info("User {} still gone after {}s — peer notified RECONNECTING (session {})",
-                            username, RECONNECT_NOTIFY_DELAY.toSeconds(), session.getId());
+                            LogSanitizer.mask(username), RECONNECT_NOTIFY_DELAY.toSeconds(), session.getId());
                 });
             }
         }
@@ -228,7 +229,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
             if (sessions != null && sessions > 0) {
                 continue;
             }
-            log.info("Match reconnect grace expired for {} — tearing down", username);
+            log.info("Match reconnect grace expired for {} — tearing down", LogSanitizer.mask(username));
             handleDisconnect(username);
             reaped++;
         }
@@ -246,7 +247,7 @@ public class DisconnectHandlerServiceImpl implements DisconnectHandlerService {
         try {
             messagingTemplate.convertAndSendToUser(stranger, "/queue/match", evt);
         } catch (Exception e) {
-            log.error("Failed to send {} to stranger {}", event, stranger, e);
+            log.error("Failed to send {} to stranger {}", event, LogSanitizer.mask(stranger), e);
         }
     }
 }

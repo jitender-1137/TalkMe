@@ -473,6 +473,16 @@ class UserServiceImplTest {
         @Mock
         private MultipartFile file;
 
+        private static final byte[] PNG = new byte[]{
+                (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+
+        @org.junit.jupiter.api.BeforeEach
+        void stubImageBytes() throws java.io.IOException {
+            // uploadAvatar now magic-byte-validates the file; feed it real PNG bytes.
+            org.mockito.Mockito.lenient().when(file.getInputStream())
+                    .thenAnswer(inv -> new java.io.ByteArrayInputStream(PNG));
+        }
+
         @Test
         @DisplayName("clean new photo → stores, saves, notifies friends and returns url")
         void storesAndNotifies() {
@@ -610,6 +620,28 @@ class UserServiceImplTest {
             verify(userRepository, never()).findByUuid(any());
             // Owner viewing self → not a friend, own last-seen used.
             assertThat(res.isFriend()).isFalse();
+        }
+
+        @Test
+        @DisplayName("peer response redacts phone + roles; self keeps them")
+        void peerPiiRedacted() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+            // Mapper yields a response carrying PII (as the real mapper does from mobileNumber/roles).
+            when(userMapper.toUserResponse(t)).thenReturn(
+                    UserResponse.builder().phone("+15551234567").roles(java.util.List.of("ROLE_USER")).build());
+
+            UserResponse peer = service.getUserById(TARGET_UUID.toString(), me);
+            assertThat(peer.getPhone()).isNull();
+            assertThat(peer.getRoles()).isNull();
+
+            // Self path keeps phone/roles.
+            when(userMapper.toUserResponse(me)).thenReturn(
+                    UserResponse.builder().phone("+15559999999").roles(java.util.List.of("ROLE_USER")).build());
+            UserResponse self = service.getUserById("me", me);
+            assertThat(self.getPhone()).isEqualTo("+15559999999");
+            assertThat(self.getRoles()).containsExactly("ROLE_USER");
         }
 
         @Test

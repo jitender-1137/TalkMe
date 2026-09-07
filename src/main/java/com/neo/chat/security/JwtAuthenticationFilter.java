@@ -50,9 +50,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String username = tokenProvider.getUsernameFromToken(jwt);
-
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                // Resolve the principal by the IMMUTABLE uuid claim when present (uuid-bound tokens);
+                // fall back to the username subject only for legacy tokens issued before uuid-binding.
+                UserDetails userDetails = resolvePrincipal(jwt);
 
                 // Reject disabled accounts (soft-deleted / pending deletion) even if their
                 // access token is still within its lifetime — the request stays anonymous
@@ -65,8 +65,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
+        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+            // A syntactically valid token whose subject no longer resolves (purged / renamed
+            // account) is routine, and attacker-triggerable at will — never a stack trace.
+            log.debug("Bearer token subject not found; request continues anonymously");
         } catch (Exception ex) {
-            log.error("Could not set user authentication in security context", ex);
+            log.warn("Could not set user authentication in security context: {}", ex.toString());
         }
 
         filterChain.doFilter(request, response);
@@ -78,6 +82,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * @param request the incoming HTTP request
      * @return the token without the {@code "Bearer "} prefix, or {@code null} if absent/malformed
      */
+    /**
+     * Resolves the token's principal by its {@code uid} claim (immutable), falling back to the
+     * username subject for a legacy token that has no {@code uid}.
+     */
+    private UserDetails resolvePrincipal(String jwt) {
+        String uuid = tokenProvider.getUserUuidFromToken(jwt);
+        if (StringUtils.hasText(uuid)) {
+            try {
+                return userDetailsService.loadUserByUuid(java.util.UUID.fromString(uuid));
+            } catch (IllegalArgumentException badUuid) {
+                // Malformed uid → treat as unresolved (request continues anonymously).
+                throw new org.springframework.security.core.userdetails.UsernameNotFoundException("bad uid");
+            }
+        }
+        return userDetailsService.loadUserByUsername(tokenProvider.getUsernameFromToken(jwt));
+    }
+
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {

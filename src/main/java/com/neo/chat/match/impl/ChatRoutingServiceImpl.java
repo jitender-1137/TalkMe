@@ -10,6 +10,7 @@ import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.NotificationDispatchService;
 import lombok.RequiredArgsConstructor;
+import com.neo.chat.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -84,7 +85,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .build();
 
         messagingTemplate.convertAndSendToUser(recipient, "/queue/match", event);
-        log.info("Relayed text message from {} to {}", sender, recipient);
+        log.info("Relayed text message from {} to {}", LogSanitizer.mask(sender), LogSanitizer.mask(recipient));
         onRelayed(recipient, event, content);
     }
 
@@ -111,7 +112,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .build();
 
         messagingTemplate.convertAndSendToUser(recipient, "/queue/match", event);
-        log.info("Relayed GIF message from {} to {}", sender, recipient);
+        log.info("Relayed GIF message from {} to {}", LogSanitizer.mask(sender), LogSanitizer.mask(recipient));
         onRelayed(recipient, event, "🎬 GIF");
     }
 
@@ -144,7 +145,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                 .build();
 
         messagingTemplate.convertAndSendToUser(recipient, "/queue/match", event);
-        log.info("Relayed Image message from {} to {}", sender, recipient);
+        log.info("Relayed Image message from {} to {}", LogSanitizer.mask(sender), LogSanitizer.mask(recipient));
         onRelayed(recipient, event, "📷 Photo");
     }
 
@@ -189,7 +190,7 @@ public class ChatRoutingServiceImpl implements ChatRoutingService {
                             user.getId(), "New message", pushBody, MATCH_DEEP_LINK));
         } catch (Exception e) {
             // Best-effort — buffering/push must never break message relay.
-            log.warn("[Match] background delivery handling failed for {}", recipient, e);
+            log.warn("[Match] background delivery handling failed for {}", LogSanitizer.mask(recipient), e);
         }
     }
 }

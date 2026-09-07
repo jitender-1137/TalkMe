@@ -113,7 +113,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional
     public void createNotification(User user, String title, String content, String type,
                                    String referenceId, User actor, String imageUrl) {
-        log.info("Creating notification '{}' for user: {}", title, user.getUsername());
+        log.info("Creating notification '{}' for user: {}", title, user.getUuid());
         Notification notification = Notification.builder()
                 .user(user)
                 .title(title)
@@ -161,7 +161,7 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             friends = friendRepository.findFriendsByUser(actor);
         } catch (Exception e) {
-            log.warn("Failed to load friends for activity notification from {}", actor.getUsername(), e);
+            log.warn("Failed to load friends for activity notification from {}", actor.getUuid(), e);
             return;
         }
         for (User friend : friends) {
@@ -171,7 +171,7 @@ public class NotificationServiceImpl implements NotificationService {
             try {
                 createNotification(friend, title, content, type, referenceId, actor, imageUrl);
             } catch (Exception e) {
-                log.warn("Failed to notify friend {} of activity by {}", friend.getUsername(), actor.getUsername(), e);
+                log.warn("Failed to notify friend {} of activity by {}", friend.getUuid(), actor.getUuid(), e);
             }
         }
     }
@@ -204,7 +204,7 @@ public class NotificationServiceImpl implements NotificationService {
                 if (u != null) recipients.put(u.getId(), u);
             }
         } catch (Exception e) {
-            log.warn("Failed to load follow graph for activity notification from {}", actor.getUsername(), e);
+            log.warn("Failed to load follow graph for activity notification from {}", actor.getUuid(), e);
             return;
         }
         recipients.remove(actor.getId());
@@ -215,7 +215,7 @@ public class NotificationServiceImpl implements NotificationService {
             try {
                 createNotification(recipient, title, content, type, referenceId, actor, imageUrl);
             } catch (Exception e) {
-                log.warn("Failed to notify {} of activity by {}", recipient.getUsername(), actor.getUsername(), e);
+                log.warn("Failed to notify {} of activity by {}", recipient.getUuid(), actor.getUuid(), e);
             }
         }
     }

@@ -25,6 +25,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -536,5 +537,61 @@ class FlirtModeServiceImplTest {
 
         // The row is fetched by the exact Chat instance resolved from the uuid (no re-load).
         verify(flirtModeRepository).findByChat(eq(chat));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  sendKiss — live "blow a kiss" (requires ACTIVE flirt mode)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("sendKiss")
+    class SendKiss {
+
+        @Test
+        @DisplayName("active flirt mode → pushes a flirt_kiss envelope to the OTHER participant")
+        void pushesKissWhenActive() {
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(chat)).thenReturn(Optional.of(row(true, true)));
+
+            service.sendKiss(lowUser, CHAT_UUID);
+
+            ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+            verify(messagingTemplate).convertAndSendToUser(
+                    eq("high_user"), eq("/queue/flirt-mode"), payload.capture());
+            assertThat(payload.getValue()).isInstanceOfSatisfying(Map.class, envelope -> {
+                assertThat(envelope.get("event")).isEqualTo("flirt_kiss");
+                assertThat(envelope.get("payload")).isInstanceOfSatisfying(Map.class, p -> {
+                    assertThat(p.get("chatId")).isEqualTo(CHAT_UUID);
+                    assertThat(p.get("fromName")).isEqualTo("low_user");
+                });
+            });
+        }
+
+        @Test
+        @DisplayName("no flirt row → BadRequest TM_834, nothing pushed")
+        void rejectsWhenNoRow() {
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(chat)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.sendKiss(lowUser, CHAT_UUID))
+                    .isInstanceOfSatisfying(BadRequestException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_834"));
+            verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("flirt row present but NOT active → BadRequest TM_834")
+        void rejectsWhenInactive() {
+            Chat chat = privateChat(lowUser, highUser);
+            when(chatRepository.findByUuidWithMembers(any())).thenReturn(Optional.of(chat));
+            when(flirtModeRepository.findByChat(chat)).thenReturn(Optional.of(row(true, false)));
+
+            assertThatThrownBy(() -> service.sendKiss(lowUser, CHAT_UUID))
+                    .isInstanceOfSatisfying(BadRequestException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_834"));
+            verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+        }
     }
 }

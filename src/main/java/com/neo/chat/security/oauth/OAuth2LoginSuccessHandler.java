@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.LoginResponse;
 import com.neo.chat.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.neo.chat.controller.AuthController;
+import com.neo.chat.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -38,6 +40,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private final AuthService authService;
     private final GoogleProfileService googleProfileService;
     private final ObjectProvider<OAuth2AuthorizedClientService> authorizedClientService;
+    private final JwtTokenProvider tokenProvider;
 
     @Value("${app.cookie.secure:false}")
     private boolean cookieSecure;
@@ -115,6 +118,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         LoginResponse login = authService.oauthLogin(info, request.getHeader("User-Agent"), request);
 
         setAuthCookies(response, login.getTokens().getRefreshToken());
+        setMediaCookie(response, login);
 
         // Full account → land on chats. The "#chats" deep link makes the home gate
         // enter the app (not the marketing page) and the SPA refreshes via the cookie.
@@ -140,5 +144,26 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, csrfCookie.toString());
+    }
+
+    /**
+     * Mirrors {@code AuthController}: an HttpOnly media-read cookie scoped to the media serve
+     * endpoint so {@code <img>} loads can be authorized without an Authorization header.
+     */
+    private void setMediaCookie(HttpServletResponse response, LoginResponse login) {
+        try {
+            String username = login.getUser() != null ? login.getUser().getUsername()
+                    : tokenProvider.getUsernameFromToken(login.getTokens().getAccessToken());
+            if (username == null) return;
+            long maxAge = 30L * 24 * 60 * 60;
+            String mediaToken = tokenProvider.generateMediaToken(username, maxAge * 1000L);
+            if (mediaToken == null) return;
+            ResponseCookie mediaCookie = ResponseCookie.from(AuthController.MEDIA_COOKIE, mediaToken)
+                    .httpOnly(true).secure(cookieSecure).path(AuthController.MEDIA_COOKIE_PATH)
+                    .maxAge(maxAge).sameSite(cookieSameSite).build();
+            response.addHeader(HttpHeaders.SET_COOKIE, mediaCookie.toString());
+        } catch (Exception e) {
+            log.debug("Media cookie not issued on OAuth login: {}", e.getMessage());
+        }
     }
 }

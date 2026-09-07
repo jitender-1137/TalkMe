@@ -89,6 +89,35 @@ public class FlirtModeServiceImpl implements FlirtModeService {
         return setConsentWithRetry(me, chatUuid, false);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public void sendKiss(User me, String chatUuid) {
+        Ctx ctx = resolve(me, chatUuid);
+        boolean active = flirtModeRepository.findByChat(ctx.chat())
+                .map(ChatFlirtMode::isActive)
+                .orElse(false);
+        if (!active) {
+            throw new BadRequestException("Flirt Mode must be active for both of you to blow a kiss", "TM_834");
+        }
+        if (ctx.other() == null || ctx.other().getUsername() == null) {
+            return; // no reachable partner — nothing to deliver
+        }
+        // Ephemeral live nudge (NOT persisted). Reuses the per-user flirt-mode queue, whose client
+        // handler fans events out by name — the `flirt_kiss` handler plays the heart animation. The
+        // payload carries `chatId` (not `chatUuid`) so it never collides with the state cache write.
+        try {
+            messagingTemplate.convertAndSendToUser(
+                    ctx.other().getUsername(),
+                    "/queue/flirt-mode",
+                    Map.of("event", "flirt_kiss",
+                            "payload", Map.of(
+                                    "chatId", chatUuid,
+                                    "fromName", me.getName() != null ? me.getName() : "")));
+        } catch (Exception e) {
+            log.debug("[flirt-mode] kiss push failed for chat {}: {}", chatUuid, e.getMessage());
+        }
+    }
+
     // ── Core mutation ────────────────────────────────────────────────────────
 
     /**

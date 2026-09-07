@@ -1,6 +1,7 @@
 package com.neo.chat.match.impl;
 
 import com.neo.chat.match.WaitingQueueService;
+import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -40,7 +41,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
         }
         redisTemplate.opsForSet().add(SET_KEY, username);
         redisTemplate.opsForList().leftPush(QUEUE_KEY, username);
-        log.info("User {} enqueued in matchmaking", username);
+        log.info("User {} enqueued in matchmaking", LogSanitizer.mask(username));
     }
 
     /**
@@ -52,7 +53,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     public void dequeue(String username) {
         redisTemplate.opsForSet().remove(SET_KEY, username);
         redisTemplate.opsForList().remove(QUEUE_KEY, 0, username);
-        log.info("User {} dequeued from matchmaking", username);
+        log.info("User {} dequeued from matchmaking", LogSanitizer.mask(username));
     }
 
     /**
@@ -130,7 +131,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
                 return Optional.empty();
             }
             redisTemplate.opsForSet().remove(SET_KEY, peer);
-            log.info("Polled next peer {} excluding {}", peer, excludeUsername);
+            log.info("Polled next peer {} excluding {}", LogSanitizer.mask(peer), LogSanitizer.mask(excludeUsername));
             return Optional.of(peer);
         }
     }

@@ -89,6 +89,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -227,7 +228,7 @@ class AuthServiceImplTest {
      * Stub the tail of {@code generateLoginResponse} shared by every login-producing path.
      */
     private void stubLoginPipeline() {
-        when(tokenProvider.generateToken(anyString(), anyBoolean())).thenReturn("access-jwt");
+        when(tokenProvider.generateToken(anyString(), anyBoolean(), any())).thenReturn("access-jwt");
         when(userMapper.toAuthUserResponse(any(User.class))).thenReturn(new AuthUserResponse());
         when(featureAccessService.effectiveWireNames(any(User.class))).thenReturn(Set.of("chat"));
     }
@@ -330,6 +331,7 @@ class AuthServiceImplTest {
 
             assertThat(resp.getTokens().getAccessToken()).isEqualTo("access-jwt");
         }
+
 
         @Test
         @DisplayName("soft-deleted account within recovery window is restored on login")
@@ -523,6 +525,18 @@ class AuthServiceImplTest {
         }
 
         @Test
+        @DisplayName("username already taken (case-insensitive) → TM_048, no save")
+        void usernameConflict() {
+            when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(any())).thenReturn(true);
+
+            assertThatThrownBy(() -> service.signup(req(), "UA", httpRequest()))
+                    .isInstanceOfSatisfying(ConflictException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_048"));
+            verify(userRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("breached password → TM_496")
         void breachedPassword() {
             when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
@@ -584,6 +598,21 @@ class AuthServiceImplTest {
             assertThat(guest.getUsername()).startsWith("guest_");
             assertThat(resp.getTokens().getAccessToken()).isEqualTo("access-jwt");
         }
+        @Test
+        @DisplayName("SECURITY: guest creation blocked past the per-IP daily cap → TM_007, no user saved")
+        void perIpCapBlocksGuestFlood() {
+            // A request whose (resolved) client IP is non-null so the per-IP cap actually runs.
+            HttpServletRequest reqWithIp = mock(HttpServletRequest.class);
+            when(reqWithIp.getRemoteAddr()).thenReturn("203.0.113.9");
+            // increment returns a value over the cap (20) → creation refused (uses the shared valueOps).
+            when(valueOps.increment(org.mockito.ArgumentMatchers.startsWith("guest:create:ip:")))
+                    .thenReturn(21L);
+
+            assertThatThrownBy(() -> service.loginAsGuest(req(), "UA", reqWithIp))
+                    .isInstanceOfSatisfying(TooManyRequestsException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_007"));
+            verify(userRepository, never()).save(any());
+        }
 
         @Test
         @DisplayName("missing ROLE_GUEST is created on demand")
@@ -621,7 +650,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmailIgnoreCase("new@gmail.com")).thenReturn(Optional.empty());
             when(roleRepository.findByName("ROLE_USER"))
                     .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
@@ -639,14 +668,14 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("existing account matched by email → Google identity + fields backfilled, login alert sent")
+        @DisplayName("existing VERIFIED account matched by email → Google identity + fields backfilled, login alert sent")
         void backfillsExistingUser() {
             User existing = activeUser();
             existing.setGoogleId(null);
             existing.setProfileImage(null);
             existing.setAge(0);
             existing.setGender(null);
-            existing.setVerified(false);
+            existing.setVerified(true); // already proved email ownership → safe to LINK (not reclaim)
             existing.setCountry(null);
             OAuthUserInfo info = OAuthUserInfo.builder()
                     .providerId("g-sub-1").email("alice@example.com").emailVerified(true)
@@ -666,6 +695,52 @@ class AuthServiceImplTest {
             assertThat(existing.getCountry()).isEqualTo("India");
             verify(emailService).sendLoginAlertEmail(any(), any(), any(), any(), any(), any(), any());
             verify(emailService, never()).sendWelcomeEmail(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("SECURITY: verified Google email claiming an UNVERIFIED local shell → reclaimed (password cleared, tokens revoked)")
+        void reclaimsUnverifiedPreRegisteredAccount() {
+            User shell = activeUser();
+            shell.setGoogleId(null);
+            shell.setVerified(false);              // pre-registration: email never proven
+            shell.setPasswordHash("$2a$attackerChosen");
+            OAuthUserInfo info = OAuthUserInfo.builder()
+                    .providerId("g-sub-1").email("alice@example.com").emailVerified(true)
+                    .name("Alice").build();
+            when(userRepository.findByGoogleId("g-sub-1")).thenReturn(Optional.empty());
+            when(userRepository.findByEmailIgnoreCase("alice@example.com")).thenReturn(Optional.of(shell));
+            when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
+            stubLoginPipeline();
+
+            service.oauthLogin(info, "UA", httpRequest());
+
+            assertThat(shell.getPasswordHash()).isNull();          // attacker's password wiped
+            assertThat(shell.isVerified()).isTrue();
+            assertThat(shell.getGoogleId()).isEqualTo("g-sub-1");
+            // reclaim revokes once; the login pipeline also revokes (single-device) → at least once.
+            verify(refreshTokenRepository, atLeastOnce()).revokeAllUserTokens(shell);
+            verify(sessionRepository).deleteByUser(shell);
+        }
+
+        @Test
+        @DisplayName("SECURITY: UNVERIFIED IdP email does NOT link to a local account (provisions a new one)")
+        void ignoresUnverifiedIdpEmail() {
+            User localVictim = activeUser(); // owns alice@example.com with a real password
+            OAuthUserInfo info = OAuthUserInfo.builder()
+                    .providerId("g-sub-1").email("alice@example.com").emailVerified(false) // NOT verified by Google
+                    .name("Alice").build();
+            when(userRepository.findByGoogleId("g-sub-1")).thenReturn(Optional.empty());
+            when(roleRepository.findByName("ROLE_USER"))
+                    .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
+            when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
+            stubLoginPipeline();
+
+            service.oauthLogin(info, "UA", httpRequest());
+
+            // The victim's account is never looked up by email for linking, and never reclaimed.
+            verify(userRepository, never()).findByEmailIgnoreCase(anyString());
+            verify(refreshTokenRepository, never()).revokeAllUserTokens(localVictim);
         }
 
         @Test
@@ -714,7 +789,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmailIgnoreCase("new@gmail.com")).thenReturn(Optional.empty());
             when(roleRepository.findByName("ROLE_USER"))
                     .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             // First save (the new row) loses the race; the later login-pipeline save succeeds.
             when(userRepository.save(any(User.class)))
@@ -736,7 +811,7 @@ class AuthServiceImplTest {
             when(userRepository.findByGoogleId("g-sub-1")).thenReturn(Optional.empty());
             when(roleRepository.findByName("ROLE_USER"))
                     .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             when(userRepository.save(any(User.class)))
                     .thenThrow(new DataIntegrityViolationException("dup"));
@@ -767,8 +842,8 @@ class AuthServiceImplTest {
         void happyPath() {
             User user = activeUser();
             RefreshToken token = validToken(user);
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
-            when(tokenProvider.generateToken("alice", false)).thenReturn("new-access");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+            when(tokenProvider.generateToken(eq("alice"), eq(false), any())).thenReturn("new-access");
             when(sessionRepository.findByUserAndIsDeletedFalse(user)).thenReturn(List.of());
 
             var resp = service.refresh("old-token", "UA", "1.2.3.4");
@@ -789,8 +864,8 @@ class AuthServiceImplTest {
             User user = activeUser();
             RefreshToken token = validToken(user);
             Session match = Session.builder().user(user).ipAddress("1.2.3.4").userAgent("UA").build();
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
-            when(tokenProvider.generateToken(any(), anyBoolean())).thenReturn("new-access");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+            when(tokenProvider.generateToken(any(), anyBoolean(), any())).thenReturn("new-access");
             when(sessionRepository.findByUserAndIsDeletedFalse(user)).thenReturn(List.of(match));
 
             service.refresh("old-token", "UA", "1.2.3.4");
@@ -804,8 +879,8 @@ class AuthServiceImplTest {
             User user = activeUser();
             RefreshToken token = validToken(user);
             Session other = Session.builder().user(user).ipAddress("9.9.9.9").userAgent("Other").build();
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
-            when(tokenProvider.generateToken(any(), anyBoolean())).thenReturn("new-access");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+            when(tokenProvider.generateToken(any(), anyBoolean(), any())).thenReturn("new-access");
             when(sessionRepository.findByUserAndIsDeletedFalse(user)).thenReturn(List.of(other));
 
             service.refresh("old-token", "UA", "1.2.3.4");
@@ -819,8 +894,8 @@ class AuthServiceImplTest {
             User guest = activeUser();
             guest.setGuest(true);
             RefreshToken token = validToken(guest);
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
-            when(tokenProvider.generateToken("alice", true)).thenReturn("new-access");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+            when(tokenProvider.generateToken(eq("alice"), eq(true), any())).thenReturn("new-access");
             when(sessionRepository.findByUserAndIsDeletedFalse(guest)).thenReturn(List.of());
 
             service.refresh("old-token", "UA", "1.2.3.4");
@@ -835,7 +910,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("unknown token → TM_026")
         void unknownToken() {
-            when(refreshTokenRepository.findByToken("nope")).thenReturn(Optional.empty());
+            when(refreshTokenRepository.findByTokenForUpdate("nope")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.refresh("nope", "UA", "1.2.3.4"))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
@@ -848,7 +923,7 @@ class AuthServiceImplTest {
             User user = activeUser();
             RefreshToken token = validToken(user);
             token.setRevoked(true);
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
 
             assertThatThrownBy(() -> service.refresh("old-token", "UA", "1.2.3.4"))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
@@ -863,7 +938,7 @@ class AuthServiceImplTest {
                     .user(user).token("old-token")
                     .expiresAt(Instant.now().minus(Duration.ofDays(1)))
                     .revoked(false).build();
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
 
             assertThatThrownBy(() -> service.refresh("old-token", "UA", "1.2.3.4"))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
@@ -875,10 +950,81 @@ class AuthServiceImplTest {
         void optimisticLock() {
             User user = activeUser();
             RefreshToken token = validToken(user);
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
-            when(tokenProvider.generateToken(any(), anyBoolean())).thenReturn("new-access");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+            when(tokenProvider.generateToken(any(), anyBoolean(), any())).thenReturn("new-access");
             when(refreshTokenRepository.saveAndFlush(token))
                     .thenThrow(new OptimisticLockingFailureException("raced"));
+
+            assertThatThrownBy(() -> service.refresh("old-token", "UA", "1.2.3.4"))
+                    .isInstanceOfSatisfying(UnauthorizedException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_026"));
+        }
+
+        @Test
+        @DisplayName("banned user with a still-valid token → TM_026 (no new access token)")
+        void bannedUserCannotRefresh() {
+            User user = activeUser();
+            user.setBanned(true);
+            RefreshToken token = validToken(user);
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+
+            assertThatThrownBy(() -> service.refresh("old-token", "UA", "1.2.3.4"))
+                    .isInstanceOfSatisfying(UnauthorizedException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_026"));
+            verify(refreshTokenRepository, never()).saveAndFlush(any());
+            verify(tokenProvider, never()).generateToken(anyString(), anyBoolean(), any());
+        }
+
+        @Test
+        @DisplayName("soft-deleted user with a still-valid token → TM_026")
+        void deletedUserCannotRefresh() {
+            User user = activeUser();
+            user.setDeleted(true);
+            RefreshToken token = validToken(user);
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+
+            assertThatThrownBy(() -> service.refresh("old-token", "UA", "1.2.3.4"))
+                    .isInstanceOfSatisfying(UnauthorizedException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_026"));
+            verify(refreshTokenRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("SECURITY/UX: concurrent refresh within the grace window re-issues off the active token — NOT logged out, and does NOT rotate it")
+        void concurrentRefreshWithinGraceReturnsFreshTokens() {
+            // A fast reload rotated the presented token a moment ago; its replacement is still active.
+            User user = activeUser();
+            RefreshToken presented = RefreshToken.builder()
+                    .user(user).token("old-token").replacedByToken("rotated-1")
+                    .expiresAt(Instant.now().plus(Duration.ofDays(1))).revoked(true).build();
+            presented.setUpdatedAt(Instant.now()); // just revoked → inside the grace window
+            RefreshToken active = validToken(user);
+            active.setToken("rotated-1");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(presented));
+            when(refreshTokenRepository.findByTokenForUpdate("rotated-1")).thenReturn(Optional.of(active));
+            when(tokenProvider.generateToken(eq("alice"), eq(false), any())).thenReturn("new-access");
+            when(sessionRepository.findByUserAndIsDeletedFalse(user)).thenReturn(List.of());
+
+            var resp = service.refresh("old-token", "UA", "1.2.3.4");
+
+            assertThat(resp.getAccessToken()).isEqualTo("new-access");   // fresh access token, no logout
+            assertThat(resp.getRefreshToken()).isEqualTo("rotated-1");   // cookie set to the ACTIVE token
+            assertThat(active.isRevoked()).isFalse();                    // active token is NOT rotated
+            // Grace re-issue must not rotate/persist a new refresh token — that's what keeps the
+            // chain from growing per duplicate request under a reload burst.
+            verify(refreshTokenRepository, never()).saveAndFlush(any());
+            verify(refreshTokenRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("revoked token OUTSIDE the grace window is a real logout → TM_026")
+        void revokedTokenOutsideGraceRejected() {
+            User user = activeUser();
+            RefreshToken presented = RefreshToken.builder()
+                    .user(user).token("old-token").replacedByToken("rotated-1")
+                    .expiresAt(Instant.now().plus(Duration.ofDays(1))).revoked(true).build();
+            presented.setUpdatedAt(Instant.now().minus(Duration.ofMinutes(5))); // long ago → outside grace
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(presented));
 
             assertThatThrownBy(() -> service.refresh("old-token", "UA", "1.2.3.4"))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
@@ -2122,7 +2268,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmailIgnoreCase("new@gmail.com")).thenReturn(Optional.empty());
             when(roleRepository.findByName("ROLE_USER"))
                     .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
@@ -2142,7 +2288,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmailIgnoreCase("new@gmail.com")).thenReturn(Optional.empty());
             when(roleRepository.findByName("ROLE_USER"))
                     .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
@@ -2164,7 +2310,7 @@ class AuthServiceImplTest {
                     .thenReturn(Optional.empty(), Optional.of(winner));
             when(roleRepository.findByName("ROLE_USER"))
                     .thenReturn(Optional.of(Role.builder().name("ROLE_USER").build()));
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             when(userRepository.save(any(User.class)))
                     .thenThrow(new DataIntegrityViolationException("dup"))
@@ -2438,8 +2584,8 @@ class AuthServiceImplTest {
                     .expiresAt(Instant.now().plus(Duration.ofDays(1)))
                     .revoked(false).build();
             Session s = Session.builder().user(user).ipAddress("1.2.3.4").userAgent("Other").build();
-            when(refreshTokenRepository.findByToken("old-token")).thenReturn(Optional.of(token));
-            when(tokenProvider.generateToken(any(), anyBoolean())).thenReturn("new-access");
+            when(refreshTokenRepository.findByTokenForUpdate("old-token")).thenReturn(Optional.of(token));
+            when(tokenProvider.generateToken(any(), anyBoolean(), any())).thenReturn("new-access");
             when(sessionRepository.findByUserAndIsDeletedFalse(user)).thenReturn(List.of(s));
 
             service.refresh("old-token", "UA", "1.2.3.4");
@@ -2494,7 +2640,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("email without '@' → base derived from the display name")
         void fromNameWhenEmailHasNoAt() {
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
 
             assertThat(gen("noatsign", "Bob")).isEqualTo("bob");
         }
@@ -2502,7 +2648,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("all-symbol local part strips to blank → falls back to 'user'")
         void fallsBackToUserWhenStripEmpty() {
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
 
             assertThat(gen("###@x.com", "Bob")).isEqualTo("user");
         }
@@ -2510,7 +2656,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("over-long base is truncated to 40 chars")
         void truncatesLongBase() {
-            when(userRepository.existsByUsername(anyString())).thenReturn(false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(false);
             String local = "a".repeat(45);
 
             String out = gen(local + "@x.com", "Bob");
@@ -2521,7 +2667,7 @@ class AuthServiceImplTest {
         @Test
         @DisplayName("collision on the base → suffixed candidate is generated")
         void suffixesOnCollision() {
-            when(userRepository.existsByUsername(anyString())).thenReturn(true, false);
+            when(userRepository.existsByUsernameIgnoreCase(anyString())).thenReturn(true, false);
 
             String out = gen("taken@x.com", "Bob");
 

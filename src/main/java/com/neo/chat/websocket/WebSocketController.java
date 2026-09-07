@@ -10,6 +10,7 @@ import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.NotificationDispatchService;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.service.UserService;
+import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -71,6 +72,27 @@ public class WebSocketController {
      * (navigating out of the lobby) still removes the user instantly.
      */
     private static final long LOBBY_LEAVE_GRACE_MS = 2000L;
+
+    /** Max characters relayed/pushed for a single lobby DM. */
+    private static final int MAX_LOBBY_MESSAGE_CHARS = 2000;
+
+    /**
+     * Whether {@code username} is currently a member of the lobby ({@code lobby:users} Redis set).
+     * Fails CLOSED (returns false) if Redis is unavailable, so a lobby DM is never relayed to a
+     * user whose lobby membership cannot be confirmed.
+     *
+     * @param username the user to check
+     * @return true only if the user is confirmed to be in the lobby
+     */
+    private boolean inLobby(String username) {
+        if (username == null || username.isBlank()) return false;
+        try {
+            return Boolean.TRUE.equals(redisTemplate.opsForSet().isMember("lobby:users", username));
+        } catch (Exception e) {
+            log.debug("Lobby membership check failed (fail-closed): {}", e.getMessage());
+            return false;
+        }
+    }
 
     /**
      * Application-level heartbeat. The client publishes here every ~30s; the server
@@ -243,7 +265,7 @@ public class WebSocketController {
     public void joinLobby(Principal principal) {
         if (principal == null) return;
         String username = principal.getName();
-        log.info("User {} joined the lobby", username);
+        log.info("User {} joined the lobby", LogSanitizer.mask(username));
 
         // A (re)join cancels any pending grace-eviction from a previous socket drop.
         redisTemplate.opsForZSet().remove(LOBBY_LEAVE_ZSET, username);
@@ -254,6 +276,11 @@ public class WebSocketController {
         // Fetch user response
         userRepository.findByUsername(username).ifPresent(user -> {
             UserResponse response = userService.getUserById(user.getUuid().toString(), user);
+            // PRIVACY: /topic/lobby is a broadcast any authenticated user can subscribe to. Strip
+            // PII from the JOIN payload (phone number, role list) so it can't be harvested — the
+            // lobby UI only needs identity + presence + coarse profile.
+            response.setPhone(null);
+            response.setRoles(null);
 
             // Broadcast join event
             Map<String, Object> payload = new HashMap<>();
@@ -274,7 +301,7 @@ public class WebSocketController {
     public void leaveLobby(Principal principal) {
         if (principal == null) return;
         String username = principal.getName();
-        log.info("User {} left the lobby", username);
+        log.info("User {} left the lobby", LogSanitizer.mask(username));
 
         // Explicit leave (navigated out of the lobby) is immediate — drop any pending
         // grace deadline and remove now so others update in real time.
@@ -307,6 +334,19 @@ public class WebSocketController {
         String content = (String) message.get("content");
         if (recipient == null || content == null) return;
 
+        // AUTHORIZATION: a lobby DM may only go to a user who is ALSO currently in the lobby, and
+        // only from a sender who is in it. Without this, a crafted STOMP frame could DM (and push-
+        // notify) ANY user on the platform, bypassing block lists / friends-only / the lobby itself.
+        if (!inLobby(sender) || !inLobby(recipient)) {
+            log.debug("Dropping lobby DM from {} to {} — not both in the lobby",
+                    LogSanitizer.mask(sender), LogSanitizer.mask(recipient));
+            return;
+        }
+        // Bound the body so a single frame can't carry an oversized payload into the push/echo path.
+        if (content.length() > MAX_LOBBY_MESSAGE_CHARS) {
+            content = content.substring(0, MAX_LOBBY_MESSAGE_CHARS);
+        }
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("id", UUID.randomUUID().toString());
         payload.put("sender", sender);
@@ -314,7 +354,10 @@ public class WebSocketController {
         payload.put("content", content);
         payload.put("timestamp", System.currentTimeMillis());
 
-        log.info("Lobby chat message from {} to {}: {}", sender, recipient, content);
+        // DEBUG + length only: never log the plaintext lobby message body in prod. Lobby
+        // DMs are ephemeral and NOT encrypted, so the raw content must not reach the logs.
+        log.debug("Lobby chat message from {} to {} ({} chars)",
+                LogSanitizer.mask(sender), LogSanitizer.mask(recipient), content == null ? 0 : content.length());
 
         // Send to recipient
         messagingTemplate.convertAndSendToUser(recipient, "/queue/lobby-chat", payload);
@@ -349,7 +392,7 @@ public class WebSocketController {
                             user.getId(), sender, body, LOBBY_DEEP_LINK));
         } catch (Exception e) {
             // Push is best-effort and must never break lobby chat.
-            log.warn("[WebPush] lobby push failed for {}", recipient, e);
+            log.warn("[WebPush] lobby push failed for {}", LogSanitizer.mask(recipient), e);
         }
     }
 
@@ -368,13 +411,15 @@ public class WebSocketController {
         String recipient = (String) payload.get("recipient");
         Boolean isTyping = (Boolean) payload.get("isTyping");
         if (recipient == null || isTyping == null) return;
+        // Only relay typing between two users who are both in the lobby (see sendLobbyChatMessage).
+        if (!inLobby(sender) || !inLobby(recipient)) return;
 
         Map<String, Object> response = new HashMap<>();
         response.put("sender", sender);
         response.put("recipient", recipient);
         response.put("isTyping", isTyping);
 
-        log.info("Lobby typing status from {} to {}: {}", sender, recipient, isTyping);
+        log.info("Lobby typing status from {} to {}: {}", LogSanitizer.mask(sender), LogSanitizer.mask(recipient), isTyping);
 
         // Send to recipient
         messagingTemplate.convertAndSendToUser(recipient, "/queue/lobby-typing", response);
@@ -393,7 +438,9 @@ public class WebSocketController {
         Principal principal = event.getUser();
         if (principal == null) return;
         String username = principal.getName();
-        log.info("WebSocket connection closed for user: {}", username);
+        // DEBUG: per-disconnect churn + username (PII). Only the Principal name (username)
+        // is available here without a lookup, so this stays out of prod INFO entirely.
+        log.debug("WebSocket connection closed for user: {}", username);
 
         // Don't evict from the lobby immediately. A backgrounded PWA / tab-switch /
         // brief blip drops the socket, but the client reconnects and re-joins shortly.

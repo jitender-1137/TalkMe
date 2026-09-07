@@ -68,6 +68,15 @@ public class AdsProperties {
     private String socialBarScriptUrl = "";
 
     /**
+     * Dev/preview mode. When true, every enabled ad slot renders a clearly-labelled
+     * PLACEHOLDER creative inside its real native chrome — so the ad layout is visible
+     * WITHOUT a live network fill (ad networks like AdsTerra/AdSense don't serve to
+     * localhost / unapproved origins). Set {@code ADS_PREVIEW=true} locally; keep it
+     * {@code false} in production so real creatives serve.
+     */
+    private boolean preview = false;
+
+    /**
      * Hard ceiling on ads shown to a user in one session, across every surface.
      */
     private int frequencyCapPerSession = 30;

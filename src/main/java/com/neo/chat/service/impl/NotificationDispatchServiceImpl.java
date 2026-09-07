@@ -11,11 +11,13 @@ import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.JwtTokenProvider;
 import com.neo.chat.service.NotificationDispatchService;
 import com.neo.chat.service.WebPushService;
+import com.neo.chat.util.LogSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
@@ -111,13 +113,23 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
     /**
      * Recomputes the user's total unread count from scratch, persists it via an atomic column
      * update (avoiding optimistic-lock failures from a stale detached principal), and broadcasts it.
-     * Transactional.
+     *
+     * <p>Runs in its OWN transaction ({@link Propagation#REQUIRES_NEW}). The
+     * {@code UPDATE users SET total_unread_count} touches a hot, denormalized counter and can lose a
+     * Postgres deadlock under concurrency. Isolating it means such a failure rolls back ONLY this
+     * inner transaction — the caller (the AFTER_COMMIT status broadcast on the live path, or the
+     * outbox re-drive on the catch-up path) is NOT marked rollback-only, so its own commit / mark-
+     * published still succeeds and the badge refresh is simply skipped for that tick (it is
+     * idempotent and recomputed on the next event). This is safe because every caller runs after the
+     * read-receipt has already COMMITTED (StatusBroadcastListener is @TransactionalEventListener
+     * AFTER_COMMIT; the re-drive reads a prior-committed outbox row), so a separate transaction still
+     * observes the up-to-date receipts and computes the correct count.
      *
      * @param user the user whose unread count is recomputed
      * @return the freshly-computed unread count
      */
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int recomputeUnread(User user) {
         int count = (int) messageRepository.countTotalUnreadForUser(user.getId());
         // Atomic column update — avoids merging a possibly-stale detached User
@@ -138,7 +150,7 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
         try {
             messagingTemplate.convertAndSendToUser(username, "/queue/unread", Map.of("totalUnread", count));
         } catch (Exception e) {
-            log.error("[Unread] Failed to broadcast unread count to {}", username, e);
+            log.error("[Unread] Failed to broadcast unread count to {}", LogSanitizer.mask(username), e);
         }
     }
 

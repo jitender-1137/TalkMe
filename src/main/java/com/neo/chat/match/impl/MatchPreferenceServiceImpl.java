@@ -2,6 +2,7 @@ package com.neo.chat.match.impl;
 
 import com.neo.chat.match.MatchPreferenceService;
 import com.neo.chat.match.MatchPreferenceSnapshot;
+import com.neo.chat.util.LogSanitizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +50,7 @@ public class MatchPreferenceServiceImpl implements MatchPreferenceService {
         try {
             redis.opsForValue().set(key(username), objectMapper.writeValueAsString(snapshot), TTL);
         } catch (Exception e) {
-            log.warn("Failed to save match prefs for {}: {}", username, e.getMessage());
+            log.warn("Failed to save match prefs for {}: {}", LogSanitizer.mask(username), e.getMessage());
         }
     }
 

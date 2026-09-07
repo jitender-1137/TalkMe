@@ -109,13 +109,15 @@ class AuthControllerUnitTest {
 
     @Mock
     private CaptchaService captchaService;
+    @Mock
+    private com.neo.chat.security.JwtTokenProvider tokenProvider;
 
     private MockMvc mockMvc;
     private User testUser;
 
     @BeforeEach
     void setUp() {
-        AuthController controller = new AuthController(authService, captchaService);
+        AuthController controller = new AuthController(authService, captchaService, tokenProvider);
         // @Value fields are not resolved without a Spring context — set them explicitly.
         ReflectionTestUtils.setField(controller, "cookieSecure", false);
         ReflectionTestUtils.setField(controller, "cookieSameSite", "Lax");
@@ -554,8 +556,9 @@ class AuthControllerUnitTest {
             assertThat(req.getValue().getEmail()).isEqualTo("testuser@example.com");
             assertThat(req.getValue().getPassword()).isEqualTo("password123");
             assertThat(ua.getValue()).isEqualTo("JUnit-UA");
-            // X-Forwarded-For wins over remoteAddr; only the first hop is trusted.
-            assertThat(ip.getValue()).isEqualTo("203.0.113.7");
+            // X-Forwarded-For wins over remoteAddr; only the LAST hop (appended by the trusted
+            // proxy) is trusted — the client-supplied first hop is ignored.
+            assertThat(ip.getValue()).isEqualTo("70.41.3.18");
         }
 
         @Test

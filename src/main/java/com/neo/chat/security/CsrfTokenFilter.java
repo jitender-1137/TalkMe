@@ -48,7 +48,11 @@ public class CsrfTokenFilter extends OncePerRequestFilter {
             "/api/v1/auth/refresh",
             "/api/v1/auth/forgot-password",
             "/api/v1/auth/reset-password",
-            "/api/v1/push/delivered"
+            "/api/v1/push/delivered",
+            // Dev-only BootUI console: it POSTs from the browser with no csrf_token cookie/header.
+            // Safe to exempt — BootUI permits /bootui itself and enforces its own localhost-only
+            // filter; in prod it's dormant, so nothing state-changing is reachable.
+            "/bootui"
     );
 
     // Reuse ObjectMapper — it is thread-safe and expensive to construct per-request

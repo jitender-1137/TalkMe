@@ -282,7 +282,7 @@ class ConsentControllerUnitTest {
         }
 
         @Test
-        void shouldForwardFirstIpWhenForwardedForHasMultiple() throws Exception {
+        void shouldForwardProxyAppendedIpWhenForwardedForHasMultiple() throws Exception {
             authenticate();
             when(consentAcceptanceService.accept(any(), any(), any(), any())).thenReturn(fullStatus());
 
@@ -294,7 +294,8 @@ class ConsentControllerUnitTest {
 
             ArgumentCaptor<String> ip = ArgumentCaptor.forClass(String.class);
             verify(consentAcceptanceService).accept(any(), any(), any(), ip.capture());
-            assertThat(ip.getValue()).isEqualTo("70.41.3.18");
+            // The rightmost entry was appended by the trusted proxy; leading entries are client-supplied.
+            assertThat(ip.getValue()).isEqualTo("10.0.0.1");
         }
 
         @Test
