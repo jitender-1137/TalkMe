@@ -45,7 +45,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PresenceServiceImpl implements PresenceService {
+public class PresenceServiceImpl implements PresenceService, com.neo.chat.event.PresenceQueryPort {
 
     private final UserPresenceRepository userPresenceRepository;
     private final UserRepository userRepository;

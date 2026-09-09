@@ -4,8 +4,6 @@ import com.neo.chat.domain.OutboxEvent;
 import com.neo.chat.domain.User;
 import com.neo.chat.repository.OutboxEventRepository;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.service.NotificationDispatchService;
-import com.neo.chat.service.PresenceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,11 +27,11 @@ import java.util.Map;
 public class StatusDeliveryService implements OutboxDeliveryHandler {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final NotificationDispatchService notificationDispatchService;
+    private final NotificationDispatchPort notificationDispatchPort;
     private final UserRepository userRepository;
     private final OutboxEventRepository outboxRepo;
     private final ObjectMapper objectMapper;
-    private final PresenceService presenceService;
+    private final PresenceQueryPort presenceQueryPort;
 
     /**
      * The outbox event type this handler owns: {@code message.status}
@@ -86,7 +84,7 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
         User actor = event.getActorUserId() != null
                 ? userRepository.findById(event.getActorUserId()).orElse(null)
                 : null;
-        boolean actorGhost = actor != null && presenceService.isGhost(actor);
+        boolean actorGhost = actor != null && presenceQueryPort.isGhost(actor);
 
         if (!actorGhost) {
             Map<String, Object> wrapper = new HashMap<>();
@@ -110,7 +108,7 @@ public class StatusDeliveryService implements OutboxDeliveryHandler {
         // is from DB, so it is idempotent and safe to repeat on a re-drive.
         if (StatusUpdateEvent.READ.equals(event.getEventName()) && actor != null) {
             try {
-                notificationDispatchService.recomputeUnread(actor);
+                notificationDispatchPort.recomputeUnread(actor);
             } catch (org.springframework.dao.CannotAcquireLockException e) {
                 // Expected under concurrency: the hot users.total_unread_count counter lost a DB
                 // deadlock. recomputeUnread runs in its OWN (REQUIRES_NEW) transaction, so only that

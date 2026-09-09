@@ -33,7 +33,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NotificationDispatchServiceImpl implements NotificationDispatchService {
+public class NotificationDispatchServiceImpl implements NotificationDispatchService, com.neo.chat.event.NotificationDispatchPort {
 
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;

@@ -2,7 +2,6 @@ package com.neo.chat.security;
 
 import com.neo.chat.enums.FeatureKey;
 import com.neo.chat.exception.VerificationRequiredException;
-import com.neo.chat.service.FeatureAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -13,13 +12,13 @@ import org.springframework.stereotype.Component;
  * {@code @PreAuthorize("@featureGuard.check('FLIRT_LOBBY')")}. Uses the already-enabled
  * method security — no extra dependency (no AOP starter). WebSocket {@code @MessageMapping}
  * handlers, which don't run through {@code @PreAuthorize}, should call
- * {@link FeatureAccessService#hasAccess} directly at the top of the handler instead.
+ * {@link FeatureAccessPort#hasAccess} directly at the top of the handler instead.
  */
 @Component("featureGuard")
 @RequiredArgsConstructor
 public class FeatureGuard {
 
-    private final FeatureAccessService featureAccessService;
+    private final FeatureAccessPort featureAccessPort;
 
     /**
      * Evaluates whether the currently-authenticated user may access the given feature. Returns
@@ -39,10 +38,10 @@ public class FeatureGuard {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails cud)) return false;
         var user = cud.getUser();
-        if (featureAccessService.hasAccess(user, fk)) return true;
+        if (featureAccessPort.hasAccess(user, fk)) return true;
         // Denied. If the ONLY blocker is email verification, surface a specific, actionable error
         // (server-side enforcement — this fires even when the client bypasses the hidden/locked UI).
-        if (featureAccessService.isVerificationLocked(user, fk)) {
+        if (featureAccessPort.isVerificationLocked(user, fk)) {
             throw new VerificationRequiredException();
         }
         return false;

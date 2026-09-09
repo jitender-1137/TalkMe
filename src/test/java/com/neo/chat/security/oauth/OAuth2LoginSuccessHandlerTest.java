@@ -3,7 +3,6 @@ package com.neo.chat.security.oauth;
 import com.neo.chat.dto.OAuthUserInfo;
 import com.neo.chat.dto.response.JwtTokensResponse;
 import com.neo.chat.dto.response.LoginResponse;
-import com.neo.chat.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +36,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit test for {@link OAuth2LoginSuccessHandler} — maps the Google OIDC principal onto a
- * local account via {@link AuthService#oauthLogin}, sets the HttpOnly refresh + CSRF cookies,
+ * local account via {@link OAuthLoginPort#oauthLogin}, sets the HttpOnly refresh + CSRF cookies,
  * and redirects the SPA to {@code /#chats}. Covers attribute mapping (incl. the name-from-
  * given/family fallback and email_verified normalization), the best-effort People-API age/
  * gender path (present, no authorized-client-service, no client, fetch failure, non-OAuth2
@@ -48,7 +47,7 @@ import static org.mockito.Mockito.when;
 class OAuth2LoginSuccessHandlerTest {
 
     @Mock
-    private AuthService authService;
+    private OAuthLoginPort oauthLoginPort;
     @Mock
     private GoogleProfileService googleProfileService;
     @Mock
@@ -75,7 +74,7 @@ class OAuth2LoginSuccessHandlerTest {
      * wired to the mocked redirect strategy — settings are constructor-injected (immutable).
      */
     private OAuth2LoginSuccessHandler newHandler(boolean cookieSecure, String frontendBaseUrl) {
-        OAuth2LoginSuccessHandler h = new OAuth2LoginSuccessHandler(authService, googleProfileService,
+        OAuth2LoginSuccessHandler h = new OAuth2LoginSuccessHandler(oauthLoginPort, googleProfileService,
                 authorizedClientServiceProvider, tokenProvider, cookieSecure, "Lax", frontendBaseUrl);
         h.setRedirectStrategy(redirectStrategy);
         return h;
@@ -106,12 +105,12 @@ class OAuth2LoginSuccessHandlerTest {
         LoginResponse login = LoginResponse.builder()
                 .tokens(JwtTokensResponse.builder().refreshToken("refresh-tok").build())
                 .build();
-        when(authService.oauthLogin(any(OAuthUserInfo.class), any())).thenReturn(login);
+        when(oauthLoginPort.oauthLogin(any(OAuthUserInfo.class), any())).thenReturn(login);
     }
 
     private OAuthUserInfo captureInfo() {
         ArgumentCaptor<OAuthUserInfo> cap = ArgumentCaptor.forClass(OAuthUserInfo.class);
-        verify(authService).oauthLogin(cap.capture(), any());
+        verify(oauthLoginPort).oauthLogin(cap.capture(), any());
         return cap.getValue();
     }
 

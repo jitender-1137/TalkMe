@@ -3,7 +3,6 @@ package com.neo.chat.event;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.MessageResponse;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.service.NotificationDispatchService;
 import com.neo.chat.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +27,7 @@ public class MessageBroadcaster {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
-    private final NotificationDispatchService notificationDispatchService;
+    private final NotificationDispatchPort notificationDispatchPort;
 
     /**
      * Fans sent message out over WebSocket: a broadcast to the chat topic
@@ -74,7 +73,7 @@ public class MessageBroadcaster {
             try {
                 User recipient = recipients.get(username);
                 if (recipient != null) {
-                    notificationDispatchService.onNewMessage(
+                    notificationDispatchPort.onNewMessage(
                             recipient, chatUuid, response,
                             event.getSenderName(), event.getSenderProfileImage());
                 }

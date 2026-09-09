@@ -4,7 +4,6 @@ import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.enums.FeatureKey;
 import com.neo.chat.exception.VerificationRequiredException;
-import com.neo.chat.service.FeatureAccessService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,10 +25,10 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit test for the {@code @featureGuard.check(...)} SpEL bean {@link FeatureGuard}: unknown key,
- * no/typed authentication, and the entitlement delegation to {@link FeatureAccessService}.
+ * no/typed authentication, and the entitlement delegation to {@link FeatureAccessPort}.
  *
  * <p>Test style: pure Mockito ({@code @ExtendWith(MockitoExtension.class)}) with a mocked
- * {@link FeatureAccessService}; the {@code SecurityContextHolder} is populated per-test via the
+ * {@link FeatureAccessPort}; the {@code SecurityContextHolder} is populated per-test via the
  * {@code authenticateAsUser()} helper and cleared in {@code @AfterEach} to isolate the thread-local.
  */
 @ExtendWith(MockitoExtension.class)
@@ -37,7 +36,7 @@ import static org.mockito.Mockito.when;
 class FeatureGuardUnitTest {
 
     @Mock
-    private FeatureAccessService featureAccessService;
+    private FeatureAccessPort featureAccessPort;
     @InjectMocks
     private FeatureGuard guard;
 
@@ -59,14 +58,14 @@ class FeatureGuardUnitTest {
     void shouldReturnFalseForUnknownFeatureKey() {
         authenticateAsUser();
         assertThat(guard.check("not_a_feature")).isFalse();
-        verifyNoInteractions(featureAccessService);
+        verifyNoInteractions(featureAccessPort);
     }
 
     @Test
     void shouldReturnFalseWhenNoAuthentication() {
         // No SecurityContext authentication set.
         assertThat(guard.check("night_owl")).isFalse();
-        verifyNoInteractions(featureAccessService);
+        verifyNoInteractions(featureAccessPort);
     }
 
     @Test
@@ -75,23 +74,23 @@ class FeatureGuardUnitTest {
                 new UsernamePasswordAuthenticationToken("plain-string-principal", null));
 
         assertThat(guard.check("night_owl")).isFalse();
-        verifyNoInteractions(featureAccessService);
+        verifyNoInteractions(featureAccessPort);
     }
 
     @Test
     void shouldReturnTrueWhenServiceGrantsAccess() {
         User user = authenticateAsUser();
-        when(featureAccessService.hasAccess(user, FeatureKey.NIGHT_OWL)).thenReturn(true);
+        when(featureAccessPort.hasAccess(user, FeatureKey.NIGHT_OWL)).thenReturn(true);
 
         assertThat(guard.check("night_owl")).isTrue();
-        verify(featureAccessService).hasAccess(user, FeatureKey.NIGHT_OWL);
+        verify(featureAccessPort).hasAccess(user, FeatureKey.NIGHT_OWL);
     }
 
     @Test
     void shouldReturnFalseWhenServiceDeniesAccess() {
         User user = authenticateAsUser();
-        when(featureAccessService.hasAccess(any(), any())).thenReturn(false);
-        when(featureAccessService.isVerificationLocked(user, FeatureKey.NIGHT_OWL)).thenReturn(false);
+        when(featureAccessPort.hasAccess(any(), any())).thenReturn(false);
+        when(featureAccessPort.isVerificationLocked(user, FeatureKey.NIGHT_OWL)).thenReturn(false);
 
         assertThat(guard.check("night_owl")).isFalse();
     }
@@ -99,8 +98,8 @@ class FeatureGuardUnitTest {
     @Test
     void shouldThrowVerificationRequiredWhenLockedPendingVerification() {
         User user = authenticateAsUser();
-        when(featureAccessService.hasAccess(user, FeatureKey.FLIRT_LOBBY)).thenReturn(false);
-        when(featureAccessService.isVerificationLocked(user, FeatureKey.FLIRT_LOBBY)).thenReturn(true);
+        when(featureAccessPort.hasAccess(user, FeatureKey.FLIRT_LOBBY)).thenReturn(false);
+        when(featureAccessPort.isVerificationLocked(user, FeatureKey.FLIRT_LOBBY)).thenReturn(true);
 
         // A direct/bypass call gets an actionable, secure denial — not a bare Access Denied.
         assertThatThrownBy(() -> guard.check("flirt_lobby"))
@@ -111,7 +110,7 @@ class FeatureGuardUnitTest {
     @Test
     void shouldResolveWireKeyCaseInsensitively() {
         User user = authenticateAsUser();
-        when(featureAccessService.hasAccess(user, FeatureKey.NIGHT_OWL)).thenReturn(true);
+        when(featureAccessPort.hasAccess(user, FeatureKey.NIGHT_OWL)).thenReturn(true);
 
         assertThat(guard.check("NIGHT_OWL")).isTrue();
     }

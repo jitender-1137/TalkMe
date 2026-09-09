@@ -9,6 +9,7 @@ import com.neo.chat.enums.FeatureKey;
 import com.neo.chat.enums.GrantDecision;
 import com.neo.chat.enums.GrantScope;
 import com.neo.chat.repository.UserFeatureGrantRepository;
+import com.neo.chat.security.FeatureAccessPort;
 import com.neo.chat.service.AgeVerificationService;
 import com.neo.chat.service.FeatureAccessService;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class FeatureAccessServiceImpl implements FeatureAccessService {
+public class FeatureAccessServiceImpl implements FeatureAccessService, FeatureAccessPort {
 
     private final FeatureFlags featureFlags;
     private final UserFeatureGrantRepository grantRepository;

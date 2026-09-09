@@ -3,7 +3,7 @@ package com.neo.chat.event;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.MessageResponse;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.service.NotificationDispatchService;
+import com.neo.chat.event.NotificationDispatchPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,13 +43,13 @@ class MessageBroadcasterTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private NotificationDispatchService notificationDispatchService;
+    private NotificationDispatchPort notificationDispatchPort;
 
     private MessageBroadcaster broadcaster;
 
     @BeforeEach
     void setUp() {
-        broadcaster = new MessageBroadcaster(messagingTemplate, userRepository, notificationDispatchService);
+        broadcaster = new MessageBroadcaster(messagingTemplate, userRepository, notificationDispatchPort);
     }
 
     private MessageResponse response() {
@@ -97,7 +97,7 @@ class MessageBroadcasterTest {
 
             verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-9/messages"), (Object) any());
             verify(messagingTemplate, never()).convertAndSendToUser(any(), any(), any());
-            verifyNoInteractions(userRepository, notificationDispatchService);
+            verifyNoInteractions(userRepository, notificationDispatchPort);
         }
 
         @Test
@@ -107,7 +107,7 @@ class MessageBroadcasterTest {
 
             verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-9/messages"), (Object) any());
             verify(messagingTemplate, never()).convertAndSendToUser(any(), any(), any());
-            verifyNoInteractions(userRepository, notificationDispatchService);
+            verifyNoInteractions(userRepository, notificationDispatchPort);
         }
     }
 
@@ -128,9 +128,9 @@ class MessageBroadcasterTest {
             verify(userRepository).findByUsernameIn(List.of("bob", "carol"));
             verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/chats"), any());
             verify(messagingTemplate).convertAndSendToUser(eq("carol"), eq("/queue/chats"), any());
-            verify(notificationDispatchService).onNewMessage(
+            verify(notificationDispatchPort).onNewMessage(
                     eq(bob), eq("chat-9"), any(MessageResponse.class), eq("Alice"), eq("http://img/alice.png"));
-            verify(notificationDispatchService).onNewMessage(
+            verify(notificationDispatchPort).onNewMessage(
                     eq(carol), eq("chat-9"), any(MessageResponse.class), eq("Alice"), eq("http://img/alice.png"));
         }
 
@@ -161,7 +161,7 @@ class MessageBroadcasterTest {
             broadcaster.broadcast(event(List.of("ghost")));
 
             verify(messagingTemplate).convertAndSendToUser(eq("ghost"), eq("/queue/chats"), any());
-            verify(notificationDispatchService, never()).onNewMessage(any(), any(), any(), any(), any());
+            verify(notificationDispatchPort, never()).onNewMessage(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -172,14 +172,14 @@ class MessageBroadcasterTest {
             when(userRepository.findByUsernameIn(List.of("bob", "carol")))
                     .thenReturn(List.of(bob, carol));
             doThrow(new RuntimeException("push down"))
-                    .when(notificationDispatchService)
+                    .when(notificationDispatchPort)
                     .onNewMessage(eq(bob), any(), any(), any(), any());
 
             broadcaster.broadcast(event(List.of("bob", "carol")));
 
             // carol still received her queue event and notification despite bob's failure.
             verify(messagingTemplate).convertAndSendToUser(eq("carol"), eq("/queue/chats"), any());
-            verify(notificationDispatchService).onNewMessage(eq(carol), any(), any(), any(), any());
+            verify(notificationDispatchPort).onNewMessage(eq(carol), any(), any(), any(), any());
         }
     }
 }

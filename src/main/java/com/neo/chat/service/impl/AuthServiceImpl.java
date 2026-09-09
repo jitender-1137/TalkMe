@@ -36,6 +36,7 @@ import com.neo.chat.repository.SessionRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.security.JwtTokenProvider;
+import com.neo.chat.security.oauth.OAuthLoginPort;
 import com.neo.chat.service.AuthService;
 import com.neo.chat.service.CountryDetectionService;
 import com.neo.chat.service.EmailService;
@@ -88,7 +89,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-public class AuthServiceImpl implements AuthService {
+public class AuthServiceImpl implements AuthService, OAuthLoginPort {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;

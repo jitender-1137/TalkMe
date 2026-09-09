@@ -4,8 +4,8 @@ import com.neo.chat.domain.OutboxEvent;
 import com.neo.chat.domain.User;
 import com.neo.chat.repository.OutboxEventRepository;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.service.NotificationDispatchService;
-import com.neo.chat.service.PresenceService;
+import com.neo.chat.event.NotificationDispatchPort;
+import com.neo.chat.event.PresenceQueryPort;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +46,7 @@ class StatusDeliveryServiceTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
     @Mock
-    private NotificationDispatchService notificationDispatchService;
+    private NotificationDispatchPort notificationDispatchPort;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -54,15 +54,15 @@ class StatusDeliveryServiceTest {
     @Mock
     private ObjectMapper objectMapper;
     @Mock
-    private PresenceService presenceService;
+    private PresenceQueryPort presenceQueryPort;
 
     private StatusDeliveryService service;
 
     @BeforeEach
     void setUp() {
         service = new StatusDeliveryService(
-                messagingTemplate, notificationDispatchService, userRepository, outboxRepo,
-                objectMapper, presenceService);
+                messagingTemplate, notificationDispatchPort, userRepository, outboxRepo,
+                objectMapper, presenceQueryPort);
     }
 
     private User actor(long id) {
@@ -112,7 +112,7 @@ class StatusDeliveryServiceTest {
         void readNonGhostFullPath() {
             User actor = actor(7L);
             when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
-            when(presenceService.isGhost(actor)).thenReturn(false);
+            when(presenceQueryPort.isGhost(actor)).thenReturn(false);
 
             service.deliverOnce(read(7L, "evk-r"));
 
@@ -128,7 +128,7 @@ class StatusDeliveryServiceTest {
             assertThat(payload).containsEntry("readBy", "actor-uuid");
             assertThat(payload).doesNotContainKey("deliveredBy");
 
-            verify(notificationDispatchService).recomputeUnread(actor);
+            verify(notificationDispatchPort).recomputeUnread(actor);
             verify(outboxRepo).markPublished(eq("evk-r"), any());
         }
 
@@ -137,7 +137,7 @@ class StatusDeliveryServiceTest {
         void deliveredNonGhost() {
             User actor = actor(7L);
             when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
-            when(presenceService.isGhost(actor)).thenReturn(false);
+            when(presenceQueryPort.isGhost(actor)).thenReturn(false);
 
             service.deliverOnce(delivered(7L));
 
@@ -149,7 +149,7 @@ class StatusDeliveryServiceTest {
             Map<String, Object> payload = (Map<String, Object>) wrapper.get("payload");
             assertThat(payload).containsEntry("deliveredBy", "actor-uuid");
             assertThat(payload).doesNotContainKey("readBy");
-            verify(notificationDispatchService, never()).recomputeUnread(any());
+            verify(notificationDispatchPort, never()).recomputeUnread(any());
             verify(outboxRepo).markPublished(eq("evk-d"), any());
         }
 
@@ -158,12 +158,12 @@ class StatusDeliveryServiceTest {
         void ghostSuppressesBroadcastButRecomputesUnread() {
             User actor = actor(7L);
             when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
-            when(presenceService.isGhost(actor)).thenReturn(true);
+            when(presenceQueryPort.isGhost(actor)).thenReturn(true);
 
             service.deliverOnce(read(7L, "evk-r"));
 
             verify(messagingTemplate, never()).convertAndSend(anyTopic(), any(Object.class));
-            verify(notificationDispatchService).recomputeUnread(actor);
+            verify(notificationDispatchPort).recomputeUnread(actor);
             verify(outboxRepo).markPublished(eq("evk-r"), any());
         }
 
@@ -174,7 +174,7 @@ class StatusDeliveryServiceTest {
 
             verify(userRepository, never()).findById(any());
             verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-2/messages"), any(Object.class));
-            verify(notificationDispatchService, never()).recomputeUnread(any());
+            verify(notificationDispatchPort, never()).recomputeUnread(any());
             verify(outboxRepo).markPublished(eq("evk-r"), any());
         }
 
@@ -186,7 +186,7 @@ class StatusDeliveryServiceTest {
             service.deliverOnce(read(7L, "evk-r"));
 
             verify(messagingTemplate).convertAndSend(eq("/topic/chat/chat-2/messages"), any(Object.class));
-            verify(notificationDispatchService, never()).recomputeUnread(any());
+            verify(notificationDispatchPort, never()).recomputeUnread(any());
         }
 
         @Test
@@ -203,9 +203,9 @@ class StatusDeliveryServiceTest {
         void recomputeDeadlockSwallowed() {
             User actor = actor(7L);
             when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
-            when(presenceService.isGhost(actor)).thenReturn(false);
+            when(presenceQueryPort.isGhost(actor)).thenReturn(false);
             doThrow(new org.springframework.dao.CannotAcquireLockException("deadlock detected"))
-                    .when(notificationDispatchService).recomputeUnread(actor);
+                    .when(notificationDispatchPort).recomputeUnread(actor);
 
             // Must NOT throw — otherwise the outbox delivery / status broadcast transaction is failed
             // and the row loops on re-drive (the exact production symptom).
@@ -220,9 +220,9 @@ class StatusDeliveryServiceTest {
         void recomputeFailureSwallowed() {
             User actor = actor(7L);
             when(userRepository.findById(7L)).thenReturn(Optional.of(actor));
-            when(presenceService.isGhost(actor)).thenReturn(false);
+            when(presenceQueryPort.isGhost(actor)).thenReturn(false);
             doThrow(new RuntimeException("recompute down"))
-                    .when(notificationDispatchService).recomputeUnread(actor);
+                    .when(notificationDispatchPort).recomputeUnread(actor);
 
             service.deliverOnce(read(7L, "evk-r"));
 
