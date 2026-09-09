@@ -1,6 +1,5 @@
 package com.neo.chat.dto.response;
 
-import com.neo.chat.config.AdsProperties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,5 +33,27 @@ public class AdsConfigResponse {
     private String popunderScriptUrl;
     private String socialBarScriptUrl;
     private int frequencyCapPerSession;
-    private Map<String, AdsProperties.Placement> placements;
+    private Map<String, Placement> placements;
+
+    /**
+     * Per-surface ad placement config exposed to the client. Field names mirror
+     * {@code AdsProperties.Placement} so the JSON contract is byte-identical; kept as an
+     * independent DTO type so the {@code dto} package does not depend on {@code config}
+     * (BootUI ARCH-PKG-001). Mapped from the config type in {@code AdsController}.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Placement {
+        private boolean enabled;
+        private int everyN;
+        private int maxPerSession;
+        private String unitId;
+        private String provider;
+        private String scriptUrl;
+        private String format;
+        private int width;
+        private int height;
+    }
 }

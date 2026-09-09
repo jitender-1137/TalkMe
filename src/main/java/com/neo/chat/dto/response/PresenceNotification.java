@@ -1,4 +1,4 @@
-package com.neo.chat.websocket;
+package com.neo.chat.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

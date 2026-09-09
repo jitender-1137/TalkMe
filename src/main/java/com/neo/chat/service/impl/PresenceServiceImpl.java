@@ -7,7 +7,7 @@ import com.neo.chat.repository.UserPresenceRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.util.LogSanitizer;
-import com.neo.chat.websocket.PresenceNotification;
+import com.neo.chat.dto.response.PresenceNotification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

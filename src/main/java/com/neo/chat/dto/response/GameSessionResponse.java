@@ -2,7 +2,7 @@ package com.neo.chat.dto.response;
 
 import com.neo.chat.domain.GameSession;
 import com.neo.chat.enums.GameState;
-import com.neo.chat.service.GamePromptBank;
+import com.neo.chat.enums.GamePromptBank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

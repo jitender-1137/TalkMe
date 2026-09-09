@@ -1,6 +1,7 @@
 package com.neo.chat.dto.response;
 
-import com.neo.chat.util.MessageResolver;
+import com.neo.chat.dto.MessageResolver;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

@@ -14,7 +14,7 @@ import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.NotFoundException;
 import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.TopicRoomChatRepository;
-import com.neo.chat.service.GamePromptBank;
+import com.neo.chat.enums.GamePromptBank;
 import com.neo.chat.service.GroupService;
 import com.neo.chat.service.LiveRoomService;
 import com.neo.chat.service.PresenceService;

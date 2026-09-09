@@ -1,7 +1,6 @@
-package com.neo.chat.cache;
+package com.neo.chat.event;
 
 import com.neo.chat.dto.response.MessageResponse;
-import com.neo.chat.event.MessageSentEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -25,6 +24,10 @@ import java.util.Map;
  *
  * <p>All keys carry a 7-day TTL. A cache miss is always safe — callers fall
  * back to the DB.
+ *
+ * <p>Lives in the {@code event} slice (not {@code cache}) because it is driven by
+ * {@code @EventListener} on {@code MessageSentEvent}; keeping the listener beside the event it
+ * consumes avoids a {@code cache -> event} package cycle (BootUI ARCH-PKG-001).
  */
 @Slf4j
 @Component

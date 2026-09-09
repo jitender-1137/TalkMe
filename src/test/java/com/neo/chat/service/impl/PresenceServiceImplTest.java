@@ -5,7 +5,7 @@ import com.neo.chat.domain.UserPresence;
 import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.repository.UserPresenceRepository;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.websocket.PresenceNotification;
+import com.neo.chat.dto.response.PresenceNotification;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

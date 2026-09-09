@@ -1,4 +1,4 @@
-package com.neo.chat.cache;
+package com.neo.chat.event;
 
 import com.neo.chat.dto.response.MessageResponse;
 import com.neo.chat.event.MessageSentEvent;

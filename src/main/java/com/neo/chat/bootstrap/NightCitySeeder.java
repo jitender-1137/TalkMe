@@ -1,5 +1,6 @@
-package com.neo.chat.config;
+package com.neo.chat.bootstrap;
 
+import com.neo.chat.config.SuperAdminSeeder;
 import com.neo.chat.domain.Chat;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.request.CreateGroupRequest;
@@ -8,7 +9,6 @@ import com.neo.chat.enums.CityLocation;
 import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.GroupService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +36,10 @@ import java.util.UUID;
  * <p>NOTE: {@code run()} is deliberately NOT {@code @Transactional}. Each {@code createGroup} owns its
  * own transaction, so one district failing to seed can't mark a shared transaction rollback-only and
  * poison the rest — every district is attempted independently.
+ *
+ * <p>Lives in the {@code bootstrap} slice (not {@code config}) so boot-time seeding, which
+ * reaches into {@code service}, does not create a {@code config -> service} package cycle
+ * (BootUI ARCH-PKG-001).
  */
 @Slf4j
 @Component

@@ -16,7 +16,7 @@ import com.neo.chat.repository.ChatFlirtModeRepository;
 import com.neo.chat.repository.ChatMemberRepository;
 import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.GameSessionRepository;
-import com.neo.chat.service.GamePromptBank;
+import com.neo.chat.enums.GamePromptBank;
 import com.neo.chat.service.ReputationRecorder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

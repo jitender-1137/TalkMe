@@ -1,4 +1,4 @@
-package com.neo.chat.util;
+package com.neo.chat.dto;
 
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
  * without requiring Spring bean injection at the call site.
  * <p>
  * Usage: MessageResolver.get("TM_210") → "Post created successfully."
+ * <p>Lives in the {@code dto} slice so {@code ResponseDto} can localize its messages without a
+ * {@code dto -> util} package dependency (BootUI ARCH-PKG-001).
  */
 @Component
 public class MessageResolver {

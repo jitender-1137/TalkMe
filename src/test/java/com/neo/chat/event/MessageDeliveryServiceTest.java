@@ -1,6 +1,6 @@
 package com.neo.chat.event;
 
-import com.neo.chat.cache.RedisMessageCache;
+import com.neo.chat.event.RedisMessageCache;
 import com.neo.chat.config.RabbitConfig;
 import com.neo.chat.domain.OutboxEvent;
 import com.neo.chat.dto.response.MessageResponse;

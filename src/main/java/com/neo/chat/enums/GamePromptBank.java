@@ -1,6 +1,5 @@
-package com.neo.chat.service;
+package com.neo.chat.enums;
 
-import com.neo.chat.enums.GameType;
 
 import java.util.List;
 import java.util.Map;
@@ -14,6 +13,10 @@ import java.util.Map;
  * <p>The {@code adult} decks (flirty/spicy) are only reachable when Flirt Mode is active for both
  * participants (enforced in {@code GameServiceImpl.start}). Their prompts are deliberately
  * suggestive/romantic rather than explicit.
+ *
+ * <p>Lives in the {@code enums} slice (beside {@link GameType}, which keys it) rather than
+ * {@code service}: a dependency-free constant bank kept low avoids a {@code dto -> service}
+ * cycle via {@code GameSessionResponse} (BootUI ARCH-PKG-001).
  */
 public final class GamePromptBank {
 

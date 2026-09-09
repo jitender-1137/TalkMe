@@ -52,7 +52,22 @@ public class AdsController {
                 .popunderScriptUrl(adsProperties.getPopunderScriptUrl())
                 .socialBarScriptUrl(adsProperties.getSocialBarScriptUrl())
                 .frequencyCapPerSession(adsProperties.getFrequencyCapPerSession())
-                .placements(adsProperties.getPlacements())
+                .placements(adsProperties.getPlacements() == null ? java.util.Map.of()
+                        : adsProperties.getPlacements().entrySet().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                java.util.Map.Entry::getKey,
+                                e -> AdsConfigResponse.Placement.builder()
+                                        .enabled(e.getValue().isEnabled())
+                                        .everyN(e.getValue().getEveryN())
+                                        .maxPerSession(e.getValue().getMaxPerSession())
+                                        .unitId(e.getValue().getUnitId())
+                                        .provider(e.getValue().getProvider())
+                                        .scriptUrl(e.getValue().getScriptUrl())
+                                        .format(e.getValue().getFormat())
+                                        .width(e.getValue().getWidth())
+                                        .height(e.getValue().getHeight())
+                                        .build(),
+                                (a, b) -> a, java.util.LinkedHashMap::new)))
                 .build();
         return ResponseEntity.ok(SuccessResponseDto.success(res));
     }
