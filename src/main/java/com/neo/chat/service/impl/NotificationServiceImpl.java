@@ -93,7 +93,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void createNotification(User user, String title, String content, String type, String referenceId) {
-        createNotification(user, title, content, type, referenceId, null, null);
+        persistAndPushNotification(user, title, content, type, referenceId, null, null);
     }
 
     /**
@@ -113,6 +113,19 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional
     public void createNotification(User user, String title, String content, String type,
                                    String referenceId, User actor, String imageUrl) {
+        persistAndPushNotification(user, title, content, type, referenceId, actor, imageUrl);
+    }
+
+    /**
+     * Proxy-free counterpart of the 7-arg {@link #createNotification} for same-bean callers
+     * (the 5-arg overload and the {@code notifyFriends}/{@code notifyFollowersAndFollowing} fan-outs).
+     * Intentionally NOT {@code @Transactional}: it runs inside the caller's existing transaction —
+     * exactly as the previous self-invocation did — so a per-recipient failure caught in the fan-out
+     * loop does NOT cross a transaction-advice boundary and cannot mark the batch rollback-only
+     * (BootUI ARCH-SPRING-004). External callers still use the public @Transactional method.
+     */
+    private void persistAndPushNotification(User user, String title, String content, String type,
+                                            String referenceId, User actor, String imageUrl) {
         log.info("Creating notification '{}' for user: {}", title, user.getUuid());
         Notification notification = Notification.builder()
                 .user(user)
@@ -169,7 +182,7 @@ public class NotificationServiceImpl implements NotificationService {
                 continue;
             }
             try {
-                createNotification(friend, title, content, type, referenceId, actor, imageUrl);
+                persistAndPushNotification(friend, title, content, type, referenceId, actor, imageUrl);
             } catch (Exception e) {
                 log.warn("Failed to notify friend {} of activity by {}", friend.getUuid(), actor.getUuid(), e);
             }
@@ -213,7 +226,7 @@ public class NotificationServiceImpl implements NotificationService {
                 continue;
             }
             try {
-                createNotification(recipient, title, content, type, referenceId, actor, imageUrl);
+                persistAndPushNotification(recipient, title, content, type, referenceId, actor, imageUrl);
             } catch (Exception e) {
                 log.warn("Failed to notify {} of activity by {}", recipient.getUuid(), actor.getUuid(), e);
             }

@@ -21,7 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -65,10 +64,9 @@ class BucketListServiceImplTest {
     private ChatMemberRepository chatMemberRepository;
     @Mock
     private SimpMessagingTemplate messagingTemplate;
-    @Mock
-    private ObjectProvider<BucketListServiceImpl> self;
-    @Mock
-    private BucketListServiceImpl selfProxy;
+    // Real collaborator (thin: only wraps the repo) so its REQUIRES_NEW insert runs the real
+    // save against the mocked repository — reproducing the old self-proxy path exactly.
+    private BucketListRowCreator rowCreator;
     @Mock
     private Chat chat;
     @Mock
@@ -83,8 +81,9 @@ class BucketListServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        rowCreator = new BucketListRowCreator(bucketListRepository);
         service = new BucketListServiceImpl(bucketListRepository, bucketListItemRepository,
-                chatRepository, chatMemberRepository, messagingTemplate, self);
+                chatRepository, chatMemberRepository, messagingTemplate, rowCreator);
         user = User.builder().username("alice").name("Alice").build();
         user.setId(7L);
     }
@@ -182,8 +181,7 @@ class BucketListServiceImplTest {
             asMember();
             when(bucketListRepository.findByChatUuid(CHAT_ID)).thenReturn(Optional.empty());
             BucketList created = list();
-            when(self.getObject()).thenReturn(selfProxy);
-            when(selfProxy.createListInNewTx(CHAT_ID)).thenReturn(created);
+            when(bucketListRepository.save(any())).thenReturn(created);
             when(bucketListItemRepository.findByBucketListOrderByOrderIndexAsc(created))
                     .thenReturn(List.of());
 
@@ -191,7 +189,7 @@ class BucketListServiceImplTest {
 
             assertThat(res.getChatId()).isEqualTo(CHAT_ID);
             assertThat(res.getItems()).isEmpty();
-            verify(selfProxy).createListInNewTx(CHAT_ID);
+            verify(bucketListRepository).save(any());
         }
 
         @Test
@@ -202,8 +200,7 @@ class BucketListServiceImplTest {
             when(bucketListRepository.findByChatUuid(CHAT_ID))
                     .thenReturn(Optional.empty())
                     .thenReturn(Optional.of(winner));
-            when(self.getObject()).thenReturn(selfProxy);
-            when(selfProxy.createListInNewTx(CHAT_ID))
+            when(bucketListRepository.save(any()))
                     .thenThrow(new DataIntegrityViolationException("dup"));
             when(bucketListItemRepository.findByBucketListOrderByOrderIndexAsc(winner))
                     .thenReturn(List.of());
@@ -218,8 +215,7 @@ class BucketListServiceImplTest {
         void raceReReadAbsentPropagates() {
             asMember();
             when(bucketListRepository.findByChatUuid(CHAT_ID)).thenReturn(Optional.empty());
-            when(self.getObject()).thenReturn(selfProxy);
-            when(selfProxy.createListInNewTx(CHAT_ID))
+            when(bucketListRepository.save(any()))
                     .thenThrow(new DataIntegrityViolationException("dup"));
 
             assertThatThrownBy(() -> service.getList(user, CHAT_ID))
@@ -450,24 +446,4 @@ class BucketListServiceImplTest {
         }
     }
 
-    // ── createListInNewTx ────────────────────────────────────────────────────────
-
-    @Nested
-    @DisplayName("createListInNewTx")
-    class CreateListInNewTx {
-
-        @Test
-        @DisplayName("persists a fresh list row bound to the chat uuid")
-        void persistsRow() {
-            BucketList saved = list();
-            when(bucketListRepository.save(any())).thenReturn(saved);
-
-            BucketList result = service.createListInNewTx(CHAT_ID);
-
-            assertThat(result).isSameAs(saved);
-            ArgumentCaptor<BucketList> cap = ArgumentCaptor.forClass(BucketList.class);
-            verify(bucketListRepository).save(cap.capture());
-            assertThat(cap.getValue().getChatUuid()).isEqualTo(CHAT_ID);
-        }
-    }
 }

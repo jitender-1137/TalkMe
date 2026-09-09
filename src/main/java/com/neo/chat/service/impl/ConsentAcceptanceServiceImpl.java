@@ -45,10 +45,18 @@ public class ConsentAcceptanceServiceImpl implements ConsentAcceptanceService {
     @Override
     @Transactional(readOnly = true)
     public ConsentStatusResponse getStatus(User user) {
+        return computeStatus(user);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #getStatus(User)} so {@link #accept} (write tx)
+     * can build the fresh status without self-invoking a proxied method (BootUI ARCH-SPRING-004).
+     */
+    private ConsentStatusResponse computeStatus(User user) {
         Map<String, Boolean> accepted = new HashMap<>();
         Map<String, String> required = new HashMap<>();
         for (ConsentType type : ConsentType.values()) {
-            accepted.put(type.name(), hasAcceptedCurrent(user, type));
+            accepted.put(type.name(), hasAcceptedCurrentInternal(user, type));
             required.put(type.name(), consentProperties.requiredVersion(type));
         }
         boolean ageOk = user.getAge() != null && user.getAge() >= MIN_AGE
@@ -95,7 +103,7 @@ public class ConsentAcceptanceServiceImpl implements ConsentAcceptanceService {
         // Consent can flip age-verification / flirt-lobby entitlement — invalidate cache.
         featureAccessCache.evict(user.getId());
         log.info("Consent accepted: user={} type={} version={}", user.getId(), type, effective);
-        return getStatus(user);
+        return computeStatus(user);
     }
 
     /**
@@ -108,6 +116,11 @@ public class ConsentAcceptanceServiceImpl implements ConsentAcceptanceService {
     @Override
     @Transactional(readOnly = true)
     public boolean hasAcceptedCurrent(User user, ConsentType type) {
+        return hasAcceptedCurrentInternal(user, type);
+    }
+
+    /** Proxy-free counterpart of {@link #hasAcceptedCurrent} (BootUI ARCH-SPRING-004). */
+    private boolean hasAcceptedCurrentInternal(User user, ConsentType type) {
         String required = consentProperties.requiredVersion(type);
         return consentRepository.findByUserAndConsentType(user, type)
                 .map(c -> required.equals(c.getConsentVersion()))

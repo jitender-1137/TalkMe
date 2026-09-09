@@ -48,6 +48,16 @@ public class ChatKeyService {
      */
     @Transactional
     public SecretKey getOrCreateSecretKey(Long chatId) {
+        return resolveOrCreateSecretKey(chatId);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #getOrCreateSecretKey(Long)} so the same-bean
+     * caller {@link #getRawKeyBase64(Long)} joins the caller's transaction directly rather than
+     * self-invoking a proxied method (BootUI ARCH-SPRING-004). Both public entry points are
+     * {@code @Transactional}, so the transactional boundary is unchanged.
+     */
+    private SecretKey resolveOrCreateSecretKey(Long chatId) {
         SecretKey cached = cache.get(chatId);
         if (cached != null) return cached;
 
@@ -84,6 +94,6 @@ public class ChatKeyService {
      */
     @Transactional
     public String getRawKeyBase64(Long chatId) {
-        return Base64.getEncoder().encodeToString(getOrCreateSecretKey(chatId).getEncoded());
+        return Base64.getEncoder().encodeToString(resolveOrCreateSecretKey(chatId).getEncoded());
     }
 }

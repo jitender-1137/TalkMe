@@ -267,6 +267,11 @@ public class StudyRoomServiceImpl implements StudyRoomService {
     @Override
     @Transactional(readOnly = true)
     public StudySessionResponse getSession(String roomUuid) {
+        return computeSession(roomUuid);
+    }
+
+    /** Proxy-free counterpart of {@link #getSession} for same-bean callers (BootUI ARCH-SPRING-004). */
+    private StudySessionResponse computeSession(String roomUuid) {
         StudySessionResponse state = readFreshState(roomUuid);
         if (state != null) {
             return state;
@@ -307,7 +312,7 @@ public class StudyRoomServiceImpl implements StudyRoomService {
         payload.put("username", user.getUsername());
         payload.put("note", trimmed);
         broadcast(roomUuid, "stuck", payload);
-        return getSession(roomUuid);
+        return computeSession(roomUuid);
     }
 
     /**

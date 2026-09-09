@@ -81,6 +81,10 @@ class FlirtModeServiceImplTest {
     @Mock
     private ObjectProvider<FlirtModeServiceImpl> self;
 
+    // Real collaborator (thin: chatRepo + flirtRepo) so its REQUIRES_NEW insert runs the real
+    // getReferenceById+save against the mocks — reproducing the old self-proxy create path.
+    private FlirtModeRowCreator rowCreator;
+
     private FlirtModeServiceImpl service;
 
     private User lowUser;   // id 10
@@ -88,7 +92,8 @@ class FlirtModeServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new FlirtModeServiceImpl(chatRepository, flirtModeRepository, messagingTemplate, self);
+        rowCreator = new FlirtModeRowCreator(chatRepository, flirtModeRepository);
+        service = new FlirtModeServiceImpl(chatRepository, flirtModeRepository, messagingTemplate, self, rowCreator);
 
         lowUser = userWithId(LOW_ID, "low_user");
         highUser = userWithId(HIGH_ID, "high_user");
@@ -352,9 +357,8 @@ class FlirtModeServiceImplTest {
             assertThat(finalRow.isEnabledByLow()).isTrue();
             assertThat(finalRow.isEnabledByHigh()).isFalse();
             assertThat(finalRow.isActive()).isFalse();
-            // Create path was taken via the self-proxy.
+            // Create path was taken through the row-creator collaborator (real instance).
             verify(chatRepository).getReferenceById(CHAT_PK);
-            verify(self, Mockito.atLeastOnce()).getObject();
         }
 
         @Test
@@ -509,21 +513,6 @@ class FlirtModeServiceImplTest {
                     .isInstanceOf(DataIntegrityViolationException.class);
         }
 
-        @Test
-        void createRowInNewTxShouldBuildFreshRowKeyedLowHighAllDisabled() {
-            Chat ref = privateChat(lowUser, highUser);
-            when(chatRepository.getReferenceById(CHAT_PK)).thenReturn(ref);
-
-            ChatFlirtMode created = service.createRowInNewTx(CHAT_PK, LOW_ID, HIGH_ID);
-
-            assertThat(created.getLowUserId()).isEqualTo(LOW_ID);
-            assertThat(created.getHighUserId()).isEqualTo(HIGH_ID);
-            assertThat(created.isEnabledByLow()).isFalse();
-            assertThat(created.isEnabledByHigh()).isFalse();
-            assertThat(created.isActive()).isFalse();
-            assertThat(created.getChat()).isSameAs(ref);
-            verify(flirtModeRepository).save(any(ChatFlirtMode.class));
-        }
     }
 
     @Test

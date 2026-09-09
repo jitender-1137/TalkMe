@@ -79,6 +79,15 @@ public class CosmeticServiceImpl implements CosmeticService {
     @Override
     @Transactional(readOnly = true)
     public List<CosmeticResponse> myCosmetics(User user) {
+        return computeMyCosmetics(user);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #myCosmetics(User)} for same-bean callers
+     * ({@link #equip}, {@link #unequip}), which run inside the class-level write transaction
+     * (BootUI ARCH-SPRING-004).
+     */
+    private List<CosmeticResponse> computeMyCosmetics(User user) {
         UserReputation rep = reputationRepo.findByUser(user).orElse(null);
         Map<String, UserCosmetic> owned = ownedByCode(user);
         Set<String> ownedBadgeCodes = ownedBadgeCodes();
@@ -148,7 +157,7 @@ public class CosmeticServiceImpl implements CosmeticService {
         }
         userCosmeticRepo.save(existing);
 
-        return myCosmetics(user);
+        return computeMyCosmetics(user);
     }
 
     /**
@@ -171,7 +180,7 @@ public class CosmeticServiceImpl implements CosmeticService {
                 userCosmeticRepo.save(uc);
             }
         }
-        return myCosmetics(user);
+        return computeMyCosmetics(user);
     }
 
     // ---- helpers -------------------------------------------------------------------

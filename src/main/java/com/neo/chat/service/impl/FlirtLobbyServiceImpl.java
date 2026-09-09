@@ -40,7 +40,7 @@ public class FlirtLobbyServiceImpl implements FlirtLobbyService {
     @Transactional(readOnly = true)
     public List<NightUserCard> enter(User user) {
         redis.opsForSet().add(KEY, user.getUsername());
-        return roster(user);
+        return computeRoster(user);
     }
 
     /**
@@ -63,6 +63,11 @@ public class FlirtLobbyServiceImpl implements FlirtLobbyService {
     @Override
     @Transactional(readOnly = true)
     public List<NightUserCard> roster(User viewer) {
+        return computeRoster(viewer);
+    }
+
+    /** Proxy-free counterpart of {@link #roster} for same-bean callers (BootUI ARCH-SPRING-004). */
+    private List<NightUserCard> computeRoster(User viewer) {
         Set<String> members = redis.opsForSet().members(KEY);
         if (members == null || members.isEmpty()) return List.of();
         Set<String> online = presenceService.getOnlineUsernames();

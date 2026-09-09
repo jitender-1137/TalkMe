@@ -58,7 +58,7 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     @Transactional(readOnly = true)
     public boolean hasAccess(User user, FeatureKey key) {
         if (user == null || key == null) return false;
-        return effectiveWireNames(user).contains(key.wireName());
+        return computeEffectiveWireNames(user).contains(key.wireName());
     }
 
     /**
@@ -70,6 +70,14 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     @Override
     @Transactional(readOnly = true)
     public Set<FeatureKey> effectiveKeys(User user) {
+        return computeEffectiveKeys(user);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #effectiveKeys(User)} so same-bean callers
+     * (e.g. {@link #effectiveWireNames(User)}) don't self-invoke a proxied method (BootUI ARCH-SPRING-004).
+     */
+    private Set<FeatureKey> computeEffectiveKeys(User user) {
         List<UserFeatureGrant> grants = grantRepository.findByUser(user);
         Instant now = Instant.now();
         EnumSet<FeatureKey> result = EnumSet.noneOf(FeatureKey.class);
@@ -90,7 +98,14 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     @Override
     @Transactional(readOnly = true)
     public Set<String> effectiveWireNames(User user) {
-        return cache.getOrCompute(user.getId(), () -> effectiveKeys(user).stream()
+        return computeEffectiveWireNames(user);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #effectiveWireNames(User)} (BootUI ARCH-SPRING-004).
+     */
+    private Set<String> computeEffectiveWireNames(User user) {
+        return cache.getOrCompute(user.getId(), () -> computeEffectiveKeys(user).stream()
                 .map(FeatureKey::wireName)
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
     }
@@ -104,6 +119,13 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     @Override
     @Transactional(readOnly = true)
     public Set<FeatureKey> verificationLockedKeys(User user) {
+        return computeVerificationLockedKeys(user);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #verificationLockedKeys(User)} (BootUI ARCH-SPRING-004).
+     */
+    private Set<FeatureKey> computeVerificationLockedKeys(User user) {
         if (user == null || !featureFlags.isRequireVerified() || user.isVerified()) {
             return EnumSet.noneOf(FeatureKey.class);
         }
@@ -121,7 +143,7 @@ public class FeatureAccessServiceImpl implements FeatureAccessService {
     @Override
     @Transactional(readOnly = true)
     public Set<String> verificationLockedWireNames(User user) {
-        return verificationLockedKeys(user).stream()
+        return computeVerificationLockedKeys(user).stream()
                 .map(FeatureKey::wireName)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }

@@ -174,7 +174,7 @@ public class FriendServiceImpl implements FriendService {
         Optional<FriendRequest> reverseRequestOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(receiver, currentUser);
         if (reverseRequestOpt.isPresent() && reverseRequestOpt.get().getStatus() == FriendRequestStatus.PENDING) {
             // Auto-accept if the other user already sent one
-            acceptFriendRequest(reverseRequestOpt.get().getUuid().toString(), currentUser);
+            doAcceptFriendRequest(reverseRequestOpt.get().getUuid().toString(), currentUser);
             return friendRequestMapper.toResponse(reverseRequestOpt.get());
         }
 
@@ -220,6 +220,11 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public void acceptFriendRequest(String requestUuid, User currentUser) {
+        doAcceptFriendRequest(requestUuid, currentUser);
+    }
+
+    /** Proxy-free counterpart of {@link #acceptFriendRequest} for same-bean callers (BootUI ARCH-SPRING-004). */
+    private void doAcceptFriendRequest(String requestUuid, User currentUser) {
         FriendRequest request = friendRequestRepository.findByUuid(UUID.fromString(requestUuid))
                 .orElseThrow(() -> new NotFoundException("Friend request not found", "TM_094"));
 
@@ -355,6 +360,11 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public void removeFriend(String friendUuid, User currentUser) {
+        doRemoveFriend(friendUuid, currentUser);
+    }
+
+    /** Proxy-free counterpart of {@link #removeFriend} for same-bean callers (BootUI ARCH-SPRING-004). */
+    private void doRemoveFriend(String friendUuid, User currentUser) {
         User friendUser = userRepository.findByUuid(UUID.fromString(friendUuid))
                 .orElseThrow(() -> new NotFoundException("Friend user not found", "TM_064"));
 
@@ -403,7 +413,7 @@ public class FriendServiceImpl implements FriendService {
         blockCache.evict(currentUser.getId());
 
         // Remove friendship if exists
-        removeFriend(userUuid, currentUser);
+        doRemoveFriend(userUuid, currentUser);
     }
 
     /**

@@ -14,11 +14,9 @@ import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.service.BucketListService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -42,10 +40,8 @@ public class BucketListServiceImpl implements BucketListService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
     private final SimpMessagingTemplate messagingTemplate;
-    /**
-     * Self-proxy so the lazy list-create runs in its OWN transaction (see getOrCreateList).
-     */
-    private final ObjectProvider<BucketListServiceImpl> self;
+    /** Isolated-transaction insert helper (own bean so the REQUIRES_NEW insert crosses a real proxy). */
+    private final BucketListRowCreator rowCreator;
 
     /**
      * IDOR guard: the caller must be a member of the chat the list belongs to.
@@ -183,20 +179,13 @@ public class BucketListServiceImpl implements BucketListService {
             return existing;
         }
         try {
-            return self.getObject().createListInNewTx(chatUuid);
+            return rowCreator.createInNewTx(chatUuid);
         } catch (DataIntegrityViolationException raced) {
             // Another request created it concurrently — its row is committed; re-read the winner.
             return bucketListRepository.findByChatUuid(chatUuid).orElseThrow(() -> raced);
         }
     }
 
-    /**
-     * Insert a fresh list row in an isolated transaction (see getOrCreateList).
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public BucketList createListInNewTx(String chatUuid) {
-        return bucketListRepository.save(BucketList.builder().chatUuid(chatUuid).build());
-    }
 
     /**
      * Load an item by uuid, scoped to the given list.

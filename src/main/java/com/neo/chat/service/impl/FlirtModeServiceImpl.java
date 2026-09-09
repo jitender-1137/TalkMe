@@ -19,7 +19,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
@@ -50,6 +49,8 @@ public class FlirtModeServiceImpl implements FlirtModeService {
      * Self-proxy so the lazy row-create + the mutation transaction run through the proxy.
      */
     private final ObjectProvider<FlirtModeServiceImpl> self;
+    /** Isolated-transaction row insert (own bean so the REQUIRES_NEW insert crosses a real proxy). */
+    private final FlirtModeRowCreator rowCreator;
 
     /**
      * Resolved, membership-verified context for a flirt-mode operation on a PRIVATE chat.
@@ -184,27 +185,12 @@ public class FlirtModeServiceImpl implements FlirtModeService {
             return existing;
         }
         try {
-            return self.getObject().createRowInNewTx(ctx.chat().getId(), ctx.lowUserId(), ctx.highUserId());
+            return rowCreator.createInNewTx(ctx.chat().getId(), ctx.lowUserId(), ctx.highUserId());
         } catch (DataIntegrityViolationException raced) {
             return flirtModeRepository.findByChat(ctx.chat()).orElseThrow(() -> raced);
         }
     }
 
-    /**
-     * Insert a fresh flirt-mode row in an isolated transaction (see getOrCreateRow).
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public ChatFlirtMode createRowInNewTx(Long chatId, Long lowUserId, Long highUserId) {
-        Chat ref = chatRepository.getReferenceById(chatId);
-        return flirtModeRepository.save(ChatFlirtMode.builder()
-                .chat(ref)
-                .lowUserId(lowUserId)
-                .highUserId(highUserId)
-                .enabledByLow(false)
-                .enabledByHigh(false)
-                .active(false)
-                .build());
-    }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 

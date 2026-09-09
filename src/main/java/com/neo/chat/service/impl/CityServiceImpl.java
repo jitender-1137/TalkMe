@@ -83,6 +83,14 @@ public class CityServiceImpl implements CityService {
     @Override
     @Transactional(readOnly = true)
     public CityDistrictDetailResponse getDistrict(String slug, User user) {
+        return computeDistrict(slug, user);
+    }
+
+    /**
+     * Internal, proxy-free counterpart of {@link #getDistrict(String, User)} for the same-bean
+     * caller {@link #enterDistrict(User, String)} (BootUI ARCH-SPRING-004).
+     */
+    private CityDistrictDetailResponse computeDistrict(String slug, User user) {
         CityLocation loc = require(slug);
         Set<String> online = safeOnline();
         return CityDistrictDetailResponse.builder()
@@ -130,7 +138,7 @@ public class CityServiceImpl implements CityService {
             log.debug("City enter presence write skipped for {} / {}: {}", user.getUsername(), key, e.getMessage());
         }
         broadcast("user_joined", loc, user);
-        return getDistrict(slug, user);
+        return computeDistrict(slug, user);
     }
 
     /**

@@ -408,6 +408,11 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse getUserById(String userId, User currentUser) {
+        return computeUserById(userId, currentUser);
+    }
+
+    /** Proxy-free counterpart of {@link #getUserById} for same-bean callers (BootUI ARCH-SPRING-004). */
+    private UserResponse computeUserById(String userId, User currentUser) {
         User targetUser;
         if ("me".equalsIgnoreCase(userId)) {
             targetUser = currentUser;
@@ -501,8 +506,8 @@ public class UserServiceImpl implements UserService {
         User target = userRepository.findByUuid(UUID.fromString(userId))
                 .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
         // Reuse the fully-mapped UserResponse (presence, lastSeen, all string sets) as the base.
-        UserResponse ur = getUserById(userId, currentUser);
-        int mutual = getMutualFriends(userId, currentUser).getCount();
+        UserResponse ur = computeUserById(userId, currentUser);
+        int mutual = computeMutualFriends(userId, currentUser).getCount();
         // Re-load the viewer as a MANAGED entity within this readOnly tx — the security
         // principal is detached, so scoring against it would hit a LazyInit on personality.
         User viewer = userRepository.findById(currentUser.getId()).orElse(currentUser);
@@ -705,6 +710,11 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public MutualFriendsResponse getMutualFriends(String userId, User currentUser) {
+        return computeMutualFriends(userId, currentUser);
+    }
+
+    /** Proxy-free counterpart of {@link #getMutualFriends} for same-bean callers (BootUI ARCH-SPRING-004). */
+    private MutualFriendsResponse computeMutualFriends(String userId, User currentUser) {
         User targetUser = userRepository.findByUuid(UUID.fromString(userId))
                 .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId, "TM_USER_NOT_FOUND"));
 
