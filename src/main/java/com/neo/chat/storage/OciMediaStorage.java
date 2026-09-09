@@ -60,8 +60,7 @@ public class OciMediaStorage implements MediaStorage {
      * @param key         the object name / key within the bucket ({@code java.lang.String})
      * @param contentType the MIME type stored on the object ({@code java.lang.String})
      * @return the reference {@code <media-root>/<key>} ({@code java.lang.String})
-     * @throws com.neo.chat.exception.FileStorageException if the key is unsafe or the
-     *                                                        upload fails
+     * @throws com.neo.chat.exception.FileStorageException if the key is unsafe or the upload fails
      */
     @Override
     public String store(Path source, String key, String contentType) {
@@ -129,7 +128,9 @@ public class OciMediaStorage implements MediaStorage {
         }
     }
 
-    /** True when the OCI error is a 404 / ObjectNotFound — an expected "missing media" case. */
+    /**
+     * True when the OCI error is a 404 / ObjectNotFound — an expected "missing media" case.
+     */
     private static boolean isNotFound(Throwable e) {
         return e instanceof BmcException bmc
                 && (bmc.getStatusCode() == 404 || "ObjectNotFound".equals(bmc.getServiceCode()));

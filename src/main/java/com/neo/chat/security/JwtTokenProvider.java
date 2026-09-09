@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.time.Instant;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -99,9 +98,10 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
-                // jjwt 0.12 only accepts java.util.Date here — convert at the library boundary.
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(expiry))
+                // JWT time claims are NumericDate (epoch seconds) per RFC 7519; set them
+                // directly so no java.util.Date is needed (byte-identical to jjwt's Date setters).
+                .claim("iat", now.getEpochSecond())
+                .claim("exp", expiry.getEpochSecond())
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -192,8 +192,8 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(DELIVERY_TOKEN_TTL_MS)))
+                .claim("iat", now.getEpochSecond())
+                .claim("exp", now.plusMillis(DELIVERY_TOKEN_TTL_MS).getEpochSecond())
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -220,8 +220,8 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusMillis(ttlMs)))
+                .claim("iat", now.getEpochSecond())
+                .claim("exp", now.plusMillis(ttlMs).getEpochSecond())
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }

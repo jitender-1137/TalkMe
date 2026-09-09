@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
@@ -79,10 +78,10 @@ public class LiveAudioServiceImpl implements LiveAudioService {
         String token = Jwts.builder()
                 .issuer(props.getApiKey())
                 .subject(identity)
-                // jjwt's builder only accepts java.util.Date — convert at the boundary.
-                .issuedAt(Date.from(now))
-                .notBefore(Date.from(now))
-                .expiration(Date.from(exp))
+                // JWT time claims are NumericDate (epoch seconds) per RFC 7519 — set directly, no java.util.Date.
+                .claim("iat", now.getEpochSecond())
+                .claim("nbf", now.getEpochSecond())
+                .claim("exp", exp.getEpochSecond())
                 .claim("name", user.getName() != null ? user.getName() : identity)
                 .claim("video", videoGrant)
                 .signWith(key, Jwts.SIG.HS256)
