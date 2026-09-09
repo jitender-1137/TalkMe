@@ -1,0 +1,36 @@
+# =============================================================================
+# Logging levels, file rolling, and pattern. Imported by application.yml.
+# =============================================================================
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT}
+    com.neo.chat: ${LOG_LEVEL_APP}
+    org.springframework.security: ${LOG_LEVEL_SPRING_SECURITY}
+    org.hibernate: ${LOG_LEVEL_HIBERNATE}
+    # ── Noise suppression (cosmetic, environment-agnostic) ─────────────────────
+    # Lettuce logs "Cannot apply TCP User Timeout options to channel type
+    # NioSocketChannel" on every Redis (re)connect when the native epoll/kqueue
+    # transport isn't on the classpath — harmless, so drop it to ERROR.
+    io.lettuce.core.ConnectionBuilder: error
+    # ddl-auto=update emits "constraint ... does not exist, skipping" (HHH000247)
+    # on every boot as it reconciles the schema — expected, not actionable.
+    org.hibernate.orm.jdbc.warn: error
+    # HHH90000025 dialect-deprecation chatter (also addressed by dropping the
+    # explicit spring.jpa.database-platform above).
+    org.hibernate.orm.deprecation: error
+  # ── File logging + daily/size rolling ──────────────────────────────────────
+  # Writes to ${LOGGING_FILE_NAME}; rolls daily and at max-file-size, keeping
+  # max-history days up to total-size-cap. Path/name are env-driven (no defaults).
+  file:
+    path: ${LOGGING_FILE_PATH}
+    name: ${LOGGING_FILE_NAME}
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOGGING_FILE_PATH}/neochathub-%d{yyyy-MM-dd}.%i.log
+      max-file-size: 10MB
+      total-size-cap: 1GB
+      max-history: 90
+      clean-history-on-start: false
+
+  pattern:
+    level: "%5p [requestId=%X{requestId}]"

@@ -2,12 +2,12 @@ package com.neo.chat.service.impl;
 
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserPresence;
+import com.neo.chat.dto.response.PresenceNotification;
 import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.repository.UserPresenceRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.util.LogSanitizer;
-import com.neo.chat.dto.response.PresenceNotification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

@@ -194,13 +194,13 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * request IP when unset, fires a best-effort sign-in alert, and issues a token pair +
      * session (single-device: prior tokens are revoked). Transactional.
      *
-     * @param request     the login credentials (email/username + password)
-     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
+     * @param request the login credentials (email/username + password)
+     * @param client  the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with user + tokens
      * @throws com.neo.chat.exception.UnauthorizedException (TM_024) unknown user, bad password,
-     *                                                         or a soft-deleted account past its recovery window
+     *                                                      or a soft-deleted account past its recovery window
      * @throws com.neo.chat.exception.ForbiddenException    (TM_029) guest account using this flow,
-     *                                                         or (TM_030) a banned account
+     *                                                      or (TM_030) a banned account
      */
     @Override
     @Transactional
@@ -293,8 +293,8 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * the request IP, resolves optional referral attribution, persists the user, sends the
      * verification email, and returns a login response. Transactional.
      *
-     * @param request     the signup fields
-     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
+     * @param request the signup fields
+     * @param client  the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with user + tokens
      * @throws com.neo.chat.exception.ConflictException          (TM_047) if the email already exists
      * @throws com.neo.chat.exception.BadRequestException        (TM_496) if the password is breached
@@ -394,8 +394,8 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * Creates an anonymous guest account (random {@code guest_*} username, ROLE_GUEST, unverified)
      * with detected country, and returns a login response (guest refresh-token TTL). Transactional.
      *
-     * @param request     the guest details (display name, age, gender)
-     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
+     * @param request the guest details (display name, age, gender)
+     * @param client  the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with the guest user + tokens
      */
     @Override
@@ -439,8 +439,8 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * existing account (also recovering a soft-deleted one). Sends a welcome email for brand-new
      * users, otherwise a best-effort sign-in alert. Transactional.
      *
-     * @param info        the OAuth profile (provider id, email, name, picture, verified, age, gender)
-     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
+     * @param info   the OAuth profile (provider id, email, name, picture, verified, age, gender)
+     * @param client the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with user + tokens
      * @throws org.springframework.dao.DataIntegrityViolationException if a creation race cannot be
      *                                                                 resolved to an existing row
@@ -484,7 +484,7 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
                     // verified Google owner: clear the (attacker-chosen) password and revoke any
                     // outstanding tokens/sessions so the pre-registrant loses all access.
                     log.warn("OAuth: verified Google email {} claimed an UNVERIFIED local account {} — "
-                            + "resetting its password and revoking tokens (possible pre-registration).",
+                                    + "resetting its password and revoking tokens (possible pre-registration).",
                             LogSanitizer.mask(info.getEmail()), byEmail.getUuid());
                     byEmail.setPasswordHash(null);
                     byEmail.setVerified(true);
@@ -612,9 +612,11 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
         return candidate;
     }
 
-    /** Grace window in which a just-rotated (revoked) refresh token is still honored by following
-     *  its replacement chain, so concurrent refreshes from a fast reload / multiple tabs are not
-     *  logged out. Outside this window a revoked token is treated as a real supersession. */
+    /**
+     * Grace window in which a just-rotated (revoked) refresh token is still honored by following
+     * its replacement chain, so concurrent refreshes from a fast reload / multiple tabs are not
+     * logged out. Outside this window a revoked token is treated as a real supersession.
+     */
     private static final long REFRESH_REUSE_GRACE_SECONDS = 30L;
 
     /**
@@ -656,7 +658,7 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * @param ip        the caller IP (to match the session)
      * @return the new access + refresh token pair
      * @throws com.neo.chat.exception.UnauthorizedException (TM_026) unknown, revoked, expired,
-     *                                                         or concurrently-rotated token
+     *                                                      or concurrently-rotated token
      */
     @Override
     @Transactional
@@ -1081,7 +1083,7 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * @param request     the change-password request (current + new password)
      * @param currentUser the signed-in user
      * @throws com.neo.chat.exception.UnauthorizedException (TM_042) if the current password
-     *                                                         is incorrect
+     *                                                      is incorrect
      * @throws com.neo.chat.exception.BadRequestException   (TM_496) if the new password is breached
      */
     @Override
@@ -1112,7 +1114,7 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
      * @param password    the current password for re-authentication (required for local accounts)
      * @throws com.neo.chat.exception.ForbiddenException    (TM_029) if the account is a guest
      * @throws com.neo.chat.exception.UnauthorizedException (TM_497) if password confirmation
-     *                                                         is missing or wrong for a local account
+     *                                                      is missing or wrong for a local account
      */
     @Override
     @Transactional
@@ -1241,7 +1243,9 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
         }
     }
 
-    /** Max guest accounts created per client IP per rolling 24h. */
+    /**
+     * Max guest accounts created per client IP per rolling 24h.
+     */
     private static final int GUEST_CREATE_CAP_PER_IP = 20;
 
     /**
@@ -1264,7 +1268,9 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
         }
     }
 
-    /** Max transactional emails of one type to a single recipient per rolling 24h. */
+    /**
+     * Max transactional emails of one type to a single recipient per rolling 24h.
+     */
     private static final int MAIL_DAILY_CAP_PER_RECIPIENT = 5;
 
     /**

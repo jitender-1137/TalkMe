@@ -1,12 +1,12 @@
 package com.neo.chat.security.oauth;
 
-import com.neo.chat.util.ClientRequestInfo;
+import com.neo.chat.controller.AuthController;
 import com.neo.chat.dto.OAuthUserInfo;
 import com.neo.chat.dto.response.LoginResponse;
+import com.neo.chat.security.JwtTokenProvider;
+import com.neo.chat.util.ClientRequestInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import com.neo.chat.controller.AuthController;
-import com.neo.chat.security.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.ObjectProvider;
@@ -46,13 +46,13 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     /**
      * Constructor-injects the collaborators and the cookie / redirect settings.
      *
-     * @param oauthLoginPort             creates/links the local account
+     * @param oauthLoginPort          creates/links the local account
      * @param googleProfileService    best-effort People API profile fetch
      * @param authorizedClientService access to the Google access token (may be absent)
      * @param tokenProvider           mints the media-read cookie token
      * @param cookieSecure            {@code app.cookie.secure} (default false)
      * @param cookieSameSite          {@code app.cookie.same-site} (default Lax)
-     * @param frontendBaseUrl         {@code app.frontend-base-url} (default http://localhost:3000)
+     * @param frontendBaseUrl         {@code app.frontend-base-url} (default <a href="http://localhost:3000">...</a>)
      */
     public OAuth2LoginSuccessHandler(OAuthLoginPort oauthLoginPort,
                                      GoogleProfileService googleProfileService,

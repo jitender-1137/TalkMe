@@ -1,0 +1,76 @@
+# =============================================================================
+# Data stores: PostgreSQL (datasource + JPA/Hibernate) and Redis. Imported by application.yml.
+# =============================================================================
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL}
+      # Keep a warm floor of open connections at all times (default 2 if unset) so
+      # the pool never drains to zero while idle — the first request after a quiet
+      # period gets a ready connection instead of opening one on the hot path.
+      minimum-idle: ${DB_MIN_IDLE:2}
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      # Ping idle connections every 2 min so the DB/firewall/NAT can't silently drop
+      # them during a long idle. Without this (Hikari default = disabled) the first
+      # open after the app has been quiet a while hits a dead connection → validation
+      # fail → synchronous reconnect → the slow "cold" open. Must be < max-lifetime.
+      keepalive-time: 120000
+
+  jpa:
+    # Dialect is auto-detected from the Postgres driver — setting it explicitly only
+    # triggers Hibernate's HHH90000025 deprecation warning on every boot, so it's omitted.
+    # Open Session in View is OFF (BootUI Spring Advisor SPRING-JPA-001): this is a pure JSON API
+    # with no view rendering. Every mapper/DTO builder runs inside a @Transactional service, the
+    # security principal is re-fetched by services that need its associations, and async/AFTER_COMMIT
+    # listeners already re-load entities (audited 2026-09-07). The one LAZY read outside a
+    # transaction — User.personality in compatibility scoring — is covered by
+    # UserRepository.findBy*WithPersonality fetch-joins at the HTTP call sites. Connections are now
+    # released when the service transaction ends instead of being held through response writing.
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: ${DATABASE_SCHEMA}
+        # Batch lazy association loads (avoid N+1 when mapping pages to DTOs).
+        default_batch_fetch_size: 50
+        # Group same-table statements so jdbc.batch_size actually forms batches (BootUI
+        # HIB-CONFIG-005). These are the top-level hibernate.order_* keys — they used to sit
+        # under jdbc.* where Hibernate silently ignored them.
+        order_inserts: true
+        order_updates: true
+        # Tuning diagnostics (BootUI HIB-CONFIG-006/007) — OFF unless the local .env opts in
+        # (HIBERNATE_STATISTICS=true, HIBERNATE_SLOW_QUERY_MS=<ms>); 0 disables slow-query logging.
+        # log_slow_query is Hibernate 6.3+'s key (JdbcSettings.LOG_SLOW_QUERY); the legacy
+        # session.events.log.LOG_QUERIES_SLOWER_THAN_MS is no longer read by Hibernate 7.
+        generate_statistics: ${HIBERNATE_STATISTICS:false}
+        log_slow_query: ${HIBERNATE_SLOW_QUERY_MS:0}
+        jdbc:
+          batch_size: 30
+          batch_versioned_data: true
+          # Pin JDBC timestamp binding/reading to UTC so java.time conversions never depend on
+          # the host JVM zone (BootUI HIB-CONFIG-013). Safe: every entity temporal field is an
+          # Instant or LocalDate (no LocalDateTime).
+          time_zone: UTC
+        query:
+          fail_on_pagination_over_collection_fetch: true
+          # BootUI HIB-CONFIG-009: pad IN-clause parameter counts to powers of two so
+          # variable-length IN (...) predicates reuse a bounded set of execution plans.
+          in_clause_parameter_padding: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      enabled: ${REDIS_ENABLED}
+      # Command timeout — raise for a remote/WAN Redis so reapers don't trip.
+      timeout: ${REDIS_TIMEOUT_MS}
+      lettuce:
+        shutdown-timeout: 200ms

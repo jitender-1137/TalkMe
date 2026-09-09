@@ -1,0 +1,47 @@
+# =============================================================================
+# Real-time / messaging: RabbitMQ connection + tuning, STOMP broker relay,
+# WebSocket origins, and Web Push (VAPID). Imported by application.yml.
+# =============================================================================
+spring:
+  # RabbitMQ CONNECTION (used only when the broker relay / AMQP events are enabled).
+  # The publishing/consume TUNING below is shared across every environment.
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        prefetch: 20
+        retry:
+          enabled: true
+          initial-interval: 1000ms
+          max-attempts: 4
+          multiplier: 2.0
+          max-interval: 10000ms
+
+app:
+  # STOMP broker relay — OFF unless enabled AND RabbitMQ STOMP plugin reachable.
+  broker:
+    relay-enabled: ${BROKER_RELAY_ENABLED}
+    relay-host: ${BROKER_RELAY_HOST}
+    relay-port: ${BROKER_RELAY_PORT}
+    relay-login: ${BROKER_RELAY_LOGIN}
+    relay-passcode: ${BROKER_RELAY_PASSCODE}
+    amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED}
+
+# WebSocket allowed origins (comma-separated; '*' only for local).
+websocket:
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS}
+
+# Web Push (VAPID).
+webpush:
+  enabled: ${WEBPUSH_ENABLED}
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY}
+    private-key: ${VAPID_PRIVATE_KEY}
+    subject: ${VAPID_SUBJECT}

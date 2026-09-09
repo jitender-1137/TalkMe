@@ -1,12 +1,10 @@
 package com.neo.chat.event;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.neo.chat.domain.OutboxEvent;
 import com.neo.chat.domain.User;
 import com.neo.chat.repository.OutboxEventRepository;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.event.NotificationDispatchPort;
-import com.neo.chat.event.PresenceQueryPort;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

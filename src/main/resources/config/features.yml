@@ -1,0 +1,71 @@
+# =============================================================================
+# Feature kill-switches + advertising customization. Imported by application.yml.
+# =============================================================================
+
+# ── Feature kill-switches (Tier-1 global) ────────────────────────────────────
+features:
+  enabled-by-default: ${FEATURES_ENABLED_BY_DEFAULT}
+  allow-non-verified-flirt-mode: ${FEATURE_ALLOW_NON_VERIFIED_FLIRT_MODE}
+  # Global email-verification gate. false (default) = ALL users (verified or unverified) can use
+  # every feature; true = features that require verification are limited to verified users.
+  # (The 18+ age-verification gate is separate and unaffected.)
+  require-verified: ${FEATURE_REQUIRE_VERIFIED:false}
+  flags:
+    live_audio: ${FEATURE_LIVE_AUDIO}
+    flirt_lobby: ${FEATURE_FLIRT_LOBBY}
+    midnight_events: ${FEATURE_MIDNIGHT_EVENTS}
+    ads: ${FEATURE_ADS}
+
+# ── Advertising customization (on/off gate is features.flags.ads above) ──────
+ads:
+  provider: ${ADS_PROVIDER}
+  label: ${ADS_LABEL}
+  ad-choices-url: ${ADS_ADCHOICES_URL}
+  client-id: ${ADS_CLIENT_ID}
+  script-url: ${ADS_SCRIPT_URL}
+  popunder-script-url: ${ADS_POPUNDER_URL}
+  social-bar-script-url: ${ADS_SOCIALBAR_URL}
+  preview: ${ADS_PREVIEW:false}
+  frequency-cap-per-session: ${ADS_FREQ_CAP}
+  csp-domains: ${ADS_CSP_DOMAINS}
+  placements:
+    feed:
+      enabled: ${ADS_FEED_ENABLED}
+      every-n: ${ADS_FEED_EVERY_N}
+      max-per-session: ${ADS_FEED_MAX}
+      unit-id: ${ADS_FEED_UNIT}
+      provider: ${ADS_FEED_PROVIDER}
+      script-url: ${ADS_FEED_SCRIPT_URL}
+      format: ${ADS_FEED_FORMAT}
+      width: ${ADS_FEED_WIDTH}
+      height: ${ADS_FEED_HEIGHT}
+    explore:
+      enabled: ${ADS_EXPLORE_ENABLED}
+      every-n: ${ADS_EXPLORE_EVERY_N}
+      max-per-session: ${ADS_EXPLORE_MAX}
+      unit-id: ${ADS_EXPLORE_UNIT}
+      provider: ${ADS_EXPLORE_PROVIDER}
+      script-url: ${ADS_EXPLORE_SCRIPT_URL}
+      format: ${ADS_EXPLORE_FORMAT}
+      width: ${ADS_EXPLORE_WIDTH}
+      height: ${ADS_EXPLORE_HEIGHT}
+    reels:
+      enabled: ${ADS_REELS_ENABLED}
+      every-n: ${ADS_REELS_EVERY_N}
+      max-per-session: ${ADS_REELS_MAX}
+      unit-id: ${ADS_REELS_UNIT}
+      provider: ${ADS_REELS_PROVIDER}
+      script-url: ${ADS_REELS_SCRIPT_URL}
+      format: ${ADS_REELS_FORMAT}
+      width: ${ADS_REELS_WIDTH}
+      height: ${ADS_REELS_HEIGHT}
+    stories:
+      enabled: ${ADS_STORIES_ENABLED}
+      every-n: ${ADS_STORIES_EVERY_N}
+      max-per-session: ${ADS_STORIES_MAX}
+      unit-id: ${ADS_STORIES_UNIT}
+      provider: ${ADS_STORIES_PROVIDER}
+      script-url: ${ADS_STORIES_SCRIPT_URL}
+      format: ${ADS_STORIES_FORMAT}
+      width: ${ADS_STORIES_WIDTH}
+      height: ${ADS_STORIES_HEIGHT}

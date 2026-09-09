@@ -3,7 +3,6 @@ package com.neo.chat.event;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.MessageResponse;
 import com.neo.chat.repository.UserRepository;
-import com.neo.chat.event.NotificationDispatchPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

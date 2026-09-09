@@ -1,0 +1,58 @@
+# =============================================================================
+# Security: JWT, rate-limiting, captcha, session base-auth, client-IP / proxy
+# trust, auth token lifetimes, chat crypto, SuperAdmin bootstrap, cookies, CORS.
+# Imported by application.yml.
+# =============================================================================
+security:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-expiration-ms: 900000        # 15 minutes
+    refresh-token-expiration-ms: 2592000000   # 30 days
+    guest-refresh-token-expiration-ms: 604800000  # 7 days
+  rate-limit:
+    capacity: ${RATE_LIMIT_CAPACITY}
+    refill-tokens: ${RATE_LIMIT_REFILL}
+    refill-period-seconds: 1
+  # Cloudflare Turnstile.
+  captcha:
+    enabled: ${CAPTCHA_ENABLED}
+    secret-key: ${TURNSTILE_SECRET_KEY}
+
+# Session base-auth credentials.
+auth:
+  username: ${AUTH_USERNAME}
+  password: ${AUTH_PASSWORD}
+
+app:
+  security:
+    # Reverse proxies in front of the app. X-Forwarded-For entries appended by these hops are
+    # trusted; the client-supplied leading entries never are (see util.ClientIp). Prod = Nginx
+    # Proxy Manager = 1. Set 0 if the app is reached directly, 2 with a CDN in front of NPM.
+    trusted-proxy-hops: ${TRUSTED_PROXY_HOPS:1}
+    # Honour CF-Connecting-IP ONLY when Cloudflare proxies all traffic (else it is forgeable).
+    trust-cloudflare-header: ${TRUST_CLOUDFLARE_HEADER:false}
+    # Fail boot (enforce) / warn / off when a PUBLIC deployment (https origins) is missing the
+    # 'prod' profile or exposes BootUI beyond localhost. Guards against shipping a dev .env to prod.
+    production-hardening: ${PRODUCTION_HARDENING:warn}
+  cookie:
+    secure: ${COOKIE_SECURE}
+    same-site: ${COOKIE_SAME_SITE}
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS}
+    allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept,X-Request-Id
+    exposed-headers: Set-Cookie,X-Request-Id,Retry-After
+    allow-credentials: true
+  auth:
+    password-reset-token-ttl-minutes: ${PASSWORD_RESET_TTL_MIN}
+    account-deletion-window-days: ${ACCOUNT_DELETION_WINDOW_DAYS}
+    email-verification-token-ttl-minutes: ${EMAIL_VERIFY_TTL_MIN}
+  # Per-conversation message encryption (AES-256-GCM). Stays OFF until master-key set.
+  # ⚠️ Losing/rotating master-key makes all encrypted messages unrecoverable — back it up.
+  crypto:
+    chat-encryption:
+      enabled: ${CHAT_ENCRYPTION_ENABLED}
+    master-key: ${CRYPTO_MASTER_KEY}
+  # SuperAdmin bootstrap — comma-separated emails granted ROLE_SUPER_ADMIN on boot.
+  super-admin:
+    emails: ${SUPER_ADMIN_EMAILS}

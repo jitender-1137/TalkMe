@@ -1,0 +1,29 @@
+# =============================================================================
+# Misc app settings: public URL, instant translation, live A/V, geo, consent
+# versions. (Other app.* slices live with their domain: app.mail → mail.yml,
+# app.broker → messaging.yml, app.security/app.auth/app.crypto → security.yml.)
+# Imported by application.yml.
+# =============================================================================
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL}
+  # Instant Translation — Azure primary, MyMemory (keyless) fallback; fails open.
+  translation:
+    enabled: ${TRANSLATION_ENABLED}
+    daily-cap-per-user: ${TRANSLATION_DAILY_CAP}
+    azure-key: ${AZURE_TRANSLATOR_KEY}
+    azure-region: ${AZURE_TRANSLATOR_REGION}
+    azure-url: ${AZURE_TRANSLATOR_URL}
+    mymemory-url: ${MYMEMORY_URL}
+  # Live A/V (deferred) — OFF until enabled AND LiveKit creds supplied.
+  live-audio:
+    enabled: ${LIVE_AUDIO_ENABLED}
+    ws-url: ${LIVEKIT_WS_URL}
+    api-key: ${LIVEKIT_API_KEY}
+    api-secret: ${LIVEKIT_API_SECRET}
+    token-ttl-seconds: ${LIVEKIT_TOKEN_TTL}
+  geo:
+    geolocate-local-ip: ${GEOLOCATE_LOCAL_IP}
+  consent:
+    age18-plus-version: ${CONSENT_AGE_VERSION}
+    community-guidelines-version: ${CONSENT_GUIDELINES_VERSION}
+    flirt-lobby-version: ${CONSENT_FLIRT_VERSION}

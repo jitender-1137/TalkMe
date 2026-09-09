@@ -1,0 +1,46 @@
+# =============================================================================
+# Email: SMTP (spring.mail, the final fallback) + the app's transactional email
+# chain (Resend → Brevo → SMTP) and unread digest. Imported by application.yml.
+# =============================================================================
+spring:
+  # SMTP — final fallback after the Resend/Brevo HTTP APIs.
+  mail:
+    host: ${MAIL_SMTP_HOST}
+    port: ${MAIL_SMTP_PORT}
+    username: ${MAIL_SMTP_USERNAME}
+    password: ${MAIL_SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS}
+        connecttimeout: 5000
+        timeout: 5000
+        writetimeout: 5000
+
+app:
+  # Transactional email chain: Resend (HTTP) → Brevo (HTTP) → SMTP (spring.mail.*).
+  mail:
+    enabled: ${MAIL_ENABLED}
+    from: ${MAIL_FROM}
+    timeout-ms: ${MAIL_TIMEOUT_MS}
+    require-verification: ${MAIL_REQUIRE_VERIFICATION}
+    disposable-domains: ${MAIL_DISPOSABLE_DOMAINS}
+    resend:
+      api-key: ${RESEND_API_KEY}
+      daily-limit: ${RESEND_DAILY_LIMIT}
+    brevo:
+      api-key: ${BREVO_API_KEY}
+      daily-limit: ${BREVO_DAILY_LIMIT}
+    smtp:
+      enabled: ${MAIL_SMTP_ENABLED}
+    brand:
+      name: ${MAIL_BRAND_NAME}
+      tagline: ${MAIL_BRAND_TAGLINE}
+      support-email: ${MAIL_SUPPORT_EMAIL}
+    unread-digest:
+      enabled: ${UNREAD_DIGEST_ENABLED}
+      cron: ${UNREAD_DIGEST_CRON}
+      zone: ${UNREAD_DIGEST_ZONE}
+      max-previews: ${UNREAD_DIGEST_MAX_PREVIEWS}

@@ -1,0 +1,29 @@
+# =============================================================================
+# Media storage (OCI object storage / local disk) + content moderation.
+# Imported by application.yml.
+# =============================================================================
+
+# Content moderation — word-lists + NSFW sidecar.
+moderation:
+  enabled: ${MODERATION_ENABLED}
+  nsfw:
+    enabled: ${NSFW_ENABLED}
+    base-url: ${NSFW_BASE_URL}
+
+# Media storage. media-root is the shared root for OCI object keys + local disk.
+storage:
+  provider: ${STORAGE_PROVIDER}
+  media-root: ${FILE_BASE_DIR}
+  # PREVIOUS media-roots (comma-separated) still carried by old DB references. Object keys
+  # never include the root, so listing an old root here lets old media keep resolving after
+  # the root is renamed (e.g. /opt/media/talkMe → /opt/media/neochathub). Default covers the
+  # known talkMe→neochathub rename; override with LEGACY_MEDIA_ROOTS.
+  legacy-media-roots: ${LEGACY_MEDIA_ROOTS:/opt/media/talkMe}
+  local:
+    directory: ${FILE_BASE_DIR}
+  oci:
+    namespace: ${OCI_NAMESPACE}
+    region: ${OCI_REGION}
+    bucket: ${OCI_BUCKET}
+    config-file: ${OCI_CONFIG_FILE}
+    config-profile: ${OCI_CONFIG_PROFILE}

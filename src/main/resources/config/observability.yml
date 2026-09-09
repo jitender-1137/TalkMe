@@ -1,0 +1,33 @@
+# =============================================================================
+# Observability: actuator endpoints, health, metrics, tracing. Imported by application.yml.
+# Endpoints under /actuator; RESTRICT to an internal network in prod.
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        # Default to the probe endpoints only. Metrics/Prometheus stay OFF unless the
+        # environment opts in (prod sets MANAGEMENT_ENDPOINTS=health,info,metrics,prometheus for
+        # the scrape target), so a dev box does not publish the runtime metric inventory that
+        # aids reconnaissance (BootUI pentest PT-A05-055 / PT-A05-040). The actuator security
+        # chain still restricts everything except health to SUPER_ADMIN.
+        include: ${MANAGEMENT_ENDPOINTS:health,info}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    rabbit:
+      enabled: ${BROKER_AMQP_EVENTS_ENABLED}
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL}
+  metrics:
+    tags:
+      application: talkMe
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT}

@@ -1,0 +1,64 @@
+# =============================================================================
+# Server + BootUI dev console. Imported by application.yml.
+# =============================================================================
+
+# BootUI — DEV-ONLY monitoring console at /bootui. It exposes internal app state, so it
+# MUST stay OFF in production: default OFF here, turned ON only via a LOCAL .env
+# (BOOTUI_ENABLED=ON). (BootUI is also dormant unless the dev/local profile — or
+# spring-boot-devtools — is active; run locally with SPRING_PROFILES_ACTIVE=dev if
+# enabling alone doesn't wake it.) NB /bootui/** is permitAll in SecurityConfig, so
+# never enable this on a public/prod host.
+bootui:
+  enabled: ${BOOTUI_ENABLED:OFF}
+  # BootUI's built-in filter rejects non-loopback callers (a good default). Reaching it over a
+  # remote IP / through a proxy needs this ON — but that exposes app internals (beans, mappings,
+  # metrics, env) to anyone who can reach the port. PREFER an SSH tunnel + localhost access; only
+  # set BOOTUI_ALLOW_NON_LOCALHOST=true on a firewalled/trusted host. Default false.
+  allow-non-localhost: ${BOOTUI_ALLOW_NON_LOCALHOST:false}
+  # BootUI MCP server (Streamable HTTP at /bootui/api/mcp) for AI-assistant diagnostics
+  # (memory_scan, spring_scan, get_exceptions, ...). Same dev-only caveat as BootUI itself:
+  # default OFF, turned ON only via a LOCAL .env (BOOTUI_MCP_ENABLED=ON).
+  mcp:
+    enabled: ${BOOTUI_MCP_ENABLED:OFF}
+
+# Behind the reverse proxy (Nginx Proxy Manager) TLS terminates at the proxy and
+# requests reach this backend over plain http. Honor X-Forwarded-Proto/Host so
+# Spring builds correct absolute URLs (critically the OAuth2 redirect_uri).
+server:
+  address: 0.0.0.0
+  port: ${SERVER_PORT}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      # The API is stateless (JWT); a servlet session only appears transiently during the
+      # Google OAuth2 login handshake, so a short explicit lifetime is plenty (BootUI
+      # SEC-SESSION-005 — Boot's implicit default is 30m).
+      timeout: 15m
+      cookie:
+        # Lax keeps that top-level OAuth redirect working while blocking cross-site
+        # subresource/POST cookie replay (BootUI SEC-SESSION-004).
+        same-site: lax
+    context-path: /
+  # Gzip responses on the wire. The Next.js bundle (~3+ MB of JS/CSS uncompressed)
+  # compresses to roughly a quarter of that, so this is a large cold-open win on
+  # any real network. Tomcat compresses on-the-fly only when the client sends
+  # `Accept-Encoding: gzip` and the response is >= min-response-size; the hashed
+  # chunks are then cached by the browser + service worker, so the CPU cost is paid
+  # at most once per asset per client. (If a reverse proxy such as Nginx already
+  # gzips upstream traffic this is harmless — it just means Tomcat rarely runs.)
+  #
+  # SECURITY — BREACH: this list is deliberately limited to PUBLIC, STATIC asset
+  # types (the JS/CSS/HTML/SVG bundle, identical for every user, containing no
+  # secrets). We do NOT compress `application/json`/`application/xml`: the API's
+  # JSON bodies carry secrets — the access-token JWT is returned in the /auth/login
+  # and /auth/refresh bodies (JwtTokensResponse.accessToken) — and compressing a
+  # response that mixes a secret with any attacker-influenced/reflected text is the
+  # BREACH oracle. Keeping dynamic JSON uncompressed removes that side channel. The
+  # performance win is unaffected (the multi-MB payload is JS, not JSON).
+  compression:
+    enabled: true
+    # Single line, no spaces between entries — a folded/multi-line scalar would
+    # fold newlines into spaces and yield " application/javascript" (leading space),
+    # which fails to match the Content-Type and would silently skip compression.
+    mime-types: text/html,text/css,text/plain,text/javascript,application/javascript,application/manifest+json,image/svg+xml
+    min-response-size: 1024

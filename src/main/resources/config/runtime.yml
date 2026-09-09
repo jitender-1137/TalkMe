@@ -1,0 +1,58 @@
+# =============================================================================
+# Framework runtime tuning: thread pools (@Async/@Scheduled), Jackson, multipart,
+# pageable defaults. Imported by application.yml.
+# =============================================================================
+spring:
+  # ---------------------------------------------------------------------------
+  # Thread pools for @Async and @Scheduled (BootUI Spring Advisor SPRING-WIRING-004 / SPRING-PERF-005).
+  #
+  # execution: the app defines its own Executor bean (broadcastExecutor, AsyncConfig), which makes
+  # Boot back off from creating applicationTaskExecutor — so every UNQUALIFIED @Async (email sends,
+  # web push) silently fell back to Spring's SimpleAsyncTaskExecutor: one new unbounded thread per
+  # call, and BootUI flagged 5 ambiguous TaskExecutor beans. mode=force makes Boot create the
+  # bounded applicationTaskExecutor (alias taskExecutor) anyway and register an AsyncConfigurer
+  # that routes plain @Async to it. Fan-out stays on @Async("broadcastExecutor").
+  #
+  # scheduling: the WebSocket broker's messageBrokerTaskScheduler also made Boot back off from
+  # its taskScheduler, so @Scheduled jobs ran on the broker pool; SchedulingConfig now defines a
+  # named taskScheduler built from these properties (20 @Scheduled methods; several 1s reapers).
+  # ---------------------------------------------------------------------------
+  task:
+    execution:
+      mode: force
+      thread-name-prefix: async-
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 1000
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
+    scheduling:
+      thread-name-prefix: sched-
+      pool:
+        size: 4
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
+
+  # Jackson: an ABSENT/null JSON primitive deserializes to its default instead of
+  # throwing (the app's optional primitive DTO fields rely on this lenient behavior).
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+
+  # GLOBAL multipart cap — must be the LARGEST allowed media (videos = 30MB). The
+  # stricter per-type image cap is enforced in UploadController.
+  servlet:
+    multipart:
+      max-file-size: 30MB
+      max-request-size: 35MB
+
+  data:
+    web:
+      pageable:
+        serialization-mode: via-dto
+        # Hard cap on ?size= for every Pageable endpoint (Spring default 2000). Prevents a
+        # single request from pulling thousands of rows (DoS / bulk scraping).
+        max-page-size: 200
