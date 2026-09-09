@@ -1,6 +1,6 @@
 package com.neo.chat.moderation;
 
-import com.neo.chat.service.impl.FfmpegSupport;
+import com.neo.chat.util.FfmpegSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

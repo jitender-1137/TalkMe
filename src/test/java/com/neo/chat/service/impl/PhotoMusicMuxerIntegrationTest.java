@@ -1,5 +1,7 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.util.FfmpegSupport;
+
 import com.neo.chat.storage.MediaStorage;
 import com.neo.chat.storage.StorageProperties;
 import org.bytedeco.ffmpeg.ffmpeg;

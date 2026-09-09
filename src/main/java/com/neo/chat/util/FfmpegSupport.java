@@ -1,4 +1,4 @@
-package com.neo.chat.service.impl;
+package com.neo.chat.util;
 
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.ffmpeg.ffmpeg;
@@ -16,6 +16,10 @@ import org.springframework.stereotype.Component;
  * {@code media.ffmpeg-path} (anything other than the bare "ffmpeg" default) always
  * wins, letting an operator point at a system ffmpeg. If the bundled binary can't
  * load for some reason, it falls back to "ffmpeg" on PATH.
+ *
+ * <p>Lives in the {@code util} slice, not {@code service}: it is a dependency-free ffmpeg
+ * process wrapper (infrastructure). Keeping it low lets {@code moderation.FrameExtractor}
+ * use it without a {@code moderation -> service} package cycle (BootUI ARCH-PKG-001).
  */
 @Slf4j
 @Component

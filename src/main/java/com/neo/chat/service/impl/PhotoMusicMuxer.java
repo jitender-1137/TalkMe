@@ -1,5 +1,6 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.util.FfmpegSupport;
 import com.neo.chat.storage.MediaKeys;
 import com.neo.chat.storage.MediaStorage;
 import com.neo.chat.storage.StorageProperties;

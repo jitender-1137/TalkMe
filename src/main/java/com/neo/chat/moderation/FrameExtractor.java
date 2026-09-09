@@ -1,6 +1,6 @@
 package com.neo.chat.moderation;
 
-import com.neo.chat.service.impl.FfmpegSupport;
+import com.neo.chat.util.FfmpegSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
