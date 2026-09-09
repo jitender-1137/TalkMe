@@ -6,6 +6,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.enums.ProfileViewType;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.ProfileViewService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +29,7 @@ import java.util.List;
 @RequestMapping("/profile-views")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Profile Views", description = "Who viewed my profile: record views and expose the viewer list, counts and seen-state")
 public class ProfileViewController {
 
     private final ProfileViewService profileViewService;
@@ -40,6 +43,7 @@ public class ProfileViewController {
      * @param userDetails authenticated viewer
      * @return an empty success response
      */
+    @Operation(summary = "Records that the current user opened userId's profile or photo")
     @PostMapping("/{userId}")
     public ResponseEntity<ResponseDto<Void>> recordView(
             @PathVariable("userId") String userUuid,
@@ -61,6 +65,7 @@ public class ProfileViewController {
      * @param userDetails authenticated caller
      * @return the list of {@link ProfileViewResponse} viewers
      */
+    @Operation(summary = "Lists who recently viewed the caller's profile")
     @GetMapping
     public ResponseEntity<ResponseDto<List<ProfileViewResponse>>> getViewers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -73,6 +78,7 @@ public class ProfileViewController {
      * @param userDetails authenticated caller
      * @return the {@link ProfileViewCountResponse}
      */
+    @Operation(summary = "Returns total and unseen viewer counts for the caller (badge)")
     @GetMapping("/count")
     public ResponseEntity<ResponseDto<ProfileViewCountResponse>> getCount(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -85,6 +91,7 @@ public class ProfileViewController {
      * @param userDetails authenticated caller
      * @return an empty success response
      */
+    @Operation(summary = "Clears the caller's \"new viewers\" badge by marking all viewers as seen")
     @PostMapping("/mark-seen")
     public ResponseEntity<ResponseDto<Void>> markSeen(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

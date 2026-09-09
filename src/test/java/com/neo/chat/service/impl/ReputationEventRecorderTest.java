@@ -58,7 +58,7 @@ class ReputationEventRecorderTest {
         // Shared across most paths; dedupe/exception paths return before touching these.
         lenient().when(props.getDailyCap()).thenReturn(150);
         lenient().when(props.getDiminishingFactor()).thenReturn(0.4);
-        recorder = new ReputationEventRecorder(ledger, props);
+        recorder = new ReputationEventRecorder(new ReputationLedgerWriter(ledger, props));
     }
 
     private ReputationSignal signal(ReputationEventType type, String sourceRef) {

@@ -40,7 +40,6 @@ import java.util.UUID;
 @Slf4j
 @Component
 @Order(55)
-@RequiredArgsConstructor
 public class NightCitySeeder implements ApplicationRunner {
 
     private static final String ROOM_CATEGORY = "Virtual City";
@@ -48,9 +47,25 @@ public class NightCitySeeder implements ApplicationRunner {
     private final ChatRepository chatRepository;
     private final UserRepository userRepository;
     private final GroupService groupService;
+    private final String superAdminEmails;
 
-    @Value("${app.super-admin.emails:}")
-    private String superAdminEmails;
+    /**
+     * Constructor-injects the collaborators and the host allow-list.
+     *
+     * @param chatRepository   idempotency guard per district
+     * @param userRepository   host account resolution
+     * @param groupService     room creation
+     * @param superAdminEmails {@code app.super-admin.emails} (comma-separated; blank = fallback host)
+     */
+    public NightCitySeeder(ChatRepository chatRepository,
+                           UserRepository userRepository,
+                           GroupService groupService,
+                           @Value("${app.super-admin.emails:}") String superAdminEmails) {
+        this.chatRepository = chatRepository;
+        this.userRepository = userRepository;
+        this.groupService = groupService;
+        this.superAdminEmails = superAdminEmails;
+    }
 
     /**
      * Runs once at startup ({@link ApplicationRunner}, deliberately NOT transactional): seeds one

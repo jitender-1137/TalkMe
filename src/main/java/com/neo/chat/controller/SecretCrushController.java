@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.SecretCrushMatchResponse;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.SecretCrushService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +30,7 @@ import java.util.List;
 @RequestMapping("/secret-crush")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Secret Crush", description = "One-sided secret crushes; only the caller's own crushes and matches are visible")
 public class SecretCrushController {
 
     private final SecretCrushService secretCrushService;
@@ -45,6 +48,7 @@ public class SecretCrushController {
      * @throws com.neo.chat.exception.NotFoundException        if no user has that UUID (TM_404)
      * @throws com.neo.chat.exception.TooManyRequestsException if the caller is at the active-crush cap (TM_912)
      */
+    @Operation(summary = "Crush on a user; returns a match if it is mutual, otherwise a non-matched result")
     @PostMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
     public ResponseEntity<ResponseDto<SecretCrushMatchResponse>> addCrush(
@@ -64,6 +68,7 @@ public class SecretCrushController {
      * @throws com.neo.chat.exception.BadRequestException if the UUID is invalid (TM_913)
      * @throws com.neo.chat.exception.NotFoundException   if no user has that UUID (TM_404)
      */
+    @Operation(summary = "Withdraw the caller's crush on a user; a mutual match is demoted back to one-sided")
     @DeleteMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
     public ResponseEntity<ResponseDto<Void>> withdrawCrush(
@@ -79,6 +84,7 @@ public class SecretCrushController {
      * @param userDetails the authenticated caller
      * @return the caller's crushes and matches in a success envelope
      */
+    @Operation(summary = "The caller's OWN outgoing crushes plus their matches (partner identity disclosed only for matches)")
     @GetMapping("/mine")
     @PreAuthorize("@featureGuard.check('SECRET_CRUSH')")
     public ResponseEntity<ResponseDto<List<SecretCrushMatchResponse>>> listMine(

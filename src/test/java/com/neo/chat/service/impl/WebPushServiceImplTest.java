@@ -96,7 +96,8 @@ class WebPushServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new WebPushServiceImpl(subscriptionRepository, pushService, properties, circuitBreakerRegistry);
+        service = new WebPushServiceImpl(subscriptionRepository, properties,
+                new WebPushDelivery(subscriptionRepository, pushService, circuitBreakerRegistry));
     }
 
     private static SavePushSubscriptionRequest request(InstallationType type) {

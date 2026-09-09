@@ -16,7 +16,7 @@ import java.time.Duration;
  * dependency. State + call metrics are bound to Micrometer, so they surface on
  * {@code /actuator/prometheus} (gauge {@code resilience4j_circuitbreaker_state}).
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class ResilienceConfig {
 
     /**

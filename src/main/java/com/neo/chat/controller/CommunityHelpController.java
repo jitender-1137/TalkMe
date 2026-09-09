@@ -23,12 +23,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Community Help feed (feature #9, COMMUNITY_HELP) — real-time, city-scoped, ephemeral practical
  * Q&amp;A. Not anonymous. Every method is gated by the COMMUNITY_HELP entitlement.
  */
 @RestController
+@Tag(name = "Community Help", description = "Community Help feed (feature #9, COMMUNITY_HELP) — real-time, city-scoped, ephemeral practical Q&A")
 @RequestMapping("/community-help")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -39,7 +43,8 @@ public class CommunityHelpController {
     /**
      * Post a new help request. City defaults to the caller's own when omitted.
      */
-    @PostMapping
+    @Operation(summary = "Post a new help request")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('COMMUNITY_HELP')")
     public ResponseEntity<ResponseDto<HelpRequestResponse>> post(
             @Valid @RequestBody PostHelpRequest request,
@@ -53,6 +58,7 @@ public class CommunityHelpController {
      * City-scoped feed of OPEN, non-expired requests, newest first. City defaults to the viewer's
      * own when omitted; category is an optional filter.
      */
+    @Operation(summary = "City-scoped feed of OPEN, non-expired requests, newest first")
     @GetMapping("/feed")
     @PreAuthorize("@featureGuard.check('COMMUNITY_HELP')")
     public ResponseEntity<ResponseDto<HelpFeedResponse>> feed(
@@ -69,7 +75,8 @@ public class CommunityHelpController {
     /**
      * Answer a help request.
      */
-    @PostMapping("/{uuid}/answer")
+    @Operation(summary = "Answer a help request")
+    @PostMapping(value = "/{uuid}/answer", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('COMMUNITY_HELP')")
     public ResponseEntity<ResponseDto<HelpAnswerResponse>> answer(
             @PathVariable("uuid") String uuid,
@@ -83,6 +90,7 @@ public class CommunityHelpController {
     /**
      * List a help request's answers, oldest first. Read-only.
      */
+    @Operation(summary = "List a help request's answers, oldest first")
     @GetMapping("/{uuid}/answers")
     @PreAuthorize("@featureGuard.check('COMMUNITY_HELP')")
     public ResponseEntity<ResponseDto<List<HelpAnswerResponse>>> answers(
@@ -96,6 +104,7 @@ public class CommunityHelpController {
     /**
      * Mark a help request resolved (asker only).
      */
+    @Operation(summary = "Mark a help request resolved (asker only)")
     @PostMapping("/{uuid}/resolve")
     @PreAuthorize("@featureGuard.check('COMMUNITY_HELP')")
     public ResponseEntity<ResponseDto<HelpRequestResponse>> resolve(

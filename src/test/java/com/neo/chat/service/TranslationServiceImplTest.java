@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -59,7 +60,8 @@ import static org.mockito.Mockito.when;
  * {@link com.neo.chat.util.SsrfGuard} — which drives the fail-open "provider=none" path.
  *
  * <p>Collaborators: {@link StringRedisTemplate} and {@link ObjectMapper} are mocked;
- * {@link TranslationProperties} is a real instance carrying the baked-in defaults, mutated per test.
+ * {@link TranslationProperties} is a real (immutable) instance carrying the baked-in defaults,
+ * rebuilt per test via {@code withProperties(...)}.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TranslationServiceImpl (unit)")
@@ -87,6 +89,16 @@ class TranslationServiceImplTest {
 
         capUser = User.builder().username("capuser").email("c@e.com").name("Cap User").build();
         capUser.setId(7L);
+    }
+
+    /**
+     * {@link TranslationProperties} is immutable (constructor-bound), so a per-test override
+     * rebuilds it from the defaults and re-creates the service under test.
+     */
+    private void withProperties(
+            UnaryOperator<TranslationProperties.TranslationPropertiesBuilder> overrides) {
+        properties = overrides.apply(properties.toBuilder()).build();
+        service = new TranslationServiceImpl(properties, redis, objectMapper);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -142,7 +154,7 @@ class TranslationServiceImplTest {
 
         @Test
         void featureDisabled_echoesInputUnchanged_providerNone() {
-            properties.setEnabled(false);
+            withProperties(b -> b.enabled(false));
             TranslateRequest req = reqOf("hello", "es", "en");
 
             TranslateResponse result = service.translate(capUser, req);
@@ -201,9 +213,10 @@ class TranslationServiceImplTest {
             when(valueOps.get(anyString())).thenReturn(null); // miss → cap is enforced
             when(valueOps.increment(anyString())).thenReturn(1L); // first of the day arms the TTL
             // Point both providers at loopback so SsrfGuard rejects them (no network) → fail-open.
-            properties.setAzureKey("test-key");
-            properties.setAzureUrl("http://127.0.0.1:1/translate");
-            properties.setMymemoryUrl("http://127.0.0.1:1/get");
+            withProperties(b -> b
+                    .azureKey("test-key")
+                    .azureUrl("http://127.0.0.1:1/translate")
+                    .mymemoryUrl("http://127.0.0.1:1/get"));
 
             TranslateResponse result = service.translate(capUser, reqOf("hi", "fr", null));
 
@@ -222,7 +235,7 @@ class TranslationServiceImplTest {
 
         @Test
         void onCacheMiss_whenIncrementExceedsCap_throws429() {
-            properties.setDailyCapPerUser(3);
+            withProperties(b -> b.dailyCapPerUser(3));
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null); // miss → the cap is enforced
             when(valueOps.increment(anyString())).thenReturn(4L); // 4 > cap 3
@@ -236,7 +249,7 @@ class TranslationServiceImplTest {
 
         @Test
         void cacheHit_servedEvenWhenAlreadyOverCap_becauseCapIsCheckedAfterCache() {
-            properties.setDailyCapPerUser(3);
+            withProperties(b -> b.dailyCapPerUser(3));
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn("hola"); // cache hit
 
@@ -251,13 +264,14 @@ class TranslationServiceImplTest {
         @Test
         void onCacheMiss_whenIncrementEqualsCap_allowed_boundaryIsStrictlyGreater() {
             // count == cap must be allowed; only count > cap trips the limit.
-            properties.setDailyCapPerUser(3);
+            withProperties(b -> b.dailyCapPerUser(3));
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null); // miss
             when(valueOps.increment(anyString())).thenReturn(3L); // 3 == cap → allowed
-            properties.setAzureKey("test-key");
-            properties.setAzureUrl("http://127.0.0.1:1/translate");
-            properties.setMymemoryUrl("http://127.0.0.1:1/get");
+            withProperties(b -> b
+                    .azureKey("test-key")
+                    .azureUrl("http://127.0.0.1:1/translate")
+                    .mymemoryUrl("http://127.0.0.1:1/get"));
 
             TranslateResponse result = service.translate(capUser, reqOf("hello", "es", "en"));
 
@@ -294,9 +308,10 @@ class TranslationServiceImplTest {
             when(redis.opsForValue()).thenThrow(new RuntimeException("redis down"));
             // Point BOTH providers (Azure + the MyMemory fallback) at a loopback host so SsrfGuard
             // rejects each immediately — no real network I/O, and the service fails open to echo.
-            properties.setAzureKey("test-key");
-            properties.setAzureUrl("http://127.0.0.1:1/translate");
-            properties.setMymemoryUrl("http://127.0.0.1:1/get");
+            withProperties(b -> b
+                    .azureKey("test-key")
+                    .azureUrl("http://127.0.0.1:1/translate")
+                    .mymemoryUrl("http://127.0.0.1:1/get"));
 
             TranslateResponse result = service.translate(capUser, reqOf("hello", "es", "en"));
 
@@ -347,9 +362,10 @@ class TranslationServiceImplTest {
             when(valueOps.get(key("es", "world"))).thenReturn(null);
             when(valueOps.increment(anyString())).thenReturn(1L);
             // Loopback providers → the single miss echoes its input (fail-open), no network.
-            properties.setAzureKey("test-key");
-            properties.setAzureUrl("http://127.0.0.1:1/translate");
-            properties.setMymemoryUrl("http://127.0.0.1:1/get");
+            withProperties(b -> b
+                    .azureKey("test-key")
+                    .azureUrl("http://127.0.0.1:1/translate")
+                    .mymemoryUrl("http://127.0.0.1:1/get"));
 
             TranslateBatchResponse res =
                     service.translateBatch(capUser, batchOf("es", "en", "m1", "hello", "m2", "world"));
@@ -403,9 +419,10 @@ class TranslationServiceImplTest {
             when(valueOps.get(anyString())).thenReturn(null); // all misses
             when(valueOps.increment(anyString())).thenReturn(2L);
             // Loopback providers → SsrfGuard rejects both → each item echoes its input.
-            properties.setAzureKey("test-key");
-            properties.setAzureUrl("http://127.0.0.1:1/translate");
-            properties.setMymemoryUrl("http://127.0.0.1:1/get");
+            withProperties(b -> b
+                    .azureKey("test-key")
+                    .azureUrl("http://127.0.0.1:1/translate")
+                    .mymemoryUrl("http://127.0.0.1:1/get"));
 
             TranslateBatchResponse res =
                     service.translateBatch(capUser, batchOf("es", "en", "m1", "hello", "m2", "world"));
@@ -419,7 +436,7 @@ class TranslationServiceImplTest {
 
         @Test
         void featureDisabled_echoesEveryItem_providerNone_noIO() {
-            properties.setEnabled(false);
+            withProperties(b -> b.enabled(false));
 
             TranslateBatchResponse res =
                     service.translateBatch(capUser, batchOf("es", "en", "m1", "hello", "m2", "world"));
@@ -471,14 +488,24 @@ class TranslationServiceImplTest {
 
         @BeforeEach
         void wireRealMapperAndMockClient() {
-            // A REAL ObjectMapper so provider JSON is genuinely parsed; a mocked HttpClient
-            // swapped in via reflection so no real network I/O ever happens.
-            svc = new TranslationServiceImpl(properties, redis, new ObjectMapper());
+            // A mocked HttpClient swapped in via reflection so no real network I/O ever happens.
             httpClient = mock(HttpClient.class);
-            ReflectionTestUtils.setField(svc, "httpClient", httpClient);
             // Public literal IP → InetAddress parses it without DNS, SsrfGuard allows it.
-            properties.setAzureUrl("http://8.8.8.8/translate");
-            properties.setMymemoryUrl("http://8.8.8.8/get");
+            withProviderProperties(b -> b
+                    .azureUrl("http://8.8.8.8/translate")
+                    .mymemoryUrl("http://8.8.8.8/get"));
+        }
+
+        /**
+         * {@link TranslationProperties} is immutable, so a per-test override rebuilds it and the
+         * service under test — with a REAL {@link ObjectMapper} (provider JSON is genuinely parsed)
+         * and the mocked {@link HttpClient} re-injected.
+         */
+        private void withProviderProperties(
+                UnaryOperator<TranslationProperties.TranslationPropertiesBuilder> overrides) {
+            properties = overrides.apply(properties.toBuilder()).build();
+            svc = new TranslationServiceImpl(properties, redis, new ObjectMapper());
+            ReflectionTestUtils.setField(svc, "httpClient", httpClient);
         }
 
         @SuppressWarnings("unchecked")
@@ -551,8 +578,7 @@ class TranslationServiceImplTest {
         @DisplayName("Azure 200 → returns the azure translation and writes it to cache")
         void azureSuccess_returnsAzureTranslation_andCachesResult() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
-            properties.setAzureRegion("eastus"); // exercises the region-header branch
+            withProviderProperties(b -> b.azureKey("k").azureRegion("eastus")); // exercises the region-header branch
             String azure = "[{\"detectedLanguage\":{\"language\":\"en\"},"
                     + "\"translations\":[{\"text\":\"hola\",\"to\":\"es\"}]}]";
             doReturn(resp(200, azure)).when(httpClient).send(any(), any());
@@ -572,7 +598,7 @@ class TranslationServiceImplTest {
         @DisplayName("Azure detectedLanguage absent → falls back to the supplied source")
         void azureNoDetectedLanguage_usesSuppliedSource() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             // concrete source "de" (not blank / not auto) exercises the &from= branch too
             String azure = "[{\"translations\":[{\"text\":\"hallo\"}]}]";
             doReturn(resp(200, azure)).when(httpClient).send(any(), any());
@@ -588,7 +614,7 @@ class TranslationServiceImplTest {
         @DisplayName("blank Azure key → straight to MyMemory (no Azure HTTP call)")
         void azureKeyBlank_fallsBackToMyMemory_success() throws Exception {
             singleMiss();
-            properties.setAzureKey(""); // Azure disabled
+            withProviderProperties(b -> b.azureKey("")); // Azure disabled
             doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"hola-mm\"}}"))
                     .when(httpClient).send(any(), any());
 
@@ -605,7 +631,7 @@ class TranslationServiceImplTest {
         @DisplayName("Azure HTTP 403 (quota) → MyMemory fallback, honouring an explicit source")
         void azureHttp403_fallsBackToMyMemory_withExplicitSource() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             doReturn(resp(403, "over quota"))
                     .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"mm-text\"}}"))
                     .when(httpClient).send(any(), any());
@@ -622,7 +648,7 @@ class TranslationServiceImplTest {
         @DisplayName("Azure empty JSON array → MyMemory fallback")
         void azureEmptyArray_fallsBackToMyMemory() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             doReturn(resp(200, "[]"))
                     .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"x\"}}"))
                     .when(httpClient).send(any(), any());
@@ -638,7 +664,7 @@ class TranslationServiceImplTest {
         @DisplayName("Azure returns an empty translation string → MyMemory fallback")
         void azureEmptyTranslationText_fallsBackToMyMemory() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             doReturn(resp(200, "[{\"translations\":[{\"text\":\"\"}]}]"))
                     .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"y\"}}"))
                     .when(httpClient).send(any(), any());
@@ -653,7 +679,7 @@ class TranslationServiceImplTest {
         @DisplayName("both providers error → echo input unchanged, provider=none, nothing cached")
         void bothProvidersHttpError_echoesInput_providerNone() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             doReturn(resp(500, "err")).doReturn(resp(500, "err"))
                     .when(httpClient).send(any(), any());
 
@@ -670,7 +696,7 @@ class TranslationServiceImplTest {
         @DisplayName("Azure fails and MyMemory returns an empty translation → echo none")
         void azureFails_andMyMemoryEmpty_echoesNone() throws Exception {
             singleMiss();
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             doReturn(resp(500, "e"))
                     .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"\"}}"))
                     .when(httpClient).send(any(), any());
@@ -689,7 +715,7 @@ class TranslationServiceImplTest {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null); // all misses
             when(valueOps.increment(anyString())).thenReturn(1L);
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             String batch = "[{\"detectedLanguage\":{\"language\":\"en\"},\"translations\":[{\"text\":\"hola\"}]},"
                     + "{\"detectedLanguage\":{\"language\":\"en\"},\"translations\":[{\"text\":\"mundo\"}]}]";
             doReturn(resp(200, batch)).when(httpClient).send(any(), any());
@@ -712,7 +738,7 @@ class TranslationServiceImplTest {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null);
             when(valueOps.increment(anyString())).thenReturn(1L);
-            properties.setAzureKey(""); // batch Azure disabled → per-item MyMemory
+            withProviderProperties(b -> b.azureKey("")); // batch Azure disabled → per-item MyMemory
             doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"a\"}}"))
                     .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"b\"}}"))
                     .when(httpClient).send(any(), any());
@@ -732,7 +758,7 @@ class TranslationServiceImplTest {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null);
             when(valueOps.increment(anyString())).thenReturn(1L);
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             // Azure returns ONE element for TWO inputs → size mismatch → per-item fallback.
             doReturn(resp(200, "[{\"translations\":[{\"text\":\"only\"}]}]"))
                     .doReturn(resp(200, "{\"responseData\":{\"translatedText\":\"a\"}}"))
@@ -752,7 +778,7 @@ class TranslationServiceImplTest {
             when(redis.opsForValue()).thenReturn(valueOps);
             when(valueOps.get(anyString())).thenReturn(null);
             when(valueOps.increment(anyString())).thenReturn(1L);
-            properties.setAzureKey("k");
+            withProviderProperties(b -> b.azureKey("k"));
             doReturn(resp(500, "e")).doReturn(resp(500, "e")).doReturn(resp(500, "e"))
                     .when(httpClient).send(any(), any());
 

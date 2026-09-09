@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Flirt Lobby (feature #3). Every route is gated by the FLIRT_LOBBY entitlement, which
@@ -22,6 +24,7 @@ import java.util.List;
  * FeatureAccessService). A locked user gets TM_FEATURE_LOCKED and the client shows the gate.
  */
 @RestController
+@Tag(name = "Flirt Lobby", description = "Flirt Lobby (feature #3)")
 @RequestMapping("/flirt-lobby")
 @RequiredArgsConstructor
 public class FlirtLobbyController {
@@ -34,6 +37,7 @@ public class FlirtLobbyController {
      * @param userDetails the authenticated user joining the lobby
      * @return 200 with the list of online lobby members (excluding self, guests and banned users)
      */
+    @Operation(summary = "Adds the current user to the flirt-lobby set and returns the current live roster")
     @PostMapping("/enter")
     @PreAuthorize("@featureGuard.check('FLIRT_LOBBY')")
     public ResponseEntity<ResponseDto<List<NightUserCard>>> enter(
@@ -47,6 +51,7 @@ public class FlirtLobbyController {
      * @param userDetails the authenticated viewer, excluded from the returned roster
      * @return 200 with the list of online lobby members (excluding self, guests and banned users)
      */
+    @Operation(summary = "Returns the current live flirt-lobby roster, pruning members who have gone offline")
     @GetMapping("/online")
     @PreAuthorize("@featureGuard.check('FLIRT_LOBBY')")
     public ResponseEntity<ResponseDto<List<NightUserCard>>> online(
@@ -68,6 +73,7 @@ public class FlirtLobbyController {
      * @param userDetails the authenticated user leaving the lobby
      * @return 200 with an empty payload and success code TM_000
      */
+    @Operation(summary = "Removes the current user from the flirt-lobby set")
     @PostMapping("/leave")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<Void>> leave(

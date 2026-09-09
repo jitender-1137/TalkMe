@@ -13,7 +13,7 @@ import org.springframework.core.Ordered;
  * ensures the {@code requestId} MDC value is already set while the JWT/authentication filters
  * execute, so their log lines carry the correlation id too.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class RequestIdFilterConfig {
 
     /**

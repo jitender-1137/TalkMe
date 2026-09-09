@@ -16,12 +16,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * User-level consent (18+, community guidelines, flirt-lobby). Distinct from the
  * per-chat {@code /chats/{id}/consent} flow. Served at {@code /api/v1/consent}.
  */
 @RestController
+@Tag(name = "Consent", description = "User-level consent (18+, community guidelines, flirt-lobby)")
 @RequestMapping("/consent")
 @RequiredArgsConstructor
 public class ConsentController {
@@ -35,6 +39,7 @@ public class ConsentController {
      * @param userDetails the authenticated principal whose consent status is returned
      * @return 200 with the {@link ConsentStatusResponse}
      */
+    @Operation(summary = "Returns the caller's user-level consent status: per-type acceptance flags, the currently required versions, plus derived...")
     @GetMapping("/status")
     public ResponseEntity<ResponseDto<ConsentStatusResponse>> status(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -52,7 +57,8 @@ public class ConsentController {
      * @param httpRequest the servlet request, used to derive the client IP (X-Forwarded-For or remote addr)
      * @return 200 with the refreshed {@link ConsentStatusResponse} (message code TM_000)
      */
-    @PostMapping("/accept")
+    @Operation(summary = "Records the caller's acceptance of a consent type at the given version (falling back to the current required version when none is...")
+    @PostMapping(value = "/accept", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<ConsentStatusResponse>> accept(
             @Valid @RequestBody ConsentAcceptRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails,

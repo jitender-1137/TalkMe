@@ -7,7 +7,11 @@ import com.neo.chat.dto.response.SkillProfileResponse;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.SkillExchangeService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +34,7 @@ import java.util.List;
 @RequestMapping("/skills")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Skill Exchange", description = "Skills to teach and learn, matched to complementary peers")
 public class SkillExchangeController {
 
     private final SkillExchangeService skillExchangeService;
@@ -37,6 +42,7 @@ public class SkillExchangeController {
     /**
      * The caller's own skill profile (offers + wants).
      */
+    @Operation(summary = "The caller's own skill profile (offers + wants)")
     @GetMapping("/mine")
     @PreAuthorize("@featureGuard.check('SKILL_EXCHANGE')")
     public ResponseEntity<ResponseDto<SkillProfileResponse>> getMine(
@@ -48,10 +54,11 @@ public class SkillExchangeController {
     /**
      * Replace the caller's entire skill set. Returns the resulting profile.
      */
-    @PutMapping("/mine")
+    @Operation(summary = "Replace the caller's entire skill set")
+    @PutMapping(value = "/mine", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('SKILL_EXCHANGE')")
     public ResponseEntity<ResponseDto<SkillProfileResponse>> updateMine(
-            @RequestBody UpdateSkillsRequest request,
+            @Valid @RequestBody UpdateSkillsRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         SkillProfileResponse response = skillExchangeService.updateSkills(
                 userDetails.getUser(), request.getOffers(), request.getWants());
@@ -61,6 +68,7 @@ public class SkillExchangeController {
     /**
      * Users the caller can exchange skills with, reciprocal matches ranked first.
      */
+    @Operation(summary = "Users the caller can exchange skills with, reciprocal matches ranked first")
     @GetMapping("/matches")
     @PreAuthorize("@featureGuard.check('SKILL_EXCHANGE')")
     public ResponseEntity<ResponseDto<List<SkillMatchResponse>>> getMatches(
@@ -73,6 +81,7 @@ public class SkillExchangeController {
      * Begin a study session with another user; returns their public match card so the client
      * can open a 1:1 chat.
      */
+    @Operation(summary = "Begin a study session with another user; returns their public match card so the client can open a 1:1 chat")
     @PostMapping("/{userUuid}/study")
     @PreAuthorize("@featureGuard.check('SKILL_EXCHANGE')")
     public ResponseEntity<ResponseDto<SkillMatchResponse>> startStudy(

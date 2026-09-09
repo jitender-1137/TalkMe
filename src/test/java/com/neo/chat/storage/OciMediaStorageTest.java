@@ -66,10 +66,10 @@ class OciMediaStorageTest {
 
     @BeforeEach
     void setUp() {
-        StorageProperties props = new StorageProperties();
-        props.setMediaRoot(ROOT);
-        props.getOci().setNamespace(NS);
-        props.getOci().setBucket(BUCKET);
+        StorageProperties.Oci oci = new StorageProperties.Oci();
+        oci.setNamespace(NS);
+        oci.setBucket(BUCKET);
+        StorageProperties props = new StorageProperties(ROOT, List.of(), oci);
         storage = new OciMediaStorage(client, props);
     }
 

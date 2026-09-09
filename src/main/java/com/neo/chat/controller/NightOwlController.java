@@ -6,6 +6,8 @@ import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.dto.response.TrendingRoomCard;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.NightOwlService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +25,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/night-owl")
 @RequiredArgsConstructor
+@Tag(name = "Night Owl", description = "Night Owl lobby and interest rooms")
 public class NightOwlController {
 
     private final NightOwlService nightOwlService;
@@ -33,6 +36,7 @@ public class NightOwlController {
      * @param userDetails authenticated caller
      * @return the assembled {@link NightOwlDashboardResponse}
      */
+    @Operation(summary = "Returns the Night Owl lobby dashboard for the current user")
     @GetMapping("/dashboard")
     @PreAuthorize("@featureGuard.check('NIGHT_OWL')")
     public ResponseEntity<ResponseDto<NightOwlDashboardResponse>> dashboard(
@@ -47,6 +51,7 @@ public class NightOwlController {
      * @param limit maximum number of room cards to return (default 20)
      * @return the trending {@link TrendingRoomCard} list
      */
+    @Operation(summary = "Trending / curated interest rooms rail (feature #23)")
     @GetMapping("/trending-rooms")
     @PreAuthorize("@featureGuard.check('INTEREST_ROOMS')")
     public ResponseEntity<ResponseDto<List<TrendingRoomCard>>> trendingRooms(

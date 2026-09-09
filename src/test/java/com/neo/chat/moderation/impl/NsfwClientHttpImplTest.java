@@ -56,10 +56,14 @@ class NsfwClientHttpImplTest {
 
     @BeforeEach
     void setUp() {
-        client = new NsfwClientHttpImpl(frameExtractor, objectMapper);
-        ReflectionTestUtils.setField(client, "http", httpClient);
-        ReflectionTestUtils.setField(client, "baseUrl", "http://localhost:8081");
-        ReflectionTestUtils.setField(client, "nsfwEnabled", true);
+        client = build(true);
+    }
+
+    private NsfwClientHttpImpl build(boolean nsfwEnabled) {
+        NsfwClientHttpImpl c = new NsfwClientHttpImpl(frameExtractor, objectMapper, "http://localhost:8081", nsfwEnabled);
+        // Swap the inline-constructed HttpClient for the mock.
+        ReflectionTestUtils.setField(c, "http", httpClient);
+        return c;
     }
 
     private Path fileWithBytes(String name, String content) throws IOException {
@@ -85,7 +89,7 @@ class NsfwClientHttpImplTest {
         @Test
         @DisplayName("disabled → empty, no HTTP and no frame extraction")
         void disabled() {
-            ReflectionTestUtils.setField(client, "nsfwEnabled", false);
+            client = build(false);
 
             assertThat(client.classify(tmp.resolve("any.jpg"), false)).isEmpty();
             verifyNoInteractions(httpClient, frameExtractor);

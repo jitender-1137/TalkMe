@@ -5,9 +5,9 @@ import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserPresence;
 import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.exception.GlobalExceptionHandler;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.PresenceService;
+import com.neo.chat.service.lookup.UserLookupSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Pure controller unit test for {@link PresenceController}.
  *
- * <p>Standalone {@link MockMvc} with a mocked {@link PresenceService} + {@link UserRepository} and
+ * <p>Standalone {@link MockMvc} with a mocked {@link PresenceService} + {@link UserLookupSupport} and
  * the real {@link GlobalExceptionHandler}. Only {@link AuthenticationPrincipalArgumentResolver} is
  * registered — every endpoint takes {@code @RequestParam}/{@code @PathVariable} scalars plus
  * {@code @AuthenticationPrincipal}; none has a {@code @RequestBody}, so neither the tolerant
@@ -71,14 +71,14 @@ class PresenceControllerUnitTest {
     private PresenceService presenceService;
 
     @Mock
-    private UserRepository userRepository;
+    private UserLookupSupport userLookup;
 
     private MockMvc mockMvc;
     private User testUser;
 
     @BeforeEach
     void setUp() {
-        PresenceController controller = new PresenceController(presenceService, userRepository);
+        PresenceController controller = new PresenceController(presenceService, userLookup);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -384,7 +384,7 @@ class PresenceControllerUnitTest {
             authenticate();
             Instant lastSeen = Instant.parse("2026-07-22T10:15:30Z");
             // Same user (findByUsername returns testUser, id matches) → owner branch.
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            when(userLookup.findByUsername("testuser")).thenReturn(Optional.of(testUser));
             when(presenceService.getUserPresence(testUser))
                     .thenReturn(presence("ONLINE", true, false, true));
             when(presenceService.getRawStatus(testUser)).thenReturn(PresenceStatus.INVISIBLE);
@@ -412,7 +412,7 @@ class PresenceControllerUnitTest {
         @Test
         void shouldReturnNullLastSeenForSelfWhenLastSeenAbsent() throws Exception {
             authenticate();
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            when(userLookup.findByUsername("testuser")).thenReturn(Optional.of(testUser));
             when(presenceService.getUserPresence(testUser))
                     .thenReturn(presence("ONLINE", false, false, false));
             when(presenceService.getRawStatus(testUser)).thenReturn(PresenceStatus.ONLINE);
@@ -429,7 +429,7 @@ class PresenceControllerUnitTest {
             authenticate();
             User target = otherUser(2L, "bob");
             Instant apparentLastSeen = Instant.parse("2026-07-21T08:00:00Z");
-            when(userRepository.findByUsername("bob")).thenReturn(Optional.of(target));
+            when(userLookup.findByUsername("bob")).thenReturn(Optional.of(target));
             // target has ghost+invisible on in the durable record, but a non-owner must never see them
             when(presenceService.getUserPresence(target))
                     .thenReturn(presence("ONLINE", true, true, true));
@@ -457,7 +457,7 @@ class PresenceControllerUnitTest {
         void shouldReturnNullLastSeenForOtherUserWhenApparentLastSeenHidden() throws Exception {
             authenticate();
             User target = otherUser(2L, "bob");
-            when(userRepository.findByUsername("bob")).thenReturn(Optional.of(target));
+            when(userLookup.findByUsername("bob")).thenReturn(Optional.of(target));
             when(presenceService.getUserPresence(target))
                     .thenReturn(presence("OFFLINE", false, false, true));
             when(presenceService.getStatus(target)).thenReturn(PresenceStatus.OFFLINE);
@@ -472,7 +472,7 @@ class PresenceControllerUnitTest {
         @Test
         void shouldReturn404WhenTargetUserNotFound() throws Exception {
             authenticate();
-            when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+            when(userLookup.findByUsername("ghost")).thenReturn(Optional.empty());
 
             mockMvc.perform(get(BASE + "/ghost"))
                     .andExpect(status().isNotFound())
@@ -485,7 +485,7 @@ class PresenceControllerUnitTest {
         void shouldReturn500OnUnexpectedServiceError() throws Exception {
             authenticate();
             User target = otherUser(2L, "bob");
-            when(userRepository.findByUsername("bob")).thenReturn(Optional.of(target));
+            when(userLookup.findByUsername("bob")).thenReturn(Optional.of(target));
             when(presenceService.getUserPresence(target)).thenThrow(new RuntimeException("boom"));
 
             mockMvc.perform(get(BASE + "/bob"))

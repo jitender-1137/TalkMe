@@ -1,5 +1,6 @@
 package com.neo.chat.controller;
 
+import com.neo.chat.util.ClientRequestInfo;
 import com.neo.chat.dto.request.ChangePasswordRequest;
 import com.neo.chat.dto.request.ForgotPasswordRequest;
 import com.neo.chat.dto.request.GuestLoginRequest;
@@ -28,7 +29,6 @@ import com.neo.chat.security.JwtTokenProvider;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -50,6 +50,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Authentication and account/session management: signup, login (credentials + guest),
@@ -58,13 +61,29 @@ import java.util.UUID;
  */
 @Slf4j
 @RestController
+@Tag(name = "Auth", description = "Authentication and account/session management: signup, login (credentials + guest), token refresh/logout, current-user profile, session...")
 @RequestMapping("/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
     private final CaptchaService captchaService;
     private final JwtTokenProvider tokenProvider;
+    /** Whether auth cookies are flagged {@code Secure} ({@code app.cookie.secure}, default false). */
+    private final boolean cookieSecure;
+    /** {@code SameSite} attribute applied to auth cookies ({@code app.cookie.same-site}, default Lax). */
+    private final String cookieSameSite;
+
+    public AuthController(AuthService authService,
+                          CaptchaService captchaService,
+                          JwtTokenProvider tokenProvider,
+                          @Value("${app.cookie.secure:false}") boolean cookieSecure,
+                          @Value("${app.cookie.same-site:Lax}") String cookieSameSite) {
+        this.authService = authService;
+        this.captchaService = captchaService;
+        this.tokenProvider = tokenProvider;
+        this.cookieSecure = cookieSecure;
+        this.cookieSameSite = cookieSameSite;
+    }
 
     /**
      * Bean Validation for the dynamically-routed /auth/login body: it is parsed by hand (guest vs
@@ -85,9 +104,6 @@ public class AuthController {
         }
     }
 
-    @Value("${app.cookie.secure:false}")
-    private boolean cookieSecure;
-
     /**
      * Bot/human gate for the auth forms: rejects filled honeypots and requires a
      * valid Cloudflare Turnstile token. Throws 400 if either check fails.
@@ -101,9 +117,6 @@ public class AuthController {
             throw new BadRequestException("CAPTCHA verification failed. Please try again.", "TM_401");
         }
     }
-
-    @Value("${app.cookie.same-site:Lax}")
-    private String cookieSameSite;
 
     private void setAuthCookies(HttpServletResponse response, JwtTokensResponse tokens, boolean isGuest) {
         setAuthCookies(response, tokens.getRefreshToken(), isGuest);
@@ -205,7 +218,8 @@ public class AuthController {
      * @throws com.neo.chat.exception.ConflictException          if the username or email is taken
      * @throws com.neo.chat.exception.ContentModerationException if the chosen username fails moderation
      */
-    @PostMapping("/signup")
+    @Operation(summary = "Register a new user, then set refresh/CSRF auth cookies and return the login payload")
+    @PostMapping(value = "/signup", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<LoginResponse>> signup(
             @Valid @RequestBody SignupRequest request,
             @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
@@ -214,7 +228,7 @@ public class AuthController {
 
         verifyHuman(request.getCaptchaToken(), request.getWebsite(), httpRequest);
 
-        LoginResponse loginResponse = authService.signup(request, userAgent, httpRequest);
+        LoginResponse loginResponse = authService.signup(request, ClientRequestInfo.from(httpRequest, userAgent));
 
         setAuthCookies(httpResponse, loginResponse.getTokens(), false);
 
@@ -236,7 +250,8 @@ public class AuthController {
      * @throws com.neo.chat.exception.ForbiddenException    if the account is suspended or a
      *                                                         non-guest account uses the guest flow (and vice versa)
      */
-    @PostMapping("/login")
+    @Operation(summary = "Unified login: routes to guest login when the body carries isGuest:true, otherwise standard credential login; sets refresh/CSRF cookies...")
+    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<LoginResponse>> login(
             @RequestBody String bodyRaw, // Allows parsing dynamic requests for guest mode
             @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
@@ -260,14 +275,14 @@ public class AuthController {
             // Guest login flow
             GuestLoginRequest request = mapper.convertValue(parsed, GuestLoginRequest.class);
             validate(request); // @NotBlank name, @ValidAge, @ValidGender — previously never enforced
-            LoginResponse response = authService.loginAsGuest(request, userAgent, httpRequest);
+            LoginResponse response = authService.loginAsGuest(request, ClientRequestInfo.from(httpRequest, userAgent));
             setAuthCookies(httpResponse, response.getTokens(), true);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         } else {
             // Standard credentials login
             LoginRequest request = mapper.convertValue(parsed, LoginRequest.class);
             validate(request); // @NotBlank identifier/password — avoids a null-password 400 with an internal message
-            LoginResponse response = authService.login(request, userAgent, ip, httpRequest);
+            LoginResponse response = authService.login(request, ClientRequestInfo.from(httpRequest, userAgent, ip));
             setAuthCookies(httpResponse, response.getTokens(), false);
             return ResponseEntity.ok(SuccessResponseDto.success(response, "Login Successful", "TM_002"));
         }
@@ -292,6 +307,7 @@ public class AuthController {
      * @throws com.neo.chat.exception.UnauthorizedException if the cookie is missing, or the
      *                                                         refresh token is invalid/expired
      */
+    @Operation(summary = "Rotate the access/refresh token pair using the refresh-token cookie; re-issues both cookies")
     @PostMapping("/refresh")
     public ResponseEntity<ResponseDto<JwtTokensResponse>> refresh(
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
@@ -319,6 +335,7 @@ public class AuthController {
      * @param httpResponse the servlet response (auth cookies are cleared on it)
      * @return an empty success envelope confirming logout
      */
+    @Operation(summary = "Invalidate the current refresh token (if present) and clear the auth cookies")
     @PostMapping("/logout")
     public ResponseEntity<ResponseDto<Void>> logout(
             @CookieValue(name = "refreshToken", required = false) String refreshToken,
@@ -338,6 +355,7 @@ public class AuthController {
      * @param userDetails the authenticated principal
      * @return the {@link AuthUserResponse} for the current user
      */
+    @Operation(summary = "Return the authenticated user's own profile")
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<AuthUserResponse>> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
         AuthUserResponse response = authService.getCurrentUser(userDetails.getUser());
@@ -351,7 +369,8 @@ public class AuthController {
      * @param userDetails the authenticated principal
      * @return the updated {@link AuthUserResponse}
      */
-    @PutMapping("/me")
+    @Operation(summary = "Update the authenticated user's editable profile fields")
+    @PutMapping(value = "/me", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<AuthUserResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -365,6 +384,7 @@ public class AuthController {
      * @param userDetails the authenticated principal
      * @return the list of {@link SessionResponse} for the user
      */
+    @Operation(summary = "List the authenticated user's active login sessions")
     @GetMapping("/sessions")
     public ResponseEntity<ResponseDto<List<SessionResponse>>> getSessions(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -380,6 +400,7 @@ public class AuthController {
      * @return an empty success envelope confirming termination
      * @throws com.neo.chat.exception.ForbiddenException if the session belongs to another user
      */
+    @Operation(summary = "Revoke (terminate) one of the authenticated user's sessions")
     @DeleteMapping("/sessions/{id}")
     public ResponseEntity<ResponseDto<Void>> revokeSession(
             @PathVariable("id") String sessionUuid,
@@ -394,6 +415,7 @@ public class AuthController {
      * @param userDetails the authenticated principal
      * @return an empty success envelope confirming the other sessions were revoked
      */
+    @Operation(summary = "Revoke all the authenticated user's other sessions")
     @PostMapping("/sessions/revoke-all")
     public ResponseEntity<ResponseDto<Void>> revokeAllSessions(@AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.revokeAllSessions(userDetails.getUser());
@@ -407,7 +429,8 @@ public class AuthController {
      * @param request the validated forgot-password request (email)
      * @return an empty success envelope
      */
-    @PostMapping("/forgot-password")
+    @Operation(summary = "Begin the password-reset flow by emailing a reset link (responds success regardless of whether the address exists, to avoid account...")
+    @PostMapping(value = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Password reset link sent successfully", "TM_036"));
@@ -421,7 +444,8 @@ public class AuthController {
      * @throws com.neo.chat.exception.UnauthorizedException if the reset token is invalid or expired
      * @throws com.neo.chat.exception.BadRequestException   if the new password fails policy checks
      */
-    @PostMapping("/reset-password")
+    @Operation(summary = "Complete a password reset using the emailed reset token and a new password")
+    @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Password reset successful", "TM_037"));
@@ -436,7 +460,8 @@ public class AuthController {
      * @throws com.neo.chat.exception.UnauthorizedException if the current password is incorrect
      * @throws com.neo.chat.exception.BadRequestException   if the new password fails policy checks
      */
-    @PostMapping("/change-password")
+    @Operation(summary = "Change the authenticated user's password after verifying their current password")
+    @PostMapping(value = "/change-password", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -451,7 +476,8 @@ public class AuthController {
      * @return an empty success envelope confirming verification
      * @throws com.neo.chat.exception.UnauthorizedException if the token is invalid or expired
      */
-    @PostMapping("/verify-email")
+    @Operation(summary = "Confirm an email-verification token (from the link in the verification email)")
+    @PostMapping(value = "/verify-email", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         authService.verifyEmail(request.getToken());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Email verified successfully", "TM_405"));
@@ -464,6 +490,7 @@ public class AuthController {
      * @return an empty success envelope confirming the email was sent
      * @throws com.neo.chat.exception.BadRequestException if the user's email is already verified
      */
+    @Operation(summary = "Re-send the verification email to the authenticated (still-unverified) user")
     @PostMapping("/resend-verification")
     public ResponseEntity<ResponseDto<Void>> resendVerification(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

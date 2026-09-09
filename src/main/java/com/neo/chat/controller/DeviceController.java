@@ -15,12 +15,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Manages push-notification device tokens for the authenticated user. Served at
  * {@code /devices}; registering a token that already exists re-assigns its ownership to the caller.
  */
 @RestController
+@Tag(name = "Device", description = "Manages push-notification device tokens for the authenticated user")
 @RequestMapping("/devices")
 @RequiredArgsConstructor
 public class DeviceController {
@@ -34,7 +38,8 @@ public class DeviceController {
      * @param userDetails the authenticated principal that will own the token
      * @return 200 with an empty payload and success code TM_055
      */
-    @PostMapping
+    @Operation(summary = "Registers (or re-assigns ownership of) a push device token for the current user")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> registerDevice(
             @Valid @RequestBody RegisterDeviceRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -51,6 +56,7 @@ public class DeviceController {
      * @throws com.neo.chat.exception.NotFoundException  if no device with the token exists
      * @throws com.neo.chat.exception.ForbiddenException if the token belongs to another user
      */
+    @Operation(summary = "Deletes a device token owned by the current user")
     @DeleteMapping
     public ResponseEntity<ResponseDto<Void>> unregisterDevice(
             @RequestParam("token") String deviceToken,

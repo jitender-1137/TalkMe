@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -21,7 +22,8 @@ import java.time.Instant;
  * entry; every mutation is broadcast live over WS to the owning chat.
  */
 @Entity
-@Table(name = "bucket_list_items")
+@Table(name = "bucket_list_items",
+        indexes = @Index(name = "idx_bucket_list_items_bucket_list_id", columnList = "bucket_list_id"))
 @Getter
 @Setter
 @Builder

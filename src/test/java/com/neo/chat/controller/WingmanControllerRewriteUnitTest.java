@@ -3,11 +3,10 @@ package com.neo.chat.controller;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.exception.GlobalExceptionHandler;
-import com.neo.chat.repository.BlockUserRepository;
-import com.neo.chat.repository.FriendRepository;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.WingmanService;
+import com.neo.chat.service.lookup.RelationshipLookupService;
+import com.neo.chat.service.lookup.UserLookupService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,11 +79,9 @@ class WingmanControllerRewriteUnitTest {
     @Mock
     private WingmanService wingmanService;
     @Mock
-    private UserRepository userRepository;
+    private UserLookupService userLookupService;
     @Mock
-    private FriendRepository friendRepository;
-    @Mock
-    private BlockUserRepository blockUserRepository;
+    private RelationshipLookupService relationshipLookup;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -92,7 +89,7 @@ class WingmanControllerRewriteUnitTest {
     @BeforeEach
     void setUp() {
         WingmanController controller = new WingmanController(
-                wingmanService, userRepository, friendRepository, blockUserRepository);
+                wingmanService, userLookupService, relationshipLookup);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();

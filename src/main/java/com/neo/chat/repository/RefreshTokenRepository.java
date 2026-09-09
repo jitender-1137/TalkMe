@@ -27,6 +27,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("SELECT r FROM RefreshToken r WHERE r.token = :token")
     Optional<RefreshToken> findByTokenForUpdate(@Param("token") String token);
 
+    // Intentionally no clearAutomatically: AuthServiceImpl.generateLoginResponse() and
+    // purgeExpiredDeletedAccounts() keep mutating and saving the managed User afterwards.
     @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.user = :user AND r.revoked = false")
     void revokeAllUserTokens(User user);

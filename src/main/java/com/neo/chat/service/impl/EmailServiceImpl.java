@@ -81,36 +81,27 @@ public class EmailServiceImpl implements EmailService {
         TRANSACTIONAL     // login alerts, unread digests, password-changed, support — VERIFIED only
     }
 
-    @Value("${app.mail.enabled:false}")
-    private boolean mailEnabled;
+    private final boolean mailEnabled;
 
     /**
      * When true, TRANSACTIONAL emails are only sent to verified addresses.
      */
-    @Value("${app.mail.require-verification:true}")
-    private boolean requireVerification;
+    private final boolean requireVerification;
 
-    @Value("${app.mail.from:NeoChatHub <noreply@neochathub.com>}")
-    private String from;
+    private final String from;
 
-    @Value("${app.mail.timeout-ms:10000}")
-    private long timeoutMs;
+    private final long timeoutMs;
 
     // Primary provider: Resend.
-    @Value("${app.mail.resend.api-key:}")
-    private String resendApiKey;
-    @Value("${app.mail.resend.daily-limit:100}")
-    private int resendDailyLimit;
+    private final String resendApiKey;
+    private final int resendDailyLimit;
 
     // Fallback 1: Brevo. Used when Resend is out of quota or errors.
-    @Value("${app.mail.brevo.api-key:}")
-    private String brevoApiKey;
-    @Value("${app.mail.brevo.daily-limit:300}")
-    private int brevoDailyLimit;
+    private final String brevoApiKey;
+    private final int brevoDailyLimit;
 
     // Fallback 2: SMTP. Last resort when both HTTP providers fail.
-    @Value("${app.mail.smtp.enabled:false}")
-    private boolean smtpEnabled;
+    private final boolean smtpEnabled;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
@@ -121,13 +112,31 @@ public class EmailServiceImpl implements EmailService {
                             ObjectProvider<JavaMailSender> mailSenderProvider,
                             EmailTemplates templates,
                             UserRepository userRepository,
-                            DisposableEmailDomains disposableDomains) {
+                            DisposableEmailDomains disposableDomains,
+                            @Value("${app.mail.enabled:false}") boolean mailEnabled,
+                            @Value("${app.mail.require-verification:true}") boolean requireVerification,
+                            @Value("${app.mail.from:NeoChatHub <noreply@neochathub.com>}") String from,
+                            @Value("${app.mail.timeout-ms:10000}") long timeoutMs,
+                            @Value("${app.mail.resend.api-key:}") String resendApiKey,
+                            @Value("${app.mail.resend.daily-limit:100}") int resendDailyLimit,
+                            @Value("${app.mail.brevo.api-key:}") String brevoApiKey,
+                            @Value("${app.mail.brevo.daily-limit:300}") int brevoDailyLimit,
+                            @Value("${app.mail.smtp.enabled:false}") boolean smtpEnabled) {
         this.objectMapper = objectMapper;
         this.redisProvider = redisProvider;
         this.mailSenderProvider = mailSenderProvider;
         this.templates = templates;
         this.userRepository = userRepository;
         this.disposableDomains = disposableDomains;
+        this.mailEnabled = mailEnabled;
+        this.requireVerification = requireVerification;
+        this.from = from;
+        this.timeoutMs = timeoutMs;
+        this.resendApiKey = resendApiKey;
+        this.resendDailyLimit = resendDailyLimit;
+        this.brevoApiKey = brevoApiKey;
+        this.brevoDailyLimit = brevoDailyLimit;
+        this.smtpEnabled = smtpEnabled;
     }
 
     /**

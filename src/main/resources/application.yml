@@ -36,6 +36,15 @@ server:
   port: ${SERVER_PORT}
   forward-headers-strategy: framework
   servlet:
+    session:
+      # The API is stateless (JWT); a servlet session only appears transiently during the
+      # Google OAuth2 login handshake, so a short explicit lifetime is plenty (BootUI
+      # SEC-SESSION-005 — Boot's implicit default is 30m).
+      timeout: 15m
+      cookie:
+        # Lax keeps that top-level OAuth redirect working while blocking cross-site
+        # subresource/POST cookie replay (BootUI SEC-SESSION-004).
+        same-site: lax
     context-path: /
   # Gzip responses on the wire. The Next.js bundle (~3+ MB of JS/CSS uncompressed)
   # compresses to roughly a quarter of that, so this is a large cold-open win on
@@ -68,6 +77,39 @@ spring:
     name: NeoChatHub
   profiles:
     active: ${SPRING_PROFILES_ACTIVE}
+
+  # ---------------------------------------------------------------------------
+  # Thread pools for @Async and @Scheduled (BootUI Spring Advisor SPRING-WIRING-004 / SPRING-PERF-005).
+  #
+  # execution: the app defines its own Executor bean (broadcastExecutor, AsyncConfig), which makes
+  # Boot back off from creating applicationTaskExecutor — so every UNQUALIFIED @Async (email sends,
+  # web push) silently fell back to Spring's SimpleAsyncTaskExecutor: one new unbounded thread per
+  # call, and BootUI flagged 5 ambiguous TaskExecutor beans. mode=force makes Boot create the
+  # bounded applicationTaskExecutor (alias taskExecutor) anyway and register an AsyncConfigurer
+  # that routes plain @Async to it. Fan-out stays on @Async("broadcastExecutor").
+  #
+  # scheduling: the WebSocket broker's messageBrokerTaskScheduler also made Boot back off from
+  # its taskScheduler, so @Scheduled jobs ran on the broker pool; SchedulingConfig now defines a
+  # named taskScheduler built from these properties (20 @Scheduled methods; several 1s reapers).
+  # ---------------------------------------------------------------------------
+  task:
+    execution:
+      mode: force
+      thread-name-prefix: async-
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 1000
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
+    scheduling:
+      thread-name-prefix: sched-
+      pool:
+        size: 4
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
 
 
   # Jackson: an ABSENT/null JSON primitive deserializes to its default instead of
@@ -122,11 +164,14 @@ spring:
   jpa:
     # Dialect is auto-detected from the Postgres driver — setting it explicitly only
     # triggers Hibernate's HHH90000025 deprecation warning on every boot, so it's omitted.
-    # Pin the OSIV behaviour explicitly to the current default (true) purely to silence
-    # the startup "open-in-view is enabled by default" warning — behaviour is unchanged.
-    # (Switching to false is a possible future optimisation but risks LazyInitialization
-    # errors during view rendering, so it's deliberately NOT changed here.)
-    open-in-view: true
+    # Open Session in View is OFF (BootUI Spring Advisor SPRING-JPA-001): this is a pure JSON API
+    # with no view rendering. Every mapper/DTO builder runs inside a @Transactional service, the
+    # security principal is re-fetched by services that need its associations, and async/AFTER_COMMIT
+    # listeners already re-load entities (audited 2026-09-07). The one LAZY read outside a
+    # transaction — User.personality in compatibility scoring — is covered by
+    # UserRepository.findBy*WithPersonality fetch-joins at the HTTP call sites. Connections are now
+    # released when the service transaction ends instead of being held through response writing.
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -135,13 +180,29 @@ spring:
         default_schema: ${DATABASE_SCHEMA}
         # Batch lazy association loads (avoid N+1 when mapping pages to DTOs).
         default_batch_fetch_size: 50
+        # Group same-table statements so jdbc.batch_size actually forms batches (BootUI
+        # HIB-CONFIG-005). These are the top-level hibernate.order_* keys — they used to sit
+        # under jdbc.* where Hibernate silently ignored them.
+        order_inserts: true
+        order_updates: true
+        # Tuning diagnostics (BootUI HIB-CONFIG-006/007) — OFF unless the local .env opts in
+        # (HIBERNATE_STATISTICS=true, HIBERNATE_SLOW_QUERY_MS=<ms>); 0 disables slow-query logging.
+        # log_slow_query is Hibernate 6.3+'s key (JdbcSettings.LOG_SLOW_QUERY); the legacy
+        # session.events.log.LOG_QUERIES_SLOWER_THAN_MS is no longer read by Hibernate 7.
+        generate_statistics: ${HIBERNATE_STATISTICS:false}
+        log_slow_query: ${HIBERNATE_SLOW_QUERY_MS:0}
         jdbc:
           batch_size: 30
-          order_inserts: true
-          order_updates: true
           batch_versioned_data: true
+          # Pin JDBC timestamp binding/reading to UTC so java.time conversions never depend on
+          # the host JVM zone (BootUI HIB-CONFIG-013). Safe: every entity temporal field is an
+          # Instant or LocalDate (no LocalDateTime).
+          time_zone: UTC
         query:
           fail_on_pagination_over_collection_fetch: true
+          # BootUI HIB-CONFIG-009: pad IN-clause parameter counts to powers of two so
+          # variable-length IN (...) predicates reuse a bounded set of execution plans.
+          in_clause_parameter_padding: true
 
   # SMTP — final fallback after the Resend/Brevo HTTP APIs.
   mail:
@@ -191,12 +252,29 @@ spring:
             scope: ${GOOGLE_OAUTH_SCOPES}
             redirect-uri: "{baseUrl}/login/oauth2/code/google"
 
+# OpenAPI / Swagger UI. Endpoint discovery tooling, not application functionality, so it is
+# OFF by default in every profile (BootUI pentest PT-A05-041) — the generated schema lists every
+# route and its request shape, which makes crafting requests trivial for anyone who reaches the
+# port. A developer who wants the UI opts in for their machine only, via the git-ignored .env:
+#   SPRINGDOC_ENABLED=true      → http://localhost:8080/swagger-ui.html
+# The 'prod' profile below pins both to false regardless, so the opt-in cannot reach production.
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
+
 # Observability. Endpoints under /actuator; RESTRICT to an internal network in prod.
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        # Default to the probe endpoints only. Metrics/Prometheus stay OFF unless the
+        # environment opts in (prod sets MANAGEMENT_ENDPOINTS=health,info,metrics,prometheus for
+        # the scrape target), so a dev box does not publish the runtime metric inventory that
+        # aids reconnaissance (BootUI pentest PT-A05-055 / PT-A05-040). The actuator security
+        # chain still restricts everything except health to SUPER_ADMIN.
+        include: ${MANAGEMENT_ENDPOINTS:health,info}
   endpoint:
     health:
       probes:

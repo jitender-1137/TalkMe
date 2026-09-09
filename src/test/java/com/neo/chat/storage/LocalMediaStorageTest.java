@@ -37,8 +37,7 @@ class LocalMediaStorageTest {
 
     @BeforeEach
     void setUp() {
-        StorageProperties props = new StorageProperties();
-        props.setMediaRoot(rootDir.toString());
+        StorageProperties props = new StorageProperties(rootDir.toString(), List.of(), new StorageProperties.Oci());
         storage = new LocalMediaStorage(props);
     }
 

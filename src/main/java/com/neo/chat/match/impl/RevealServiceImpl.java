@@ -9,7 +9,6 @@ import com.neo.chat.match.RevealService;
 import com.neo.chat.match.SessionService;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.util.LogSanitizer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,7 +25,6 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RevealServiceImpl implements RevealService {
 
     private static final int MAX_DECLINES = 3;
@@ -38,8 +36,17 @@ public class RevealServiceImpl implements RevealService {
     /**
      * When true, a PHOTO reveal is blocked until VOICE is mutually revealed (feature #15).
      */
-    @Value("${match.voice-before-photo.enabled:false}")
-    private boolean voiceBeforePhoto;
+    private final boolean voiceBeforePhoto;
+
+    public RevealServiceImpl(SessionService sessionService,
+                             UserRepository userRepository,
+                             SimpMessagingTemplate messagingTemplate,
+                             @Value("${match.voice-before-photo.enabled:false}") boolean voiceBeforePhoto) {
+        this.sessionService = sessionService;
+        this.userRepository = userRepository;
+        this.messagingTemplate = messagingTemplate;
+        this.voiceBeforePhoto = voiceBeforePhoto;
+    }
 
     /**
      * Requests (and simultaneously offers) a channel reveal. Under a session lock: no-ops

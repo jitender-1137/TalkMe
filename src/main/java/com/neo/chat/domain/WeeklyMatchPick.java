@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -26,7 +27,8 @@ import java.time.LocalDate;
         name = "weekly_match_picks",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_weekly_match_pick_user_picked_week",
-                columnNames = {"user_id", "picked_user_id", "week_start"}))
+                columnNames = {"user_id", "picked_user_id", "week_start"}),
+        indexes = @Index(name = "idx_weekly_match_picks_picked_user_id", columnList = "picked_user_id"))
 @Getter
 @Setter
 @Builder

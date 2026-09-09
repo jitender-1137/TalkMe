@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
@@ -25,7 +26,12 @@ import java.time.Instant;
  * One row per chat, lazily created on the first explicit message / consent request.
  */
 @Entity
-@Table(name = "chat_explicit_consent", uniqueConstraints = @UniqueConstraint(name = "uk_consent_chat", columnNames = "chat_id"))
+@Table(name = "chat_explicit_consent", uniqueConstraints = @UniqueConstraint(name = "uk_consent_chat", columnNames = "chat_id"),
+        indexes = {
+                @Index(name = "idx_chat_explicit_consent_requested_by", columnList = "requested_by"),
+                @Index(name = "idx_chat_explicit_consent_responded_by", columnList = "responded_by"),
+                @Index(name = "idx_chat_explicit_consent_revoked_by", columnList = "revoked_by")
+        })
 @Getter
 @Setter
 @Builder

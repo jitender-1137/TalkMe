@@ -6,7 +6,8 @@ import com.neo.chat.enums.FeatureKey;
 import com.neo.chat.enums.GrantDecision;
 import com.neo.chat.enums.GrantScope;
 import com.neo.chat.exception.GlobalExceptionHandler;
-import com.neo.chat.repository.UserRepository;
+import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.service.lookup.UserLookupService;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.FeatureAccessService;
 import org.junit.jupiter.api.AfterEach;
@@ -51,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Pure controller unit test for {@link AdminFeatureController}.
  *
  * <p>Standalone {@link MockMvc} with a mocked {@link FeatureAccessService} +
- * {@link UserRepository} and the real {@link GlobalExceptionHandler}.
+ * {@link UserLookupService} and the real {@link GlobalExceptionHandler}.
  *
  * <p><b>Scope boundary:</b> this is an ADMIN controller — {@code @PreAuthorize("hasRole('SUPER_ADMIN')")}
  * plus the {@code /api/v1/admin/**} filter-chain rule (JWT auth + {@code ROLE_SUPER_ADMIN}/
@@ -81,7 +82,7 @@ class AdminFeatureControllerUnitTest {
     private FeatureAccessService featureAccessService;
 
     @Mock
-    private UserRepository userRepository;
+    private UserLookupService userLookupService;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -90,7 +91,7 @@ class AdminFeatureControllerUnitTest {
     @BeforeEach
     void setUp() {
         AdminFeatureController controller =
-                new AdminFeatureController(featureAccessService, userRepository);
+                new AdminFeatureController(featureAccessService, userLookupService);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -130,10 +131,10 @@ class AdminFeatureControllerUnitTest {
     }
 
     /**
-     * Stubs the repository to resolve {@link #UUID_STR} to the {@code targetUser}.
+     * Stubs the lookup service to resolve {@link #UUID_STR} to the {@code targetUser}.
      */
     private void stubUserFound() {
-        when(userRepository.findByUuid(eq(UUID.fromString(UUID_STR)))).thenReturn(Optional.of(targetUser));
+        when(userLookupService.requireByUuid(eq(UUID.fromString(UUID_STR)))).thenReturn(targetUser);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -208,7 +209,7 @@ class AdminFeatureControllerUnitTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.messageCode").value(VALIDATION_CODE));
             verifyNoInteractions(featureAccessService);
-            verifyNoInteractions(userRepository);
+            verifyNoInteractions(userLookupService);
         }
 
         @Test
@@ -219,7 +220,7 @@ class AdminFeatureControllerUnitTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.messageCode").value(VALIDATION_CODE));
             verifyNoInteractions(featureAccessService);
-            verifyNoInteractions(userRepository);
+            verifyNoInteractions(userLookupService);
         }
 
         @Test
@@ -251,7 +252,7 @@ class AdminFeatureControllerUnitTest {
         @Test
         void shouldReturn404WhenUserNotFound() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(any())).thenReturn(Optional.empty());
+            when(userLookupService.requireByUuid(any())).thenThrow(new NotFoundException("User not found", "TM_024"));
             mockMvc.perform(post(BASE + "/users/" + UUID_STR)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"key\":\"night_owl\"}"))
@@ -269,7 +270,7 @@ class AdminFeatureControllerUnitTest {
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
             verifyNoInteractions(featureAccessService);
-            verifyNoInteractions(userRepository);
+            verifyNoInteractions(userLookupService);
         }
 
         @Test
@@ -334,7 +335,7 @@ class AdminFeatureControllerUnitTest {
         @Test
         void shouldReturn404WhenUserNotFound() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(any())).thenReturn(Optional.empty());
+            when(userLookupService.requireByUuid(any())).thenThrow(new NotFoundException("User not found", "TM_024"));
             mockMvc.perform(delete(BASE + "/users/" + UUID_STR + "/night_owl"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.messageCode").value("TM_024"));

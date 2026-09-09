@@ -8,7 +8,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -32,8 +31,9 @@ import java.time.Instant;
 @Table(name = "user_feature_grants",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_ufg_user_key_scope",
-                columnNames = {"user_id", "feature_key", "scope"}),
-        indexes = @Index(name = "idx_ufg_user", columnList = "user_id"))
+                columnNames = {"user_id", "feature_key", "scope"}))
+// user_id lookups are covered by the leading column of uk_ufg_user_key_scope; the former
+// idx_ufg_user single-column index was redundant (BootUI DB-SCHEMA-003).
 @Getter
 @Setter
 @Builder
@@ -41,7 +41,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class UserFeatureGrant extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

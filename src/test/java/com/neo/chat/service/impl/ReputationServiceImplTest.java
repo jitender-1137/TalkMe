@@ -598,8 +598,8 @@ class ReputationServiceImplTest {
         @Test
         @DisplayName("degenerate flat curve (span 0) → progress pinned to 100%")
         void flatCurvePinsProgressTo100() {
-            ReputationCurveProperties flat = new ReputationCurveProperties();
-            flat.setK(0); // every level costs 0 XP → span between levels is 0
+            // k=0 → every level costs 0 XP → span between levels is 0
+            ReputationCurveProperties flat = new ReputationCurveProperties(0, 1.9);
             ReputationServiceImpl svc = new ReputationServiceImpl(reputationRepository, ledgerRepository,
                     userRepository, flat, reputationCache, objectMapper, messagingTemplate, selfProvider);
             UserReputation r = rep(1, 0L, StarRank.BRONZE_STAR);

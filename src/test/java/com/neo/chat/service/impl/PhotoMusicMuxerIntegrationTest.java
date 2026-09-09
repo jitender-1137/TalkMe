@@ -19,6 +19,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +48,8 @@ class PhotoMusicMuxerIntegrationTest {
     private Path audio25s;
     private Path audio10s;
     private PhotoMusicMuxer muxer;
+    // Stand-in for the app's applicationTaskExecutor (drains ffmpeg stderr).
+    private final ExecutorService drainPool = Executors.newCachedThreadPool();
 
     @BeforeAll
     void setUp() throws Exception {
@@ -68,18 +72,19 @@ class PhotoMusicMuxerIntegrationTest {
         assumeThat(Files.exists(imagePng) && Files.size(imagePng) > 0).isTrue();
         assumeThat(Files.exists(audio25s) && Files.size(audio25s) > 0).isTrue();
 
-        FfmpegSupport support = new FfmpegSupport();
+        FfmpegSupport support = new FfmpegSupport(ffmpeg);
         // Not a Spring context — pin the resolver to the binary we already found.
         var f = FfmpegSupport.class.getDeclaredField("resolved");
         f.setAccessible(true);
         f.set(support, ffmpeg);
 
         StorageProperties props = new StorageProperties();
-        muxer = new PhotoMusicMuxer(support, new LocalFsStorage(workDir), props);
+        muxer = new PhotoMusicMuxer(support, new LocalFsStorage(workDir), props, drainPool);
     }
 
     @AfterAll
     void tearDown() {
+        drainPool.shutdownNow();
         deleteRecursively(workDir);
     }
 

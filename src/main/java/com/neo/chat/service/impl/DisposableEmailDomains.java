@@ -32,8 +32,11 @@ public class DisposableEmailDomains {
 
     private final Set<String> domains = new HashSet<>();
 
-    @Value("${app.mail.disposable-domains:}")
-    private String extraCsv;
+    private final String extraCsv;
+
+    public DisposableEmailDomains(@Value("${app.mail.disposable-domains:}") String extraCsv) {
+        this.extraCsv = extraCsv;
+    }
 
     /**
      * Loads the blocklist at startup from the bundled resource (skipping blanks and {@code #} comments) and

@@ -8,7 +8,6 @@ import com.neo.chat.dto.EmailUnreadPreview;
 import com.neo.chat.repository.MessageRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -37,7 +36,6 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class UnreadDigestService {
 
     private final MessageRepository messageRepository;
@@ -46,14 +44,27 @@ public class UnreadDigestService {
     private final EmailService emailService;
     private final MessageCryptoService messageCryptoService;
 
-    @Value("${app.mail.unread-digest.enabled:true}")
-    private boolean enabled;
+    private final boolean enabled;
+    private final int maxPreviews;
+    private final String frontendBaseUrl;
 
-    @Value("${app.mail.unread-digest.max-previews:5}")
-    private int maxPreviews;
-
-    @Value("${app.frontend-base-url:http://localhost:3000}")
-    private String frontendBaseUrl;
+    public UnreadDigestService(MessageRepository messageRepository,
+                               UserRepository userRepository,
+                               UserSettingRepository userSettingRepository,
+                               EmailService emailService,
+                               MessageCryptoService messageCryptoService,
+                               @Value("${app.mail.unread-digest.enabled:true}") boolean enabled,
+                               @Value("${app.mail.unread-digest.max-previews:5}") int maxPreviews,
+                               @Value("${app.frontend-base-url:http://localhost:3000}") String frontendBaseUrl) {
+        this.messageRepository = messageRepository;
+        this.userRepository = userRepository;
+        this.userSettingRepository = userSettingRepository;
+        this.emailService = emailService;
+        this.messageCryptoService = messageCryptoService;
+        this.enabled = enabled;
+        this.maxPreviews = maxPreviews;
+        this.frontendBaseUrl = frontendBaseUrl;
+    }
 
     /**
      * Find every user with new (not-yet-notified) unread messages and email them a digest.

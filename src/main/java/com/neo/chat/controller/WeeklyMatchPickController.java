@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.dto.response.WeeklyMatchPickResponse;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.WeeklyMatchPickService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +25,7 @@ import java.util.List;
 @RequestMapping("/match/weekly-picks")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Weekly Match Picks", description = "Current ISO week's curated, ranked list of most-compatible users")
 public class WeeklyMatchPickController {
 
     private final WeeklyMatchPickService weeklyMatchPickService;
@@ -34,6 +37,7 @@ public class WeeklyMatchPickController {
      * @param userDetails the authenticated principal
      * @return 200 with the ranked list of {@link WeeklyMatchPickResponse}
      */
+    @Operation(summary = "Return the current ISO week's curated, ranked most-compatible users for the signed-in user")
     @GetMapping
     @PreAuthorize("@featureGuard.check('WEEKLY_PICKS')")
     public ResponseEntity<ResponseDto<List<WeeklyMatchPickResponse>>> current(

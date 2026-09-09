@@ -17,8 +17,11 @@ import com.neo.chat.service.AuthService;
 import com.neo.chat.service.FriendService;
 import com.neo.chat.service.PostService;
 import com.neo.chat.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -51,6 +54,7 @@ import java.util.Map;
 @RequestMapping("/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER') or hasRole('GUEST')")
+@Tag(name = "Users", description = "User profile, account, social (block/report/mutual friends), search and public-profile endpoints")
 public class UserController {
 
     private final UserService userService;
@@ -64,6 +68,7 @@ public class UserController {
      * @param userDetails the authenticated principal
      * @return 200 with the current user's {@link UserResponse}
      */
+    @Operation(summary = "Return the current user's full profile")
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<UserResponse>> getMe(@AuthenticationPrincipal CustomUserDetails userDetails) {
         UserResponse response = userService.getCurrentUser(userDetails.getUser());
@@ -79,7 +84,8 @@ public class UserController {
      * @throws com.neo.chat.exception.ContentModerationException if a free-text field fails moderation
      * @throws com.neo.chat.exception.BadRequestException        if the request tries to change the country
      */
-    @RequestMapping(value = "/me", method = {RequestMethod.PATCH, RequestMethod.PUT})
+    @Operation(summary = "Update the current user's editable profile fields (country is immutable once set)")
+    @RequestMapping(value = "/me", method = {RequestMethod.PATCH, RequestMethod.PUT}, consumes = {MediaType.APPLICATION_JSON_VALUE, "application/merge-patch+json"})
     public ResponseEntity<ResponseDto<UserResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -98,7 +104,8 @@ public class UserController {
      * @throws com.neo.chat.exception.BadRequestException if the username is unchanged/invalid
      * @throws com.neo.chat.exception.ConflictException   if the username is already taken
      */
-    @PatchMapping("/me/username")
+    @Operation(summary = "Change the current user's username (unique; names of accounts pending deletion stay reserved)")
+    @PatchMapping(value = "/me/username", consumes = {MediaType.APPLICATION_JSON_VALUE, "application/merge-patch+json"})
     public ResponseEntity<ResponseDto<UserResponse>> changeUsername(
             @Valid @RequestBody ChangeUsernameRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -113,6 +120,7 @@ public class UserController {
      * @param userDetails the authenticated principal (own current username counts as available)
      * @return 200 with a map {@code {"available": boolean}}
      */
+    @Operation(summary = "Live availability check for the username field")
     @GetMapping("/me/username-available")
     public ResponseEntity<ResponseDto<Map<String, Boolean>>> usernameAvailable(
             @RequestParam("username") String username,
@@ -129,6 +137,7 @@ public class UserController {
      * @return 200 with the updated {@link UserResponse}
      * @throws com.neo.chat.exception.BadRequestException if the mood value is invalid
      */
+    @Operation(summary = "Fast, param-based mood update (feature #4) — e.g. PUT /users/me/mood?value=FLIRT")
     @PutMapping("/me/mood")
     public ResponseEntity<ResponseDto<UserResponse>> updateMood(
             @RequestParam("value") String value,
@@ -145,6 +154,7 @@ public class UserController {
      * @return 200 with a map containing the stored avatar url
      * @throws com.neo.chat.exception.ContentModerationException if the image is explicit
      */
+    @Operation(summary = "Upload and set the current user's avatar image")
     @PostMapping(value = "/me/avatar", consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<Map<String, String>>> uploadAvatar(
             @RequestParam("file") MultipartFile file,
@@ -160,6 +170,7 @@ public class UserController {
      * @param userDetails the authenticated principal
      * @return 200 with an empty body
      */
+    @Operation(summary = "Remove the current user's avatar")
     @DeleteMapping("/me/avatar")
     public ResponseEntity<ResponseDto<Void>> removeAvatar(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.removeAvatar(userDetails.getUser());
@@ -177,9 +188,10 @@ public class UserController {
      * @throws com.neo.chat.exception.ForbiddenException    if the account is a guest (cannot be deleted)
      * @throws com.neo.chat.exception.UnauthorizedException if the supplied password does not match
      */
+    @Operation(summary = "Soft-delete the current account")
     @DeleteMapping("/me")
     public ResponseEntity<ResponseDto<Void>> deleteAccount(
-            @RequestBody(required = false) DeleteAccountRequest request,
+            @Valid @RequestBody(required = false) DeleteAccountRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.requestAccountDeletion(userDetails.getUser(),
                 request != null ? request.getPassword() : null);
@@ -196,6 +208,7 @@ public class UserController {
      * @return 200 with the target's {@link UserResponse}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      */
+    @Operation(summary = "Fetch another user's profile by UUID (or \"me\"), enriched with presence, block, and friend flags")
     @GetMapping("/{userId}")
     public ResponseEntity<ResponseDto<UserResponse>> getUserById(
             @PathVariable("userId") String userId,
@@ -215,6 +228,7 @@ public class UserController {
      * @return 200 with the {@link PublicProfileResponse} projection
      * @throws com.neo.chat.exception.NotFoundException if no active, public account matches
      */
+    @Operation(summary = "PUBLIC profile lookup by username, backing the shareable /@username link")
     @GetMapping("/by-username/{username}")
     @PreAuthorize("permitAll()")
     public ResponseEntity<ResponseDto<PublicProfileResponse>> getPublicProfileByUsername(
@@ -232,6 +246,7 @@ public class UserController {
      * @return 200 with the {@link SmartProfileCardResponse}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      */
+    @Operation(summary = "Smart Profile Card (feature #20) — late-night attributes + compatibility hint")
     @GetMapping("/{userId}/card")
     @PreAuthorize("@featureGuard.check('SMART_PROFILE_CARD')")
     public ResponseEntity<ResponseDto<SmartProfileCardResponse>> getSmartProfileCard(
@@ -251,6 +266,7 @@ public class UserController {
      * @return 200 with a {@link PaginatedResponse} of matching users
      * @throws com.neo.chat.exception.BadRequestException if the query is shorter than 2 characters
      */
+    @Operation(summary = "Cursor-paginated user search by name/username")
     @GetMapping("/search")
     public ResponseEntity<ResponseDto<PaginatedResponse<UserResponse>>> searchUsers(
             @RequestParam("q") String query,
@@ -271,6 +287,7 @@ public class UserController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the id
      * @throws com.neo.chat.exception.BadRequestException if attempting to block yourself
      */
+    @Operation(summary = "Block another user")
     @PostMapping("/{userId}/block")
     public ResponseEntity<ResponseDto<Void>> blockUser(
             @PathVariable("userId") String userId,
@@ -288,6 +305,7 @@ public class UserController {
      * @return 200 with an empty body
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      */
+    @Operation(summary = "Unblock a previously blocked user")
     @DeleteMapping("/{userId}/block")
     public ResponseEntity<ResponseDto<Void>> unblockUser(
             @PathVariable("userId") String userId,
@@ -303,6 +321,7 @@ public class UserController {
      * @param userDetails the authenticated principal
      * @return 200 with a {@link PaginatedResponse} of blocked users
      */
+    @Operation(summary = "List the users the current user has blocked")
     @GetMapping("/blocked")
     public ResponseEntity<ResponseDto<PaginatedResponse<BlockedUserResponse>>> getBlockedUsers(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -321,7 +340,8 @@ public class UserController {
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      * @throws com.neo.chat.exception.ConflictException if an open report already exists for this pair
      */
-    @PostMapping("/{userId}/report")
+    @Operation(summary = "File a moderation report against another user (one open report per reporter→reported pair)")
+    @PostMapping(value = "/{userId}/report", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> reportUser(
             @PathVariable("userId") String userId,
             @RequestBody Map<String, String> payload,
@@ -343,6 +363,7 @@ public class UserController {
      * @return 200 with a {@link Page} of {@link PostResponse}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      */
+    @Operation(summary = "Paginated profile feed of a user's posts (newest first)")
     @GetMapping("/{userId}/posts")
     public ResponseEntity<ResponseDto<Page<PostResponse>>> getUserPosts(
             @PathVariable("userId") String userId,
@@ -361,6 +382,7 @@ public class UserController {
      * @return 200 with the target's {@link UserResponse}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      */
+    @Operation(summary = "Fetch a user's profile by UUID (alias of getUserById for the /profile route)")
     @GetMapping("/{userId}/profile")
     public ResponseEntity<ResponseDto<UserResponse>> getUserProfile(
             @PathVariable("userId") String userId,
@@ -378,6 +400,7 @@ public class UserController {
      * @return 200 with a {@link MutualFriendsResponse} (count + sample)
      * @throws com.neo.chat.exception.NotFoundException if no user matches the id
      */
+    @Operation(summary = "Mutual friends between the current user and the target user")
     @GetMapping("/{userId}/mutual-friends")
     public ResponseEntity<ResponseDto<MutualFriendsResponse>> getMutualFriends(
             @PathVariable("userId") String userId,
@@ -394,6 +417,7 @@ public class UserController {
      * @param userDetails the authenticated principal, or null when anonymous
      * @return 200 with the list of lobby {@link UserResponse}
      */
+    @Operation(summary = "List currently-visible lobby users")
     @GetMapping("/lobby")
     @PreAuthorize("permitAll()")
     public ResponseEntity<ResponseDto<List<UserResponse>>> getLobbyUsers(

@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Human Knowledge Network — "ask someone who has done it". Users tag real experiences and
@@ -31,6 +34,7 @@ import java.util.List;
  * {@code KNOWLEDGE_NETWORK} entitlement.
  */
 @RestController
+@Tag(name = "Knowledge Network", description = "Human Knowledge Network — \"ask someone who has done it\"")
 @RequestMapping("/knowledge")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -41,6 +45,7 @@ public class KnowledgeNetworkController {
     /**
      * The caller's own experience tags (their full, editable set).
      */
+    @Operation(summary = "The caller's own experience tags (their full, editable set)")
     @GetMapping("/mine")
     @PreAuthorize("@featureGuard.check('KNOWLEDGE_NETWORK')")
     public ResponseEntity<ResponseDto<List<ExperienceResponse>>> getMine(
@@ -55,7 +60,8 @@ public class KnowledgeNetworkController {
      * @throws com.neo.chat.exception.BadRequestException on a blank/too-long tag (TM_942) or
      *                                                     when the count cap is exceeded (TM_943)
      */
-    @PutMapping("/mine")
+    @Operation(summary = "Replace the caller's whole set of experience tags")
+    @PutMapping(value = "/mine", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('KNOWLEDGE_NETWORK')")
     public ResponseEntity<ResponseDto<List<ExperienceResponse>>> updateMine(
             @Valid @RequestBody UpdateExperiencesRequest request,
@@ -69,6 +75,7 @@ public class KnowledgeNetworkController {
      * Find people who have an experience matching {@code query} and/or {@code category} and are
      * open to questions. Ranked available/online first. Cursor-paginated.
      */
+    @Operation(summary = "Find people who have an experience matching query and/or category and are open to questions")
     @GetMapping("/search")
     @PreAuthorize("@featureGuard.check('KNOWLEDGE_NETWORK')")
     public ResponseEntity<ResponseDto<KnowledgeSearchPageResponse>> search(
@@ -90,6 +97,7 @@ public class KnowledgeNetworkController {
      * @throws com.neo.chat.exception.NotFoundException   if no user has that UUID (TM_946)
      * @throws com.neo.chat.exception.ForbiddenException  if a block exists either way (TM_945)
      */
+    @Operation(summary = "Resolve a person to open a 1:1 chat with (the \"ask\" action)")
     @PostMapping("/{userUuid}/ask")
     @PreAuthorize("@featureGuard.check('KNOWLEDGE_NETWORK')")
     public ResponseEntity<ResponseDto<KnowledgePersonResponse>> ask(

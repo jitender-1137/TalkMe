@@ -13,7 +13,7 @@ import java.util.Optional;
  * fields are populated automatically. The auditor is resolved from the current
  * Spring Security authentication via the {@code auditorProvider} bean.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 public class JpaConfig {
 

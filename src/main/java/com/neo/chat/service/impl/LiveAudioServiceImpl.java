@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
@@ -60,9 +61,8 @@ public class LiveAudioServiceImpl implements LiveAudioService {
         }
         Chat chat = resolveMemberChat(user, chatUuid);
 
-        long nowMs = System.currentTimeMillis();
-        Date now = new Date(nowMs);
-        Date exp = new Date(nowMs + props.getTokenTtlSeconds() * 1000L);
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(props.getTokenTtlSeconds());
         String room = chat.getUuid().toString();
         String identity = user.getUsername();
 
@@ -79,9 +79,10 @@ public class LiveAudioServiceImpl implements LiveAudioService {
         String token = Jwts.builder()
                 .issuer(props.getApiKey())
                 .subject(identity)
-                .issuedAt(now)
-                .notBefore(now)
-                .expiration(exp)
+                // jjwt's builder only accepts java.util.Date — convert at the boundary.
+                .issuedAt(Date.from(now))
+                .notBefore(Date.from(now))
+                .expiration(Date.from(exp))
                 .claim("name", user.getName() != null ? user.getName() : identity)
                 .claim("video", videoGrant)
                 .signWith(key, Jwts.SIG.HS256)

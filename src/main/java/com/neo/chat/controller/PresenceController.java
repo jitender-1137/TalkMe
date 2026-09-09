@@ -8,9 +8,11 @@ import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.NotFoundException;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.PresenceService;
+import com.neo.chat.service.lookup.UserLookupSupport;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -33,10 +35,11 @@ import java.time.Instant;
 @RestController
 @RequestMapping("/presence")
 @RequiredArgsConstructor
+@Tag(name = "Presence", description = "Live presence status, privacy toggles (Ghost, Invisible, Hide-last-seen) and presence lookup")
 public class PresenceController {
 
     private final PresenceService presenceService;
-    private final UserRepository userRepository;
+    private final UserLookupSupport userLookup;
 
     /**
      * Sets the caller's presence status (ONLINE, OFFLINE, AWAY, IDLE, INVISIBLE).
@@ -46,6 +49,7 @@ public class PresenceController {
      * @return an empty success response
      * @throws com.neo.chat.exception.BadRequestException if the status value is not one of the allowed names
      */
+    @Operation(summary = "Sets the caller's presence status (ONLINE, OFFLINE, AWAY, IDLE, INVISIBLE)")
     @PutMapping("/status")
     public ResponseEntity<ResponseDto<Void>> setStatus(
             @RequestParam("status") String statusStr,
@@ -69,6 +73,7 @@ public class PresenceController {
      * @param userDetails authenticated caller
      * @return an empty success response
      */
+    @Operation(summary = "Toggles Ghost Mode (receipts-only; suppresses outbound presence) for the caller")
     @PutMapping("/ghost")
     public ResponseEntity<ResponseDto<Void>> toggleGhostMode(
             @RequestParam("enabled") boolean enabled,
@@ -85,6 +90,7 @@ public class PresenceController {
      * @param userDetails authenticated caller
      * @return an empty success response
      */
+    @Operation(summary = "Toggles Invisible Mode (appear offline to others) for the caller")
     @PutMapping("/invisible")
     public ResponseEntity<ResponseDto<Void>> toggleInvisibleMode(
             @RequestParam("enabled") boolean enabled,
@@ -101,6 +107,7 @@ public class PresenceController {
      * @param userDetails authenticated caller
      * @return an empty success response
      */
+    @Operation(summary = "Toggles Hide-last-seen (others cannot see the caller's last-seen timestamp) for the caller")
     @PutMapping("/hide-last-seen")
     public ResponseEntity<ResponseDto<Void>> toggleHideLastSeen(
             @RequestParam("enabled") boolean enabled,
@@ -116,6 +123,7 @@ public class PresenceController {
      * @param userDetails authenticated caller
      * @return an empty success response
      */
+    @Operation(summary = "Resets the caller's presence privacy properties back to defaults")
     @DeleteMapping("/reset")
     public ResponseEntity<ResponseDto<Void>> resetPresence(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -132,13 +140,14 @@ public class PresenceController {
      * @return the {@link PresenceResponse}, viewer-relative
      * @throws com.neo.chat.exception.NotFoundException if no user has that username
      */
+    @Operation(summary = "Returns presence for a user by username")
     @GetMapping("/{username}")
     public ResponseEntity<ResponseDto<PresenceResponse>> getPresence(
             @PathVariable("username") String username,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
         User currentUser = userDetails.getUser();
-        User targetUser = userRepository.findByUsername(username)
+        User targetUser = userLookup.findByUsername(username)
                 .orElseThrow(() -> new NotFoundException("User not found with username: " + username, "TM_USER_NOT_FOUND"));
 
         UserPresence targetPresence = presenceService.getUserPresence(targetUser);

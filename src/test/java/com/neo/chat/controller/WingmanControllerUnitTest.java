@@ -1,14 +1,13 @@
 package com.neo.chat.controller;
 
-import com.neo.chat.domain.Friend;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.exception.GlobalExceptionHandler;
-import com.neo.chat.repository.BlockUserRepository;
-import com.neo.chat.repository.FriendRepository;
-import com.neo.chat.repository.UserRepository;
+import com.neo.chat.exception.NotFoundException;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.WingmanService;
+import com.neo.chat.service.lookup.RelationshipLookupService;
+import com.neo.chat.service.lookup.UserLookupService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +28,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -50,9 +49,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Pure controller unit test for {@link WingmanController}.
  *
- * <p>Standalone {@link MockMvc} with a mocked {@link WingmanService} + the three repositories the
- * controller consults directly ({@link UserRepository}, {@link FriendRepository},
- * {@link BlockUserRepository}) and the real {@link GlobalExceptionHandler}.
+ * <p>Standalone {@link MockMvc} with a mocked {@link WingmanService} + the two lookup services the
+ * controller consults ({@link UserLookupService}, {@link RelationshipLookupService}) and the real
+ * {@link GlobalExceptionHandler}. The block-direction and soft-deleted-friend semantics now live in
+ * {@link RelationshipLookupService} and are pinned by its own unit test.
  *
  * <p><b>Scope boundary:</b> {@code @PreAuthorize("hasRole('USER')")} on the class and
  * {@code @PreAuthorize("@featureGuard.check('AI_WINGMAN')")} on each method are method-security
@@ -80,11 +80,9 @@ class WingmanControllerUnitTest {
     @Mock
     private WingmanService wingmanService;
     @Mock
-    private UserRepository userRepository;
+    private UserLookupService userLookupService;
     @Mock
-    private FriendRepository friendRepository;
-    @Mock
-    private BlockUserRepository blockUserRepository;
+    private RelationshipLookupService relationshipLookup;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -93,7 +91,7 @@ class WingmanControllerUnitTest {
     @BeforeEach
     void setUp() {
         WingmanController controller =
-                new WingmanController(wingmanService, userRepository, friendRepository, blockUserRepository);
+                new WingmanController(wingmanService, userLookupService, relationshipLookup);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -118,6 +116,9 @@ class WingmanControllerUnitTest {
                 .build();
         other.setId(OTHER_ID);
         other.setUuid(UUID.fromString(OTHER_UUID));
+
+        // The controller re-loads the principal with its personality fetch-joined; echo it back.
+        lenient().when(userLookupService.reloadWithPersonality(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @AfterEach
@@ -138,12 +139,9 @@ class WingmanControllerUnitTest {
      * Wire the happy-path relationship gates: other exists, no blocks either way, and friends.
      */
     private void wireFriendship() {
-        when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(other));
-        when(blockUserRepository.existsByUserAndBlocked(eq(testUser), eq(other))).thenReturn(false);
-        when(blockUserRepository.existsByUserAndBlocked(eq(other), eq(testUser))).thenReturn(false);
-        Friend friend = Friend.builder().user(testUser).friend(other).build();
-        friend.setDeleted(false);
-        when(friendRepository.findByUserAndFriend(eq(testUser), eq(other))).thenReturn(Optional.of(friend));
+        when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID))).thenReturn(other);
+        when(relationshipLookup.isBlockedEitherWay(eq(testUser), eq(other))).thenReturn(false);
+        when(relationshipLookup.areActiveFriends(eq(testUser), eq(other))).thenReturn(true);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -247,21 +245,21 @@ class WingmanControllerUnitTest {
         void shouldReturn400AndSkipServiceWhenTargetIsSelf() throws Exception {
             authenticate();
             // findByUuid returns a user whose id equals mine → self-icebreaker guard trips.
-            when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(testUser));
+            when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID))).thenReturn(testUser);
 
             mockMvc.perform(get(BASE + "/icebreakers/" + OTHER_UUID))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.messageCode").value("TM_025"));
 
             verifyNoInteractions(wingmanService);
-            verify(blockUserRepository, never()).existsByUserAndBlocked(any(), any());
+            verify(relationshipLookup, never()).isBlockedEitherWay(any(), any());
         }
 
         @Test
         void shouldReturn404WhenIBlockedThem() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(other));
-            when(blockUserRepository.existsByUserAndBlocked(eq(testUser), eq(other))).thenReturn(true);
+            when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID))).thenReturn(other);
+            when(relationshipLookup.isBlockedEitherWay(eq(testUser), eq(other))).thenReturn(true);
 
             // Block state is masked as "User not found" (TM_024) to avoid leaking it.
             mockMvc.perform(get(BASE + "/icebreakers/" + OTHER_UUID))
@@ -269,30 +267,30 @@ class WingmanControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_024"));
 
             verifyNoInteractions(wingmanService);
-            verify(friendRepository, never()).findByUserAndFriend(any(), any());
+            verify(relationshipLookup, never()).areActiveFriends(any(), any());
         }
 
         @Test
         void shouldReturn404WhenTheyBlockedMe() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(other));
-            when(blockUserRepository.existsByUserAndBlocked(eq(testUser), eq(other))).thenReturn(false);
-            when(blockUserRepository.existsByUserAndBlocked(eq(other), eq(testUser))).thenReturn(true);
+            when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID))).thenReturn(other);
+            // Reverse-direction block: the lookup service reports it as blocked either way.
+            when(relationshipLookup.isBlockedEitherWay(eq(testUser), eq(other))).thenReturn(true);
 
             mockMvc.perform(get(BASE + "/icebreakers/" + OTHER_UUID))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.messageCode").value("TM_024"));
 
             verifyNoInteractions(wingmanService);
-            verify(friendRepository, never()).findByUserAndFriend(any(), any());
+            verify(relationshipLookup, never()).areActiveFriends(any(), any());
         }
 
         @Test
         void shouldReturn403WhenNotFriends() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(other));
-            when(blockUserRepository.existsByUserAndBlocked(any(), any())).thenReturn(false);
-            when(friendRepository.findByUserAndFriend(eq(testUser), eq(other))).thenReturn(Optional.empty());
+            when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID))).thenReturn(other);
+            when(relationshipLookup.isBlockedEitherWay(any(), any())).thenReturn(false);
+            when(relationshipLookup.areActiveFriends(eq(testUser), eq(other))).thenReturn(false);
 
             mockMvc.perform(get(BASE + "/icebreakers/" + OTHER_UUID))
                     .andExpect(status().isForbidden())
@@ -304,11 +302,10 @@ class WingmanControllerUnitTest {
         @Test
         void shouldReturn403WhenFriendRecordIsSoftDeleted() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.of(other));
-            when(blockUserRepository.existsByUserAndBlocked(any(), any())).thenReturn(false);
-            Friend deleted = Friend.builder().user(testUser).friend(other).build();
-            deleted.setDeleted(true);
-            when(friendRepository.findByUserAndFriend(eq(testUser), eq(other))).thenReturn(Optional.of(deleted));
+            when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID))).thenReturn(other);
+            when(relationshipLookup.isBlockedEitherWay(any(), any())).thenReturn(false);
+            // A soft-deleted friend row is reported as "not friends" by the lookup service.
+            when(relationshipLookup.areActiveFriends(eq(testUser), eq(other))).thenReturn(false);
 
             mockMvc.perform(get(BASE + "/icebreakers/" + OTHER_UUID))
                     .andExpect(status().isForbidden())
@@ -320,7 +317,8 @@ class WingmanControllerUnitTest {
         @Test
         void shouldReturn404WhenTargetUserMissing() throws Exception {
             authenticate();
-            when(userRepository.findByUuid(UUID.fromString(OTHER_UUID))).thenReturn(Optional.empty());
+            when(userLookupService.requireByUuidWithPersonality(UUID.fromString(OTHER_UUID)))
+                    .thenThrow(new NotFoundException("User not found", "TM_024"));
 
             mockMvc.perform(get(BASE + "/icebreakers/" + OTHER_UUID))
                     .andExpect(status().isNotFound())
@@ -338,7 +336,7 @@ class WingmanControllerUnitTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.messageCode").value("TM_INVALID_UUID"));
 
-            verifyNoInteractions(userRepository);
+            verifyNoInteractions(userLookupService);
             verifyNoInteractions(wingmanService);
         }
 

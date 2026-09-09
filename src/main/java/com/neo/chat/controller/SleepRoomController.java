@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.SleepRoomResponse;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.SleepRoomService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/sleep-rooms")
 @RequiredArgsConstructor
+@Tag(name = "Sleep Rooms", description = "Sleep companion rooms: public rooms in SLEEP_COMPANION mode")
 public class SleepRoomController {
 
     private final SleepRoomService sleepRoomService;
@@ -35,6 +38,7 @@ public class SleepRoomController {
      * @param name        optional room name
      * @return the created sleep room in a success envelope (message "Sleep room created", TM_994)
      */
+    @Operation(summary = "Create a sleep companion room (public ROOM in SLEEP_COMPANION mode) owned by the caller")
     @PostMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
     public ResponseEntity<ResponseDto<SleepRoomResponse>> create(
@@ -49,6 +53,7 @@ public class SleepRoomController {
      *
      * @return the active sleep rooms in a success envelope
      */
+    @Operation(summary = "List active sleep companion rooms")
     @GetMapping
     @PreAuthorize("@featureGuard.check('SLEEP_ROOMS')")
     public ResponseEntity<ResponseDto<List<SleepRoomResponse>>> list() {

@@ -20,12 +20,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Peer-endorse able cosmetic badges (feature #30). Gated by the BADGES entitlement.
  * Badges are decoration only — they never gate any feature or limit.
  */
 @RestController
+@Tag(name = "Badge", description = "Peer-endorsable cosmetic badges (feature #30)")
 @RequestMapping("/reputation/badges")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -39,6 +43,7 @@ public class BadgeController {
      * @param userUuid the target user's UUID
      * @return the list of {@link BadgeResponse} for that user
      */
+    @Operation(summary = "All badges for a user (earned + in-progress endorsement counts)")
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('BADGES')")
     public ResponseEntity<ResponseDto<List<BadgeResponse>>> listBadges(
@@ -54,6 +59,7 @@ public class BadgeController {
      * @param userUuid the target user's UUID
      * @return the aggregate {@link HelpfulScoreResponse} for that user
      */
+    @Operation(summary = "A user's aggregate \"helpfulness\" score, derived from their peer-endorsement badges: total distinct-endorser count across all traits, a...")
     @GetMapping("/{userUuid}/helpful-score")
     @PreAuthorize("@featureGuard.check('BADGES')")
     public ResponseEntity<ResponseDto<HelpfulScoreResponse>> getHelpfulScore(
@@ -72,7 +78,8 @@ public class BadgeController {
      *                                                       recipient is the caller, or the recipient is not a valid target
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not allowed to endorse
      */
-    @PostMapping("/endorse")
+    @Operation(summary = "Endorse a peer for a trait; returns the resulting badge state")
+    @PostMapping(value = "/endorse", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('BADGES')")
     public ResponseEntity<ResponseDto<BadgeResponse>> endorse(
             @Valid @RequestBody EndorseBadgeRequest request,

@@ -3,7 +3,8 @@ package com.neo.chat.storage;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,17 +14,19 @@ import java.util.List;
  * backends (OCI object keys and the local/instance disk) — the stored reference is
  * always {@code <mediaRoot>/<key>}. {@link Oci} holds the OCI-specific settings, used
  * only when {@code storage.provider=oci}.
+ *
+ * <p>Immutable at the top level: bound once at startup through constructor binding (registered
+ * by {@code @ConfigurationPropertiesScan} on {@code TalkMeApplication}, not component scanning).
+ * The nested {@link Oci} block stays a JavaBean so {@code storage.oci.*} binds as before.
  */
 @Getter
-@Setter
-@Component
 @ConfigurationProperties(prefix = "storage")
 public class StorageProperties {
 
     /**
      * Root for all media references/keys (OCI + instance disk). Defaults to /media.
      */
-    private String mediaRoot = "/media";
+    private final String mediaRoot;
 
     /**
      * PREVIOUS media-roots to also recognise when resolving a stored reference to an object key.
@@ -35,9 +38,34 @@ public class StorageProperties {
      * Listing an old root here lets {@code MediaKeys.key} strip it too, so old media keeps loading.
      * Bound from {@code storage.legacy-media-roots} (comma-separated).
      */
-    private List<String> legacyMediaRoots = new ArrayList<>();
+    private final List<String> legacyMediaRoots;
 
-    private final Oci oci = new Oci();
+    private final Oci oci;
+
+    /**
+     * Defaults: {@code /media} root, no legacy roots, default OCI block.
+     */
+    public StorageProperties() {
+        this("/media", new ArrayList<>(), new Oci());
+    }
+
+    /**
+     * Binds {@code storage.*}.
+     *
+     * @param mediaRoot        shared media root (default {@code /media})
+     * @param legacyMediaRoots previous roots still carried by old references; {@code null}
+     *                         (unset) yields an empty list
+     * @param oci              the {@code storage.oci.*} block; {@code null} (nothing configured)
+     *                         yields the default block so callers never see a null
+     */
+    @ConstructorBinding
+    public StorageProperties(@DefaultValue("/media") String mediaRoot,
+                             List<String> legacyMediaRoots,
+                             Oci oci) {
+        this.mediaRoot = mediaRoot;
+        this.legacyMediaRoots = legacyMediaRoots != null ? legacyMediaRoots : new ArrayList<>();
+        this.oci = oci != null ? oci : new Oci();
+    }
 
     @Getter
     @Setter

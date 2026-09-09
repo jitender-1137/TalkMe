@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Live A/V token endpoint (Phase 6, deferred). Gated by the LIVE_AUDIO entitlement — whose global
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * seam is switched on. STOMP keeps app state; LiveKit carries media using the minted token.
  */
 @RestController
+@Tag(name = "Live", description = "Live A/V token endpoint (Phase 6, deferred)")
 @RequestMapping("/live")
 @RequiredArgsConstructor
 public class LiveController {
@@ -39,7 +43,8 @@ public class LiveController {
      * @throws com.neo.chat.exception.NotFoundException   chat not found (TM_981)
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member of the chat (TM_103)
      */
-    @PostMapping("/token")
+    @Operation(summary = "Mint a LiveKit access token scoping the caller to their chat's voice room")
+    @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('LIVE_AUDIO')")
     public ResponseEntity<ResponseDto<LiveTokenResponse>> token(
             @Valid @RequestBody LiveTokenRequest request,

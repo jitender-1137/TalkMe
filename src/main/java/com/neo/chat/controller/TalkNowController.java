@@ -7,7 +7,11 @@ import com.neo.chat.dto.response.TalkNowAvailabilityResponse;
 import com.neo.chat.dto.response.TalkNowMatchResponse;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.TalkNowService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/talk-now")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Talk Now", description = "Intent + availability matching: declare availability, browse and match")
 public class TalkNowController {
 
     private final TalkNowService talkNowService;
@@ -43,10 +48,11 @@ public class TalkNowController {
      * @return the availability snapshot in a success envelope
      * @throws com.neo.chat.exception.BadRequestException if the intent is missing (TM_936)
      */
-    @PostMapping("/available")
+    @Operation(summary = "Declares the caller available with the given intent (+ optional language/country) and returns the current availability snapshot")
+    @PostMapping(value = "/available", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('TALK_NOW')")
     public ResponseEntity<ResponseDto<TalkNowAvailabilityResponse>> declareAvailable(
-            @RequestBody DeclareAvailableRequest request,
+            @Valid @RequestBody DeclareAvailableRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         TalkNowAvailabilityResponse response = talkNowService.declareAvailable(
                 userDetails.getUser(), request.getIntent(), request.getLanguage(), request.getCountry());
@@ -59,6 +65,7 @@ public class TalkNowController {
      * @param userDetails the authenticated caller
      * @return an empty success envelope (message "No longer available", TM_000)
      */
+    @Operation(summary = "Removes the caller from the availability pool")
     @DeleteMapping("/available")
     @PreAuthorize("@featureGuard.check('TALK_NOW')")
     public ResponseEntity<ResponseDto<Void>> cancel(
@@ -74,6 +81,7 @@ public class TalkNowController {
      * @param userDetails the authenticated caller
      * @return the availability snapshot in a success envelope
      */
+    @Operation(summary = "Lists who is available to talk right now (online + non-stale), with per-intent counts, from the caller's perspective")
     @GetMapping("/available")
     @PreAuthorize("@featureGuard.check('TALK_NOW')")
     public ResponseEntity<ResponseDto<TalkNowAvailabilityResponse>> getAvailable(
@@ -91,10 +99,11 @@ public class TalkNowController {
      * @return a matched or waiting result in a success envelope
      * @throws com.neo.chat.exception.BadRequestException if the intent is missing (TM_936)
      */
-    @PostMapping("/match")
+    @Operation(summary = "Matches the caller with the best available compatible user for the intent, or marks them available and returns a waiting result")
+    @PostMapping(value = "/match", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('TALK_NOW')")
     public ResponseEntity<ResponseDto<TalkNowMatchResponse>> match(
-            @RequestBody DeclareAvailableRequest request,
+            @Valid @RequestBody DeclareAvailableRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         TalkNowMatchResponse response = talkNowService.matchNow(userDetails.getUser(), request.getIntent());
         return ResponseEntity.ok(SuccessResponseDto.success(response));

@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Per-chat Flirt Mode surface (feature FLIRT_MODE — age + verified gated). Distinct from the
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * with {@code ChatController}'s mappings.
  */
 @RestController
+@Tag(name = "Flirt Mode", description = "Per-chat Flirt Mode surface (feature FLIRT_MODE — age + verified gated)")
 @RequestMapping("/chats")
 @RequiredArgsConstructor
 public class FlirtModeController {
@@ -43,6 +46,7 @@ public class FlirtModeController {
      * @throws com.neo.chat.exception.NotFoundException   if no chat matches the UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Returns the caller's viewer-relative flirt-mode state for a 1:1 chat")
     @GetMapping("/{chatUuid}/flirt-mode")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<FlirtModeResponse>> getState(
@@ -64,6 +68,7 @@ public class FlirtModeController {
      * @throws com.neo.chat.exception.NotFoundException   if no chat matches the UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Sets the caller's flirt-mode consent to ON for a 1:1 chat; mode is ACTIVE only when both participants have enabled it")
     @PostMapping("/{chatUuid}/flirt-mode/enable")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<FlirtModeResponse>> enable(
@@ -85,6 +90,7 @@ public class FlirtModeController {
      * @throws com.neo.chat.exception.NotFoundException   if no chat matches the UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Sets the caller's flirt-mode consent to OFF for a 1:1 chat, deactivating the mode")
     @PostMapping("/{chatUuid}/flirt-mode/disable")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<FlirtModeResponse>> disable(
@@ -108,6 +114,7 @@ public class FlirtModeController {
      * @throws com.neo.chat.exception.NotFoundException   if no chat matches the UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Blows a playful kiss to the other participant: a live, ephemeral flirt_kiss event (full-screen heart animation) delivered over WebSocket")
     @PostMapping("/{chatUuid}/flirt-mode/kiss")
     @PreAuthorize("@featureGuard.check('FLIRT_MODE')")
     public ResponseEntity<ResponseDto<Void>> kiss(

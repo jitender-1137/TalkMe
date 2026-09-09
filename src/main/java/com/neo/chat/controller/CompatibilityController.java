@@ -5,11 +5,10 @@ import com.neo.chat.dto.response.CompatibilityScore;
 import com.neo.chat.dto.response.ConnectionInsightResponse;
 import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
-import com.neo.chat.exception.NotFoundException;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.CompatibilityService;
 import com.neo.chat.service.WingmanService;
+import com.neo.chat.service.lookup.UserLookupService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -21,19 +20,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Compatibility meter (feature #10) between the current user and another user.
  * Gated by the COMPATIBILITY_METER feature entitlement.
  */
 @RestController
+@Tag(name = "Compatibility", description = "Compatibility meter (feature #10) between the current user and another user")
 @RequestMapping("/match/compatibility")
 @RequiredArgsConstructor
 public class CompatibilityController {
 
     private final CompatibilityService compatibilityService;
     private final WingmanService wingmanService;
-    private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
 
     /**
      * Number of icebreakers surfaced alongside the compatibility score.
@@ -50,14 +52,15 @@ public class CompatibilityController {
      * @throws com.neo.chat.exception.NotFoundException if no user matches {@code userUuid} (TM_024)
      * @throws java.lang.IllegalArgumentException          if {@code userUuid} is not a valid UUID
      */
+    @Operation(summary = "Computes the deterministic weighted compatibility score between the caller and another user")
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('COMPATIBILITY_METER')")
     public ResponseEntity<ResponseDto<CompatibilityScore>> compatibility(
             @PathVariable("userUuid") String userUuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User other = userRepository.findByUuid(UUID.fromString(userUuid))
-                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
-        CompatibilityScore score = compatibilityService.score(userDetails.getUser(), other);
+        User other = userLookupService.requireByUuidWithPersonality(UUID.fromString(userUuid));
+        User caller = withPersonality(userDetails.getUser());
+        CompatibilityScore score = compatibilityService.score(caller, other);
         return ResponseEntity.ok(SuccessResponseDto.success(score));
     }
 
@@ -74,14 +77,14 @@ public class CompatibilityController {
      * @throws com.neo.chat.exception.NotFoundException if no user matches {@code userUuid} (TM_024)
      * @throws java.lang.IllegalArgumentException       if {@code userUuid} is not a valid UUID
      */
+    @Operation(summary = "Combined Connect insight between the caller and another user: the full compatibility score (overall %, breakdown, highlights and the...")
     @GetMapping("/{userUuid}/starters")
     @PreAuthorize("@featureGuard.check('COMPATIBILITY_METER')")
     public ResponseEntity<ResponseDto<ConnectionInsightResponse>> starters(
             @PathVariable("userUuid") String userUuid,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User caller = userDetails.getUser();
-        User other = userRepository.findByUuid(UUID.fromString(userUuid))
-                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        User other = userLookupService.requireByUuidWithPersonality(UUID.fromString(userUuid));
+        User caller = withPersonality(userDetails.getUser());
         CompatibilityScore score = compatibilityService.score(caller, other);
         List<String> icebreakers = wingmanService.icebreakers(caller, other, STARTER_COUNT);
         ConnectionInsightResponse insight = ConnectionInsightResponse.builder()
@@ -89,5 +92,18 @@ public class CompatibilityController {
                 .icebreakers(icebreakers)
                 .build();
         return ResponseEntity.ok(SuccessResponseDto.success(insight));
+    }
+
+    /**
+     * Re-loads the authenticated principal with its LAZY {@code personality} map fetch-joined.
+     * The principal is detached (loaded by the JWT filter in its own read-only transaction, and
+     * open-in-view is off), so without this the personality factor would silently score neutral.
+     * Falls back to the principal instance if the row vanished mid-request.
+     *
+     * @param principal the authenticated user
+     * @return a user instance whose {@code personality} is initialised
+     */
+    private User withPersonality(User principal) {
+        return userLookupService.reloadWithPersonality(principal);
     }
 }

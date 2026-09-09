@@ -50,7 +50,7 @@ import com.neo.chat.service.LoginAttemptService;
 import com.neo.chat.service.PwnedPasswordService;
 import com.neo.chat.service.ReputationRecorder;
 import com.neo.chat.service.WebPushService;
-import jakarta.servlet.http.HttpServletRequest;
+import com.neo.chat.util.ClientRequestInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -166,15 +166,9 @@ class AuthServiceImplTest {
                 sessionRepository, passwordEncoder, tokenProvider, userMapper, sessionMapper,
                 countryDetectionService, loginAttemptService, redisTemplate, pwnedPasswordService,
                 emailService, webPushService, moderationService, userSettingRepository,
-                featureAccessService, featureAccessCache, reputationRecorder);
-
-        ReflectionTestUtils.setField(service, "accessTokenExpirationMs", ACCESS_TTL_MS);
-        ReflectionTestUtils.setField(service, "refreshTokenExpirationMs", REFRESH_TTL_MS);
-        ReflectionTestUtils.setField(service, "guestRefreshTokenExpirationMs", GUEST_REFRESH_TTL_MS);
-        ReflectionTestUtils.setField(service, "passwordResetTtlMinutes", 30L);
-        ReflectionTestUtils.setField(service, "emailVerificationTtlMinutes", 1440L);
-        ReflectionTestUtils.setField(service, "accountDeletionWindowDays", 30L);
-        ReflectionTestUtils.setField(service, "frontendBaseUrl", "http://localhost:3000/");
+                featureAccessService, featureAccessCache, reputationRecorder,
+                ACCESS_TTL_MS, REFRESH_TTL_MS, GUEST_REFRESH_TTL_MS,
+                30L, 1440L, 30L, "http://localhost:3000/");
 
         // Shared, lenient stubs: any Redis value-op path resolves through valueOps, and
         // userRepository.save echoes back the entity (assigning id/uuid on first insert)
@@ -233,8 +227,15 @@ class AuthServiceImplTest {
         when(featureAccessService.effectiveWireNames(any(User.class))).thenReturn(Set.of("chat"));
     }
 
-    private HttpServletRequest httpRequest() {
-        return mock(HttpServletRequest.class);
+    /**
+     * Request snapshot with no resolvable client IP (mirrors a bare mock servlet request).
+     */
+    private ClientRequestInfo client(String userAgent) {
+        return client(userAgent, null);
+    }
+
+    private ClientRequestInfo client(String userAgent, String ip) {
+        return new ClientRequestInfo(userAgent, ip, java.util.Map.of());
     }
 
     // ══════════════════════════════════════════════════════════════════════════════
@@ -262,7 +263,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            LoginResponse resp = service.login(req("alice", "pw"), "Mozilla", "1.2.3.4", httpRequest());
+            LoginResponse resp = service.login(req("alice", "pw"), client("Mozilla", "1.2.3.4"));
 
             assertThat(resp.getTokens().getAccessToken()).isEqualTo("access-jwt");
             assertThat(resp.getTokens().getExpiresIn()).isEqualTo(ACCESS_TTL_MS / 1000);
@@ -283,7 +284,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            LoginResponse resp = service.login(req("alice@example.com", "pw"), "UA", "1.2.3.4", httpRequest());
+            LoginResponse resp = service.login(req("alice@example.com", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(resp.getUser()).isNotNull();
         }
@@ -298,7 +299,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getCountry()).isEqualTo("India");
         }
@@ -313,7 +314,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getCountry()).isEqualTo("Canada");
         }
@@ -327,7 +328,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenThrow(new RuntimeException("geo down"));
             stubLoginPipeline();
 
-            LoginResponse resp = service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            LoginResponse resp = service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(resp.getTokens().getAccessToken()).isEqualTo("access-jwt");
         }
@@ -344,7 +345,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.isDeleted()).isFalse();
             assertThat(user.getDeletionRequestedAt()).isNull();
@@ -356,7 +357,7 @@ class AuthServiceImplTest {
             doThrow(new TooManyRequestsException("locked", "TM_106"))
                     .when(loginAttemptService).assertNotBlocked("alice", "1.2.3.4");
 
-            assertThatThrownBy(() -> service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("alice", "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOf(TooManyRequestsException.class);
             verify(userRepository, never()).findByUsernameIgnoreCase(any());
         }
@@ -367,7 +368,7 @@ class AuthServiceImplTest {
             when(userRepository.findByUsernameIgnoreCase("ghost")).thenReturn(Optional.empty());
             when(userRepository.findByEmailIgnoreCase("ghost")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.login(req("ghost", "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("ghost", "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_024"));
             verify(loginAttemptService).recordFailure("ghost", "1.2.3.4");
@@ -380,7 +381,7 @@ class AuthServiceImplTest {
             guest.setGuest(true);
             when(userRepository.findByUsernameIgnoreCase("alice")).thenReturn(Optional.of(guest));
 
-            assertThatThrownBy(() -> service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("alice", "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(ForbiddenException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_029"));
             verify(loginAttemptService, never()).recordFailure(any(), any());
@@ -393,7 +394,7 @@ class AuthServiceImplTest {
             user.setBanned(true);
             when(userRepository.findByUsernameIgnoreCase("alice")).thenReturn(Optional.of(user));
 
-            assertThatThrownBy(() -> service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("alice", "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(ForbiddenException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_030"));
             verify(loginAttemptService).recordFailure("alice", "1.2.3.4");
@@ -406,7 +407,7 @@ class AuthServiceImplTest {
             when(userRepository.findByUsernameIgnoreCase("alice")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches("bad", "$2a$hash")).thenReturn(false);
 
-            assertThatThrownBy(() -> service.login(req("alice", "bad"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("alice", "bad"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_024"));
             verify(loginAttemptService).recordFailure("alice", "1.2.3.4");
@@ -421,7 +422,7 @@ class AuthServiceImplTest {
             when(userRepository.findByUsernameIgnoreCase("alice")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(any(), any())).thenReturn(true);
 
-            assertThatThrownBy(() -> service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("alice", "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_024"));
         }
@@ -435,7 +436,7 @@ class AuthServiceImplTest {
             when(userRepository.findByUsernameIgnoreCase("alice")).thenReturn(Optional.of(user));
             when(passwordEncoder.matches(any(), any())).thenReturn(true);
 
-            assertThatThrownBy(() -> service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req("alice", "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_024"));
         }
@@ -474,7 +475,7 @@ class AuthServiceImplTest {
             when(valueOps.setIfAbsent(anyString(), eq("1"), any(Duration.class))).thenReturn(true);
             stubLoginPipeline();
 
-            LoginResponse resp = service.signup(req(), "UA", httpRequest());
+            LoginResponse resp = service.signup(req(), client("UA"));
 
             // Persisted once on insert, again by the login pipeline (last-location write).
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
@@ -506,7 +507,7 @@ class AuthServiceImplTest {
             when(valueOps.setIfAbsent(anyString(), any(), any())).thenReturn(true);
             stubLoginPipeline();
 
-            service.signup(r, "UA", httpRequest());
+            service.signup(r, client("UA"));
 
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
@@ -518,7 +519,7 @@ class AuthServiceImplTest {
         void emailConflict() {
             when(userRepository.existsByEmailIgnoreCase("new@example.com")).thenReturn(true);
 
-            assertThatThrownBy(() -> service.signup(req(), "UA", httpRequest()))
+            assertThatThrownBy(() -> service.signup(req(), client("UA")))
                     .isInstanceOfSatisfying(ConflictException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_047"));
             verify(userRepository, never()).save(any());
@@ -530,7 +531,7 @@ class AuthServiceImplTest {
             when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
             when(userRepository.existsByUsernameIgnoreCase(any())).thenReturn(true);
 
-            assertThatThrownBy(() -> service.signup(req(), "UA", httpRequest()))
+            assertThatThrownBy(() -> service.signup(req(), client("UA")))
                     .isInstanceOfSatisfying(ConflictException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_048"));
             verify(userRepository, never()).save(any());
@@ -542,7 +543,7 @@ class AuthServiceImplTest {
             when(userRepository.existsByEmailIgnoreCase(any())).thenReturn(false);
             when(pwnedPasswordService.isBreached("Sup3rStr0ng!")).thenReturn(true);
 
-            assertThatThrownBy(() -> service.signup(req(), "UA", httpRequest()))
+            assertThatThrownBy(() -> service.signup(req(), client("UA")))
                     .isInstanceOfSatisfying(BadRequestException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_496"));
             verify(userRepository, never()).save(any());
@@ -556,7 +557,7 @@ class AuthServiceImplTest {
             when(moderationService.moderateText("New User"))
                     .thenReturn(ModerationResult.explicit(ModerationResult.Category.PROFANITY, 0.9, List.of()));
 
-            assertThatThrownBy(() -> service.signup(req(), "UA", httpRequest()))
+            assertThatThrownBy(() -> service.signup(req(), client("UA")))
                     .isInstanceOfSatisfying(ContentModerationException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_490"));
             verify(userRepository, never()).save(any());
@@ -588,7 +589,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            LoginResponse resp = service.loginAsGuest(req(), "UA", httpRequest());
+            LoginResponse resp = service.loginAsGuest(req(), client("UA"));
 
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
@@ -602,13 +603,12 @@ class AuthServiceImplTest {
         @DisplayName("SECURITY: guest creation blocked past the per-IP daily cap → TM_007, no user saved")
         void perIpCapBlocksGuestFlood() {
             // A request whose (resolved) client IP is non-null so the per-IP cap actually runs.
-            HttpServletRequest reqWithIp = mock(HttpServletRequest.class);
-            when(reqWithIp.getRemoteAddr()).thenReturn("203.0.113.9");
+            ClientRequestInfo reqWithIp = client("UA", "203.0.113.9");
             // increment returns a value over the cap (20) → creation refused (uses the shared valueOps).
             when(valueOps.increment(org.mockito.ArgumentMatchers.startsWith("guest:create:ip:")))
                     .thenReturn(21L);
 
-            assertThatThrownBy(() -> service.loginAsGuest(req(), "UA", reqWithIp))
+            assertThatThrownBy(() -> service.loginAsGuest(req(), reqWithIp))
                     .isInstanceOfSatisfying(TooManyRequestsException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_007"));
             verify(userRepository, never()).save(any());
@@ -622,7 +622,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.loginAsGuest(req(), "UA", httpRequest());
+            service.loginAsGuest(req(), client("UA"));
 
             verify(roleRepository).save(any(Role.class));
         }
@@ -654,7 +654,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info(), "UA", httpRequest());
+            service.oauthLogin(info(), client("UA"));
 
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
@@ -685,7 +685,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(existing.getGoogleId()).isEqualTo("g-sub-1");
             assertThat(existing.getProfileImage()).isEqualTo("http://newpic");
@@ -712,7 +712,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(shell.getPasswordHash()).isNull();          // attacker's password wiped
             assertThat(shell.isVerified()).isTrue();
@@ -736,7 +736,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             // The victim's account is never looked up by email for linking, and never reclaimed.
             verify(userRepository, never()).findByEmailIgnoreCase(anyString());
@@ -754,7 +754,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info(), "UA", httpRequest());
+            service.oauthLogin(info(), client("UA"));
 
             assertThat(existing.isDeleted()).isFalse();
             assertThat(existing.getDeletionRequestedAt()).isNull();
@@ -774,7 +774,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info(), "UA", httpRequest());
+            service.oauthLogin(info(), client("UA"));
 
             // generateLoginResponse always saves once; a second save would signal a dirty backfill.
             verify(userRepository, times(1)).save(existing);
@@ -797,7 +797,7 @@ class AuthServiceImplTest {
                     .thenAnswer(inv -> inv.getArgument(0));
             stubLoginPipeline();
 
-            service.oauthLogin(info(), "UA", httpRequest());
+            service.oauthLogin(info(), client("UA"));
 
             // Winner row reused → not provisioned → login alert (not welcome).
             verify(emailService, never()).sendWelcomeEmail(any(), any(), any());
@@ -816,7 +816,7 @@ class AuthServiceImplTest {
             when(userRepository.save(any(User.class)))
                     .thenThrow(new DataIntegrityViolationException("dup"));
 
-            assertThatThrownBy(() -> service.oauthLogin(info, "UA", httpRequest()))
+            assertThatThrownBy(() -> service.oauthLogin(info, client("UA")))
                     .isInstanceOf(DataIntegrityViolationException.class);
         }
     }
@@ -1867,7 +1867,7 @@ class AuthServiceImplTest {
             when(userRepository.findByUsernameIgnoreCase("")).thenReturn(Optional.empty());
             when(userRepository.findByEmailIgnoreCase("")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.login(req(null, "pw"), "UA", "1.2.3.4", httpRequest()))
+            assertThatThrownBy(() -> service.login(req(null, "pw"), client("UA", "1.2.3.4")))
                     .isInstanceOfSatisfying(UnauthorizedException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_024"));
             verify(loginAttemptService).recordFailure("", "1.2.3.4");
@@ -1883,7 +1883,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getCountry()).isEqualTo("India");
         }
@@ -1898,7 +1898,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detectionOnly("Unknown"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getCountry()).isNull();
         }
@@ -1913,7 +1913,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detectionOnly("  "));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getCountry()).isNull();
         }
@@ -1928,7 +1928,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detectionOnly(null));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getCountry()).isNull();
         }
@@ -1945,7 +1945,7 @@ class AuthServiceImplTest {
                     .thenReturn(Optional.of(UserSetting.builder().emailLoginAlerts(false).build()));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             verify(emailService, never()).sendLoginAlertEmail(any(), any(), any(), any(), any(), any(), any());
         }
@@ -1961,7 +1961,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             verify(emailService, never()).sendLoginAlertEmail(any(), any(), any(), any(), any(), any(), any());
         }
@@ -1977,7 +1977,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             verify(emailService, never()).sendLoginAlertEmail(any(), any(), any(), any(), any(), any(), any());
         }
@@ -1994,7 +1994,7 @@ class AuthServiceImplTest {
                     .sendLoginAlertEmail(any(), any(), any(), any(), any(), any(), any());
             stubLoginPipeline();
 
-            LoginResponse resp = service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            LoginResponse resp = service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(resp.getTokens().getAccessToken()).isEqualTo("access-jwt");
         }
@@ -2011,7 +2011,7 @@ class AuthServiceImplTest {
                             .city("Pune").region("Maharashtra").build());
             stubLoginPipeline();
 
-            service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(user.getLastLoginIp()).isNull();
         }
@@ -2026,7 +2026,7 @@ class AuthServiceImplTest {
             doThrow(new RuntimeException("push down")).when(webPushService).removeAllSubscriptionsForUser(1L);
             stubLoginPipeline();
 
-            LoginResponse resp = service.login(req("alice", "pw"), "UA", "1.2.3.4", httpRequest());
+            LoginResponse resp = service.login(req("alice", "pw"), client("UA", "1.2.3.4"));
 
             assertThat(resp.getTokens().getAccessToken()).isEqualTo("access-jwt");
         }
@@ -2082,7 +2082,7 @@ class AuthServiceImplTest {
         void blankReferrerIgnored() {
             stubSignupBase();
 
-            service.signup(req("   "), "UA", httpRequest());
+            service.signup(req("   "), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2092,7 +2092,7 @@ class AuthServiceImplTest {
         void atOnlyReferrerIgnored() {
             stubSignupBase();
 
-            service.signup(req("@"), "UA", httpRequest());
+            service.signup(req("@"), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2102,7 +2102,7 @@ class AuthServiceImplTest {
         void selfReferralIgnored() {
             stubSignupBase();
 
-            service.signup(req("newuser"), "UA", httpRequest());
+            service.signup(req("newuser"), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2116,7 +2116,7 @@ class AuthServiceImplTest {
             referrer.setGuest(true);
             when(userRepository.findByUsernameIgnoreCase("sponsor")).thenReturn(Optional.of(referrer));
 
-            service.signup(req("@sponsor"), "UA", httpRequest());
+            service.signup(req("@sponsor"), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2130,7 +2130,7 @@ class AuthServiceImplTest {
             referrer.setBanned(true);
             when(userRepository.findByUsernameIgnoreCase("sponsor")).thenReturn(Optional.of(referrer));
 
-            service.signup(req("@sponsor"), "UA", httpRequest());
+            service.signup(req("@sponsor"), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2144,7 +2144,7 @@ class AuthServiceImplTest {
             referrer.setDeleted(true);
             when(userRepository.findByUsernameIgnoreCase("sponsor")).thenReturn(Optional.of(referrer));
 
-            service.signup(req("@sponsor"), "UA", httpRequest());
+            service.signup(req("@sponsor"), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2156,7 +2156,7 @@ class AuthServiceImplTest {
             when(userRepository.findByUsernameIgnoreCase("sponsor"))
                     .thenThrow(new RuntimeException("db blip"));
 
-            service.signup(req("@sponsor"), "UA", httpRequest());
+            service.signup(req("@sponsor"), client("UA"));
 
             assertThat(savedUser().getReferredBy()).isNull();
         }
@@ -2174,7 +2174,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.signup(r, "UA", httpRequest());
+            service.signup(r, client("UA"));
 
             verify(emailService, never()).sendVerificationEmail(any(), any(), any(), anyLong());
         }
@@ -2221,7 +2221,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             verify(userRepository, times(1)).save(existing);
         }
@@ -2236,7 +2236,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(existing.getGoogleId()).isNull();
             verify(userRepository, times(1)).save(existing);
@@ -2252,7 +2252,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             // providerId "" is non-null, so googleId is linked to the blank value (dirty save).
             assertThat(existing.getGoogleId()).isEmpty();
@@ -2272,7 +2272,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
@@ -2292,7 +2292,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
@@ -2317,7 +2317,7 @@ class AuthServiceImplTest {
                     .thenAnswer(inv -> inv.getArgument(0));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             verify(emailService, never()).sendWelcomeEmail(any(), any(), any());
         }
@@ -2332,7 +2332,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(existing.getProfileImage()).isEqualTo("http://newpic");
         }
@@ -2347,7 +2347,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(existing.getProfileImage()).isNull();
             verify(userRepository, times(1)).save(existing);
@@ -2363,7 +2363,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(existing.getGender()).isEmpty();
             verify(userRepository, times(1)).save(existing);
@@ -2379,7 +2379,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(info, "UA", httpRequest());
+            service.oauthLogin(info, client("UA"));
 
             assertThat(existing.isVerified()).isFalse();
             verify(userRepository, times(1)).save(existing);
@@ -2394,7 +2394,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detection("India"));
             stubLoginPipeline();
 
-            service.oauthLogin(infoFor(existing).build(), "UA", httpRequest());
+            service.oauthLogin(infoFor(existing).build(), client("UA"));
 
             assertThat(existing.getCountry()).isEqualTo("India");
         }
@@ -2408,7 +2408,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detectionOnly("Unknown"));
             stubLoginPipeline();
 
-            service.oauthLogin(infoFor(existing).build(), "UA", httpRequest());
+            service.oauthLogin(infoFor(existing).build(), client("UA"));
 
             assertThat(existing.getCountry()).isNull();
             verify(userRepository, times(1)).save(existing);
@@ -2423,7 +2423,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detectionOnly("  "));
             stubLoginPipeline();
 
-            service.oauthLogin(infoFor(existing).build(), "UA", httpRequest());
+            service.oauthLogin(infoFor(existing).build(), client("UA"));
 
             assertThat(existing.getCountry()).isNull();
             verify(userRepository, times(1)).save(existing);
@@ -2438,7 +2438,7 @@ class AuthServiceImplTest {
             when(countryDetectionService.detectCountry(any())).thenReturn(detectionOnly(null));
             stubLoginPipeline();
 
-            service.oauthLogin(infoFor(existing).build(), "UA", httpRequest());
+            service.oauthLogin(infoFor(existing).build(), client("UA"));
 
             assertThat(existing.getCountry()).isNull();
             verify(userRepository, times(1)).save(existing);

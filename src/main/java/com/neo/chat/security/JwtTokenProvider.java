@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,7 +53,7 @@ public class JwtTokenProvider {
      */
     public String generateToken(Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        assert userDetails != null;
+        assert userDetails != null : "authentication principal must be a CustomUserDetails";
         String uuid = userDetails.getUser() != null && userDetails.getUser().getUuid() != null
                 ? userDetails.getUser().getUuid().toString() : null;
         return generateToken(userDetails.getUsername(), userDetails.isGuest(), uuid);
@@ -86,8 +87,8 @@ public class JwtTokenProvider {
      * @return the compact, signed JWT string
      */
     public String generateToken(String username, boolean isGuest, String uuid) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        Instant now = Instant.now();
+        Instant expiry = now.plusMillis(jwtExpirationInMs);
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("isGuest", isGuest);
@@ -98,8 +99,9 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
-                .issuedAt(now)
-                .expiration(expiryDate)
+                // jjwt 0.12 only accepts java.util.Date here — convert at the library boundary.
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -183,15 +185,15 @@ public class JwtTokenProvider {
      * @return the compact, signed delivery-ack JWT string
      */
     public String generateDeliveryToken(String username, String chatUuid) {
-        Date now = new Date();
+        Instant now = Instant.now();
         Map<String, Object> claims = new HashMap<>();
         claims.put("purpose", DELIVERY_PURPOSE);
         claims.put("chatUuid", chatUuid);
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + DELIVERY_TOKEN_TTL_MS))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(DELIVERY_TOKEN_TTL_MS)))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -212,14 +214,14 @@ public class JwtTokenProvider {
      * @return compact signed JWT
      */
     public String generateMediaToken(String username, long ttlMs) {
-        Date now = new Date();
+        Instant now = Instant.now();
         Map<String, Object> claims = new HashMap<>();
         claims.put("purpose", MEDIA_PURPOSE);
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + ttlMs))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(ttlMs)))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }

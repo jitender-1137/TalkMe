@@ -18,23 +18,35 @@ import java.util.stream.Collectors;
  * a blank {@code allowed-origins} combined with {@code allow-credentials=true} is
  * rejected at startup (credentials cannot be sent with a wildcard origin).
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class CorsConfig {
 
-    @Value("${app.cors.allowed-origins}")
-    private String allowedOrigins;
+    private final String allowedOrigins;
+    private final String allowedMethods;
+    private final String allowedHeaders;
+    private final String exposedHeaders;
+    private final boolean allowCredentials;
 
-    @Value("${app.cors.allowed-methods}")
-    private String allowedMethods;
-
-    @Value("${app.cors.allowed-headers}")
-    private String allowedHeaders;
-
-    @Value("${app.cors.exposed-headers}")
-    private String exposedHeaders;
-
-    @Value("${app.cors.allow-credentials}")
-    private boolean allowCredentials;
+    /**
+     * Constructor-injects the {@code app.cors.*} settings (all required — no inline defaults).
+     *
+     * @param allowedOrigins   comma-separated allowed origins
+     * @param allowedMethods   comma-separated allowed methods
+     * @param allowedHeaders   comma-separated allowed request headers
+     * @param exposedHeaders   comma-separated exposed response headers
+     * @param allowCredentials whether credentialed requests are allowed
+     */
+    public CorsConfig(@Value("${app.cors.allowed-origins}") String allowedOrigins,
+                      @Value("${app.cors.allowed-methods}") String allowedMethods,
+                      @Value("${app.cors.allowed-headers}") String allowedHeaders,
+                      @Value("${app.cors.exposed-headers}") String exposedHeaders,
+                      @Value("${app.cors.allow-credentials}") boolean allowCredentials) {
+        this.allowedOrigins = allowedOrigins;
+        this.allowedMethods = allowedMethods;
+        this.allowedHeaders = allowedHeaders;
+        this.exposedHeaders = exposedHeaders;
+        this.allowCredentials = allowCredentials;
+    }
 
     /**
      * Configures and returns a {@link CorsFilter} bean to handle Cross-Origin Resource Sharing (CORS) requests.

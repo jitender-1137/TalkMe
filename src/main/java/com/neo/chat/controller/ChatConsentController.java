@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Per-chat explicit-content consent handshake for 1:1 conversations (request/accept/decline/revoke).
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * require the chat to be 1:1. Distinct from the user-level {@code /consent} flow.
  */
 @RestController
+@Tag(name = "Chat Consent", description = "Per-chat explicit-content consent handshake for 1:1 conversations (request/accept/decline/revoke)")
 @RequestMapping("/chats/{chatId}/consent")
 @RequiredArgsConstructor
 public class ChatConsentController {
@@ -36,6 +39,7 @@ public class ChatConsentController {
      * @throws com.neo.chat.exception.NotFoundException  if the chat does not exist (TM_121)
      * @throws com.neo.chat.exception.ForbiddenException if the caller is not a member of the chat (TM_141)
      */
+    @Operation(summary = "Returns the viewer-relative consent state (status, whether they can request/revoke, whether they are the requester, count of their own...")
     @GetMapping
     public ResponseEntity<ResponseDto<ConsentStateResponse>> getState(
             @PathVariable("chatId") String chatUuid,
@@ -56,6 +60,7 @@ public class ChatConsentController {
      * @throws com.neo.chat.exception.ForbiddenException if the caller is not a member (TM_141) or the
      *                                                      chat is not 1:1 (TM_494)
      */
+    @Operation(summary = "Requests explicit-content consent from the other participant")
     @PostMapping("/request")
     public ResponseEntity<ResponseDto<ConsentStateResponse>> requestConsent(
             @PathVariable("chatId") String chatUuid,
@@ -79,6 +84,7 @@ public class ChatConsentController {
      *                                                      (TM_494), there is no pending request (TM_492),
      *                                                      or the caller is the requester (TM_493)
      */
+    @Operation(summary = "Accepts a pending consent request (only the non-requesting party may accept)")
     @PostMapping("/accept")
     public ResponseEntity<ResponseDto<ConsentStateResponse>> acceptConsent(
             @PathVariable("chatId") String chatUuid,
@@ -102,6 +108,7 @@ public class ChatConsentController {
      *                                                      (TM_494), there is no pending request (TM_492),
      *                                                      or the caller is the requester (TM_493)
      */
+    @Operation(summary = "Declines a pending consent request (only the non-requesting party may decline)")
     @PostMapping("/decline")
     public ResponseEntity<ResponseDto<ConsentStateResponse>> declineConsent(
             @PathVariable("chatId") String chatUuid,
@@ -123,6 +130,7 @@ public class ChatConsentController {
      * @throws com.neo.chat.exception.ForbiddenException if the caller is not a member (TM_141) or the
      *                                                      chat is not 1:1 (TM_494)
      */
+    @Operation(summary = "Turns off previously-granted consent, resetting to the default (NONE) state and recording the revoker (so only the other party may...")
     @PostMapping("/revoke")
     public ResponseEntity<ResponseDto<ConsentStateResponse>> revokeConsent(
             @PathVariable("chatId") String chatUuid,

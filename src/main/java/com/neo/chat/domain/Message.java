@@ -47,7 +47,9 @@ import java.util.Set;
         // auto-index FK referencing columns).
         @Index(name = "idx_messages_sender_id", columnList = "sender_id"),
         // Release-on-consent query: find held messages per chat.
-        @Index(name = "idx_messages_chat_moderation", columnList = "chat_id, moderation_status")
+        @Index(name = "idx_messages_chat_moderation", columnList = "chat_id, moderation_status"),
+        // FK column (BootUI DB-SCHEMA-002 / HIB-MAP-019)
+        @Index(name = "idx_messages_parent_message_id", columnList = "parent_message_id")
 })
 @Getter
 @Setter
@@ -56,11 +58,11 @@ import java.util.Set;
 @AllArgsConstructor
 public class Message extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "chat_id", nullable = false)
     private Chat chat;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sender_id", nullable = false)
     private User sender;
 
@@ -182,7 +184,12 @@ public class Message extends BaseEntity {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "message_mentions",
             joinColumns = @JoinColumn(name = "message_id"),
-            indexes = @Index(name = "idx_message_mentions_user", columnList = "mentioned_user_id"))
+            indexes = {
+                    @Index(name = "idx_message_mentions_user", columnList = "mentioned_user_id"),
+                    // Hibernate orders the composite PK by type then name => (mentioned_user_id,
+                    // message_id), so the message_id FK is not PK-leading and needs its own index.
+                    @Index(name = "idx_message_mentions_message_id", columnList = "message_id")
+            })
     @Column(name = "mentioned_user_id", nullable = false)
     @Builder.Default
     private Set<Long> mentionedUserIds = new HashSet<>();

@@ -2,7 +2,7 @@ package com.neo.chat.service.impl;
 
 import com.neo.chat.dto.response.CountryDetectionResult;
 import com.neo.chat.service.CountryDetectionService;
-import jakarta.servlet.http.HttpServletRequest;
+import com.neo.chat.util.ClientRequestInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -23,20 +23,21 @@ import java.util.Map;
 @Service
 public class CountryDetectionServiceImpl implements CountryDetectionService {
 
-    @Value("${app.country-header:X-Country-Code}")
-    private String proxyCountryHeader;
+    private final String proxyCountryHeader;
 
     // Dev convenience: when the client IP is local/private (e.g. on localhost),
     // geolocate the SERVER's own public IP instead of bailing out to "Unknown",
     // so country detection works during local development. MUST stay false in
     // production — there a private IP means a misconfigured proxy, not the dev's
     // machine, and we don't want to attribute the server's location to a user.
-    @Value("${app.geo.geolocate-local-ip:false}")
-    private boolean geolocateLocalIp;
+    private final boolean geolocateLocalIp;
 
     private final RestTemplate restTemplate;
 
-    public CountryDetectionServiceImpl() {
+    public CountryDetectionServiceImpl(@Value("${app.country-header:X-Country-Code}") String proxyCountryHeader,
+                                       @Value("${app.geo.geolocate-local-ip:false}") boolean geolocateLocalIp) {
+        this.proxyCountryHeader = proxyCountryHeader;
+        this.geolocateLocalIp = geolocateLocalIp;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(1000);
         factory.setReadTimeout(1000);
@@ -48,11 +49,11 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
      * header (configured or common fallbacks), then an ip-api.com GeoIP lookup on the resolved client IP.
      * Returns an "Unknown" result when nothing resolves, on error/timeout, or for local IPs outside dev mode.
      *
-     * @param request the incoming HTTP request (maybe null)
+     * @param request the request snapshot built in the web layer (maybe null)
      * @return the detected country/location and its source; never null
      */
     @Override
-    public CountryDetectionResult detectCountry(HttpServletRequest request) {
+    public CountryDetectionResult detectCountry(ClientRequestInfo request) {
         if (request == null) {
             return CountryDetectionResult.builder()
                     .country("Unknown")
@@ -61,10 +62,10 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
                     .build();
         }
 
-        String clientIp = resolveIp(request);
+        String clientIp = request.clientIp();
 
         // 1. Cloudflare Country Header
-        String cfCountryCode = request.getHeader("CF-IPCountry");
+        String cfCountryCode = request.header("CF-IPCountry");
         if (cfCountryCode != null && !cfCountryCode.isBlank() && !cfCountryCode.equalsIgnoreCase("XX")) {
             String countryName = getCountryNameFromCode(cfCountryCode.trim());
             log.debug("Country detected via Cloudflare header: {} -> {}", cfCountryCode, countryName);
@@ -76,12 +77,12 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
         }
 
         // 2. Reverse Proxy Country Header (e.g. X-Country-Code)
-        String proxyCountryCode = request.getHeader(proxyCountryHeader);
+        String proxyCountryCode = request.header(proxyCountryHeader);
         if (proxyCountryCode == null || proxyCountryCode.isBlank()) {
             // Check common fallbacks if custom configured is missing
-            proxyCountryCode = request.getHeader("X-Country-Code");
+            proxyCountryCode = request.header("X-Country-Code");
             if (proxyCountryCode == null || proxyCountryCode.isBlank()) {
-                proxyCountryCode = request.getHeader("X-Country");
+                proxyCountryCode = request.header("X-Country");
             }
         }
         if (proxyCountryCode != null && !proxyCountryCode.isBlank()) {
@@ -142,19 +143,6 @@ public class CountryDetectionServiceImpl implements CountryDetectionService {
                 .source("Unknown")
                 .clientIp(clientIp)
                 .build();
-    }
-
-    /**
-     * Resolves the real client IP behind Cloudflare/Nginx/load balancers, checking {@code CF-Connecting-IP},
-     * {@code X-Forwarded-For} (first hop), {@code X-Real-IP}, then the raw remote address.
-     *
-     * @param request the incoming request
-     * @return the best-guess client IP
-     */
-    private String resolveIp(HttpServletRequest request) {
-        // Proxy-aware resolution (trusted-hop aware; CF-Connecting-IP only when enabled) — the
-        // client-supplied first X-Forwarded-For hop is never trusted.
-        return com.neo.chat.util.ClientIp.resolve(request);
     }
 
     /**

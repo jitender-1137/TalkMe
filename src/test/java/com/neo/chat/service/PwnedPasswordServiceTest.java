@@ -53,10 +53,14 @@ class PwnedPasswordServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PwnedPasswordService();
-        ReflectionTestUtils.setField(service, "enabled", true);
+        service = build(true);
+    }
+
+    private PwnedPasswordService build(boolean enabled) {
+        PwnedPasswordService s = new PwnedPasswordService(enabled);
         // Swap the inline-constructed HttpClient for the mock (non-static final instance field).
-        ReflectionTestUtils.setField(service, "http", http);
+        ReflectionTestUtils.setField(s, "http", http);
+        return s;
     }
 
     @SuppressWarnings("unchecked")
@@ -74,7 +78,7 @@ class PwnedPasswordServiceTest {
         @Test
         @DisplayName("disabled flag → not breached, no network call")
         void disabledSkips() throws Exception {
-            ReflectionTestUtils.setField(service, "enabled", false);
+            service = build(false);
 
             assertThat(service.isBreached(PWD)).isFalse();
             verify(http, never()).send(any(), any());

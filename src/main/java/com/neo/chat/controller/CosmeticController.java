@@ -21,12 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Cosmetic rewards API (Phase 4 gamification surface). Gated by the {@code COSMETICS} feature.
  * Everything served is decoration — no endpoint here changes authorization or limits.
  */
 @RestController
+@Tag(name = "Cosmetic", description = "Cosmetic rewards API (Phase 4 gamification surface)")
 @RequestMapping("/cosmetics")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -40,6 +44,7 @@ public class CosmeticController {
      * @param userDetails the authenticated principal
      * @return the list of {@link CosmeticResponse} for the whole catalog
      */
+    @Operation(summary = "Full catalog with owned/locked/equipped flags for the caller")
     @GetMapping("/catalog")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> catalog(
@@ -54,6 +59,7 @@ public class CosmeticController {
      * @param userDetails the authenticated principal
      * @return the list of {@link CosmeticResponse} the caller owns
      */
+    @Operation(summary = "The caller's owned cosmetics")
     @GetMapping("/me")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> mine(
@@ -72,7 +78,8 @@ public class CosmeticController {
      *                                                       is not yet unlocked by the caller
      * @throws com.neo.chat.exception.NotFoundException   if the code matches no known cosmetic
      */
-    @PutMapping("/equip")
+    @Operation(summary = "Equip a cosmetic the caller owns")
+    @PutMapping(value = "/equip", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> equip(
             @RequestBody Map<String, String> body,
@@ -90,6 +97,7 @@ public class CosmeticController {
      * @return the caller's cosmetics list reflecting the cleared slot
      * @throws com.neo.chat.exception.BadRequestException if the slot name is unknown
      */
+    @Operation(summary = "Unequip whatever is equipped in the given slot")
     @DeleteMapping("/equip/{slot}")
     @PreAuthorize("@featureGuard.check('COSMETICS')")
     public ResponseEntity<ResponseDto<List<CosmeticResponse>>> unequip(

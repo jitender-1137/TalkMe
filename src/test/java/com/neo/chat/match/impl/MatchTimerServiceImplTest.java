@@ -17,7 +17,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.Map;
@@ -67,8 +66,7 @@ class MatchTimerServiceImplTest {
     void setUp() {
         lenient().when(redis.opsForZSet()).thenReturn(zSetOps);
         lenient().when(redis.opsForValue()).thenReturn(valueOps);
-        service = new MatchTimerServiceImpl(sessionService, messagingTemplate, redis);
-        ReflectionTestUtils.setField(service, "promptIntervalMs", INTERVAL);
+        service = new MatchTimerServiceImpl(sessionService, messagingTemplate, redis, INTERVAL);
     }
 
     private MatchSession session(MatchMode mode) {

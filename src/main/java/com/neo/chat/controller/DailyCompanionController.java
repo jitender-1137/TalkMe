@@ -14,12 +14,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Daily Companion (feature #8). One curated companion per user per day; after 24h the user
  * chooses to stay friends, continue, or end. Gated behind the DAILY_COMPANION feature key.
  */
 @RestController
+@Tag(name = "Daily Companion", description = "Daily Companion (feature #8)")
 @RequestMapping("/daily-companion")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -34,6 +37,7 @@ public class DailyCompanionController {
      * @param userDetails the authenticated principal whose pairing is returned
      * @return 200 with the {@link DailyCompanionResponse} for today
      */
+    @Operation(summary = "Returns the caller's companion pairing for today, or an empty response (just today's date) when none has been assigned yet")
     @GetMapping("/today")
     @PreAuthorize("@featureGuard.check('DAILY_COMPANION')")
     public ResponseEntity<ResponseDto<DailyCompanionResponse>> getToday(
@@ -53,6 +57,7 @@ public class DailyCompanionController {
      *                                                       companion is assigned today, or the decision
      *                                                       is already final (TM_400)
      */
+    @Operation(summary = "Applies the caller's decision on today's companion: STAY_FRIENDS (marks converted), CONTINUE (keeps active and extends expiry by 7...")
     @PostMapping("/action")
     @PreAuthorize("@featureGuard.check('DAILY_COMPANION')")
     public ResponseEntity<ResponseDto<DailyCompanionResponse>> act(

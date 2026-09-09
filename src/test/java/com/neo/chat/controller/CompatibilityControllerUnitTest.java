@@ -4,7 +4,8 @@ import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.CompatibilityScore;
 import com.neo.chat.exception.GlobalExceptionHandler;
-import com.neo.chat.repository.UserRepository;
+import com.neo.chat.exception.NotFoundException;
+import com.neo.chat.service.lookup.UserLookupService;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.CompatibilityService;
 import com.neo.chat.service.WingmanService;
@@ -34,6 +35,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -45,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Pure controller unit test for {@link CompatibilityController}.
  *
- * <p>Standalone {@link MockMvc} with mocked {@link CompatibilityService} + {@link UserRepository}
+ * <p>Standalone {@link MockMvc} with mocked {@link CompatibilityService} + {@link UserLookupService}
  * and the real {@link GlobalExceptionHandler}. Exercises the controller's two branches: the
  * {@code UUID.fromString} guard (invalid UUID → 400/TM_INVALID_UUID) and the
  * {@code orElseThrow(NotFoundException)} (unknown user → 404/TM_024).
@@ -65,7 +67,7 @@ class CompatibilityControllerUnitTest {
     @Mock
     private WingmanService wingmanService;
     @Mock
-    private UserRepository userRepository;
+    private UserLookupService userLookupService;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -73,14 +75,14 @@ class CompatibilityControllerUnitTest {
 
     /**
      * Builds the standalone {@link MockMvc} (mocked {@link CompatibilityService} +
-     * {@link UserRepository}, real {@link GlobalExceptionHandler}, validator, principal resolver),
+     * {@link UserLookupService}, real {@link GlobalExceptionHandler}, validator, principal resolver),
      * seeds the caller ({@code me}) and target ({@code other}) users, and installs {@code me} as the
      * authenticated principal.
      */
     @BeforeEach
     void setUp() {
         CompatibilityController controller =
-                new CompatibilityController(compatibilityService, wingmanService, userRepository);
+                new CompatibilityController(compatibilityService, wingmanService, userLookupService);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -96,6 +98,11 @@ class CompatibilityControllerUnitTest {
                 .isGuest(false).roles(Set.of(role)).build();
         otherUser = User.builder().username("other").email("o@e.com").name("Other")
                 .isGuest(false).roles(Set.of(role)).build();
+
+        // The controller re-loads the principal with its personality fetch-joined; the previous
+        // repository mock returned Optional.empty() so the controller fell back to the principal
+        // itself — mirror that by returning the principal from the lookup service.
+        lenient().when(userLookupService.reloadWithPersonality(testUser)).thenReturn(testUser);
 
         CustomUserDetails principal = new CustomUserDetails(testUser);
         Authentication auth =
@@ -121,7 +128,7 @@ class CompatibilityControllerUnitTest {
 
         @Test
         void shouldReturnScoreForValidUser() throws Exception {
-            when(userRepository.findByUuid(any())).thenReturn(Optional.of(otherUser));
+            when(userLookupService.requireByUuidWithPersonality(any())).thenReturn(otherUser);
             when(compatibilityService.score(testUser, otherUser)).thenReturn(score(88));
 
             mockMvc.perform(get(BASE + "/" + OTHER_UUID))
@@ -133,7 +140,7 @@ class CompatibilityControllerUnitTest {
 
             // The path UUID is parsed and looked up; the score is computed between me and other.
             ArgumentCaptor<UUID> uuid = ArgumentCaptor.forClass(UUID.class);
-            verify(userRepository).findByUuid(uuid.capture());
+            verify(userLookupService).requireByUuidWithPersonality(uuid.capture());
             assertThat(uuid.getValue()).isEqualTo(UUID.fromString(OTHER_UUID));
             verify(compatibilityService).score(testUser, otherUser);
         }
@@ -145,24 +152,24 @@ class CompatibilityControllerUnitTest {
                     // UUID.fromString throws IllegalArgumentException("Invalid UUID string: ...")
                     .andExpect(jsonPath("$.messageCode").value("TM_INVALID_UUID"));
 
-            verifyNoInteractions(userRepository, compatibilityService);
+            verifyNoInteractions(userLookupService, compatibilityService);
         }
 
         @Test
         void shouldReturn404WhenUserNotFound() throws Exception {
-            when(userRepository.findByUuid(any())).thenReturn(Optional.empty());
+            when(userLookupService.requireByUuidWithPersonality(any())).thenThrow(new NotFoundException("User not found", "TM_024"));
 
             mockMvc.perform(get(BASE + "/" + OTHER_UUID))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.messageCode").value("TM_024"));
 
-            verify(userRepository).findByUuid(any());
+            verify(userLookupService).requireByUuidWithPersonality(any());
             verify(compatibilityService, never()).score(any(), any());
         }
 
         @Test
         void shouldReturn500WhenScoringFails() throws Exception {
-            when(userRepository.findByUuid(any())).thenReturn(Optional.of(otherUser));
+            when(userLookupService.requireByUuidWithPersonality(any())).thenReturn(otherUser);
             when(compatibilityService.score(any(), any())).thenThrow(new RuntimeException("boom"));
 
             mockMvc.perform(get(BASE + "/" + OTHER_UUID))
@@ -172,7 +179,7 @@ class CompatibilityControllerUnitTest {
 
         @Test
         void shouldReturnZeroScoreBucket() throws Exception {
-            when(userRepository.findByUuid(any())).thenReturn(Optional.of(otherUser));
+            when(userLookupService.requireByUuidWithPersonality(any())).thenReturn(otherUser);
             when(compatibilityService.score(any(), any())).thenReturn(score(0));
 
             mockMvc.perform(get(BASE + "/" + OTHER_UUID))
@@ -187,7 +194,7 @@ class CompatibilityControllerUnitTest {
 
         @Test
         void shouldReturnCompatibilityAndIcebreakers() throws Exception {
-            when(userRepository.findByUuid(any())).thenReturn(Optional.of(otherUser));
+            when(userLookupService.requireByUuidWithPersonality(any())).thenReturn(otherUser);
             when(compatibilityService.score(testUser, otherUser)).thenReturn(score(77));
             when(wingmanService.icebreakers(eq(testUser), eq(otherUser), eq(5)))
                     .thenReturn(List.of("What's the best photo you've ever taken?", "Coffee or tea?"));
@@ -204,7 +211,7 @@ class CompatibilityControllerUnitTest {
 
             // Both collaborators are called for the same caller/target pair, capped at 5 starters.
             ArgumentCaptor<UUID> uuid = ArgumentCaptor.forClass(UUID.class);
-            verify(userRepository).findByUuid(uuid.capture());
+            verify(userLookupService).requireByUuidWithPersonality(uuid.capture());
             assertThat(uuid.getValue()).isEqualTo(UUID.fromString(OTHER_UUID));
             verify(compatibilityService).score(testUser, otherUser);
             verify(wingmanService).icebreakers(testUser, otherUser, 5);
@@ -216,18 +223,18 @@ class CompatibilityControllerUnitTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.messageCode").value("TM_INVALID_UUID"));
 
-            verifyNoInteractions(userRepository, compatibilityService, wingmanService);
+            verifyNoInteractions(userLookupService, compatibilityService, wingmanService);
         }
 
         @Test
         void shouldReturn404WhenUserNotFound() throws Exception {
-            when(userRepository.findByUuid(any())).thenReturn(Optional.empty());
+            when(userLookupService.requireByUuidWithPersonality(any())).thenThrow(new NotFoundException("User not found", "TM_024"));
 
             mockMvc.perform(get(BASE + "/" + OTHER_UUID + "/starters"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.messageCode").value("TM_024"));
 
-            verify(userRepository).findByUuid(any());
+            verify(userLookupService).requireByUuidWithPersonality(any());
             verify(compatibilityService, never()).score(any(), any());
             verify(wingmanService, never()).icebreakers(any(), any(), org.mockito.ArgumentMatchers.anyInt());
         }

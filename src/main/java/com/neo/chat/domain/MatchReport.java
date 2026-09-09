@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -16,7 +17,12 @@ import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 
 @Entity
-@Table(name = "match_reports")
+@Table(name = "match_reports",
+        indexes = {
+                @Index(name = "idx_match_reports_reporter_id", columnList = "reporter_id"),
+                @Index(name = "idx_match_reports_reported_id", columnList = "reported_id"),
+                @Index(name = "idx_match_reports_session_id", columnList = "session_id")
+        })
 @Getter
 @Setter
 @Builder
@@ -24,11 +30,11 @@ import java.time.Instant;
 @AllArgsConstructor
 public class MatchReport extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "reporter_id", nullable = false)
     private User reporter;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "reported_id", nullable = false)
     private User reported;
 

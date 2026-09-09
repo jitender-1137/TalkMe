@@ -19,12 +19,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Manages the follow graph (follow, unfollow, remove-follower, and paginated follower/following
  * lists). Served at {@code /follows}; every route is gated by {@code hasRole('USER')} at class level.
  */
 @RestController
+@Tag(name = "Follow", description = "Manages the follow graph (follow, unfollow, remove-follower, and paginated follower/following lists)")
 @RequestMapping("/follows")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -41,6 +44,7 @@ public class FollowController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if following self or already following
      */
+    @Operation(summary = "Makes the current user follow the target user and notifies the target of the new follower")
     @PostMapping("/{userUuid}")
     public ResponseEntity<ResponseDto<Void>> followUser(
             @PathVariable("userUuid") String userUuid,
@@ -58,6 +62,7 @@ public class FollowController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if not currently following the user
      */
+    @Operation(summary = "Makes the current user stop following the target user (soft-deletes the follow edge)")
     @DeleteMapping("/{userUuid}")
     public ResponseEntity<ResponseDto<Void>> unfollowUser(
             @PathVariable("userUuid") String userUuid,
@@ -75,6 +80,7 @@ public class FollowController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if that user is not following the caller
      */
+    @Operation(summary = "Removes one of the current user's followers (soft-deletes their follow edge to the caller)")
     @DeleteMapping("/followers/{followerUuid}")
     public ResponseEntity<ResponseDto<Void>> removeFollower(
             @PathVariable("followerUuid") String followerUuid,
@@ -93,6 +99,7 @@ public class FollowController {
      * @return 200 with a page of follower user summaries
      * @throws com.neo.chat.exception.NotFoundException if no user matches the resolved UUID
      */
+    @Operation(summary = "Returns a paginated list of the target user's accepted followers (\"me\" resolves to the current user)")
     @GetMapping("/{userUuid}/followers")
     public ResponseEntity<ResponseDto<Page<AuthUserResponse>>> getFollowers(
             @PathVariable("userUuid") String userUuid,
@@ -113,6 +120,7 @@ public class FollowController {
      * @return 200 with a page of followed user summaries
      * @throws com.neo.chat.exception.NotFoundException if no user matches the resolved UUID
      */
+    @Operation(summary = "Returns a paginated list of the users the target user follows (\"me\" resolves to the current user)")
     @GetMapping("/{userUuid}/following")
     public ResponseEntity<ResponseDto<Page<AuthUserResponse>>> getFollowing(
             @PathVariable("userUuid") String userUuid,

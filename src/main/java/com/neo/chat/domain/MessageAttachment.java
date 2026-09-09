@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -13,7 +14,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "message_attachments")
+@Table(name = "message_attachments",
+        indexes = @Index(name = "idx_message_attachments_message_id", columnList = "message_id"))
 @Getter
 @Setter
 @Builder
@@ -21,7 +23,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class MessageAttachment extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "message_id", nullable = false)
     private Message message;
 

@@ -6,12 +6,12 @@ import com.neo.chat.domain.User;
 import com.neo.chat.dto.request.SavePushSubscriptionRequest;
 import com.neo.chat.enums.InstallationType;
 import com.neo.chat.exception.GlobalExceptionHandler;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.security.JwtTokenProvider;
 import com.neo.chat.service.ChatService;
 import com.neo.chat.service.NotificationDispatchService;
 import com.neo.chat.service.WebPushService;
+import com.neo.chat.service.lookup.UserLookupSupport;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +56,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Pure controller unit test for {@link PushController}.
  *
  * <p>Standalone {@link MockMvc} with mocked collaborators ({@link WebPushService},
- * {@link UserRepository}, {@link NotificationDispatchService}, {@link JwtTokenProvider},
+ * {@link UserLookupSupport}, {@link NotificationDispatchService}, {@link JwtTokenProvider},
  * {@link ChatService}) and the real {@link GlobalExceptionHandler}. The VAPID key is served
  * from a real {@link WebPushProperties} instance (a bean, not a {@code @Value} field) whose
  * public key is set via its setter in {@code setUp}. {@link AuthenticationPrincipalArgumentResolver}
@@ -84,7 +84,7 @@ class PushControllerUnitTest {
     @Mock
     private WebPushService webPushService;
     @Mock
-    private UserRepository userRepository;
+    private UserLookupSupport userLookup;
     @Mock
     private NotificationDispatchService notificationDispatchService;
     @Mock
@@ -98,11 +98,11 @@ class PushControllerUnitTest {
 
     @BeforeEach
     void setUp() {
-        webPushProperties = new WebPushProperties();
-        webPushProperties.getVapid().setPublicKey(VAPID_KEY);
+        webPushProperties = new WebPushProperties(true,
+                new WebPushProperties.Vapid(VAPID_KEY, null, null));
 
         PushController controller = new PushController(
-                webPushService, webPushProperties, userRepository,
+                webPushService, webPushProperties, userLookup,
                 notificationDispatchService, jwtTokenProvider, chatService);
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
@@ -152,7 +152,7 @@ class PushControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_000"))
                     .andExpect(jsonPath("$.data.publicKey").value(VAPID_KEY));
 
-            verifyNoInteractions(webPushService, userRepository,
+            verifyNoInteractions(webPushService, userLookup,
                     notificationDispatchService, jwtTokenProvider, chatService);
         }
     }
@@ -277,7 +277,7 @@ class PushControllerUnitTest {
         @Test
         void shouldReturn200AndPersistInstallationType() throws Exception {
             authenticate();
-            when(userRepository.save(any())).thenReturn(testUser);
+            when(userLookup.save(any())).thenReturn(testUser);
 
             mockMvc.perform(put(BASE + "/installation").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"installationType\":\"PWA\"}"))
@@ -287,7 +287,7 @@ class PushControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_282"));
 
             ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
-            verify(userRepository).save(saved.capture());
+            verify(userLookup).save(saved.capture());
             assertThat(saved.getValue().getInstallationType()).isEqualTo(InstallationType.PWA);
         }
 
@@ -298,7 +298,7 @@ class PushControllerUnitTest {
                             .content("{}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.messageCode").value(VALIDATION_CODE));
-            verifyNoInteractions(userRepository);
+            verifyNoInteractions(userLookup);
         }
 
         @Test
@@ -308,7 +308,7 @@ class PushControllerUnitTest {
             mockMvc.perform(put(BASE + "/installation").contentType(MediaType.APPLICATION_JSON).content("{bad"))
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
-            verifyNoInteractions(userRepository);
+            verifyNoInteractions(userLookup);
         }
     }
 
@@ -359,7 +359,7 @@ class PushControllerUnitTest {
             when(claims.getSubject()).thenReturn("testuser");
             when(claims.get("chatUuid", String.class)).thenReturn("chat-uuid-1");
             when(jwtTokenProvider.parseDeliveryToken("tok-1")).thenReturn(claims);
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            when(userLookup.findByUsername("testuser")).thenReturn(Optional.of(testUser));
 
             mockMvc.perform(post(BASE + "/delivered").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"token\":\"tok-1\"}"))
@@ -378,7 +378,7 @@ class PushControllerUnitTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.messageCode").value("TM_283"));
 
-            verifyNoInteractions(jwtTokenProvider, userRepository, chatService);
+            verifyNoInteractions(jwtTokenProvider, userLookup, chatService);
         }
 
         @Test
@@ -391,7 +391,7 @@ class PushControllerUnitTest {
                     .andExpect(jsonPath("$.messageCode").value("TM_283"));
 
             verify(jwtTokenProvider).parseDeliveryToken("bad-tok");
-            verifyNoInteractions(userRepository, chatService);
+            verifyNoInteractions(userLookup, chatService);
         }
 
         @Test
@@ -400,7 +400,7 @@ class PushControllerUnitTest {
             when(claims.getSubject()).thenReturn("ghost");
             when(claims.get("chatUuid", String.class)).thenReturn("chat-uuid-1");
             when(jwtTokenProvider.parseDeliveryToken("tok-2")).thenReturn(claims);
-            when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+            when(userLookup.findByUsername("ghost")).thenReturn(Optional.empty());
 
             mockMvc.perform(post(BASE + "/delivered").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"token\":\"tok-2\"}"))
@@ -416,7 +416,7 @@ class PushControllerUnitTest {
             mockMvc.perform(post(BASE + "/delivered").contentType(MediaType.APPLICATION_JSON).content("{bad"))
                     .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.messageCode").value(INTERNAL_ERROR_CODE));
-            verifyNoInteractions(jwtTokenProvider, userRepository, chatService);
+            verifyNoInteractions(jwtTokenProvider, userLookup, chatService);
         }
     }
 }

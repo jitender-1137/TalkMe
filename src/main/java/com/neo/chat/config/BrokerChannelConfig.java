@@ -14,7 +14,7 @@ import org.springframework.messaging.support.AbstractSubscribableChannel;
  * interceptor is a no-op unless the relay is enabled, so registering it
  * unconditionally is harmless.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class BrokerChannelConfig {
 
     /**

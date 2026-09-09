@@ -6,7 +6,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -29,8 +28,9 @@ import java.time.Instant;
 @Table(name = "consent_acceptances",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_consent_user_type",
-                columnNames = {"user_id", "consent_type"}),
-        indexes = @Index(name = "idx_consent_user", columnList = "user_id"))
+                columnNames = {"user_id", "consent_type"}))
+// user_id lookups are covered by the leading column of uk_consent_user_type; the former
+// idx_consent_user single-column index was redundant (BootUI DB-SCHEMA-003).
 @Getter
 @Setter
 @Builder
@@ -38,7 +38,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class ConsentAcceptance extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

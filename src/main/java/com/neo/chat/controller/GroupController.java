@@ -27,12 +27,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Group / channel management. A group IS a chat, so messaging still flows through
  * ChatController/MessageController — this handles create, info, membership & roles.
  */
 @RestController
+@Tag(name = "Group", description = "Group / channel management")
 @RequestMapping("/chats/group")
 @RequiredArgsConstructor
 public class GroupController {
@@ -46,7 +50,8 @@ public class GroupController {
      * @param userDetails the authenticated creator
      * @return the created chat as a ChatResponse (TM_280)
      */
-    @PostMapping
+    @Operation(summary = "Create a group, channel, or room (subtype from the request); the caller becomes OWNER")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<ChatResponse>> createGroup(
             @Valid @RequestBody CreateGroupRequest request,
@@ -66,7 +71,8 @@ public class GroupController {
      * @throws com.neo.chat.exception.BadRequestException chat is not a group (TM_299), or bad id (TM_300)
      * @throws com.neo.chat.exception.ForbiddenException  caller lacks edit permission (TM_291)
      */
-    @PatchMapping("/{id}")
+    @Operation(summary = "Update group info/settings (name, image, visibility, send/pin/edit policies, slow mode…)")
+    @PatchMapping(value = "/{id}", consumes = {MediaType.APPLICATION_JSON_VALUE, "application/merge-patch+json"})
     public ResponseEntity<ResponseDto<ChatResponse>> updateGroup(
             @PathVariable("id") String uuid,
             @Valid @RequestBody UpdateGroupRequest request,
@@ -85,6 +91,7 @@ public class GroupController {
      * @throws com.neo.chat.exception.BadRequestException chat is not a group (TM_299), or bad id (TM_300)
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member
      */
+    @Operation(summary = "List active members of a group (former members excluded), enriched with role and presence")
     @GetMapping("/{id}/members")
     public ResponseEntity<ResponseDto<List<GroupMemberResponse>>> getMembers(
             @PathVariable("id") String uuid,
@@ -106,7 +113,8 @@ public class GroupController {
      * @throws com.neo.chat.exception.ForbiddenException  caller lacks add permission (TM_291), or the
      *                                                       group only allows friends (TM_306)
      */
-    @PostMapping("/{id}/members")
+    @Operation(summary = "Add members to a group; targets whose privacy disallows a direct add get an invitation instead")
+    @PostMapping(value = "/{id}/members", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<ChatResponse>> addMembers(
             @PathVariable("id") String uuid,
             @RequestBody Map<String, List<String>> body,
@@ -129,6 +137,7 @@ public class GroupController {
      * @throws com.neo.chat.exception.ForbiddenException  target is the owner (TM_303), or an admin
      *                                                       removing another admin (TM_304)
      */
+    @Operation(summary = "Remove a member from a group (marks them a former member, keeping read-only history)")
     @DeleteMapping("/{id}/members/{userId}")
     public ResponseEntity<ResponseDto<Void>> removeMember(
             @PathVariable("id") String uuid,
@@ -153,7 +162,8 @@ public class GroupController {
      * @throws com.neo.chat.exception.ForbiddenException  target is the owner (TM_305)
      * @throws IllegalArgumentException                      role value is not a valid MemberRole
      */
-    @PutMapping("/{id}/members/{userId}/role")
+    @Operation(summary = "Set a member's role (MEMBER/ADMIN); owner-only")
+    @PutMapping(value = "/{id}/members/{userId}/role", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> setRole(
             @PathVariable("id") String uuid,
             @PathVariable("userId") String userId,
@@ -175,6 +185,7 @@ public class GroupController {
      *                                                       (TM_299), or bad id (TM_300)
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member
      */
+    @Operation(summary = "Leave a group (marks the caller a former member); the owner must transfer/delete first")
     @PostMapping("/{id}/leave")
     public ResponseEntity<ResponseDto<Void>> leave(
             @PathVariable("id") String uuid,
@@ -195,7 +206,8 @@ public class GroupController {
      * @throws com.neo.chat.exception.BadRequestException not a group (TM_299), or bad id (TM_300)
      * @throws com.neo.chat.exception.ForbiddenException  caller is not the owner
      */
-    @PostMapping("/{id}/transfer-ownership")
+    @Operation(summary = "Transfer ownership to another member (caller demotes to ADMIN, target becomes OWNER)")
+    @PostMapping(value = "/{id}/transfer-ownership", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> transferOwnership(
             @PathVariable("id") String uuid,
             @RequestBody Map<String, String> body,
@@ -213,6 +225,7 @@ public class GroupController {
      * @param userDetails the authenticated caller
      * @return matching public discovery cards (membership-free) wrapped in a success envelope
      */
+    @Operation(summary = "Discover public channels/rooms")
     @GetMapping("/discover")
     public ResponseEntity<ResponseDto<List<ChatResponse>>> discover(
             @RequestParam(value = "type", required = false) String type,
@@ -234,6 +247,7 @@ public class GroupController {
      *                                                       or bad id (TM_300)
      * @throws com.neo.chat.exception.ForbiddenException  chat is not open to join (TM_293)
      */
+    @Operation(summary = "Join a public, open channel/room")
     @PostMapping("/{id}/join")
     public ResponseEntity<ResponseDto<ChatResponse>> join(
             @PathVariable("id") String uuid,
@@ -253,6 +267,7 @@ public class GroupController {
      * @throws com.neo.chat.exception.BadRequestException group is full (TM_297), not a group (TM_299),
      *                                                       or bad id (TM_300)
      */
+    @Operation(summary = "Accept a pending group invitation (join the group)")
     @PostMapping("/{id}/invite/accept")
     public ResponseEntity<ResponseDto<ChatResponse>> acceptInvite(
             @PathVariable("id") String uuid,
@@ -270,6 +285,7 @@ public class GroupController {
      * @throws com.neo.chat.exception.NotFoundException   group not found (TM_121)
      * @throws com.neo.chat.exception.BadRequestException not a group (TM_299), or bad id (TM_300)
      */
+    @Operation(summary = "Decline a pending group invitation (no-op if there is none)")
     @PostMapping("/{id}/invite/decline")
     public ResponseEntity<ResponseDto<Void>> declineInvite(
             @PathVariable("id") String uuid,
@@ -288,7 +304,8 @@ public class GroupController {
      * @throws com.neo.chat.exception.NotFoundException   group not found (TM_121)
      * @throws com.neo.chat.exception.BadRequestException not a group (TM_299), or bad id (TM_300)
      */
-    @PostMapping("/{id}/report")
+    @Operation(summary = "Report a group/channel/room (writes an audit-log entry)")
+    @PostMapping(value = "/{id}/report", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> report(
             @PathVariable("id") String uuid,
             @RequestBody(required = false) Map<String, String> body,

@@ -69,6 +69,8 @@ public interface ReputationEventRepository extends JpaRepository<ReputationEvent
     /**
      * Flag the given ledger rows as folded into the owner's snapshot.
      */
+    // Intentionally no clearAutomatically: ReputationServiceImpl.recompute()/prestige() keep mutating and
+    // saving the managed UserReputation after this statement; clearing would detach it.
     @Modifying
     @Query("update ReputationEvent e set e.snapshotApplied = true where e.id in :ids")
     void markSnapshotApplied(@Param("ids") Collection<Long> ids);

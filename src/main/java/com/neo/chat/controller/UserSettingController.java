@@ -6,8 +6,11 @@ import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.dto.response.UserSettingResponse;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.UserSettingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/settings")
 @RequiredArgsConstructor
+@Tag(name = "User Settings", description = "Per-user application settings and privacy preferences")
 public class UserSettingController {
 
     private final UserSettingService userSettingService;
@@ -35,6 +39,7 @@ public class UserSettingController {
      * @param userDetails the authenticated principal
      * @return 200 with the {@link UserSettingResponse}
      */
+    @Operation(summary = "Return the current user's settings")
     @GetMapping
     public ResponseEntity<ResponseDto<UserSettingResponse>> getSettings(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -50,7 +55,8 @@ public class UserSettingController {
      * @return 200 with the updated {@link UserSettingResponse}
      * @throws com.neo.chat.exception.BadRequestException if a supplied enum value is invalid
      */
-    @PutMapping
+    @Operation(summary = "Update the current user's settings from the supplied request")
+    @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateSettings(
             @Valid @RequestBody UpdateSettingRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -66,6 +72,7 @@ public class UserSettingController {
      * @return 200 with the updated {@link UserSettingResponse}
      * @throws com.neo.chat.exception.BadRequestException if the value is not a valid option
      */
+    @Operation(summary = "Dedicated, param-based update for the \"who can message me\" preference")
     @PutMapping("/messaging-privacy")
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateMessagingPrivacy(
             @RequestParam("value") String value,
@@ -83,6 +90,7 @@ public class UserSettingController {
      * @return 200 with the updated {@link UserSettingResponse}
      * @throws com.neo.chat.exception.BadRequestException if the value is not a valid option
      */
+    @Operation(summary = "Dedicated, param-based update for the \"who can add me to groups/rooms\" preference")
     @PutMapping("/group-add-privacy")
     public ResponseEntity<ResponseDto<UserSettingResponse>> updateGroupAddPrivacy(
             @RequestParam("value") String value,

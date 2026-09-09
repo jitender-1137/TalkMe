@@ -15,7 +15,6 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,9 +45,7 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new HttpCookieOAuth2AuthorizationRequestRepository();
-        ReflectionTestUtils.setField(repo, "cookieSecure", false);
-        ReflectionTestUtils.setField(repo, "cookieSameSite", "Lax");
+        repo = new HttpCookieOAuth2AuthorizationRequestRepository(false, "Lax");
     }
 
     private static OAuth2AuthorizationRequest sampleRequest() {
@@ -95,7 +92,7 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
         @Test
         @DisplayName("cookieSecure=true → cookie carries the Secure attribute")
         void secureFlag() {
-            ReflectionTestUtils.setField(repo, "cookieSecure", true);
+            repo = new HttpCookieOAuth2AuthorizationRequestRepository(true, "Lax");
 
             repo.saveAuthorizationRequest(sampleRequest(), request, response);
 

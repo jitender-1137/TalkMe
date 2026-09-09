@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -25,7 +26,8 @@ import lombok.Setter;
 @Table(name = "badge_endorsements",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_badge_endorsements_pair_type",
-                columnNames = {"endorser_id", "recipient_id", "badge_type"}))
+                columnNames = {"endorser_id", "recipient_id", "badge_type"}),
+        indexes = @Index(name = "idx_badge_endorsements_recipient_id", columnList = "recipient_id"))
 @Getter
 @Setter
 @Builder

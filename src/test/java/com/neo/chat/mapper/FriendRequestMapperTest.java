@@ -8,7 +8,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.UUID;
 
@@ -23,14 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("FriendRequestMapper (unit)")
 class FriendRequestMapperTest {
 
-    private final FriendRequestMapper mapper = Mappers.getMapper(FriendRequestMapper.class);
-
-    // The generated FriendRequestMapperImpl injects UserMapper as an @Autowired field (spring
-    // component model). Mappers.getMapper leaves it null since there is no Spring context, so we
-    // wire the REAL UserMapper impl (never a mock) to exercise the nested sender mapping.
-    {
-        ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
-    }
+    // The generated FriendRequestMapperImpl takes UserMapper as a CONSTRUCTOR argument
+    // (componentModel = "spring", injectionStrategy = CONSTRUCTOR), so it is built directly with
+    // the REAL UserMapper impl (never a mock) to exercise the nested sender mapping.
+    private final FriendRequestMapper mapper =
+            new FriendRequestMapperImpl(Mappers.getMapper(UserMapper.class));
 
     private User user(String username, String name) {
         User u = User.builder().username(username).name(name).build();

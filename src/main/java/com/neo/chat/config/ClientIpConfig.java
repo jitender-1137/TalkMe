@@ -16,14 +16,23 @@ import org.springframework.context.annotation.Configuration;
  * </ul>
  */
 @Slf4j
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class ClientIpConfig {
 
-    @Value("${app.security.trusted-proxy-hops:1}")
-    private int trustedProxyHops;
+    private final int trustedProxyHops;
+    private final boolean trustCloudflareHeader;
 
-    @Value("${app.security.trust-cloudflare-header:false}")
-    private boolean trustCloudflareHeader;
+    /**
+     * Constructor-injects the proxy-trust settings.
+     *
+     * @param trustedProxyHops      {@code app.security.trusted-proxy-hops} (default 1)
+     * @param trustCloudflareHeader {@code app.security.trust-cloudflare-header} (default false)
+     */
+    public ClientIpConfig(@Value("${app.security.trusted-proxy-hops:1}") int trustedProxyHops,
+                          @Value("${app.security.trust-cloudflare-header:false}") boolean trustCloudflareHeader) {
+        this.trustedProxyHops = trustedProxyHops;
+        this.trustCloudflareHeader = trustCloudflareHeader;
+    }
 
     @PostConstruct
     void apply() {

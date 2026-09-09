@@ -5,7 +5,7 @@ import com.neo.chat.storage.MediaStorage;
 import com.neo.chat.storage.StorageProperties;
 import com.neo.chat.util.SsrfGuard;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -18,7 +18,11 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,12 +47,19 @@ public class PhotoMusicMuxer {
     private final FfmpegSupport ffmpeg;
     private final MediaStorage mediaStorage;
     private final StorageProperties storageProperties;
+    private final Executor drainExecutor;
 
+    /**
+     * @param drainExecutor shared executor used to drain ffmpeg's stderr concurrently with
+     *                      {@code waitFor} (the application task pool, so no ad-hoc threads)
+     */
     public PhotoMusicMuxer(FfmpegSupport ffmpeg, MediaStorage mediaStorage,
-                           StorageProperties storageProperties) {
+                           StorageProperties storageProperties,
+                           @Qualifier("applicationTaskExecutor") Executor drainExecutor) {
         this.ffmpeg = ffmpeg;
         this.mediaStorage = mediaStorage;
         this.storageProperties = storageProperties;
+        this.drainExecutor = drainExecutor;
     }
 
     /**
@@ -167,21 +178,21 @@ public class PhotoMusicMuxer {
             process = new ProcessBuilder(command)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .start();
-            // Drain stderr on a daemon thread: (1) so the OS pipe buffer never fills
-            // and deadlocks waitFor(), and (2) so we can log FFMpeg's REAL error on
+            // Drain stderr on the shared task executor: (1) so the OS pipe buffer never
+            // fills and deadlocks waitFor(), and (2) so we can log FFMpeg's REAL error on
             // failure instead of a bare exit code (the old DISCARD hid every cause).
             final Process running = process;
             final StringBuilder err = new StringBuilder();
-            Thread drain = getDrain(running, err, "ffmpeg-stderr");
+            CompletableFuture<Void> drain = drainStderr(running, err);
 
             boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                drain.join(2000);
+                awaitQuietly(drain, 2000);
                 log.warn("Photo+music mux timed out after {}s. ffmpeg: {}", TIMEOUT_SECONDS, tail(err));
                 return false;
             }
-            drain.join(2000); // stderr hits EOF once the process exits
+            awaitQuietly(drain, 2000); // stderr hits EOF once the process exits
             if (process.exitValue() != 0) {
                 log.warn("Photo+music mux ffmpeg exited {}: {}", process.exitValue(), tail(err));
                 return false;
@@ -197,8 +208,12 @@ public class PhotoMusicMuxer {
         }
     }
 
-    private static @NonNull Thread getDrain(Process running, StringBuilder err, String name) {
-        Thread drain = new Thread(() -> {
+    /**
+     * Drains the process's stderr into {@code err} (capped) on the shared executor, so the pipe
+     * never blocks the child while the caller waits on it.
+     */
+    private CompletableFuture<Void> drainStderr(Process running, StringBuilder err) {
+        return CompletableFuture.runAsync(() -> {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(
                     running.getErrorStream(), StandardCharsets.UTF_8))) {
                 String line;
@@ -208,10 +223,19 @@ public class PhotoMusicMuxer {
             } catch (IOException ignored) {
                 // stream closed on process exit
             }
-        }, name);
-        drain.setDaemon(true);
-        drain.start();
-        return drain;
+        }, drainExecutor);
+    }
+
+    /**
+     * Waits up to {@code millis} for the drain to finish (best-effort: a timeout or drain failure
+     * just means a shorter stderr tail). Interrupts propagate to the caller.
+     */
+    private static void awaitQuietly(CompletableFuture<?> drain, long millis) throws InterruptedException {
+        try {
+            drain.get(millis, TimeUnit.MILLISECONDS);
+        } catch (ExecutionException | TimeoutException ignored) {
+            // best-effort stderr capture
+        }
     }
 
     /**
@@ -239,9 +263,9 @@ public class PhotoMusicMuxer {
                     .start();
             final Process running = p;
             final StringBuilder err = new StringBuilder();
-            Thread drain = getDrain(running, err, "ffmpeg-probe");
+            CompletableFuture<Void> drain = drainStderr(running, err);
             p.waitFor(20, TimeUnit.SECONDS);
-            drain.join(2000);
+            awaitQuietly(drain, 2000);
             Matcher m =
                     Pattern.compile("Duration:\\s*(\\d+):(\\d+):(\\d+)").matcher(err);
             if (m.find()) {

@@ -2,9 +2,9 @@ package com.neo.chat.service;
 
 import com.neo.chat.dto.response.CountryDetectionResult;
 import com.neo.chat.service.impl.CountryDetectionServiceImpl;
+import com.neo.chat.util.ClientRequestInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
  */
 class CountryDetectionServiceTest {
 
-    @InjectMocks
     private CountryDetectionServiceImpl countryDetectionService;
 
     @Mock
@@ -44,8 +43,17 @@ class CountryDetectionServiceTest {
         com.neo.chat.util.ClientIp.setTrustedProxyHops(1);
         com.neo.chat.util.ClientIp.setTrustCloudflareHeader(false);
         MockitoAnnotations.openMocks(this);
-        ReflectionTestUtils.setField(countryDetectionService, "restTemplate", mockRestTemplate);
-        ReflectionTestUtils.setField(countryDetectionService, "proxyCountryHeader", "X-Country-Code");
+        countryDetectionService = build("X-Country-Code", false);
+    }
+
+    /**
+     * Builds the service with the given config; the impl constructs its own RestTemplate, so the
+     * mock is swapped in to keep the GeoIP lookup off the network.
+     */
+    private CountryDetectionServiceImpl build(String proxyCountryHeader, boolean geolocateLocalIp) {
+        CountryDetectionServiceImpl s = new CountryDetectionServiceImpl(proxyCountryHeader, geolocateLocalIp);
+        ReflectionTestUtils.setField(s, "restTemplate", mockRestTemplate);
+        return s;
     }
 
     @Test
@@ -54,7 +62,7 @@ class CountryDetectionServiceTest {
         request.addHeader("CF-IPCountry", "IN");
         request.setRemoteAddr("103.21.244.5"); // Cloudflare range public IP
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("India", result.getCountry());
         assertEquals("Cloudflare Header", result.getSource());
@@ -66,7 +74,7 @@ class CountryDetectionServiceTest {
         request.addHeader("X-Country-Code", "GB");
         request.setRemoteAddr("8.8.8.8");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("United Kingdom", result.getCountry());
         assertEquals("Proxy Header", result.getSource());
@@ -77,7 +85,7 @@ class CountryDetectionServiceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("127.0.0.1");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -96,7 +104,7 @@ class CountryDetectionServiceTest {
 
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(geoIpResponse);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("United States", result.getCountry());
         assertEquals("GeoIP", result.getSource());
@@ -111,7 +119,7 @@ class CountryDetectionServiceTest {
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class)))
                 .thenThrow(new RuntimeException("API error or timeout"));
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -122,7 +130,7 @@ class CountryDetectionServiceTest {
 
     @Test
     void testDetectCountry_nullRequest_returnsUnknownStub() {
-        CountryDetectionResult result = countryDetectionService.detectCountry(null);
+        CountryDetectionResult result = countryDetectionService.detectCountry((ClientRequestInfo) null);
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -139,7 +147,7 @@ class CountryDetectionServiceTest {
         request.addHeader("CF-IPCountry", "xx");
         request.setRemoteAddr("127.0.0.1");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -154,7 +162,7 @@ class CountryDetectionServiceTest {
         request.addHeader("X-Country", "FR");
         request.setRemoteAddr("8.8.8.8");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("France", result.getCountry());
         assertEquals("Proxy Header", result.getSource());
@@ -162,12 +170,12 @@ class CountryDetectionServiceTest {
 
     @Test
     void testDetectCountry_customConfiguredProxyHeader() {
-        ReflectionTestUtils.setField(countryDetectionService, "proxyCountryHeader", "X-My-Geo");
+        countryDetectionService = build("X-My-Geo", false);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-My-Geo", "DE");
         request.setRemoteAddr("8.8.8.8");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Germany", result.getCountry());
         assertEquals("Proxy Header", result.getSource());
@@ -187,7 +195,7 @@ class CountryDetectionServiceTest {
             request.setRemoteAddr("2.2.2.2");
             when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-            CountryDetectionResult result = countryDetectionService.detectCountry(request);
+            CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
             assertEquals("9.9.9.9", result.getClientIp());
         } finally {
@@ -205,7 +213,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("2.2.2.2");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("1.1.1.1", result.getClientIp());
     }
@@ -219,7 +227,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("2.2.2.2");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("9.9.9.9", result.getClientIp());
     }
@@ -231,7 +239,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("2.2.2.2");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("3.4.5.6", result.getClientIp());
     }
@@ -242,7 +250,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("4.5.6.7");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("4.5.6.7", result.getClientIp());
     }
@@ -255,7 +263,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("8.8.8.8");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(null);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -270,7 +278,7 @@ class CountryDetectionServiceTest {
         body.put("country", "Nowhere");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(body);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -285,7 +293,7 @@ class CountryDetectionServiceTest {
         body.put("country", "   ");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(body);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -305,7 +313,7 @@ class CountryDetectionServiceTest {
         body.put("lon", 73);         // Integer → asDouble must still coerce
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(body);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("India", result.getCountry());
         assertEquals("GeoIP", result.getSource());
@@ -327,7 +335,7 @@ class CountryDetectionServiceTest {
         body.put("lon", null);
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(body);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("India", result.getCountry());
         assertNull(result.getLat());
@@ -338,12 +346,12 @@ class CountryDetectionServiceTest {
     void testDetectCountry_localIpWithGeolocateLocalIpEnabled_doesLookup() {
         // In dev mode (geolocateLocalIp=true) a local IP is geolocated (against the server's own
         // public IP) instead of bailing to Unknown.
-        ReflectionTestUtils.setField(countryDetectionService, "geolocateLocalIp", true);
+        countryDetectionService = build("X-Country-Code", true);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("127.0.0.1");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("United States", result.getCountry());
         assertEquals("GeoIP", result.getSource());
@@ -356,7 +364,7 @@ class CountryDetectionServiceTest {
     void testPrivateIp_tenBlock_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("10.1.2.3");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
     }
 
@@ -364,7 +372,7 @@ class CountryDetectionServiceTest {
     void testPrivateIp_oneNineTwoBlock_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("192.168.10.10");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
     }
 
@@ -372,7 +380,7 @@ class CountryDetectionServiceTest {
     void testPrivateIp_172_16_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("172.16.5.5");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
     }
 
@@ -380,7 +388,7 @@ class CountryDetectionServiceTest {
     void testPrivateIp_172_31_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("172.31.255.1");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
     }
 
@@ -388,7 +396,7 @@ class CountryDetectionServiceTest {
     void testIpv6Loopback_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("::1");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
         assertEquals("::1", result.getClientIp());
     }
@@ -400,7 +408,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("172.15.0.1");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("GeoIP", result.getSource());
         assertEquals("172.15.0.1", result.getClientIp());
@@ -413,7 +421,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("172.32.0.1");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("GeoIP", result.getSource());
     }
@@ -427,7 +435,7 @@ class CountryDetectionServiceTest {
         request.addHeader("CF-IPCountry", "   ");
         request.setRemoteAddr("127.0.0.1");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getSource());
     }
@@ -436,13 +444,13 @@ class CountryDetectionServiceTest {
     void testDetectCountry_configuredHeaderBlank_thenXCountryCodeWins() {
         // Configured header present but BLANK → line 65 isBlank() true → enters fallback block;
         // X-Country-Code is present and non-blank → inner line 68 is false (skips X-Country).
-        ReflectionTestUtils.setField(countryDetectionService, "proxyCountryHeader", "X-My-Geo");
+        countryDetectionService = build("X-My-Geo", false);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-My-Geo", "   ");
         request.addHeader("X-Country-Code", "GB");
         request.setRemoteAddr("8.8.8.8");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("United Kingdom", result.getCountry());
         assertEquals("Proxy Header", result.getSource());
@@ -452,13 +460,13 @@ class CountryDetectionServiceTest {
     void testDetectCountry_xCountryCodeBlank_thenXCountryFallbackWins() {
         // Configured header absent → line 65 null true → enter; X-Country-Code present but BLANK →
         // inner line 68 isBlank() true → falls to the X-Country fallback.
-        ReflectionTestUtils.setField(countryDetectionService, "proxyCountryHeader", "X-My-Geo");
+        countryDetectionService = build("X-My-Geo", false);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-Country-Code", "   ");
         request.addHeader("X-Country", "FR");
         request.setRemoteAddr("8.8.8.8");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("France", result.getCountry());
         assertEquals("Proxy Header", result.getSource());
@@ -474,7 +482,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("8.8.8.8");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("GeoIP", result.getSource());
     }
@@ -488,7 +496,7 @@ class CountryDetectionServiceTest {
         body.put("status", "success");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(body);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getCountry());
         assertEquals("Unknown", result.getSource());
@@ -502,7 +510,7 @@ class CountryDetectionServiceTest {
         request.addHeader("CF-IPCountry", "999");
         request.setRemoteAddr("8.8.8.8");
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("999", result.getCountry());
         assertEquals("Cloudflare Header", result.getSource());
@@ -518,7 +526,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("2.2.2.2");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("1.1.1.1", result.getClientIp());
     }
@@ -531,7 +539,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("2.2.2.2");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("3.3.3.3", result.getClientIp());
     }
@@ -543,7 +551,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("4.4.4.4");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("4.4.4.4", result.getClientIp());
     }
@@ -557,7 +565,7 @@ class CountryDetectionServiceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr(null);
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("Unknown", result.getSource());
         assertNull(result.getClientIp());
@@ -567,7 +575,7 @@ class CountryDetectionServiceTest {
     void testLongFormIpv6Loopback_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("0:0:0:0:0:0:0:1");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
         assertEquals("0:0:0:0:0:0:0:1", result.getClientIp());
     }
@@ -576,7 +584,7 @@ class CountryDetectionServiceTest {
     void testLiteralLocalhost_isBypassed() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr("localhost");
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
         assertEquals("Unknown", result.getSource());
     }
 
@@ -588,7 +596,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("172.");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("GeoIP", result.getSource());
     }
@@ -601,7 +609,7 @@ class CountryDetectionServiceTest {
         request.setRemoteAddr("172.zz.0.1");
         when(mockRestTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(successGeo());
 
-        CountryDetectionResult result = countryDetectionService.detectCountry(request);
+        CountryDetectionResult result = countryDetectionService.detectCountry(ClientRequestInfo.from(request));
 
         assertEquals("GeoIP", result.getSource());
     }

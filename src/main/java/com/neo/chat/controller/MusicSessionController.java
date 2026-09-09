@@ -8,7 +8,11 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.MusicSessionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/chats/{chatId}/music")
 @RequiredArgsConstructor
+@Tag(name = "Music Sessions", description = "Shared per-chat music session: state, play/pause/seek and reactions kept in sync")
 public class MusicSessionController {
 
     private final MusicSessionService musicSessionService;
@@ -42,6 +47,7 @@ public class MusicSessionController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is not a valid UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
+    @Operation(summary = "Returns the current shared music session state for the chat so a joining client can align its clock")
     @GetMapping
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> getSession(
@@ -61,11 +67,12 @@ public class MusicSessionController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is invalid or no playable track url given
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
-    @PostMapping("/play")
+    @Operation(summary = "Starts (or switches) playback of a track and broadcasts the new state to the chat's music topic")
+    @PostMapping(value = "/play", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> play(
             @PathVariable("chatId") String chatId,
-            @RequestBody MusicPlayRequest request,
+            @Valid @RequestBody MusicPlayRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         MusicSessionState state = musicSessionService.play(userDetails.getUser(), chatId, request);
         return ResponseEntity.ok(SuccessResponseDto.success(state, "Playing", "TM_000"));
@@ -81,11 +88,12 @@ public class MusicSessionController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is invalid or there is no active session
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
-    @PostMapping("/pause")
+    @Operation(summary = "Pauses playback at an optional reported position and broadcasts the paused state to the chat")
+    @PostMapping(value = "/pause", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> pause(
             @PathVariable("chatId") String chatId,
-            @RequestBody(required = false) MusicSeekRequest request,
+            @Valid @RequestBody(required = false) MusicSeekRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Double position = request != null ? request.getPositionSec() : null;
         MusicSessionState state = musicSessionService.pause(userDetails.getUser(), chatId, position);
@@ -103,11 +111,12 @@ public class MusicSessionController {
      *                                                       active session exists
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
-    @PostMapping("/seek")
+    @Operation(summary = "Seeks the shared play head to a new position and broadcasts the updated state to the chat")
+    @PostMapping(value = "/seek", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> seek(
             @PathVariable("chatId") String chatId,
-            @RequestBody MusicSeekRequest request,
+            @Valid @RequestBody MusicSeekRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Double position = request != null ? request.getPositionSec() : null;
         MusicSessionState state = musicSessionService.seek(userDetails.getUser(), chatId, position);
@@ -124,11 +133,12 @@ public class MusicSessionController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is invalid or the emoji is missing
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
-    @PostMapping("/react")
+    @Operation(summary = "Emits an emoji reaction to the current track and broadcasts it to the chat's music topic")
+    @PostMapping(value = "/react", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('MUSIC_SESSION')")
     public ResponseEntity<ResponseDto<MusicSessionState>> react(
             @PathVariable("chatId") String chatId,
-            @RequestBody MusicReactRequest request,
+            @Valid @RequestBody MusicReactRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         String emoji = request != null ? request.getEmoji() : null;
         MusicSessionState state = musicSessionService.react(userDetails.getUser(), chatId, emoji);

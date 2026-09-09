@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.NaturalId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -57,6 +58,7 @@ public class OutboxEvent {
      * or a generated UUID for a status event. Used for dedup and for the unique
      * constraint that makes the producing insert idempotent.
      */
+    @NaturalId
     @Column(name = "event_key", nullable = false, length = 64)
     private String eventKey;
 

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -49,8 +48,7 @@ class MessageCryptoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new MessageCryptoService(chatKeyService, masterKeyService);
-        ReflectionTestUtils.setField(service, "enabled", true);
+        service = new MessageCryptoService(chatKeyService, masterKeyService, true);
         lenient().when(masterKeyService.isConfigured()).thenReturn(true);
         lenient().when(chatKeyService.getOrCreateSecretKey(anyLong())).thenReturn(KEY);
     }
@@ -68,7 +66,7 @@ class MessageCryptoServiceTest {
         @Test
         @DisplayName("flag off → disabled even with master key")
         void disabledWhenFlagOff() {
-            ReflectionTestUtils.setField(service, "enabled", false);
+            service = new MessageCryptoService(chatKeyService, masterKeyService, false);
             assertThat(service.isEnabled()).isFalse();
         }
 
@@ -97,7 +95,7 @@ class MessageCryptoServiceTest {
         @Test
         @DisplayName("no-op when encryption disabled → returns plaintext, no key lookup")
         void noopWhenDisabled() {
-            ReflectionTestUtils.setField(service, "enabled", false);
+            service = new MessageCryptoService(chatKeyService, masterKeyService, false);
 
             assertThat(service.encrypt(CHAT_ID, "hello")).isEqualTo("hello");
             verify(chatKeyService, never()).getOrCreateSecretKey(anyLong());

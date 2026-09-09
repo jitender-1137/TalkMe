@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -30,7 +31,8 @@ import java.time.Instant;
  * Answers thread off a request via {@link HelpAnswer}; {@link #answerCount} is a denormalised counter.
  */
 @Entity
-@Table(name = "community_help_requests")
+@Table(name = "community_help_requests",
+        indexes = @Index(name = "idx_community_help_requests_asker_id", columnList = "asker_id"))
 @Getter
 @Setter
 @Builder

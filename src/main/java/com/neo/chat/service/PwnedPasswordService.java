@@ -28,13 +28,16 @@ public class PwnedPasswordService {
 
     private static final String RANGE_API = "https://api.pwnedpasswords.com/range/";
 
-    @Value("${app.auth.breach-check.enabled:true}")
-    private boolean enabled;
+    private final boolean enabled;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+
+    public PwnedPasswordService(@Value("${app.auth.breach-check.enabled:true}") boolean enabled) {
+        this.enabled = enabled;
+    }
 
     /**
      * @return true only if the password is known-breached (so the caller should reject it).

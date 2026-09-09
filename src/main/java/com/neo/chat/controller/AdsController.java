@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Serves the client-facing advertising configuration. Served at
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * ({@code GET /features}) — the client only asks for this config once it holds that.
  */
 @RestController
+@Tag(name = "Ads", description = "Serves the client-facing advertising configuration")
 @RequestMapping("/ads")
 @RequiredArgsConstructor
 public class AdsController {
@@ -34,6 +37,7 @@ public class AdsController {
      *
      * @return the {@link AdsConfigResponse} client-facing ad configuration
      */
+    @Operation(summary = "Return the global advertising configuration (provider, script URLs, placements, frequency cap) plus the enabled flag from the ADS global...")
     @GetMapping("/config")
     public ResponseEntity<ResponseDto<AdsConfigResponse>> getConfig() {
         AdsConfigResponse res = AdsConfigResponse.builder()

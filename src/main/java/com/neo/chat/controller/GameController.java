@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Conversation Games (feature #13). REST-driven so it stays decoupled from the chat
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Every route is gated by the CONVERSATION_GAMES entitlement.
  */
 @RestController
+@Tag(name = "Game", description = "Conversation Games (feature #13)")
 @RequestMapping("/games")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -42,7 +46,8 @@ public class GameController {
      *                                                       exist for the game type (TM_400)
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member of the chat (TM_103)
      */
-    @PostMapping("/start")
+    @Operation(summary = "Start a game in a chat, retiring any existing live session for that chat first")
+    @PostMapping(value = "/start", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> start(
             @Valid @RequestBody GameStartRequest request,
@@ -63,6 +68,7 @@ public class GameController {
      * @throws com.neo.chat.exception.NotFoundException   game session not found
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member of the chat (TM_103)
      */
+    @Operation(summary = "Advance the game to the next prompt/round; ends the game when the prompt bank is exhausted")
     @PostMapping("/{uuid}/next")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> next(
@@ -82,6 +88,7 @@ public class GameController {
      * @throws com.neo.chat.exception.NotFoundException   game session not found
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member of the chat (TM_103)
      */
+    @Operation(summary = "End a game session (marks it ENDED)")
     @PostMapping("/{uuid}/end")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> end(
@@ -100,6 +107,7 @@ public class GameController {
      * @throws com.neo.chat.exception.BadRequestException chatId missing (TM_400)
      * @throws com.neo.chat.exception.ForbiddenException  caller is not a member of the chat (TM_103)
      */
+    @Operation(summary = "Return the current live (non-ended) game session for a chat, or null if none")
     @GetMapping("/active")
     @PreAuthorize("@featureGuard.check('CONVERSATION_GAMES')")
     public ResponseEntity<ResponseDto<GameSessionResponse>> active(

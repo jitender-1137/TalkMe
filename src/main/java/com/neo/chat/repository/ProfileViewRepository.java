@@ -29,7 +29,7 @@ public interface ProfileViewRepository extends JpaRepository<ProfileView, Long> 
     @Query("SELECT COUNT(pv) FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.seen = false AND pv.isDeleted = false")
     long countUnseenByViewed(@Param("viewed") User viewed);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE ProfileView pv SET pv.seen = true WHERE pv.viewed = :viewed AND pv.seen = false")
     void markAllSeen(@Param("viewed") User viewed);
 }

@@ -13,6 +13,7 @@ import com.neo.chat.dto.response.AuthUserResponse;
 import com.neo.chat.dto.response.JwtTokensResponse;
 import com.neo.chat.dto.response.LoginResponse;
 import com.neo.chat.dto.response.SessionResponse;
+import com.neo.chat.util.ClientRequestInfo;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
@@ -22,11 +23,15 @@ import java.util.List;
  * session management, email verification, password reset, profile updates and account deletion.
  */
 public interface AuthService {
-    LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest);
+    /**
+     * Credential login. {@code client} carries the caller's User-Agent (recorded on the session +
+     * alert), the client IP (lockout accounting + geolocation) and proxy headers.
+     */
+    LoginResponse login(LoginRequest request, ClientRequestInfo client);
 
-    LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest);
+    LoginResponse signup(SignupRequest request, ClientRequestInfo client);
 
-    LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, HttpServletRequest httpRequest);
+    LoginResponse loginAsGuest(GuestLoginRequest request, ClientRequestInfo client);
 
     /**
      * Create or link a full account from an external identity provider (Google) and
@@ -34,8 +39,15 @@ public interface AuthService {
      * new verified user. Profile image / name / age / gender are backfilled from the
      * provider when the local account is missing them.
      */
-    LoginResponse oauthLogin(OAuthUserInfo info, String userAgent,
-                             HttpServletRequest httpRequest);
+    LoginResponse oauthLogin(OAuthUserInfo info, ClientRequestInfo client);
+
+    // ── Servlet bridges (web layer only) ─────────────────────────────────────────
+    // Controllers/handlers should build the snapshot themselves and call the plain overloads
+    // above; these defaults exist only until every web caller has switched.
+
+
+
+
 
     JwtTokensResponse refresh(String refreshToken, String userAgent, String ip);
 

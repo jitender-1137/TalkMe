@@ -19,7 +19,7 @@ import java.io.IOException;
  * (default {@code ~/.oci/config}) holding the tenancy/user/fingerprint/key-file.
  */
 @Slf4j
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "storage.provider", havingValue = "oci")
 public class OciClientConfig {
 

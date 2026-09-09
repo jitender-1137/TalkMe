@@ -30,11 +30,21 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     public static final String COOKIE_NAME = "oauth2_auth_request";
     private static final int EXPIRE_SECONDS = 180;
 
-    @Value("${app.cookie.secure:false}")
-    private boolean cookieSecure;
+    private final boolean cookieSecure;
+    private final String cookieSameSite;
 
-    @Value("${app.cookie.same-site:Lax}")
-    private String cookieSameSite;
+    /**
+     * Constructor-injects the cookie attributes.
+     *
+     * @param cookieSecure   {@code app.cookie.secure} (default false)
+     * @param cookieSameSite {@code app.cookie.same-site} (default Lax)
+     */
+    public HttpCookieOAuth2AuthorizationRequestRepository(
+            @Value("${app.cookie.secure:false}") boolean cookieSecure,
+            @Value("${app.cookie.same-site:Lax}") String cookieSameSite) {
+        this.cookieSecure = cookieSecure;
+        this.cookieSameSite = cookieSameSite;
+    }
 
     /**
      * Loads the in-flight authorization request from the cookie, if present.

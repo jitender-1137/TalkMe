@@ -9,21 +9,13 @@ import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.repository.PushSubscriptionRepository;
 import com.neo.chat.service.WebPushService;
 import com.neo.chat.util.SsrfGuard;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import nl.martijndwars.webpush.Notification;
-import nl.martijndwars.webpush.PushService;
-import nl.martijndwars.webpush.Urgency;
-import org.apache.http.HttpResponse;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Web Push (VAPID) subscription store and dispatcher.
@@ -43,9 +35,8 @@ public class WebPushServiceImpl implements WebPushService {
 
 
     private final PushSubscriptionRepository subscriptionRepository;
-    private final PushService pushService;
     private final WebPushProperties properties;
-    private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final WebPushDelivery delivery;
 
     /**
      * Create or update (upsert by endpoint) a push subscription for the user. The endpoint is
@@ -131,62 +122,14 @@ public class WebPushServiceImpl implements WebPushService {
      * @param userId      the recipient user
      * @param payloadJson the JSON push payload
      */
+    /**
+     * Async fan-out: gated on the feature flag, then delegates to the transactional
+     * {@link WebPushDelivery#deliverToUser(Long, String)} on the async worker thread.
+     */
     @Async
     @Override
-    @Transactional
     public void sendToUser(Long userId, String payloadJson) {
         if (!properties.isEnabled()) return;
-
-        List<PushSubscription> subs = subscriptionRepository.findByUser_Id(userId);
-        if (subs.isEmpty()) {
-            log.debug("[WebPush] No subscriptions for user {} — nothing to send", userId);
-            return;
-        }
-        byte[] payload = payloadJson.getBytes(StandardCharsets.UTF_8);
-        for (PushSubscription sub : subs) {
-            try {
-                int status = sendOne(sub, payload);
-                if (status == 404 || status == 410) {
-                    subscriptionRepository.delete(sub);
-                    log.info("[WebPush] Pruned expired subscription {} (status {})", sub.getEndpoint(), status);
-                } else if (status >= 400) {
-                    log.warn("[WebPush] Push FAILED status={} endpoint={}", status, sub.getEndpoint());
-                } else {
-                    log.info("[WebPush] Push sent (status {}) to {}", status, sub.getEndpoint());
-                }
-            } catch (Exception e) {
-                log.error("[WebPush] Error sending push to {}", sub.getEndpoint(), e);
-            }
-        }
-    }
-
-    /**
-     * Build and send a single Web Push (HIGH urgency, 24h TTL) through the "webpush" circuit
-     * breaker so failing/slow relays fail fast instead of tying up async threads.
-     *
-     * @param sub     the target subscription
-     * @param payload the encrypted push payload bytes
-     * @return the push service HTTP status code
-     * @throws Exception on send failure or when the breaker is open
-     *                   ({@code io.github.resilience4j.circuitbreaker.CallNotPermittedException})
-     */
-    private int sendOne(PushSubscription sub, byte[] payload) throws Exception {
-        Notification notification = Notification.builder()
-                .endpoint(sub.getEndpoint())
-                .userPublicKey(sub.getP256dh())
-                .userAuth(sub.getAuth())
-                .payload(payload)
-                // HIGH urgency + a TTL so push services still deliver to a
-                // closed/dozing device instead of dropping the message.
-                .urgency(Urgency.HIGH)
-                .ttl((int) TimeUnit.HOURS.toSeconds(24))
-                .build();
-        // Guard the outbound push with a circuit breaker: if the push relays are
-        // failing/slow, the breaker opens and these calls fail fast (throwing
-        // CallNotPermittedException, handled by the per-subscription catch in the
-        // caller) instead of tying up async threads.
-        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("webpush");
-        HttpResponse response = breaker.executeCallable(() -> pushService.send(notification));
-        return response.getStatusLine().getStatusCode();
+        delivery.deliverToUser(userId, payloadJson);
     }
 }

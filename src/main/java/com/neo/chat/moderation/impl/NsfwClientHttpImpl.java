@@ -4,7 +4,6 @@ import com.neo.chat.moderation.FrameExtractor;
 import com.neo.chat.moderation.NsfwClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -26,21 +25,28 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class NsfwClientHttpImpl implements NsfwClient {
 
     private final FrameExtractor frameExtractor;
     private final ObjectMapper objectMapper;
 
-    @Value("${moderation.nsfw.base-url:http://localhost:8081}")
-    private String baseUrl;
+    private final String baseUrl;
 
-    @Value("${moderation.nsfw.enabled:true}")
-    private boolean nsfwEnabled;
+    private final boolean nsfwEnabled;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
             .build();
+
+    public NsfwClientHttpImpl(FrameExtractor frameExtractor,
+                              ObjectMapper objectMapper,
+                              @Value("${moderation.nsfw.base-url:http://localhost:8081}") String baseUrl,
+                              @Value("${moderation.nsfw.enabled:true}") boolean nsfwEnabled) {
+        this.frameExtractor = frameExtractor;
+        this.objectMapper = objectMapper;
+        this.baseUrl = baseUrl;
+        this.nsfwEnabled = nsfwEnabled;
+    }
 
     /**
      * Classifies a stored file: for video it extracts frames and returns NSFW if ANY frame

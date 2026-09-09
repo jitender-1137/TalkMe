@@ -18,80 +18,95 @@ public class MailTheme {
     /**
      * Buttons + solid header fallback (deep emerald).
      */
-    @Value("${app.mail.theme.primary:#047857}")
-    private String primary;
+    private final String primary;
 
     /**
      * Header gradient start (deep emerald).
      */
-    @Value("${app.mail.theme.header-from:#064e3b}")
-    private String headerFrom;
+    private final String headerFrom;
 
     /**
      * Header gradient end (teal).
      */
-    @Value("${app.mail.theme.header-to:#0f766e}")
-    private String headerTo;
+    private final String headerTo;
 
     /**
      * Links, checkmarks, chips (calm teal).
      */
-    @Value("${app.mail.theme.accent:#0f766e}")
-    private String accent;
+    private final String accent;
 
     /**
      * Headings / strong text.
      */
-    @Value("${app.mail.theme.ink:#0f172a}")
-    private String ink;
+    private final String ink;
 
     /**
      * Body copy.
      */
-    @Value("${app.mail.theme.body:#334155}")
-    private String body;
+    private final String body;
 
     /**
      * Secondary / muted copy.
      */
-    @Value("${app.mail.theme.muted:#64748b}")
-    private String muted;
+    private final String muted;
 
     /**
      * Page background behind the card.
      */
-    @Value("${app.mail.theme.page-bg:#eef2f6}")
-    private String pageBg;
+    private final String pageBg;
 
     /**
      * Card + divider borders.
      */
-    @Value("${app.mail.theme.card-border:#e6ebf1}")
-    private String cardBorder;
+    private final String cardBorder;
 
     /**
      * Footer background.
      */
-    @Value("${app.mail.theme.footer-bg:#f8fafc}")
-    private String footerBg;
+    private final String footerBg;
 
     /**
      * Footer text.
      */
-    @Value("${app.mail.theme.footer-text:#94a3b8}")
-    private String footerText;
+    private final String footerText;
 
     /**
      * Font stack for the whole email.
      */
-    @Value("${app.mail.theme.font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}")
-    private String font;
+    private final String font;
 
     /**
      * Palette for initial-circle avatars when no photo URL is available (comma-separated hex).
      */
-    @Value("${app.mail.theme.avatar-colors:#6366f1,#0ea5e9,#0d9488,#f59e0b,#e11d48,#8b5cf6,#db2777,#0f766e}")
-    private String avatarColorsCsv;
+    private final String avatarColorsCsv;
+
+    public MailTheme(@Value("${app.mail.theme.primary:#047857}") String primary,
+                     @Value("${app.mail.theme.header-from:#064e3b}") String headerFrom,
+                     @Value("${app.mail.theme.header-to:#0f766e}") String headerTo,
+                     @Value("${app.mail.theme.accent:#0f766e}") String accent,
+                     @Value("${app.mail.theme.ink:#0f172a}") String ink,
+                     @Value("${app.mail.theme.body:#334155}") String body,
+                     @Value("${app.mail.theme.muted:#64748b}") String muted,
+                     @Value("${app.mail.theme.page-bg:#eef2f6}") String pageBg,
+                     @Value("${app.mail.theme.card-border:#e6ebf1}") String cardBorder,
+                     @Value("${app.mail.theme.footer-bg:#f8fafc}") String footerBg,
+                     @Value("${app.mail.theme.footer-text:#94a3b8}") String footerText,
+                     @Value("${app.mail.theme.font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}") String font,
+                     @Value("${app.mail.theme.avatar-colors:#6366f1,#0ea5e9,#0d9488,#f59e0b,#e11d48,#8b5cf6,#db2777,#0f766e}") String avatarColorsCsv) {
+        this.primary = primary;
+        this.headerFrom = headerFrom;
+        this.headerTo = headerTo;
+        this.accent = accent;
+        this.ink = ink;
+        this.body = body;
+        this.muted = muted;
+        this.pageBg = pageBg;
+        this.cardBorder = cardBorder;
+        this.footerBg = footerBg;
+        this.footerText = footerText;
+        this.font = font;
+        this.avatarColorsCsv = avatarColorsCsv;
+    }
 
     public String primary() {
         return primary;

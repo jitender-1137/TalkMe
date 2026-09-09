@@ -19,7 +19,6 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -70,11 +69,12 @@ class UnreadDigestServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UnreadDigestService(messageRepository, userRepository, userSettingRepository,
-                emailService, messageCryptoService);
-        ReflectionTestUtils.setField(service, "enabled", true);
-        ReflectionTestUtils.setField(service, "maxPreviews", 5);
-        ReflectionTestUtils.setField(service, "frontendBaseUrl", "http://localhost:3000");
+        service = build(true, 5, "http://localhost:3000");
+    }
+
+    private UnreadDigestService build(boolean enabled, int maxPreviews, String frontendBaseUrl) {
+        return new UnreadDigestService(messageRepository, userRepository, userSettingRepository,
+                emailService, messageCryptoService, enabled, maxPreviews, frontendBaseUrl);
     }
 
     // ── fixtures ────────────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ class UnreadDigestServiceTest {
         @Test
         @DisplayName("disabled flag → returns immediately, never queries candidates")
         void disabledNoop() {
-            ReflectionTestUtils.setField(service, "enabled", false);
+            service = build(false, 5, "http://localhost:3000");
 
             service.sendDailyUnreadDigests();
 
@@ -282,7 +282,7 @@ class UnreadDigestServiceTest {
         @Test
         @DisplayName("open link strips a trailing slash from the configured base url")
         void normalisesOpenLink() {
-            ReflectionTestUtils.setField(service, "frontendBaseUrl", "http://localhost:3000///");
+            service = build(true, 5, "http://localhost:3000///");
             wireEligibleUser(0L, 50L);
             when(messageRepository.countTotalUnreadForUser(USER_ID)).thenReturn(1L);
             when(messageCryptoService.decrypt(anyLong(), any())).thenReturn("hi");
@@ -330,7 +330,7 @@ class UnreadDigestServiceTest {
         @Test
         @DisplayName("preview list is capped at maxPreviews distinct senders")
         void capsPreviews() {
-            ReflectionTestUtils.setField(service, "maxPreviews", 2);
+            service = build(true, 2, "http://localhost:3000");
             User u = user(USER_ID, "jane@example.com", "Jane", 0L);
             Message m1 = message(50L, senderNamed(501L, "A"), "cipher", Instant.now());
             Message m2 = message(49L, senderNamed(502L, "B"), "cipher", Instant.now());

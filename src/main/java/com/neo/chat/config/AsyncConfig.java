@@ -9,16 +9,17 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Dedicated thread pool for post-commit async work: WebSocket broadcast,
- * RabbitMQ publish, and Redis cache updates. Isolated from Spring's default
- * SimpleAsyncTaskExecutor so message fan-out never competes with scheduled jobs
- * or other @Async tasks.
+ * RabbitMQ publish, and Redis cache updates. Isolated from the bounded, Boot-managed
+ * {@code applicationTaskExecutor} ({@code spring.task.execution.*}, {@code mode=force}) that
+ * plain {@code @Async} methods (email, web push) run on, so message fan-out never competes
+ * with those sends, scheduled jobs or other @Async tasks.
  * <p>
  * Sizing: 8 core / 32 max / 10 000 queue — enough to absorb bursts of concurrent
  * sends without shedding load. CallerRunsPolicy is the backstop: under extreme
  * saturation the HTTP thread does the broadcast itself (same latency as the old
  * synchronous path) rather than dropping work.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class AsyncConfig {
 
     /**

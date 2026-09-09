@@ -24,7 +24,6 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.RedirectStrategy;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -68,12 +67,18 @@ class OAuth2LoginSuccessHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new OAuth2LoginSuccessHandler(authService, googleProfileService,
-                authorizedClientServiceProvider, tokenProvider);
-        ReflectionTestUtils.setField(handler, "cookieSecure", false);
-        ReflectionTestUtils.setField(handler, "cookieSameSite", "Lax");
-        ReflectionTestUtils.setField(handler, "frontendBaseUrl", "http://localhost:3000");
-        handler.setRedirectStrategy(redirectStrategy);
+        handler = newHandler(false, "http://localhost:3000");
+    }
+
+    /**
+     * Builds a handler with the given cookie-secure flag and SPA base URL (SameSite fixed to Lax),
+     * wired to the mocked redirect strategy — settings are constructor-injected (immutable).
+     */
+    private OAuth2LoginSuccessHandler newHandler(boolean cookieSecure, String frontendBaseUrl) {
+        OAuth2LoginSuccessHandler h = new OAuth2LoginSuccessHandler(authService, googleProfileService,
+                authorizedClientServiceProvider, tokenProvider, cookieSecure, "Lax", frontendBaseUrl);
+        h.setRedirectStrategy(redirectStrategy);
+        return h;
     }
 
     /**
@@ -101,12 +106,12 @@ class OAuth2LoginSuccessHandlerTest {
         LoginResponse login = LoginResponse.builder()
                 .tokens(JwtTokensResponse.builder().refreshToken("refresh-tok").build())
                 .build();
-        when(authService.oauthLogin(any(OAuthUserInfo.class), any(), eq(request))).thenReturn(login);
+        when(authService.oauthLogin(any(OAuthUserInfo.class), any())).thenReturn(login);
     }
 
     private OAuthUserInfo captureInfo() {
         ArgumentCaptor<OAuthUserInfo> cap = ArgumentCaptor.forClass(OAuthUserInfo.class);
-        verify(authService).oauthLogin(cap.capture(), any(), eq(request));
+        verify(authService).oauthLogin(cap.capture(), any());
         return cap.getValue();
     }
 
@@ -281,7 +286,7 @@ class OAuth2LoginSuccessHandlerTest {
         @Test
         @DisplayName("cookieSecure=true → refresh cookie carries Secure")
         void secureCookies() throws Exception {
-            ReflectionTestUtils.setField(handler, "cookieSecure", true);
+            handler = newHandler(true, "http://localhost:3000");
             OAuth2AuthenticationToken token = tokenWith(principalWithName("Ada"));
             when(authorizedClientServiceProvider.getIfAvailable()).thenReturn(null);
             stubLogin();
@@ -299,7 +304,7 @@ class OAuth2LoginSuccessHandlerTest {
         @Test
         @DisplayName("frontend base url with trailing slashes → trimmed before appending /#chats")
         void trimsTrailingSlashes() throws Exception {
-            ReflectionTestUtils.setField(handler, "frontendBaseUrl", "https://app.talkme.fun///");
+            handler = newHandler(false, "https://app.talkme.fun///");
             OAuth2AuthenticationToken token = tokenWith(principalWithName("Ada"));
             when(authorizedClientServiceProvider.getIfAvailable()).thenReturn(null);
             stubLogin();

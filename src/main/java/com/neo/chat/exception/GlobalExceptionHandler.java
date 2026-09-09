@@ -82,7 +82,8 @@ public class GlobalExceptionHandler {
         log.warn("Upload exceeded multipart limit: {}", ex.getMessage());
         ResponseDto<Void> response = ResponseDto.error(
                 "File is too large. Images can be up to 2 MB and videos up to 30 MB.", "TM_493", null);
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(response);
+        // 413 — CONTENT_TOO_LARGE is the RFC 9110 name; PAYLOAD_TOO_LARGE is deprecated in Spring 7.
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(response);
     }
 
     /**

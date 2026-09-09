@@ -6,9 +6,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.enums.FeatureKey;
 import com.neo.chat.exception.BadRequestException;
-import com.neo.chat.exception.NotFoundException;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.service.FeatureAccessService;
+import com.neo.chat.service.lookup.UserLookupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,19 +20,23 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * SuperAdmin feature-grant management. Served at {@code /api/v1/admin/features}
  * (covered by the {@code /api/v1/admin/**} security rule + the class-level guard).
  */
 @RestController
+@Tag(name = "Admin Features", description = "SuperAdmin feature-grant management")
 @RequestMapping("/admin/features")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('SUPER_ADMIN')")
 public class AdminFeatureController {
 
     private final FeatureAccessService featureAccessService;
-    private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
 
     /**
      * Apply a feature grant (decision/scope/cohort/expiry/note) to a target user.
@@ -44,7 +47,8 @@ public class AdminFeatureController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if the feature key is unknown
      */
-    @PostMapping("/users/{uuid}")
+    @Operation(summary = "Apply a feature grant (decision/scope/cohort/expiry/note) to a target user")
+    @PostMapping(value = "/users/{uuid}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<Void>> grant(
             @PathVariable("uuid") String uuid,
             @Valid @RequestBody FeatureGrantRequest request) {
@@ -67,6 +71,7 @@ public class AdminFeatureController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if the feature key is unknown
      */
+    @Operation(summary = "Remove an existing feature grant from a target user")
     @DeleteMapping("/users/{uuid}/{key}")
     public ResponseEntity<ResponseDto<Void>> revoke(
             @PathVariable("uuid") String uuid,
@@ -81,7 +86,6 @@ public class AdminFeatureController {
     }
 
     private User findUser(String uuid) {
-        return userRepository.findByUuid(UUID.fromString(uuid))
-                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        return userLookupService.requireByUuid(UUID.fromString(uuid));
     }
 }

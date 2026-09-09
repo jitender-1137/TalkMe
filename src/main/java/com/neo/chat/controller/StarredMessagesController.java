@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.MessageService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/messages")
 @RequiredArgsConstructor
+@Tag(name = "Starred Messages", description = "The current user's starred (saved) messages across all their chats")
 public class StarredMessagesController {
 
     private final MessageService messageService;
@@ -32,6 +35,7 @@ public class StarredMessagesController {
      * @param userDetails the authenticated caller
      * @return the caller's starred messages in a success envelope
      */
+    @Operation(summary = "The caller's starred messages across all chats, newest first (each flagged starred)")
     @GetMapping("/starred")
     public ResponseEntity<ResponseDto<List<MessageResponse>>> getStarred(
             @RequestParam(value = "limit", defaultValue = "100") int limit,

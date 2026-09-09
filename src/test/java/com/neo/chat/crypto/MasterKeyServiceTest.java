@@ -29,15 +29,13 @@ class MasterKeyServiceTest {
             Base64.getEncoder().encodeToString("0123456789abcdef0123456789abcdef".getBytes());
 
     private MasterKeyService armed() {
-        MasterKeyService svc = new MasterKeyService();
-        ReflectionTestUtils.setField(svc, "masterKeyB64", VALID_KEY_B64);
+        MasterKeyService svc = new MasterKeyService(VALID_KEY_B64);
         ReflectionTestUtils.invokeMethod(svc, "init");
         return svc;
     }
 
     private MasterKeyService dark() {
-        MasterKeyService svc = new MasterKeyService();
-        ReflectionTestUtils.setField(svc, "masterKeyB64", "");
+        MasterKeyService svc = new MasterKeyService("");
         ReflectionTestUtils.invokeMethod(svc, "init");
         return svc;
     }
@@ -61,8 +59,7 @@ class MasterKeyServiceTest {
         @Test
         @DisplayName("null key → DARK")
         void nullKeyStaysDark() {
-            MasterKeyService svc = new MasterKeyService();
-            ReflectionTestUtils.setField(svc, "masterKeyB64", null);
+            MasterKeyService svc = new MasterKeyService(null);
             ReflectionTestUtils.invokeMethod(svc, "init");
             assertThat(svc.isConfigured()).isFalse();
         }
@@ -70,8 +67,7 @@ class MasterKeyServiceTest {
         @Test
         @DisplayName("whitespace-padded key is trimmed and accepted")
         void trimsWhitespace() {
-            MasterKeyService svc = new MasterKeyService();
-            ReflectionTestUtils.setField(svc, "masterKeyB64", "  " + VALID_KEY_B64 + "  ");
+            MasterKeyService svc = new MasterKeyService("  " + VALID_KEY_B64 + "  ");
             ReflectionTestUtils.invokeMethod(svc, "init");
             assertThat(svc.isConfigured()).isTrue();
         }
@@ -80,8 +76,7 @@ class MasterKeyServiceTest {
         @DisplayName("key of wrong byte length → IllegalStateException")
         void wrongLengthRejected() {
             String tooShort = Base64.getEncoder().encodeToString("only-16-bytes!!!".getBytes());
-            MasterKeyService svc = new MasterKeyService();
-            ReflectionTestUtils.setField(svc, "masterKeyB64", tooShort);
+            MasterKeyService svc = new MasterKeyService(tooShort);
             assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(svc, "init"))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("exactly 32 bytes");
@@ -90,8 +85,7 @@ class MasterKeyServiceTest {
         @Test
         @DisplayName("non-base64 key → IllegalArgumentException from decoder")
         void invalidBase64Rejected() {
-            MasterKeyService svc = new MasterKeyService();
-            ReflectionTestUtils.setField(svc, "masterKeyB64", "!!!not-base64!!!");
+            MasterKeyService svc = new MasterKeyService("!!!not-base64!!!");
             assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(svc, "init"))
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -165,9 +159,7 @@ class MasterKeyServiceTest {
             MasterKeyService a = armed();
             String wrapped = a.wrap("a-32-byte-data-key-aaaaaaaaaaaaa!".getBytes());
 
-            MasterKeyService b = new MasterKeyService();
-            ReflectionTestUtils.setField(b, "masterKeyB64",
-                    Base64.getEncoder().encodeToString("ffffffffffffffffffffffffffffffff".getBytes()));
+            MasterKeyService b = new MasterKeyService(Base64.getEncoder().encodeToString("ffffffffffffffffffffffffffffffff".getBytes()));
             ReflectionTestUtils.invokeMethod(b, "init");
 
             assertThatThrownBy(() -> b.unwrap(wrapped))

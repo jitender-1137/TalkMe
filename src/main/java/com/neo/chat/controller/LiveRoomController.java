@@ -22,6 +22,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Live Rooms (Connect Wave-2): "third place" topic rooms and language-practice rooms. Topic
@@ -30,6 +33,7 @@ import java.util.List;
  * LANGUAGE_PRACTICE mode; enter/leave maintain a live Redis roster broadcast over WebSocket.
  */
 @RestController
+@Tag(name = "Live Room", description = "Live Rooms (Connect Wave-2): \"third place\" topic rooms and language-practice rooms")
 @RequestMapping("/rooms/live")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -40,7 +44,8 @@ public class LiveRoomController {
     /**
      * Create a public "third place" TOPIC room owned by the caller.
      */
-    @PostMapping("/topic")
+    @Operation(summary = "Create a public \"third place\" TOPIC room owned by the caller")
+    @PostMapping(value = "/topic", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('TOPIC_ROOMS')")
     public ResponseEntity<ResponseDto<LiveRoomResponse>> createTopic(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -53,7 +58,8 @@ public class LiveRoomController {
     /**
      * Create a public LANGUAGE_PRACTICE room owned by the caller.
      */
-    @PostMapping("/language")
+    @Operation(summary = "Create a public LANGUAGE_PRACTICE room owned by the caller")
+    @PostMapping(value = "/language", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('LANGUAGE_ROOMS')")
     public ResponseEntity<ResponseDto<LiveRoomResponse>> createLanguage(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -67,6 +73,7 @@ public class LiveRoomController {
     /**
      * List active TOPIC rooms.
      */
+    @Operation(summary = "List active TOPIC rooms")
     @GetMapping("/topic")
     @PreAuthorize("@featureGuard.check('TOPIC_ROOMS')")
     public ResponseEntity<ResponseDto<List<LiveRoomResponse>>> listTopic() {
@@ -76,6 +83,7 @@ public class LiveRoomController {
     /**
      * List active LANGUAGE_PRACTICE rooms.
      */
+    @Operation(summary = "List active LANGUAGE_PRACTICE rooms")
     @GetMapping("/language")
     @PreAuthorize("@featureGuard.check('LANGUAGE_ROOMS')")
     public ResponseEntity<ResponseDto<List<LiveRoomResponse>>> listLanguage() {
@@ -85,6 +93,7 @@ public class LiveRoomController {
     /**
      * Join a live room (open-join). Returns the room card.
      */
+    @Operation(summary = "Join a live room (open-join)")
     @PostMapping("/{uuid}/join")
     @PreAuthorize("@featureGuard.check('TOPIC_ROOMS')")
     public ResponseEntity<ResponseDto<LiveRoomResponse>> join(
@@ -97,6 +106,7 @@ public class LiveRoomController {
     /**
      * Mark the caller present in a room's live roster; returns the refreshed room card.
      */
+    @Operation(summary = "Mark the caller present in a room's live roster; returns the refreshed room card")
     @PostMapping("/{uuid}/enter")
     @PreAuthorize("@featureGuard.check('TOPIC_ROOMS')")
     public ResponseEntity<ResponseDto<LiveRoomResponse>> enter(
@@ -109,6 +119,7 @@ public class LiveRoomController {
     /**
      * Mark the caller absent from a room's live roster.
      */
+    @Operation(summary = "Mark the caller absent from a room's live roster")
     @PostMapping("/{uuid}/leave")
     @PreAuthorize("@featureGuard.check('TOPIC_ROOMS')")
     public ResponseEntity<ResponseDto<Void>> leave(
@@ -121,7 +132,8 @@ public class LiveRoomController {
     /**
      * Translate plaintext inside a language-practice room.
      */
-    @PostMapping("/{uuid}/translate")
+    @Operation(summary = "Translate plaintext inside a language-practice room")
+    @PostMapping(value = "/{uuid}/translate", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('LANGUAGE_ROOMS')")
     public ResponseEntity<ResponseDto<TranslateResponse>> translate(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -134,6 +146,7 @@ public class LiveRoomController {
     /**
      * A few conversation-starter prompts for a room.
      */
+    @Operation(summary = "A few conversation-starter prompts for a room")
     @GetMapping("/{uuid}/topics")
     @PreAuthorize("@featureGuard.check('TOPIC_ROOMS')")
     public ResponseEntity<ResponseDto<List<String>>> topics(

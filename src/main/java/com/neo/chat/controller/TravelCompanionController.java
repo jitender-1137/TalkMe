@@ -7,8 +7,11 @@ import com.neo.chat.dto.response.TravelCompanionResponse;
 import com.neo.chat.dto.response.TripResponse;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.TravelCompanionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +35,7 @@ import java.util.List;
 @RequestMapping("/travel")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Travel Companion", description = "Register trips and discover overlapping travelers to the same destination")
 public class TravelCompanionController {
 
     private final TravelCompanionService travelCompanionService;
@@ -39,7 +43,8 @@ public class TravelCompanionController {
     /**
      * Register a new trip for the caller.
      */
-    @PostMapping("/trips")
+    @Operation(summary = "Register a new trip for the caller")
+    @PostMapping(value = "/trips", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('TRAVEL_COMPANION')")
     public ResponseEntity<ResponseDto<TripResponse>> addTrip(
             @Valid @RequestBody AddTripRequest request,
@@ -56,6 +61,7 @@ public class TravelCompanionController {
     /**
      * The caller's own trips, soonest first.
      */
+    @Operation(summary = "The caller's own trips, soonest first")
     @GetMapping("/trips")
     @PreAuthorize("@featureGuard.check('TRAVEL_COMPANION')")
     public ResponseEntity<ResponseDto<List<TripResponse>>> getMyTrips(
@@ -67,6 +73,7 @@ public class TravelCompanionController {
     /**
      * Cancel one of the caller's trips (owner-only).
      */
+    @Operation(summary = "Cancel one of the caller's trips (owner-only)")
     @DeleteMapping("/trips/{uuid}")
     @PreAuthorize("@featureGuard.check('TRAVEL_COMPANION')")
     public ResponseEntity<ResponseDto<Void>> cancelTrip(
@@ -79,6 +86,7 @@ public class TravelCompanionController {
     /**
      * Fellow travelers whose ACTIVE trips to the same destination overlap the given trip.
      */
+    @Operation(summary = "Fellow travelers whose ACTIVE trips to the same destination overlap the given trip")
     @GetMapping("/trips/{uuid}/companions")
     @PreAuthorize("@featureGuard.check('TRAVEL_COMPANION')")
     public ResponseEntity<ResponseDto<List<TravelCompanionResponse>>> companions(
@@ -93,6 +101,7 @@ public class TravelCompanionController {
      * Resolve a fellow traveler to open a 1:1 chat with. Returns their public info; the client
      * opens the draft conversation.
      */
+    @Operation(summary = "Resolve a fellow traveler to open a 1:1 chat with")
     @PostMapping("/{userUuid}/connect")
     @PreAuthorize("@featureGuard.check('TRAVEL_COMPANION')")
     public ResponseEntity<ResponseDto<TravelCompanionResponse>> connect(

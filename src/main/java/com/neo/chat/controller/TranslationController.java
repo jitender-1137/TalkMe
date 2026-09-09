@@ -8,8 +8,11 @@ import com.neo.chat.dto.response.TranslateBatchResponse;
 import com.neo.chat.dto.response.TranslateResponse;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.TranslationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/translate")
 @RequiredArgsConstructor
+@Tag(name = "Translation", description = "Stateless instant translation of client-supplied plaintext")
 public class TranslationController {
 
     private final TranslationService translationService;
@@ -39,7 +43,8 @@ public class TranslationController {
      * @throws com.neo.chat.exception.TooManyRequestsException if the caller's daily translation cap is
      *                                                            exceeded (TM_TRANSLATE_CAP)
      */
-    @PostMapping
+    @Operation(summary = "Translate a single already-decrypted text (cache hits are free; a provider call costs one daily-cap unit)")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('INSTANT_TRANSLATE')")
     public ResponseEntity<ResponseDto<TranslateResponse>> translate(
             @Valid @RequestBody TranslateRequest request,
@@ -58,7 +63,8 @@ public class TranslationController {
      * @throws com.neo.chat.exception.TooManyRequestsException if the caller's daily translation cap is
      *                                                            exceeded (TM_TRANSLATE_CAP)
      */
-    @PostMapping("/batch")
+    @Operation(summary = "Translate many texts in one call (cache hits are free; the remainder costs one daily-cap unit)")
+    @PostMapping(value = "/batch", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('INSTANT_TRANSLATE')")
     public ResponseEntity<ResponseDto<TranslateBatchResponse>> translateBatch(
             @Valid @RequestBody TranslateBatchRequest request,

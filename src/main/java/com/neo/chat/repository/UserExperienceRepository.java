@@ -4,6 +4,9 @@ import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserExperience;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -30,5 +33,10 @@ public interface UserExperienceRepository
      * Hard-removes every experience row for a user. Used by the "replace my experiences"
      * update so the {@code (user_id, tag)} unique constraint never collides with stale rows.
      */
-    void deleteByUser(User user);
+    // Bulk JPQL delete (BootUI HIB-QUERY-004): the derived deleteBy… variant loaded every row and
+    // removed it one by one. The entity has no cascades/orphanRemoval and no @PreRemove hooks, so a
+    // single DELETE statement is equivalent.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM UserExperience e WHERE e.user = :user")
+    void deleteByUser(@Param("user") User user);
 }

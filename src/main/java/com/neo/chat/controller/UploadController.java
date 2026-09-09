@@ -1,7 +1,6 @@
 package com.neo.chat.controller;
 
 import com.neo.chat.domain.User;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.JwtTokenProvider;
 import com.neo.chat.storage.MediaKeys;
 import com.neo.chat.storage.StorageProperties;
@@ -16,13 +15,15 @@ import com.neo.chat.dto.response.UploadResponse;
 import com.neo.chat.exception.ContentModerationException;
 import com.neo.chat.exception.ServiceException;
 import com.neo.chat.moderation.ContentModerationService;
-import com.neo.chat.repository.ChatMemberRepository;
-import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.MediaAssetService;
 import com.neo.chat.service.StorageService;
+import com.neo.chat.service.lookup.ChatMembershipLookupService;
+import com.neo.chat.service.lookup.UserLookupSupport;
 import com.neo.chat.storage.MediaStorage;
 import com.neo.chat.util.UploadValidator;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -52,6 +53,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/uploads")
 @RequiredArgsConstructor
+@Tag(name = "Uploads", description = "Media upload and serve endpoints")
 public class UploadController {
 
     /**
@@ -62,13 +64,12 @@ public class UploadController {
 
     private final StorageService storageService;
     private final MediaStorage mediaStorage;
-    private final ChatRepository chatRepository;
-    private final ChatMemberRepository chatMemberRepository;
+    private final ChatMembershipLookupService chatMembershipLookup;
     private final ContentModerationService moderationService;
     private final MediaAssetService mediaAssetService;
     private final StorageProperties storageProperties;
     private final JwtTokenProvider tokenProvider;
-    private final UserRepository userRepository;
+    private final UserLookupSupport userLookup;
 
     /**
      * Upload categories whose images/videos must be CLEAN (publicly visible content).
@@ -90,6 +91,7 @@ public class UploadController {
      * @throws com.neo.chat.exception.ContentModerationException if a moderated-context image is explicit
      * @throws com.neo.chat.exception.FileStorageException       if the file cannot be stored
      */
+    @Operation(summary = "Upload a single media file (size-capped, type-verified, moderated for public contexts) and record its ownership")
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ResponseDto<UploadResponse>> uploadFile(
             @RequestParam("file") MultipartFile file,
@@ -183,6 +185,7 @@ public class UploadController {
      * @param request the servlet request (Bearer principal / media cookie)
      * @return 200 with the file resource, or the status codes above
      */
+    @Operation(summary = "Serve a stored media file by path via the active storage backend (traversal-guarded; download-forced for scriptable types)")
     @GetMapping("/media")
     public ResponseEntity<Resource> getMedia(@RequestParam("path") String path, HttpServletRequest request) {
         String[] catAndId = categoryAndChat(path);
@@ -277,7 +280,7 @@ public class UploadController {
                 String username = tokenProvider.parseMediaToken(c.getValue());
                 if (username == null) return null;
                 // A media cookie outlives a ban / deletion — re-check the account state.
-                return userRepository.findByUsername(username)
+                return userLookup.findByUsername(username)
                         .filter(u -> !u.isDeleted() && !u.isBanned())
                         .map(User::getUsername)
                         .orElse(null);
@@ -292,7 +295,7 @@ public class UploadController {
      */
     private boolean isChatMember(String chatUuid, String viewer) {
         try {
-            return chatRepository.findByUuidWithMembers(UUID.fromString(chatUuid))
+            return chatMembershipLookup.findByUuidWithMembers(UUID.fromString(chatUuid))
                     .map(chat -> chat.getMembers().stream()
                             .anyMatch(m -> m.getUser() != null && viewer.equals(m.getUser().getUsername())))
                     .orElse(false);
@@ -355,9 +358,8 @@ public class UploadController {
                 // uploader is a member of — never trust a client-supplied conversation id.
                 String cid = safeUuid(contextId);
                 if (cid != null && userDetails != null && userDetails.getUser() != null
-                        && chatRepository.findByUuid(UUID.fromString(cid))
-                        .filter(chat -> chatMemberRepository
-                                .findByChatAndUser(chat, userDetails.getUser()).isPresent())
+                        && chatMembershipLookup.findByUuid(UUID.fromString(cid))
+                        .filter(chat -> chatMembershipLookup.isMember(chat, userDetails.getUser()))
                         .isPresent()) {
                     return "conversations/" + cid;
                 }

@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.ReferralService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/referrals")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Referrals", description = "Refer-a-friend attribution (who invited whom), no reward payout")
 public class ReferralController {
 
     private final ReferralService referralService;
@@ -32,6 +35,7 @@ public class ReferralController {
      * @param userDetails the authenticated caller
      * @return the caller's referral summary wrapped in a success envelope
      */
+    @Operation(summary = "The caller's referral summary — their share link username plus attribution counts (no rewards)")
     @GetMapping("/me")
     public ResponseEntity<ResponseDto<ReferralSummaryResponse>> getMySummary(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

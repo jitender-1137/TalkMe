@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -25,7 +26,8 @@ import java.time.Instant;
  * viewed user's "who viewed me" badge.
  */
 @Entity
-@Table(name = "profile_views", uniqueConstraints = @UniqueConstraint(columnNames = {"viewer_id", "viewed_id"}))
+@Table(name = "profile_views", uniqueConstraints = @UniqueConstraint(columnNames = {"viewer_id", "viewed_id"}),
+        indexes = @Index(name = "idx_profile_views_viewed_id", columnList = "viewed_id"))
 @Getter
 @Setter
 @Builder
@@ -33,11 +35,11 @@ import java.time.Instant;
 @AllArgsConstructor
 public class ProfileView extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "viewer_id", nullable = false)
     private User viewer;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "viewed_id", nullable = false)
     private User viewed;
 

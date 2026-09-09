@@ -1,16 +1,16 @@
 package com.neo.chat.websocket;
 
+import com.neo.chat.domain.Chat;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.UserResponse;
 import com.neo.chat.enums.PresenceStatus;
-import com.neo.chat.repository.ChatMemberRepository;
-import com.neo.chat.repository.ChatRepository;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.NotificationDispatchService;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.service.UserService;
+import com.neo.chat.service.lookup.ChatMembershipLookupService;
+import com.neo.chat.service.lookup.UserLookupSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,6 +27,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -62,15 +63,13 @@ class WebSocketControllerUnitTest {
     @Mock
     private UserService userService;
     @Mock
-    private UserRepository userRepository;
+    private UserLookupSupport userLookupSupport;
     @Mock
     private PresenceService presenceService;
     @Mock
     private NotificationDispatchService notificationDispatchService;
     @Mock
-    private ChatRepository chatRepository;
-    @Mock
-    private ChatMemberRepository chatMemberRepository;
+    private ChatMembershipLookupService chatMembershipLookupService;
 
     @Mock
     private ValueOperations<String, String> valueOps;
@@ -87,8 +86,8 @@ class WebSocketControllerUnitTest {
     @BeforeEach
     void setUp() {
         controller = new WebSocketController(messagingTemplate, redisTemplate, userService,
-                userRepository, presenceService, notificationDispatchService,
-                chatRepository, chatMemberRepository);
+                userLookupSupport, presenceService, notificationDispatchService,
+                chatMembershipLookupService);
 
         Role role = Role.builder().name("ROLE_USER").build();
         testUser = User.builder().username("alice").email("a@e.com").name("Alice")
@@ -208,6 +207,59 @@ class WebSocketControllerUnitTest {
             controller.handleTypingNotification(CHAT, true, plainPrincipal("alice"));
             verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
         }
+
+        @Test
+        void shouldFallBackToLookupServiceAndCacheOnCacheMiss() {
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null); // cache miss → lookup service
+            Chat chat = Chat.builder().build();
+            when(chatMembershipLookupService.findByUuid(UUID.fromString(CHAT)))
+                    .thenReturn(Optional.of(chat));
+            when(chatMembershipLookupService.isMember(chat, testUser)).thenReturn(true);
+
+            controller.handleTypingNotification(CHAT, true, authPrincipal());
+
+            verify(messagingTemplate).convertAndSend(eq("/topic/chat/" + CHAT + "/typing"), any(Object.class));
+            verify(valueOps).set(anyString(), eq("1"), any(Duration.class));
+        }
+
+        @Test
+        void shouldNotBroadcastWhenChatDoesNotExist() {
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+            when(chatMembershipLookupService.findByUuid(UUID.fromString(CHAT)))
+                    .thenReturn(Optional.empty()); // chat gone → not a member, isMember never called
+
+            controller.handleTypingNotification(CHAT, true, authPrincipal());
+
+            verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+            verify(chatMembershipLookupService, never()).isMember(any(), any());
+            verify(valueOps).set(anyString(), eq("0"), any(Duration.class));
+        }
+
+        @Test
+        void shouldNotBroadcastForMalformedChatUuid() {
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+
+            controller.handleTypingNotification("not-a-uuid", true, authPrincipal());
+
+            verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+            verifyNoInteractions(chatMembershipLookupService);
+        }
+
+        @Test
+        void shouldFailOpenWhenLookupThrows() {
+            when(redisTemplate.opsForValue()).thenReturn(valueOps);
+            when(valueOps.get(anyString())).thenReturn(null);
+            when(chatMembershipLookupService.findByUuid(UUID.fromString(CHAT)))
+                    .thenThrow(new RuntimeException("db down"));
+
+            controller.handleTypingNotification(CHAT, true, authPrincipal());
+
+            // Transient failure must never break the typing indicator.
+            verify(messagingTemplate).convertAndSend(eq("/topic/chat/" + CHAT + "/typing"), any(Object.class));
+        }
     }
 
     // ── /chat/{chatUuid}/activity ───────────────────────────────────────────────
@@ -261,7 +313,7 @@ class WebSocketControllerUnitTest {
         void shouldBroadcastJoinForKnownUser() {
             when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
             when(redisTemplate.opsForSet()).thenReturn(setOps);
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.of(testUser));
+            when(userLookupSupport.findByUsername("alice")).thenReturn(Optional.of(testUser));
             when(userService.getUserById(anyString(), eq(testUser))).thenReturn(mock(UserResponse.class));
 
             controller.joinLobby(authPrincipal());
@@ -275,7 +327,7 @@ class WebSocketControllerUnitTest {
         void shouldNotBroadcastJoinWhenUserUnknown() {
             when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
             when(redisTemplate.opsForSet()).thenReturn(setOps);
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
+            when(userLookupSupport.findByUsername("alice")).thenReturn(Optional.empty());
 
             controller.joinLobby(authPrincipal());
 
@@ -286,7 +338,7 @@ class WebSocketControllerUnitTest {
         @Test
         void shouldNoOpJoinWhenPrincipalNull() {
             controller.joinLobby(null);
-            verifyNoInteractions(redisTemplate, messagingTemplate, userRepository);
+            verifyNoInteractions(redisTemplate, messagingTemplate, userLookupSupport);
         }
 
         @Test
@@ -333,7 +385,7 @@ class WebSocketControllerUnitTest {
             when(setOps.isMember("lobby:users", "alice")).thenReturn(true);
             when(setOps.isMember("lobby:users", "bob")).thenReturn(true);
             when(setOps.size("presence:sessions:bob")).thenReturn(0L); // no live socket
-            when(userRepository.findByUsername("bob")).thenReturn(Optional.of(testUser));
+            when(userLookupSupport.findByUsername("bob")).thenReturn(Optional.of(testUser));
 
             controller.sendLobbyChatMessage(map("recipient", "bob", "content", "hi"), authPrincipal());
 

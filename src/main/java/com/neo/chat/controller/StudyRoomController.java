@@ -9,8 +9,11 @@ import com.neo.chat.dto.response.StudySessionResponse;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.StudyRoomService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +35,7 @@ import java.util.List;
 @RequestMapping("/rooms/study")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Study Rooms", description = "Study rooms driven by a shared, server-authoritative Pomodoro timer")
 public class StudyRoomController {
 
     private final StudyRoomService studyRoomService;
@@ -39,7 +43,8 @@ public class StudyRoomController {
     /**
      * Create a study room (public ROOM in STUDY_POMODORO mode) owned by the caller.
      */
-    @PostMapping
+    @Operation(summary = "Create a study room (public ROOM in STUDY_POMODORO mode) owned by the caller")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudyRoomResponse>> create(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -54,6 +59,7 @@ public class StudyRoomController {
     /**
      * List active study rooms with a live Pomodoro snapshot and participant count.
      */
+    @Operation(summary = "List active study rooms with a live Pomodoro snapshot and participant count")
     @GetMapping
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<List<StudyRoomResponse>>> list() {
@@ -63,6 +69,7 @@ public class StudyRoomController {
     /**
      * Join the study room's underlying chat (real membership).
      */
+    @Operation(summary = "Join the study room's underlying chat (real membership)")
     @PostMapping("/{roomUuid}/join")
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudyRoomResponse>> join(
@@ -75,6 +82,7 @@ public class StudyRoomController {
     /**
      * Mark the caller present in the room's live roster (broadcasts user_joined).
      */
+    @Operation(summary = "Mark the caller present in the room's live roster (broadcasts user_joined)")
     @PostMapping("/{roomUuid}/enter")
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudyRoomResponse>> enter(
@@ -87,6 +95,7 @@ public class StudyRoomController {
     /**
      * Remove the caller from the room's live roster (broadcasts user_left).
      */
+    @Operation(summary = "Remove the caller from the room's live roster (broadcasts user_left)")
     @PostMapping("/{roomUuid}/leave")
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<Void>> leave(
@@ -99,6 +108,7 @@ public class StudyRoomController {
     /**
      * Owner-only: start the Pomodoro timer for the room.
      */
+    @Operation(summary = "Owner-only: start the Pomodoro timer for the room")
     @PostMapping("/{roomUuid}/start")
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudySessionResponse>> start(
@@ -111,6 +121,7 @@ public class StudyRoomController {
     /**
      * Current Pomodoro session for a room (phase + remaining seconds).
      */
+    @Operation(summary = "Current Pomodoro session for a room (phase + remaining seconds)")
     @GetMapping("/{roomUuid}/session")
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudySessionResponse>> session(
@@ -121,12 +132,13 @@ public class StudyRoomController {
     /**
      * The "I'm stuck" button: broadcast a stuck event (who + optional note) to the room.
      */
-    @PostMapping("/{roomUuid}/stuck")
+    @Operation(summary = "The \"I'm stuck\" button: broadcast a stuck event (who + optional note) to the room")
+    @PostMapping(value = "/{roomUuid}/stuck", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudySessionResponse>> stuck(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("roomUuid") String roomUuid,
-            @RequestBody(required = false) StuckRequest request) {
+            @Valid @RequestBody(required = false) StuckRequest request) {
         String note = request != null ? request.getNote() : null;
         StudySessionResponse session = studyRoomService.imStuck(userDetails.getUser(), roomUuid, note);
         return ResponseEntity.ok(SuccessResponseDto.success(session, "Marked as stuck", "TM_000"));
@@ -135,12 +147,13 @@ public class StudyRoomController {
     /**
      * Set the caller's shared session goal.
      */
-    @PostMapping("/{roomUuid}/goal")
+    @Operation(summary = "Set the caller's shared session goal")
+    @PostMapping(value = "/{roomUuid}/goal", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('STUDY_ROOMS')")
     public ResponseEntity<ResponseDto<StudySessionResponse>> setGoal(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("roomUuid") String roomUuid,
-            @RequestBody SetGoalRequest request) {
+            @Valid @RequestBody SetGoalRequest request) {
         StudySessionResponse session = studyRoomService.setGoal(
                 userDetails.getUser(), roomUuid, request != null ? request.getText() : null);
         return ResponseEntity.ok(SuccessResponseDto.success(session, "Goal set", "TM_000"));

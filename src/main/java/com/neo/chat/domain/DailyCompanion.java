@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -33,8 +34,8 @@ import java.time.LocalDate;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_daily_companion_user_pair_date",
                 columnNames = {"user_id", "pair_date"}
-        )
-)
+        ),
+        indexes = @Index(name = "idx_daily_companions_companion_id", columnList = "companion_id"))
 @Getter
 @Setter
 @Builder

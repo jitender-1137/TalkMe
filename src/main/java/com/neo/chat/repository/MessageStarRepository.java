@@ -5,6 +5,7 @@ import com.neo.chat.domain.MessageStar;
 import com.neo.chat.domain.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,7 +17,12 @@ import java.util.Optional;
 public interface MessageStarRepository extends JpaRepository<MessageStar, Long> {
     Optional<MessageStar> findByMessageAndUser(Message message, User user);
 
-    void deleteByMessageAndUser(Message message, User user);
+    // Bulk JPQL delete (BootUI HIB-QUERY-004): the derived deleteBy… variant loaded every row and
+    // removed it one by one. The entity has no cascades/orphanRemoval and no @PreRemove hooks, so a
+    // single DELETE statement is equivalent.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM MessageStar s WHERE s.message = :message AND s.user = :user")
+    void deleteByMessageAndUser(@Param("message") Message message, @Param("user") User user);
 
     /**
      * The user's starred messages, newest-first, with the message + its chat loaded.

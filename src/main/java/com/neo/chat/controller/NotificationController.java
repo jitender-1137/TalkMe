@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.NotificationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
+@Tag(name = "Notifications", description = "In-app notification inbox: paged listing and read-state updates")
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -35,6 +38,7 @@ public class NotificationController {
      * @param userDetails authenticated caller
      * @return a page of {@link NotificationResponse}
      */
+    @Operation(summary = "Returns the current user's notifications, newest first")
     @GetMapping
     public ResponseEntity<ResponseDto<Page<NotificationResponse>>> getNotifications(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
@@ -51,6 +55,7 @@ public class NotificationController {
      * @return an empty success response
      * @throws com.neo.chat.exception.NotFoundException if no such notification exists for this user
      */
+    @Operation(summary = "Marks a single notification (owned by the caller) as read")
     @PutMapping("/{id}/read")
     public ResponseEntity<ResponseDto<Void>> markAsRead(
             @PathVariable("id") String notificationUuid,
@@ -65,6 +70,7 @@ public class NotificationController {
      * @param userDetails authenticated caller
      * @return an empty success response
      */
+    @Operation(summary = "Marks all the caller's notifications as read")
     @PutMapping("/read-all")
     public ResponseEntity<ResponseDto<Void>> markAllAsRead(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

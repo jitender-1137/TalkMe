@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -21,7 +22,11 @@ import lombok.Setter;
  * answered (single-level threading), or {@code null} for a top-level reply.
  */
 @Entity
-@Table(name = "advice_replies")
+@Table(name = "advice_replies",
+        indexes = {
+                @Index(name = "idx_advice_replies_question_id", columnList = "question_id"),
+                @Index(name = "idx_advice_replies_author_id", columnList = "author_id")
+        })
 @Getter
 @Setter
 @Builder

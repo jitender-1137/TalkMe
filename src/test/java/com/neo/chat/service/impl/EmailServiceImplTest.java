@@ -87,35 +87,47 @@ class EmailServiceImplTest {
 
     private EmailServiceImpl service;
 
+    // Sensible default config: mail on, verification required, only the from address set.
+    // Tests flip these and call rebuild() — config is constructor-injected, so the service is
+    // re-created rather than mutated.
+    private boolean mailEnabled = true;
+    private boolean requireVerification = true;
+    private String from = "NeoChatHub <noreply@neochathub.com>";
+    private String resendApiKey = "";
+    private String brevoApiKey = "";
+    private boolean smtpEnabled = false;
+
     @BeforeEach
     void setUp() {
-        service = new EmailServiceImpl(new ObjectMapper(), redisProvider, mailSenderProvider,
-                templates, userRepository, disposableDomains);
-        ReflectionTestUtils.setField(service, "http", http);
-        // Sensible default config: mail on, verification required, only the from address set.
-        ReflectionTestUtils.setField(service, "mailEnabled", true);
-        ReflectionTestUtils.setField(service, "requireVerification", true);
-        ReflectionTestUtils.setField(service, "from", "NeoChatHub <noreply@neochathub.com>");
-        ReflectionTestUtils.setField(service, "timeoutMs", 10_000L);
-        ReflectionTestUtils.setField(service, "resendApiKey", "");
-        ReflectionTestUtils.setField(service, "resendDailyLimit", 100);
-        ReflectionTestUtils.setField(service, "brevoApiKey", "");
-        ReflectionTestUtils.setField(service, "brevoDailyLimit", 300);
-        ReflectionTestUtils.setField(service, "smtpEnabled", false);
+        rebuild();
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    /**
+     * (Re)creates the service from the current config fields, swapping in the mocked HttpClient.
+     */
+    private void rebuild() {
+        service = new EmailServiceImpl(new ObjectMapper(), redisProvider, mailSenderProvider,
+                templates, userRepository, disposableDomains,
+                mailEnabled, requireVerification, from, 10_000L,
+                resendApiKey, 100, brevoApiKey, 300, smtpEnabled);
+        ReflectionTestUtils.setField(service, "http", http);
+    }
+
     private void withResend() {
-        ReflectionTestUtils.setField(service, "resendApiKey", "re_key");
+        resendApiKey = "re_key";
+        rebuild();
     }
 
     private void withBrevo() {
-        ReflectionTestUtils.setField(service, "brevoApiKey", "brevo_key");
+        brevoApiKey = "brevo_key";
+        rebuild();
     }
 
     private void withSmtp() {
-        ReflectionTestUtils.setField(service, "smtpEnabled", true);
+        smtpEnabled = true;
+        rebuild();
         lenient().when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
         lenient().when(mailSender.createMimeMessage()).thenReturn(mock(MimeMessage.class));
     }
@@ -162,7 +174,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("mail disabled → nothing rendered or sent")
         void disabledIsNoop() throws Exception {
-            ReflectionTestUtils.setField(service, "mailEnabled", false);
+            mailEnabled = false;
+            rebuild();
             withResend();
 
             service.sendPasswordResetEmail(TO, NAME, "https://x/reset", 30);
@@ -272,7 +285,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("Brevo with a bare 'from' (no display name) still builds a valid sender")
         void brevoBareFromAddress() throws Exception {
-            ReflectionTestUtils.setField(service, "from", "noreply@neochathub.com");
+            from = "noreply@neochathub.com";
+            rebuild();
             withBrevo();
             stubByHost(200, 200);
             when(templates.passwordReset(anyString(), anyString(), ArgumentMatchers.anyLong()))
@@ -463,7 +477,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("require-verification off → TRANSACTIONAL to unverified still sends")
         void requireVerificationOffSends() throws Exception {
-            ReflectionTestUtils.setField(service, "requireVerification", false);
+            requireVerification = false;
+            rebuild();
             withResend();
             stubSend(response(200));
             when(templates.passwordChanged(NAME)).thenReturn("<html>");
@@ -510,7 +525,8 @@ class EmailServiceImplTest {
         void configure() throws Exception {
             withResend();
             // Skip the verification gate so TRANSACTIONAL types deliver without stubbing a user.
-            ReflectionTestUtils.setField(service, "requireVerification", false);
+            requireVerification = false;
+            rebuild();
             stubSend(response(200));
         }
 
@@ -642,7 +658,8 @@ class EmailServiceImplTest {
         void maskEmailEdgeCases() throws Exception {
             // Mail disabled routes every reset call through log.warn("... {}", maskEmail(toEmail)),
             // which is evaluated eagerly, so each recipient shape exercises a maskEmail branch.
-            ReflectionTestUtils.setField(service, "mailEnabled", false);
+            mailEnabled = false;
+            rebuild();
 
             service.sendPasswordResetEmail(null, NAME, "https://x/reset", 30);        // email == null
             service.sendPasswordResetEmail("", NAME, "https://x/reset", 30);           // isBlank
@@ -656,7 +673,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("SMTP-only config (no HTTP keys) → deliveryConfigured via smtpAvailable, SMTP sends")
         void smtpOnlyDelivers() throws Exception {
-            ReflectionTestUtils.setField(service, "requireVerification", false);
+            requireVerification = false;
+            rebuild();
             withSmtp(); // smtpEnabled=true + provider returns a mail sender
 
             service.sendHtmlEmail(TO, NAME, "Subject", "<html>");
@@ -668,7 +686,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("SMTP enabled but no mail-sender bean → smtpAvailable false, delivery not configured")
         void smtpEnabledButNoBeanIsNoop() throws Exception {
-            ReflectionTestUtils.setField(service, "smtpEnabled", true);
+            smtpEnabled = true;
+            rebuild();
             // mailSenderProvider.getIfAvailable() returns null (unstubbed mock default)
 
             service.sendHtmlEmail(TO, NAME, "Subject", "<html>");
@@ -680,8 +699,10 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("Brevo sender with an empty display name (from='<addr>') omits the name field")
         void brevoEmptyDisplayName() throws Exception {
-            ReflectionTestUtils.setField(service, "from", "  <noreply@neochathub.com>");
-            ReflectionTestUtils.setField(service, "requireVerification", false);
+            from = "  <noreply@neochathub.com>";
+            rebuild();
+            requireVerification = false;
+            rebuild();
             withBrevo();
             stubByHost(200, 200);
 
@@ -695,7 +716,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("Brevo recipient with a null name omits the recipient name field")
         void brevoNullRecipientName() throws Exception {
-            ReflectionTestUtils.setField(service, "requireVerification", false);
+            requireVerification = false;
+            rebuild();
             withBrevo();
             stubByHost(200, 200);
 
@@ -742,7 +764,8 @@ class EmailServiceImplTest {
         @DisplayName("support ack with a blank ticket id → generic subject branch")
         void supportBlankTicket() throws Exception {
             withResend();
-            ReflectionTestUtils.setField(service, "requireVerification", false);
+            requireVerification = false;
+            rebuild();
             stubSend(response(200));
             when(templates.supportReceived(NAME, "   ", "Help")).thenReturn("<html>");
 
@@ -755,7 +778,8 @@ class EmailServiceImplTest {
         @Test
         @DisplayName("mail disabled → unread/password-changed/support/announcement/raw/login/welcome/verify all no-op")
         void disabledSendersAreNoops() throws Exception {
-            ReflectionTestUtils.setField(service, "mailEnabled", false);
+            mailEnabled = false;
+            rebuild();
 
             service.sendUnreadMessagesEmail(TO, NAME, List.of(), 2, "https://x/open");
             service.sendPasswordChangedEmail(TO, NAME);

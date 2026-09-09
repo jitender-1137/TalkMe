@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Shared Bucket List surface (feature #18). Every route is gated by the BUCKET_LIST
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * list live over WS to {@code /topic/chat/{chatId}/bucket-list}.
  */
 @RestController
+@Tag(name = "Bucket List", description = "Shared Bucket List surface (feature #18)")
 @RequestMapping("/chats/{chatId}/bucket-list")
 @RequiredArgsConstructor
 public class BucketListController {
@@ -40,6 +44,7 @@ public class BucketListController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is invalid
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Fetch the shared bucket list for a chat (created on first access if absent)")
     @GetMapping
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> getList(
@@ -59,7 +64,8 @@ public class BucketListController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is invalid or text is empty
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
-    @PostMapping("/items")
+    @Operation(summary = "Add an item to the chat's bucket list; broadcasts the refreshed list over WS")
+    @PostMapping(value = "/items", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> addItem(
             @PathVariable String chatId,
@@ -80,6 +86,7 @@ public class BucketListController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id or item id is invalid
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Toggle an item's done/undone state; broadcasts the refreshed list over WS")
     @PostMapping("/items/{itemUuid}/toggle")
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> toggleItem(
@@ -101,6 +108,7 @@ public class BucketListController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id or item id is invalid
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a chat member
      */
+    @Operation(summary = "Remove an item from the chat's bucket list; broadcasts the refreshed list over WS")
     @DeleteMapping("/items/{itemUuid}")
     @PreAuthorize("@featureGuard.check('BUCKET_LIST')")
     public ResponseEntity<ResponseDto<BucketListResponse>> removeItem(

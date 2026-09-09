@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -15,7 +16,8 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "sessions")
+@Table(name = "sessions",
+        indexes = @Index(name = "idx_sessions_user_id", columnList = "user_id"))
 @Getter
 @Setter
 @Builder
@@ -23,7 +25,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class Session extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

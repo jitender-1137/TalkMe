@@ -4,7 +4,6 @@ import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.repository.RoleRepository;
 import com.neo.chat.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,16 +24,28 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class SuperAdminSeeder implements ApplicationRunner {
 
     public static final String ROLE_SUPER_ADMIN = "ROLE_SUPER_ADMIN";
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
+    private final String superAdminEmails;
 
-    @Value("${app.super-admin.emails:}")
-    private String superAdminEmails;
+    /**
+     * Constructor-injects the repositories and the allow-list.
+     *
+     * @param roleRepository   role lookup/creation
+     * @param userRepository   account lookup by email
+     * @param superAdminEmails {@code app.super-admin.emails} (comma-separated; blank = no-op)
+     */
+    public SuperAdminSeeder(RoleRepository roleRepository,
+                            UserRepository userRepository,
+                            @Value("${app.super-admin.emails:}") String superAdminEmails) {
+        this.roleRepository = roleRepository;
+        this.userRepository = userRepository;
+        this.superAdminEmails = superAdminEmails;
+    }
 
     /**
      * Runs once at startup ({@link ApplicationRunner}, transactional): grants

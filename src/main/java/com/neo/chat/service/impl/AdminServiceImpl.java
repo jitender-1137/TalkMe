@@ -1908,7 +1908,7 @@ public class AdminServiceImpl implements AdminService {
                                      .build())
                           .collect(Collectors.toList());
 
-        assert m != null;
+        assert m != null : "attachment must belong to a message";
         return AdminAttachmentView.builder()
                 .id(a.getUuid() != null ? a.getUuid().toString() : String.valueOf(a.getId()))
                 .messageId(m.getUuid() != null ? m.getUuid().toString() : null)

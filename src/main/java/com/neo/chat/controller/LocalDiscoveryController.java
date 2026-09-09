@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Local Discovery (feature {@code LOCAL_DISCOVERY}) — find people in a given city, optionally
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * entitlement.
  */
 @RestController
+@Tag(name = "Local Discovery", description = "Local Discovery (feature LOCAL_DISCOVERY) — find people in a given city, optionally filtered by a shared interest, ranked...")
 @RequestMapping("/local")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -35,6 +38,7 @@ public class LocalDiscoveryController {
      *
      * @throws com.neo.chat.exception.BadRequestException if {@code city} is blank (TM_870)
      */
+    @Operation(summary = "Find people in city (case-insensitive exact match) optionally sharing interest")
     @GetMapping("/search")
     @PreAuthorize("@featureGuard.check('LOCAL_DISCOVERY')")
     public ResponseEntity<ResponseDto<LocalSearchPageResponse>> search(
@@ -53,6 +57,7 @@ public class LocalDiscoveryController {
      *
      * @throws com.neo.chat.exception.BadRequestException if the caller has no city set (TM_870)
      */
+    @Operation(summary = "Find people in the caller's own profile city, optionally sharing interest")
     @GetMapping("/nearby")
     @PreAuthorize("@featureGuard.check('LOCAL_DISCOVERY')")
     public ResponseEntity<ResponseDto<LocalSearchPageResponse>> nearby(

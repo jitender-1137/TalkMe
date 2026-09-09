@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Lets the client refresh its effective feature set without a full re-login (e.g.
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * the user is entitled to on/off. Served at {@code /api/v1/features}.
  */
 @RestController
+@Tag(name = "Feature", description = "Lets the client refresh its effective feature set without a full re-login (e.g. right after email verification or consent unlocks a...")
 @RequestMapping("/features")
 @RequiredArgsConstructor
 public class FeatureController {
@@ -36,6 +39,7 @@ public class FeatureController {
      * @param userDetails the authenticated user whose entitlements are resolved
      * @return 200 with a {@link FeatureAccessResponse} listing the enabled feature wire names
      */
+    @Operation(summary = "Returns the current user's effective feature set (resolved wire names) so the client can refresh entitlements without re-login")
     @GetMapping
     public ResponseEntity<ResponseDto<FeatureAccessResponse>> getFeatures(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -57,6 +61,7 @@ public class FeatureController {
      * @return 200 with the recomputed {@link FeatureAccessResponse} and success code TM_066
      * @throws com.neo.chat.exception.BadRequestException if the key is not a known feature (TM_002)
      */
+    @Operation(summary = "Sets the current user's self opt-in/opt-out preference for a feature they are entitled to, then returns the recomputed effective feature set")
     @PutMapping("/{key}")
     public ResponseEntity<ResponseDto<FeatureAccessResponse>> toggleFeature(
             @PathVariable("key") String key,

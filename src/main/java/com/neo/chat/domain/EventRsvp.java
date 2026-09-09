@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -29,8 +30,8 @@ import org.hibernate.annotations.ColumnDefault;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_event_rsvp_event_user",
                 columnNames = {"event_id", "user_id"}
-        )
-)
+        ),
+        indexes = @Index(name = "idx_event_rsvps_user_id", columnList = "user_id"))
 @Getter
 @Setter
 @Builder

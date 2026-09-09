@@ -16,7 +16,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
@@ -54,8 +53,7 @@ class RevealServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new RevealServiceImpl(sessionService, userRepository, messagingTemplate);
-        ReflectionTestUtils.setField(service, "voiceBeforePhoto", false);
+        service = new RevealServiceImpl(sessionService, userRepository, messagingTemplate, false);
     }
 
     private MatchSession session() {
@@ -200,7 +198,7 @@ class RevealServiceImplTest {
         @Test
         @DisplayName("voice-before-photo enabled and VOICE not yet revealed → PHOTO request blocked")
         void voiceBeforePhotoBlocksPhoto() {
-            ReflectionTestUtils.setField(service, "voiceBeforePhoto", true);
+            service = new RevealServiceImpl(sessionService, userRepository, messagingTemplate, true);
             MatchSession s = session();
             when(sessionService.getSessionByUser(A)).thenReturn(Optional.of(s));
 
@@ -214,7 +212,7 @@ class RevealServiceImplTest {
         @Test
         @DisplayName("voice-before-photo enabled but VOICE already exchanged → PHOTO request proceeds")
         void voiceBeforePhotoAllowsWhenVoiceExchanged() {
-            ReflectionTestUtils.setField(service, "voiceBeforePhoto", true);
+            service = new RevealServiceImpl(sessionService, userRepository, messagingTemplate, true);
             MatchSession s = session();
             s.getRevealExchanged().add(RevealChannel.VOICE);
             when(sessionService.getSessionByUser(A)).thenReturn(Optional.of(s));
@@ -294,7 +292,7 @@ class RevealServiceImplTest {
         @Test
         @DisplayName("voice-before-photo enabled → PHOTO accept blocked")
         void voiceBeforePhotoBlocksAccept() {
-            ReflectionTestUtils.setField(service, "voiceBeforePhoto", true);
+            service = new RevealServiceImpl(sessionService, userRepository, messagingTemplate, true);
             MatchSession s = session();
             when(sessionService.getSessionByUser(A)).thenReturn(Optional.of(s));
 

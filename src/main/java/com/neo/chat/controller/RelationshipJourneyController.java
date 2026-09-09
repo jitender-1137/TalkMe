@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.RelationshipJourneyService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/relationship-journey")
 @RequiredArgsConstructor
+@Tag(name = "Relationship Journey", description = "Milestone timeline between the caller and a target user")
 public class RelationshipJourneyController {
 
     private final RelationshipJourneyService relationshipJourneyService;
@@ -38,6 +41,7 @@ public class RelationshipJourneyController {
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not an active friend of the
      *                                                       target (TM_821)
      */
+    @Operation(summary = "Returns the milestone timeline between the caller and the target user (empty if viewing self)")
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('RELATIONSHIP_JOURNEY')")
     public ResponseEntity<ResponseDto<RelationshipJourneyResponse>> getJourney(

@@ -41,8 +41,7 @@ class ContentModerationServiceImplTest {
      */
     @BeforeEach
     void setUp() {
-        service = new ContentModerationServiceImpl(null); // text-only tests don't use the NSFW client
-        ReflectionTestUtils.setField(service, "enabled", true);
+        service = new ContentModerationServiceImpl(null, true); // text-only tests don't use the NSFW client
         // invoke @PostConstruct loader
         ReflectionTestUtils.invokeMethod(service, "load");
     }
@@ -88,8 +87,7 @@ class ContentModerationServiceImplTest {
     @Test
     void isEnabledReflectsTheConfiguredFlag() {
         assertTrue(service.isEnabled());
-        ContentModerationServiceImpl off = new ContentModerationServiceImpl(null);
-        ReflectionTestUtils.setField(off, "enabled", false);
+        ContentModerationServiceImpl off = new ContentModerationServiceImpl(null, false);
         assertFalse(off.isEnabled());
     }
 
@@ -97,8 +95,7 @@ class ContentModerationServiceImplTest {
 
     @Test
     void disabledService_returnsClean_evenForProfanity() {
-        ContentModerationServiceImpl off = new ContentModerationServiceImpl(null);
-        ReflectionTestUtils.setField(off, "enabled", false);
+        ContentModerationServiceImpl off = new ContentModerationServiceImpl(null, false);
         ReflectionTestUtils.invokeMethod(off, "load");
 
         assertFalse(off.moderateText("you are a fuck").explicit());
@@ -112,8 +109,7 @@ class ContentModerationServiceImplTest {
     @Test
     void emptyWordList_returnsClean_evenForProfanity() {
         // Build the service but never invoke load() → badWords is empty → always clean.
-        ContentModerationServiceImpl noList = new ContentModerationServiceImpl(null);
-        ReflectionTestUtils.setField(noList, "enabled", true);
+        ContentModerationServiceImpl noList = new ContentModerationServiceImpl(null, true);
 
         assertFalse(noList.moderateText("you are a fuck").explicit());
     }
@@ -134,8 +130,7 @@ class ContentModerationServiceImplTest {
      * Builds an enabled service wired to the given (usually mocked) NSFW client for media tests.
      */
     private ContentModerationServiceImpl mediaService(NsfwClient client) {
-        ContentModerationServiceImpl s = new ContentModerationServiceImpl(client);
-        ReflectionTestUtils.setField(s, "enabled", true);
+        ContentModerationServiceImpl s = new ContentModerationServiceImpl(client, true);
         return s;
     }
 
@@ -151,8 +146,7 @@ class ContentModerationServiceImplTest {
     @Test
     void moderateMedia_disabled_returnsClean_withoutCallingClassifier() {
         NsfwClient client = mock(NsfwClient.class);
-        ContentModerationServiceImpl s = new ContentModerationServiceImpl(client);
-        ReflectionTestUtils.setField(s, "enabled", false);
+        ContentModerationServiceImpl s = new ContentModerationServiceImpl(client, false);
 
         assertFalse(s.moderateMedia(Path.of("/tmp/x.jpg"), MessageType.IMAGE).explicit());
         verifyNoInteractions(client);
@@ -237,8 +231,7 @@ class ContentModerationServiceImplTest {
     @Test
     void moderateUpload_disabled_returnsClean() {
         NsfwClient client = mock(NsfwClient.class);
-        ContentModerationServiceImpl s = new ContentModerationServiceImpl(client);
-        ReflectionTestUtils.setField(s, "enabled", false);
+        ContentModerationServiceImpl s = new ContentModerationServiceImpl(client, false);
         MockMultipartFile img = new MockMultipartFile("f", "a.jpg", "image/jpeg", new byte[]{1, 2, 3});
 
         assertFalse(s.moderateUpload(img).explicit());

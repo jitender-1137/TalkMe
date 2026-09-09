@@ -1,17 +1,16 @@
 package com.neo.chat.controller;
 
 import com.neo.chat.domain.Chat;
-import com.neo.chat.domain.ChatMember;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.exception.GlobalExceptionHandler;
 import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.moderation.ModerationResult;
-import com.neo.chat.repository.ChatMemberRepository;
-import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.MediaAssetService;
 import com.neo.chat.service.StorageService;
+import com.neo.chat.service.lookup.ChatMembershipLookupService;
+import com.neo.chat.service.lookup.UserLookupSupport;
 import com.neo.chat.storage.MediaStorage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,7 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Pure controller unit test for {@link UploadController}.
  *
  * <p>Standalone {@link MockMvc} with mocked collaborators ({@link StorageService},
- * {@link MediaStorage}, {@link ChatRepository}, {@link ChatMemberRepository},
+ * {@link MediaStorage}, {@link ChatMembershipLookupService}, {@link UserLookupSupport},
  * {@link ContentModerationService}) and the real {@link GlobalExceptionHandler}. The
  * {@link com.neo.chat.util.UploadValidator} magic-byte check is a STATIC util and runs
  * for real, so success-path fixtures carry genuine signature bytes.
@@ -91,9 +90,7 @@ class UploadControllerUnitTest {
     @Mock
     private MediaStorage mediaStorage;
     @Mock
-    private ChatRepository chatRepository;
-    @Mock
-    private ChatMemberRepository chatMemberRepository;
+    private ChatMembershipLookupService chatMembershipLookup;
     @Mock
     private ContentModerationService moderationService;
     @Mock
@@ -103,7 +100,7 @@ class UploadControllerUnitTest {
     @Mock
     private com.neo.chat.security.JwtTokenProvider tokenProvider;
     @Mock
-    private com.neo.chat.repository.UserRepository userRepository;
+    private UserLookupSupport userLookup;
 
     private MockMvc mockMvc;
     private User testUser;
@@ -111,8 +108,8 @@ class UploadControllerUnitTest {
     @BeforeEach
     void setUp() {
         UploadController controller = new UploadController(
-                storageService, mediaStorage, chatRepository, chatMemberRepository, moderationService,
-                mediaAssetService, storageProperties, tokenProvider, userRepository);
+                storageService, mediaStorage, chatMembershipLookup, moderationService,
+                mediaAssetService, storageProperties, tokenProvider, userLookup);
         org.mockito.Mockito.lenient().when(storageProperties.getMediaRoot()).thenReturn("/media");
         org.mockito.Mockito.lenient().when(storageProperties.getLegacyMediaRoots()).thenReturn(java.util.List.of());
 
@@ -186,7 +183,7 @@ class UploadControllerUnitTest {
                     .andExpect(status().isPayloadTooLarge())
                     .andExpect(jsonPath("$.messageCode").value("TM_491"));
 
-            verifyNoInteractions(storageService, moderationService, chatRepository, chatMemberRepository);
+            verifyNoInteractions(storageService, moderationService, chatMembershipLookup);
         }
 
         @Test
@@ -199,7 +196,7 @@ class UploadControllerUnitTest {
                     .andExpect(status().isPayloadTooLarge())
                     .andExpect(jsonPath("$.messageCode").value("TM_492"));
 
-            verifyNoInteractions(storageService, moderationService, chatRepository, chatMemberRepository);
+            verifyNoInteractions(storageService, moderationService, chatMembershipLookup);
         }
 
         @Test
@@ -440,9 +437,8 @@ class UploadControllerUnitTest {
             authenticate();
             String cid = "22222222-2222-2222-2222-222222222222";
             Chat chat = mock(Chat.class);
-            ChatMember member = mock(ChatMember.class);
-            when(chatRepository.findByUuid(any())).thenReturn(Optional.of(chat));
-            when(chatMemberRepository.findByChatAndUser(eq(chat), eq(testUser))).thenReturn(Optional.of(member));
+            when(chatMembershipLookup.findByUuid(any())).thenReturn(Optional.of(chat));
+            when(chatMembershipLookup.isMember(eq(chat), eq(testUser))).thenReturn(true);
 
             assertThat(uploadAndCaptureSubdir("conversation", cid)).isEqualTo("conversations/" + cid);
         }
@@ -452,8 +448,8 @@ class UploadControllerUnitTest {
             authenticate();
             String cid = "22222222-2222-2222-2222-222222222222";
             Chat chat = mock(Chat.class);
-            when(chatRepository.findByUuid(any())).thenReturn(Optional.of(chat));
-            when(chatMemberRepository.findByChatAndUser(any(), any())).thenReturn(Optional.empty());
+            when(chatMembershipLookup.findByUuid(any())).thenReturn(Optional.of(chat));
+            when(chatMembershipLookup.isMember(any(), any())).thenReturn(false);
 
             assertThat(uploadAndCaptureSubdir("conversation", cid)).isEqualTo("others");
         }
@@ -462,7 +458,7 @@ class UploadControllerUnitTest {
         void conversationWithUnknownChatFallsBackToOthers() throws Exception {
             authenticate();
             String cid = "22222222-2222-2222-2222-222222222222";
-            when(chatRepository.findByUuid(any())).thenReturn(Optional.empty());
+            when(chatMembershipLookup.findByUuid(any())).thenReturn(Optional.empty());
 
             assertThat(uploadAndCaptureSubdir("conversation", cid)).isEqualTo("others");
         }
@@ -472,7 +468,7 @@ class UploadControllerUnitTest {
             authenticate();
             // safeUuid() rejects a non-UUID contextId before the repository is ever queried.
             assertThat(uploadAndCaptureSubdir("conversation", "not-a-uuid")).isEqualTo("others");
-            verifyNoInteractions(chatRepository, chatMemberRepository);
+            verifyNoInteractions(chatMembershipLookup);
         }
 
         @Test
@@ -481,7 +477,7 @@ class UploadControllerUnitTest {
             // No contextId → safeUuid(null) hits the (value == null) branch and returns null, so the
             // conversation guard's (cid != null) sub-condition is false and the repo is never queried.
             assertThat(uploadAndCaptureSubdir("conversation", null)).isEqualTo("others");
-            verifyNoInteractions(chatRepository, chatMemberRepository);
+            verifyNoInteractions(chatMembershipLookup);
         }
 
         @Test
@@ -489,7 +485,7 @@ class UploadControllerUnitTest {
             authenticate();
             // A whitespace-only contextId → safeUuid hits the (value.isBlank()) branch and returns null.
             assertThat(uploadAndCaptureSubdir("conversation", "   ")).isEqualTo("others");
-            verifyNoInteractions(chatRepository, chatMemberRepository);
+            verifyNoInteractions(chatMembershipLookup);
         }
 
         // ── Unauthenticated principal: userDetails == null → uid == null everywhere ────────────
@@ -526,7 +522,7 @@ class UploadControllerUnitTest {
             // sub-condition short-circuits to false, so the repositories are never consulted.
             String cid = "22222222-2222-2222-2222-222222222222";
             assertThat(uploadAndCaptureSubdir("conversation", cid)).isEqualTo("others");
-            verifyNoInteractions(chatRepository, chatMemberRepository);
+            verifyNoInteractions(chatMembershipLookup);
         }
     }
 
@@ -667,7 +663,7 @@ class UploadControllerUnitTest {
         void conversationMediaRequiresMembership() throws Exception {
             asTestUser();
             User other = User.builder().username("bob").build();
-            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+            when(chatMembershipLookup.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
                     .thenReturn(Optional.of(chatWith(other)));
 
             mockMvc.perform(get(MEDIA).param("path", "/media/conversations/" + CHAT_UUID + "/rand.png"))
@@ -678,7 +674,7 @@ class UploadControllerUnitTest {
         @Test
         void conversationMediaServedToMember() throws Exception {
             asTestUser();
-            when(chatRepository.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
+            when(chatMembershipLookup.findByUuidWithMembers(UUID.fromString(CHAT_UUID)))
                     .thenReturn(Optional.of(chatWith(testUser)));
             byte[] body = pngBytes();
             when(mediaStorage.open(any())).thenReturn(Optional.of(
@@ -699,7 +695,7 @@ class UploadControllerUnitTest {
         @Test
         void mediaCookieAuthenticatesTheViewer() throws Exception {
             when(tokenProvider.parseMediaToken("mt")).thenReturn("testuser");
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            when(userLookup.findByUsername("testuser")).thenReturn(Optional.of(testUser));
             byte[] body = pngBytes();
             when(mediaStorage.open(any())).thenReturn(Optional.of(
                     new MediaStorage.MediaContent(new ByteArrayResource(body), "image/png", body.length)));
@@ -713,7 +709,7 @@ class UploadControllerUnitTest {
         void mediaCookieOfBannedUserIsRejected() throws Exception {
             testUser.setBanned(true);
             when(tokenProvider.parseMediaToken("mt")).thenReturn("testuser");
-            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            when(userLookup.findByUsername("testuser")).thenReturn(Optional.of(testUser));
 
             mockMvc.perform(get(MEDIA).param("path", "/media/others/rand.png")
                             .cookie(new jakarta.servlet.http.Cookie(AuthController.MEDIA_COOKIE, "mt")))

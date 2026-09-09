@@ -4,6 +4,8 @@ import com.neo.chat.dto.response.MusicTrackResponse;
 import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.service.MusicService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +24,7 @@ import java.util.List;
 @RequestMapping("/music")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Music", description = "Music track search proxied to the key-less iTunes Search API")
 public class MusicController {
 
     private final MusicService musicService;
@@ -33,6 +36,7 @@ public class MusicController {
      * @param limit max results (defaults to 24, clamped to 1..50 by the service)
      * @return matching tracks wrapped in a success envelope
      */
+    @Operation(summary = "Search music tracks (returns only playable-preview results; empty list on blank query/errors)")
     @GetMapping("/search")
     public ResponseEntity<ResponseDto<List<MusicTrackResponse>>> search(
             @RequestParam("q") String query,

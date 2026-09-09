@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.NaturalId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -60,6 +61,7 @@ public class ReputationEvent {
     @Column(name = "awarded_weight", nullable = false)
     private int awardedWeight;
 
+    @NaturalId
     @Column(name = "dedupe_key", nullable = false, length = 200, unique = true)
     private String dedupeKey;
 

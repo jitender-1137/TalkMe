@@ -30,8 +30,11 @@ public class MasterKeyService {
     private final SecureRandom random = new SecureRandom();
     private SecretKeySpec masterKey;
 
-    @Value("${app.crypto.master-key:}")
-    private String masterKeyB64;
+    private final String masterKeyB64;
+
+    public MasterKeyService(@Value("${app.crypto.master-key:}") String masterKeyB64) {
+        this.masterKeyB64 = masterKeyB64;
+    }
 
     /**
      * Loads the master key from configuration at startup: if present, decodes it and arms

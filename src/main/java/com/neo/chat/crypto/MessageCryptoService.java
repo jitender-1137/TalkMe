@@ -1,6 +1,5 @@
 package com.neo.chat.crypto;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,6 @@ import java.util.Base64;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class MessageCryptoService {
 
     public static final String MARKER = "enc:v1:";
@@ -37,8 +35,15 @@ public class MessageCryptoService {
     private final MasterKeyService masterKeyService;
     private final SecureRandom random = new SecureRandom();
 
-    @Value("${app.crypto.chat-encryption.enabled:true}")
-    private boolean enabled;
+    private final boolean enabled;
+
+    public MessageCryptoService(ChatKeyService chatKeyService,
+                                MasterKeyService masterKeyService,
+                                @Value("${app.crypto.chat-encryption.enabled:true}") boolean enabled) {
+        this.chatKeyService = chatKeyService;
+        this.masterKeyService = masterKeyService;
+        this.enabled = enabled;
+    }
 
     /**
      * Encryption is active only when both the flag is on AND a master key exists.

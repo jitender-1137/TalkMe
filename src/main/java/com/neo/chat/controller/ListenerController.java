@@ -7,6 +7,7 @@ import com.neo.chat.enums.ListenerReason;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.ListenerService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * "Someone Is Listening" volunteer queue (features #26/#27). Every route is gated by the LISTENER
@@ -25,6 +29,7 @@ import java.util.List;
  * room.
  */
 @RestController
+@Tag(name = "Listener", description = "\"Someone Is Listening\" volunteer queue (features #26/#27)")
 @RequestMapping("/listener")
 @RequiredArgsConstructor
 public class ListenerController {
@@ -38,6 +43,7 @@ public class ListenerController {
      * @return the AVAILABLE listener shift (TM_990)
      * @throws com.neo.chat.exception.ForbiddenException the caller is a guest (TM_997)
      */
+    @Operation(summary = "Go on duty as a listener (creates or re-arms the caller's shift as AVAILABLE)")
     @PostMapping("/available")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<ListenerShiftResponse>> goAvailable(
@@ -52,6 +58,7 @@ public class ListenerController {
      * @param userDetails the authenticated volunteer
      * @return empty success envelope (TM_991)
      */
+    @Operation(summary = "Clock off duty (idempotent; credits the in-progress person if mid-session)")
     @PostMapping("/end")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<Void>> end(
@@ -69,10 +76,11 @@ public class ListenerController {
      * @throws com.neo.chat.exception.NotFoundException no listener is available (TM_993), or the
      *                                                     freshly created room can't be reloaded (TM_998)
      */
-    @PostMapping("/request")
+    @Operation(summary = "Match me with the oldest-waiting available listener and open a private, non-recorded room")
+    @PostMapping(value = "/request", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<ListenerShiftResponse>> request(
-            @RequestBody(required = false) RequestListenerBody body,
+            @Valid @RequestBody(required = false) RequestListenerBody body,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         ListenerReason reason = ListenerReason
                 .fromWireOrDefault(body == null ? null : body.reason());
@@ -91,6 +99,7 @@ public class ListenerController {
      *
      * @return the list of currently AVAILABLE listener shifts wrapped in a success envelope
      */
+    @Operation(summary = "The current live queue of available listeners (oldest-waiting first)")
     @GetMapping("/available")
     @PreAuthorize("@featureGuard.check('LISTENER')")
     public ResponseEntity<ResponseDto<List<ListenerShiftResponse>>> listAvailable() {

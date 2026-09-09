@@ -14,6 +14,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
@@ -37,7 +38,8 @@ import java.util.Map;
 import java.util.Set;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users",
+        indexes = @Index(name = "idx_users_referred_by_id", columnList = "referred_by_id"))
 @Getter
 @Setter
 @Builder
@@ -200,8 +202,11 @@ public class User extends BaseEntity {
      * Languages spoken (feature #3 filter + compatibility).
      */
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "user_languages", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "language")
+    @CollectionTable(name = "user_languages", joinColumns = @JoinColumn(name = "user_id"),
+            // Non-nullable element => Hibernate generates the (user_id, language) PK on fresh schemas; the explicit FK
+            // index is kept because ddl-auto=update never adds a PK to the pre-existing production table.
+            indexes = @Index(name = "idx_user_languages_user_id", columnList = "user_id"))
+    @Column(name = "language", nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private Set<Language> languages = new HashSet<>();
@@ -210,8 +215,11 @@ public class User extends BaseEntity {
      * What the user is looking for (feature #29).
      */
     @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "user_looking_for", joinColumns = @JoinColumn(name = "user_id"))
-    @Column(name = "tag")
+    @CollectionTable(name = "user_looking_for", joinColumns = @JoinColumn(name = "user_id"),
+            // Non-nullable element => Hibernate generates the (user_id, tag) PK on fresh schemas; the explicit FK
+            // index is kept because ddl-auto=update never adds a PK to the pre-existing production table.
+            indexes = @Index(name = "idx_user_looking_for_user_id", columnList = "user_id"))
+    @Column(name = "tag", nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private Set<LookingForTag> lookingFor = new HashSet<>();
@@ -248,7 +256,16 @@ public class User extends BaseEntity {
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
+            inverseJoinColumns = @JoinColumn(name = "role_id"),
+            // The composite PK covers only its LEADING column, and that column differs between
+            // Hibernate versions / existing databases (the live Postgres schema is (user_id,
+            // role_id); newer Hibernate generates (role_id, user_id)). Index both FK columns
+            // explicitly so each is covered regardless (BootUI DB-SCHEMA-002); the table is small,
+            // so the one redundant index is negligible.
+            indexes = {
+                    @Index(name = "idx_user_roles_user_id", columnList = "user_id"),
+                    @Index(name = "idx_user_roles_role_id", columnList = "role_id")
+            }
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();

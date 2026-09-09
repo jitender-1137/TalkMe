@@ -3,14 +3,14 @@ package com.neo.chat.websocket;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.UserResponse;
 import com.neo.chat.enums.PresenceStatus;
-import com.neo.chat.repository.ChatMemberRepository;
-import com.neo.chat.repository.ChatRepository;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.NotificationDispatchService;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.service.UserService;
+import com.neo.chat.service.lookup.ChatMembershipLookupService;
+import com.neo.chat.service.lookup.UserLookupSupport;
 import com.neo.chat.util.LogSanitizer;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -42,16 +42,24 @@ import java.util.UUID;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
+@Tag(
+        name = "WebSocket (Chat, Presence & Lobby)",
+        description = """
+                STOMP message endpoints (not HTTP): presence heartbeat and tab-visibility signals \
+                (/app/presence/heartbeat, /app/presence/visibility), per-chat typing and activity \
+                indicators (/app/chat/{chatUuid}/typing, /app/chat/{chatUuid}/activity) broadcast to \
+                /topic/chat/{chatUuid}/typing, and the lobby flows (/app/lobby/join, /app/lobby/leave, \
+                /app/lobby/chat, /app/lobby/typing) fanned out to /topic/lobby and the per-user \
+                /queue/lobby-chat and /queue/lobby-typing destinations.""")
 public class WebSocketController {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redisTemplate;
     private final UserService userService;
-    private final UserRepository userRepository;
+    private final UserLookupSupport userLookupSupport;
     private final PresenceService presenceService;
     private final NotificationDispatchService notificationDispatchService;
-    private final ChatRepository chatRepository;
-    private final ChatMemberRepository chatMemberRepository;
+    private final ChatMembershipLookupService chatMembershipLookupService;
 
     /**
      * Deadline ZSET for grace-evicting lobby members whose socket dropped.
@@ -153,9 +161,9 @@ public class WebSocketController {
         }
         boolean member;
         try {
-            member = chatRepository.findByUuid(UUID.fromString(chatUuid))
-                    .flatMap(c -> chatMemberRepository.findByChatAndUser(c, user))
-                    .isPresent();
+            member = chatMembershipLookupService.findByUuid(UUID.fromString(chatUuid))
+                    .map(c -> chatMembershipLookupService.isMember(c, user))
+                    .orElse(false);
         } catch (IllegalArgumentException badUuid) {
             return false;
         } catch (Exception e) {
@@ -274,7 +282,7 @@ public class WebSocketController {
         redisTemplate.opsForSet().add("lobby:users", username);
 
         // Fetch user response
-        userRepository.findByUsername(username).ifPresent(user -> {
+        userLookupSupport.findByUsername(username).ifPresent(user -> {
             UserResponse response = userService.getUserById(user.getUuid().toString(), user);
             // PRIVACY: /topic/lobby is a broadcast any authenticated user can subscribe to. Strip
             // PII from the JOIN payload (phone number, role list) so it can't be harvested — the
@@ -387,7 +395,7 @@ public class WebSocketController {
                 return; // recipient is connected — in-app delivery already happened
             }
             String body = content.length() > 120 ? content.substring(0, 117) + "…" : content;
-            userRepository.findByUsername(recipient).ifPresent(user ->
+            userLookupSupport.findByUsername(recipient).ifPresent(user ->
                     notificationDispatchService.onEphemeralMessage(
                             user.getId(), sender, body, LOBBY_DEEP_LINK));
         } catch (Exception e) {

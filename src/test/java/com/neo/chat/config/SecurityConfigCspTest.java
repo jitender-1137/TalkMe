@@ -23,7 +23,7 @@ class SecurityConfigCspTest {
      */
     private static final String BASELINE =
             "default-src 'self'; " +
-                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; " +
+                    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com; " +
                     "style-src 'self' 'unsafe-inline'; " +
                     "img-src 'self' data: blob: https:; " +
                     "font-src 'self' data:; " +
@@ -67,7 +67,7 @@ class SecurityConfigCspTest {
                     List.of("https://pagead2.googlesyndication.com", "https://*.adsterra.com"));
 
             assertThat(csp).contains(
-                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com "
+                    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com "
                             + "https://pagead2.googlesyndication.com https://*.adsterra.com;");
             assertThat(csp).contains(
                     "frame-src 'self' https://challenges.cloudflare.com "

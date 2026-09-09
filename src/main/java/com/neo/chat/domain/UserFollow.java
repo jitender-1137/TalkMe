@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -13,7 +14,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "user_follows")
+@Table(name = "user_follows",
+        indexes = {
+                @Index(name = "idx_user_follows_follower_id", columnList = "follower_id"),
+                @Index(name = "idx_user_follows_following_id", columnList = "following_id")
+        })
 @Getter
 @Setter
 @Builder
@@ -21,11 +26,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class UserFollow extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "follower_id", nullable = false)
     private User follower;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "following_id", nullable = false)
     private User following;
 

@@ -2,6 +2,7 @@ package com.neo.chat.mapper;
 
 import com.neo.chat.domain.FriendRequest;
 import com.neo.chat.dto.response.FriendRequestResponse;
+import org.mapstruct.InjectionStrategy;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -10,7 +11,7 @@ import org.mapstruct.Mapping;
  * {@link com.neo.chat.dto.response.FriendRequestResponse}, rendering the UUID and status
  * enum as strings and delegating the sender to {@link UserMapper}.
  */
-@Mapper(componentModel = "spring", uses = {UserMapper.class})
+@Mapper(componentModel = "spring", uses = {UserMapper.class}, injectionStrategy = InjectionStrategy.CONSTRUCTOR)
 public interface FriendRequestMapper {
 
     @Mapping(target = "id", expression = "java(request.getUuid().toString())")

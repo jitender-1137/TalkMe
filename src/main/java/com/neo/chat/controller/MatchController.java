@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.match.MatchmakingService;
 import com.neo.chat.security.CustomUserDetails;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +23,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/match")
 @RequiredArgsConstructor
+@Tag(name = "Match", description = "Read-only matchmaking surface: current anonymous match session and live online count")
 public class MatchController {
 
     private final MatchmakingService matchmakingService;
@@ -31,6 +34,7 @@ public class MatchController {
      * @param userDetails the authenticated caller
      * @return the active MatchSessionResponse, or null when the caller has no session
      */
+    @Operation(summary = "Return the caller's current active match session (anonymized), or null if none")
     @GetMapping("/session")
     public ResponseEntity<ResponseDto<MatchSessionResponse>> checkMatch(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -43,6 +47,7 @@ public class MatchController {
      *
      * @return a success envelope wrapping a single-entry map {@code {"count": <n>}}
      */
+    @Operation(summary = "Return the current live matchmaking online count")
     @GetMapping("/online")
     public ResponseEntity<ResponseDto<Map<String, Long>>> getOnlineCount() {
         long count = matchmakingService.getOnlineCount();

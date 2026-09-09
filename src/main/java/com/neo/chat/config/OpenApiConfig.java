@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * version and description, and declares a global {@code bearerAuth} HTTP-bearer
  * security scheme (JWT) so the generated docs and Swagger UI can carry a token.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class OpenApiConfig {
 
     /**

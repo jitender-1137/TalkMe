@@ -13,12 +13,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * "Our Story" conversation summary (feature #3.3). Read-only; gated by CONVERSATION_SUMMARY.
  * A dedicated controller (not ChatController) so the feature is self-contained.
  */
 @RestController
+@Tag(name = "Conversation Summary", description = "\"Our Story\" conversation summary (feature #3.3)")
 @RequestMapping("/chats")
 @RequiredArgsConstructor
 public class ConversationSummaryController {
@@ -37,6 +40,7 @@ public class ConversationSummaryController {
      * @throws com.neo.chat.exception.ForbiddenException if the caller is not an active member (TM_026)
      *                                                      or the chat is multi-party (TM_026)
      */
+    @Operation(summary = "Builds the read-only \"Our Story\" summary for a 1:1 chat: message counts, photos shared, active days, first-message time, days-known...")
     @GetMapping("/{chatUuid}/summary")
     @PreAuthorize("@featureGuard.check('CONVERSATION_SUMMARY')")
     public ResponseEntity<ResponseDto<ConversationSummaryResponse>> summary(

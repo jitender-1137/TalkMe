@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -21,7 +22,11 @@ import lombok.Setter;
 @Entity
 @Table(
         name = "group_invites",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"chat_id", "invitee_id"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"chat_id", "invitee_id"}),
+        indexes = {
+                @Index(name = "idx_group_invites_inviter_id", columnList = "inviter_id"),
+                @Index(name = "idx_group_invites_invitee_id", columnList = "invitee_id")
+        })
 @Getter
 @Setter
 @Builder
@@ -29,15 +34,15 @@ import lombok.Setter;
 @AllArgsConstructor
 public class GroupInvite extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "chat_id", nullable = false)
     private Chat chat;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "inviter_id", nullable = false)
     private User inviter;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "invitee_id", nullable = false)
     private User invitee;
 

@@ -5,7 +5,6 @@ import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.moderation.ModerationResult;
 import com.neo.chat.moderation.NsfwClient;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
@@ -41,15 +40,19 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ContentModerationServiceImpl implements ContentModerationService {
 
     private static final int RUN_MIN_LEN = 3;
 
     private final NsfwClient nsfwClient;
 
-    @Value("${moderation.enabled:true}")
-    private boolean enabled;
+    private final boolean enabled;
+
+    public ContentModerationServiceImpl(NsfwClient nsfwClient,
+                                        @Value("${moderation.enabled:true}") boolean enabled) {
+        this.nsfwClient = nsfwClient;
+        this.enabled = enabled;
+    }
 
     private final Set<String> badWords = new HashSet<>();
     private final List<String> runScanWords = new ArrayList<>();

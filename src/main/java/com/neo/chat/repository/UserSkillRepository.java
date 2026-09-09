@@ -31,7 +31,7 @@ public interface UserSkillRepository extends JpaRepository<UserSkill, Long> {
      * Bulk-remove every skill owned by a user. Executes as an immediate DELETE so a
      * subsequent re-insert in the same transaction cannot collide with the unique constraint.
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM UserSkill us WHERE us.user = :user")
     void deleteAllByUser(@Param("user") User user);
 

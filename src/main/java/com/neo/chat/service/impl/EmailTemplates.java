@@ -32,17 +32,13 @@ public class EmailTemplates {
 
     private final MailTheme theme;
 
-    @Value("${app.mail.brand.name:NeoChatHub}")
-    private String brandName;
+    private final String brandName;
 
-    @Value("${app.mail.brand.tagline:Meet new people. Chat. Connect.}")
-    private String tagline;
+    private final String tagline;
 
-    @Value("${app.mail.brand.support-email:support@neochathub.com}")
-    private String supportEmail;
+    private final String supportEmail;
 
-    @Value("${app.frontend-base-url:http://localhost:3000}")
-    private String baseUrl;
+    private final String baseUrl;
 
     /**
      * Public URL of the brand logo shown in the email header. Defaults to the
@@ -50,8 +46,7 @@ public class EmailTemplates {
      * served by PublicAssetController with no auth), so it works without a separate
      * CDN. Override with {@code app.mail.logo-url} to point at a hosted/CDN logo.
      */
-    @Value("${app.mail.logo-url:}")
-    private String logoUrlOverride;
+    private final String logoUrlOverride;
 
     /**
      * Resolves the effective email-logo URL: the override, or the backend endpoint.
@@ -64,8 +59,18 @@ public class EmailTemplates {
         return base + "/api/v1/assets/logo.png";
     }
 
-    public EmailTemplates(MailTheme theme) {
+    public EmailTemplates(MailTheme theme,
+                          @Value("${app.mail.brand.name:NeoChatHub}") String brandName,
+                          @Value("${app.mail.brand.tagline:Meet new people. Chat. Connect.}") String tagline,
+                          @Value("${app.mail.brand.support-email:support@neochathub.com}") String supportEmail,
+                          @Value("${app.frontend-base-url:http://localhost:3000}") String baseUrl,
+                          @Value("${app.mail.logo-url:}") String logoUrlOverride) {
         this.theme = theme;
+        this.brandName = brandName;
+        this.tagline = tagline;
+        this.supportEmail = supportEmail;
+        this.baseUrl = baseUrl;
+        this.logoUrlOverride = logoUrlOverride;
     }
 
     // ── Public templates ───────────────────────────────────────────────────────

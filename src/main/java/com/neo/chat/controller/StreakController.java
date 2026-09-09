@@ -5,6 +5,8 @@ import com.neo.chat.dto.response.StreakResponse;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.StreakService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/reputation/streak")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Streaks", description = "Daily-streak surface (cosmetic): streak status and check-ins")
 public class StreakController {
 
     private final StreakService streakService;
@@ -32,6 +35,7 @@ public class StreakController {
      * @param userDetails the authenticated caller
      * @return the caller's streak response in a success envelope
      */
+    @Operation(summary = "The caller's current daily-streak card (current streak, longest, freeze state)")
     @GetMapping
     @PreAuthorize("@featureGuard.check('STREAKS')")
     public ResponseEntity<ResponseDto<StreakResponse>> getStreak(
@@ -46,6 +50,7 @@ public class StreakController {
      * @param userDetails the authenticated caller
      * @return the updated streak response (message "Streak updated", TM_950)
      */
+    @Operation(summary = "Record a daily check-in for the caller and return the updated streak card")
     @PostMapping("/checkin")
     @PreAuthorize("@featureGuard.check('STREAKS')")
     public ResponseEntity<ResponseDto<StreakResponse>> checkIn(

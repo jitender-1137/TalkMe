@@ -14,7 +14,7 @@ import java.security.Security;
  * web-push library relies on for the ECDH/HKDF crypto.
  */
 @Slf4j
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class WebPushConfig {
 
     /**

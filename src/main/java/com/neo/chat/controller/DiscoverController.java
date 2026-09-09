@@ -17,12 +17,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * People-discovery surface: a filtered, presence-ordered feed of other users plus like/unlike.
  * Served at {@code /discover}; every route is gated by {@code hasRole('USER')} at class level.
  */
 @RestController
+@Tag(name = "Discover", description = "People-discovery surface: a filtered, presence-ordered feed of other users plus like/unlike")
 @RequestMapping("/discover")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -49,6 +52,7 @@ public class DiscoverController {
      * @return 200 with a paginated list of Discover profiles (like/friend/request flags relative
      * to the viewer) plus cursor/hasNext/total pagination info
      */
+    @Operation(summary = "Returns a cursor-paginated, ONLINE-then-AWAY-then-recently-active feed of discoverable users (excludes self, guests and deleted...")
     @GetMapping
     public ResponseEntity<ResponseDto<PaginatedResponse<DiscoverProfileResponse>>> getDiscover(
             @RequestParam(value = "q", required = false) String query,
@@ -78,6 +82,7 @@ public class DiscoverController {
      * @return 200 with an empty payload and success code TM_DISCOVER_002
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Records the current user's like of the target profile; idempotent (a repeat like is a no-op)")
     @PostMapping("/{userId}/like")
     public ResponseEntity<ResponseDto<Void>> likeProfile(
             @PathVariable("userId") String userId,
@@ -95,6 +100,7 @@ public class DiscoverController {
      * @return 200 with an empty payload and success code TM_DISCOVER_003
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Removes the current user's like of the target profile; a no-op if not currently liked")
     @DeleteMapping("/{userId}/like")
     public ResponseEntity<ResponseDto<Void>> unlikeProfile(
             @PathVariable("userId") String userId,

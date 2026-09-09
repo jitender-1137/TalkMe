@@ -7,8 +7,11 @@ import com.neo.chat.dto.response.StoryViewerResponse;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.StoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +35,7 @@ import java.util.List;
 @RequestMapping("/stories")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Stories", description = "24-hour stories (status) for the authenticated user")
 public class StoryController {
 
     private final StoryService storyService;
@@ -55,7 +59,8 @@ public class StoryController {
      * @throws com.neo.chat.exception.BadRequestException        if a VOICE story's media is not an
      *                                                              audio clip
      */
-    @PostMapping
+    @Operation(summary = "Posts a new story for the current user, expiring 24 hours after creation")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<StoryResponse>> createStory(
             @Valid @RequestBody StoryRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -71,6 +76,7 @@ public class StoryController {
      * @param userDetails the authenticated principal (the viewer)
      * @return the visible active stories, newest first (empty when none)
      */
+    @Operation(summary = "Lists the non-expired stories the current user is allowed to see, newest first")
     @GetMapping("/active")
     public ResponseEntity<ResponseDto<List<StoryResponse>>> getActiveStories(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -85,6 +91,7 @@ public class StoryController {
      * @param userDetails the authenticated principal whose archive is returned
      * @return the user's stories (active and expired), newest first
      */
+    @Operation(summary = "Returns the current user's own stories, newest first, including expired ones (the \"My Stories\" archive)")
     @GetMapping("/mine")
     public ResponseEntity<ResponseDto<List<StoryResponse>>> getMyStories(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -101,6 +108,7 @@ public class StoryController {
      * @throws com.neo.chat.exception.NotFoundException  if no such story exists
      * @throws com.neo.chat.exception.ForbiddenException if the caller is not the story's author
      */
+    @Operation(summary = "Soft-deletes one of the current user's stories (owner-only)")
     @DeleteMapping("/{id}")
     public ResponseEntity<ResponseDto<Void>> deleteStory(
             @PathVariable("id") String storyUuid,
@@ -118,6 +126,7 @@ public class StoryController {
      * @return an empty success envelope
      * @throws com.neo.chat.exception.NotFoundException if no such story exists
      */
+    @Operation(summary = "Records that the current user viewed a story")
     @PostMapping("/{id}/view")
     public ResponseEntity<ResponseDto<Void>> viewStory(
             @PathVariable("id") String storyUuid,
@@ -136,6 +145,7 @@ public class StoryController {
      * @throws com.neo.chat.exception.NotFoundException  if no such story exists
      * @throws com.neo.chat.exception.ForbiddenException if the caller is not the story's author
      */
+    @Operation(summary = "Returns the \"seen by\" list for a story — its viewers with per-viewer timestamps, most recent first")
     @GetMapping("/{id}/viewers")
     public ResponseEntity<ResponseDto<List<StoryViewerResponse>>> getStoryViewers(
             @PathVariable("id") String storyUuid,

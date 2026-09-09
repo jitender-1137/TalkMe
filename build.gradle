@@ -63,6 +63,45 @@ configurations.configureEach {
             details.useVersion '3.0.0'
             details.because 'JAX-RS API that Jersey 3.0.8 targets (Spring Boot 4 BOM forces 4.0.0).'
         }
+        // --- Security patch overrides (BootUI / OSV.dev vulnerability scan) -------------
+        if (requested.group == "io.netty" && !requested.name.startsWith("netty-tcnative")) {
+            // netty-tcnative excluded: it ships on its own 2.0.x line, so forcing it here
+            // would ask for a version that does not exist.
+            useVersion("4.2.17.Final")
+            because("Fix Netty security vulnerabilities CVE-2026-75595, CVE-2026-44249, CVE-2026-50010 and CVE-2026-45416")
+        }
+        if (requested.group == "com.fasterxml.jackson.core"
+                && requested.name in ["jackson-core", "jackson-databind"]) {
+            useVersion("2.21.5")
+            because("Fix Jackson 2 PolymorphicTypeValidator bypasses CVE-2026-54512, CVE-2026-54513 and 8 further advisories")
+        }
+        if (requested.group == "tools.jackson.core"
+                && requested.name in ["jackson-core", "jackson-databind"]) {
+            useVersion("3.1.5")
+            because("Same advisory set as Jackson 2, for the Jackson 3 artifacts Spring Boot 4 uses by default")
+        }
+        if (requested.group == "com.rabbitmq" && requested.name == "amqp-client") {
+            useVersion("5.33.1")
+            because("Fix RabbitMQ client CVE-2026-69219, CVE-2026-69220, CVE-2026-63337 and 3 further advisories")
+        }
+        if (requested.group == "org.springframework.data" && requested.name.startsWith("spring-data-")) {
+            useVersion("4.0.6")
+            because("Fix Spring Data SpEL RCE CVE-2026-41719 and 4 unbounded-cache DoS advisories")
+        }
+        if (requested.group == "org.apache.logging.log4j"
+                && requested.name in ["log4j-api", "log4j-to-slf4j"]) {
+            useVersion("2.25.5")
+            because("Fix Log4j API CVE-2026-49844")
+        }
+        if (requested.group == "ch.qos.logback"
+                && requested.name in ["logback-core", "logback-classic"]) {
+            useVersion("1.5.34")
+            because("Fix Logback deserialization CVE-2026-10532 and CVE-2026-9828")
+        }
+        if (requested.group == "org.asynchttpclient") {
+            useVersion("2.16.0")
+            because("Fix AsyncHttpClient CVE-2026-45300, CVE-2026-40490 and CVE-2026-55688 (cross-origin cookie/credential leaks)")
+        }
     }
 }
 
@@ -113,7 +152,6 @@ dependencies {
     runtimeOnly 'com.julien-dubois.bootui:bootui-spring-boot-starter:1.15.0'
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0'
 
     // Source: https://mvnrepository.com/artifact/com.oracle.oci.sdk/oci-java-sdk-objectstorage
     implementation('com.oracle.oci.sdk:oci-java-sdk-objectstorage:3.91.1')
@@ -143,7 +181,7 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
+//    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testImplementation 'com.h2database:h2'

@@ -11,6 +11,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.NaturalId;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -30,6 +31,11 @@ public abstract class BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Public, immutable business identifier. Assigned once in {@link #onCreate()} and never
+     * reassigned on a managed instance, so it is the entity's (immutable) natural id.
+     */
+    @NaturalId
     @Column(name = "uuid", nullable = false, unique = true, updatable = false)
     private UUID uuid;
 

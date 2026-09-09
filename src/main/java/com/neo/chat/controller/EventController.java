@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Midnight Events (feature #24). Every route is gated by the MIDNIGHT_EVENTS entitlement, which
@@ -27,6 +30,7 @@ import java.util.List;
  * attendance reputation out-of-band; these endpoints only schedule, list and RSVP.
  */
 @RestController
+@Tag(name = "Event", description = "Midnight Events (feature #24)")
 @RequestMapping("/events")
 @RequiredArgsConstructor
 public class EventController {
@@ -42,7 +46,8 @@ public class EventController {
      * @throws com.neo.chat.exception.BadRequestException if the start time is not in the future,
      *                                                       the end time is not after the start, or maxAttendees is negative
      */
-    @PostMapping
+    @Operation(summary = "Schedules a new event hosted by the current user")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
     public ResponseEntity<ResponseDto<EventResponse>> create(
             @Valid @RequestBody CreateEventRequest request,
@@ -57,6 +62,7 @@ public class EventController {
      * @param userDetails the authenticated viewer (used to populate viewer-relative RSVP fields)
      * @return 200 with the list of upcoming events
      */
+    @Operation(summary = "Lists all SCHEDULED events whose start time is still in the future, soonest first")
     @GetMapping("/upcoming")
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
     public ResponseEntity<ResponseDto<List<EventResponse>>> upcoming(
@@ -73,6 +79,7 @@ public class EventController {
      * @return 200 with the event
      * @throws com.neo.chat.exception.NotFoundException if the UUID is malformed or no event exists
      */
+    @Operation(summary = "Fetches a single event by UUID")
     @GetMapping("/{uuid}")
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
     public ResponseEntity<ResponseDto<EventResponse>> get(
@@ -94,7 +101,8 @@ public class EventController {
      *                                                       canceled/ended, or a new GOING RSVP would exceed the seat
      *                                                       cap
      */
-    @PostMapping("/{uuid}/rsvp")
+    @Operation(summary = "Sets or updates the current user's RSVP (GOING / INTERESTED / DECLINED) for an event")
+    @PostMapping(value = "/{uuid}/rsvp", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
     public ResponseEntity<ResponseDto<EventResponse>> rsvp(
             @PathVariable String uuid,
@@ -114,6 +122,7 @@ public class EventController {
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not the host
      * @throws com.neo.chat.exception.BadRequestException if the event is already ended or canceled
      */
+    @Operation(summary = "Cancels an event; only the host may do so")
     @PostMapping("/{uuid}/cancel")
     @PreAuthorize("@featureGuard.check('MIDNIGHT_EVENTS')")
     public ResponseEntity<ResponseDto<EventResponse>> cancel(

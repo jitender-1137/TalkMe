@@ -34,7 +34,7 @@ import org.hibernate.annotations.ColumnDefault;
 @AllArgsConstructor
 public class UserCosmetic extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

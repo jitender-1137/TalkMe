@@ -10,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.RedirectStrategy;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,8 +37,7 @@ class OAuth2LoginFailureHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new OAuth2LoginFailureHandler();
-        ReflectionTestUtils.setField(handler, "frontendBaseUrl", "http://localhost:3000");
+        handler = new OAuth2LoginFailureHandler("http://localhost:3000");
         handler.setRedirectStrategy(redirectStrategy);
     }
 
@@ -57,7 +55,8 @@ class OAuth2LoginFailureHandlerTest {
     @Test
     @DisplayName("base url with trailing slashes → trimmed before appending the login hash")
     void trimsTrailingSlashes() throws Exception {
-        ReflectionTestUtils.setField(handler, "frontendBaseUrl", "https://app.talkme.fun//");
+        handler = new OAuth2LoginFailureHandler("https://app.talkme.fun//");
+        handler.setRedirectStrategy(redirectStrategy);
         when(exception.getMessage()).thenReturn("boom");
 
         handler.onAuthenticationFailure(request, response, exception);

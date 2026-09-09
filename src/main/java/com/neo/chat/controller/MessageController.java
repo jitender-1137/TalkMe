@@ -9,8 +9,11 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.MessageService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -37,6 +40,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/chats/{chatId}/messages")
 @RequiredArgsConstructor
+@Tag(name = "Messages", description = "Per-chat message operations: send, history, edit/delete, self-destruct media, pin/star and reactions")
 public class MessageController {
 
     private final MessageService messageService;
@@ -56,7 +60,8 @@ public class MessageController {
      * @throws com.neo.chat.exception.TooManyRequestsException   slow mode active (TM_296)
      * @throws com.neo.chat.exception.ContentModerationException explicit content hard-blocked in a group
      */
-    @PostMapping
+    @Operation(summary = "Send a message to a chat (idempotent by client id; runs moderation/consent + durable fan-out)")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<MessageResponse>> sendMessage(
             @PathVariable("chatId") String chatUuid,
             @Valid @RequestBody SendMessageRequest request,
@@ -76,6 +81,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.NotFoundException  chat not found (TM_121)
      * @throws com.neo.chat.exception.ForbiddenException caller is not a member (TM_141)
      */
+    @Operation(summary = "Fetch a page of chat history (newest first) using a sequence-number cursor")
     @GetMapping
     public ResponseEntity<ResponseDto<MessagePageResponse>> getMessages(
             @PathVariable("chatId") String chatUuid,
@@ -96,6 +102,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.NotFoundException  chat not found (TM_121)
      * @throws com.neo.chat.exception.ForbiddenException caller is not a member (TM_141)
      */
+    @Operation(summary = "Fetch messages created after a given sequence number (incremental catch-up sync)")
     @GetMapping("/sync")
     public ResponseEntity<ResponseDto<List<MessageResponse>>> syncMessages(
             @PathVariable("chatId") String chatUuid,
@@ -116,6 +123,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.NotFoundException  chat not found (TM_121)
      * @throws com.neo.chat.exception.ForbiddenException caller is not a member (TM_141)
      */
+    @Operation(summary = "Full-text search within a chat's messages")
     @GetMapping("/search")
     public ResponseEntity<ResponseDto<Page<MessageResponse>>> searchMessages(
             @PathVariable("chatId") String chatUuid,
@@ -141,11 +149,12 @@ public class MessageController {
      *                                                              or empty content (TM_166)
      * @throws com.neo.chat.exception.ContentModerationException edited text violates guidelines
      */
-    @PatchMapping("/{messageId}")
+    @Operation(summary = "Edit the caller's own text message (re-runs moderation, then broadcasts the update)")
+    @PatchMapping(value = "/{messageId}", consumes = {MediaType.APPLICATION_JSON_VALUE, "application/merge-patch+json"})
     public ResponseEntity<ResponseDto<MessageResponse>> editMessage(
             @PathVariable("chatId") String chatUuid,
             @PathVariable("messageId") String messageUuid,
-            @RequestBody EditMessageRequest request,
+            @Valid @RequestBody EditMessageRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         MessageResponse response = messageService.editMessage(
                 chatUuid, messageUuid, request.getContent(), userDetails.getUser());
@@ -164,6 +173,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), or message not in this
      *                                                      chat (TM_162)
      */
+    @Operation(summary = "Delete a message: sender/group-admin deletes for everyone, a recipient deletes it for themselves only")
     @DeleteMapping("/{messageId}")
     public ResponseEntity<ResponseDto<Void>> deleteMessage(
             @PathVariable("chatId") String chatUuid,
@@ -187,6 +197,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), message not in this chat
      *                                                      (TM_162), or the sender tried to open it (TM_165)
      */
+    @Operation(summary = "Receiver opens a self-destruct/view-once media message, arming the server-side timer")
     @PostMapping("/{messageId}/reveal")
     public ResponseEntity<ResponseDto<MessageResponse>> revealSelfDestruct(
             @PathVariable("chatId") String chatUuid,
@@ -209,6 +220,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), or message not in this
      *                                                      chat (TM_162)
      */
+    @Operation(summary = "Receiver finished viewing a self-destruct message, destroying the media now (no-op for sender)")
     @PostMapping("/{messageId}/consume")
     public ResponseEntity<ResponseDto<Void>> consumeSelfDestruct(
             @PathVariable("chatId") String chatUuid,
@@ -231,6 +243,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), message not in this chat
      *                                                      (TM_162), or lacks pin permission (TM_291)
      */
+    @Operation(summary = "Pin a message (group pinning gated by the chat's whoCanPin setting); broadcasts the change")
     @PostMapping("/{messageId}/pin")
     public ResponseEntity<ResponseDto<MessageResponse>> pinMessage(
             @PathVariable("chatId") String chatUuid,
@@ -251,6 +264,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), message not in this chat
      *                                                      (TM_162), or lacks pin permission (TM_291)
      */
+    @Operation(summary = "Unpin a message (group pinning gated by the chat's whoCanPin setting); broadcasts the change")
     @DeleteMapping("/{messageId}/pin")
     public ResponseEntity<ResponseDto<MessageResponse>> unpinMessage(
             @PathVariable("chatId") String chatUuid,
@@ -273,6 +287,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), or message not in this
      *                                                      chat (TM_162)
      */
+    @Operation(summary = "Star (save) a message for the current user; idempotent")
     @PostMapping("/{messageId}/star")
     public ResponseEntity<ResponseDto<Void>> starMessage(
             @PathVariable("chatId") String chatUuid,
@@ -293,6 +308,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), or message not in this
      *                                                      chat (TM_162)
      */
+    @Operation(summary = "Unstar (unsave) a message for the current user; a no-op if it was not starred")
     @DeleteMapping("/{messageId}/star")
     public ResponseEntity<ResponseDto<Void>> unstarMessage(
             @PathVariable("chatId") String chatUuid,
@@ -314,7 +330,8 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), or message not in this
      *                                                      chat (TM_103)
      */
-    @PostMapping("/{messageId}/reactions")
+    @Operation(summary = "Add an emoji reaction to a message (no-op if the caller already reacted with it); broadcasts")
+    @PostMapping(value = "/{messageId}/reactions", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<MessageResponse>> reactToMessage(
             @PathVariable("chatId") String chatUuid,
             @PathVariable("messageId") String messageUuid,
@@ -336,6 +353,7 @@ public class MessageController {
      * @throws com.neo.chat.exception.ForbiddenException not a member (TM_141), or message not in this
      *                                                      chat (TM_103)
      */
+    @Operation(summary = "Remove the caller's emoji reaction from a message (no-op if absent); broadcasts the change")
     @DeleteMapping("/{messageId}/reactions/{emoji}")
     public ResponseEntity<ResponseDto<MessageResponse>> removeReaction(
             @PathVariable("chatId") String chatUuid,

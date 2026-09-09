@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Fallback;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -26,16 +26,24 @@ import java.util.concurrent.TimeUnit;
  * caching resolver that maps clean URLs to {@code .html} files, falls back to
  * {@code index.html} for SPA routes, and avoids concurrent fat-jar inflation corruption.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class WebMvcConfig implements WebMvcConfigurer {
 
     /**
-     * Primary {@link ObjectMapper} bean (plain Jackson 2 mapper).
+     * Legacy Jackson 2 {@link ObjectMapper} used by services that persist/parse JSON blobs
+     * (Redis buffers, stored payloads, external API clients — ~25 injection points).
+     * <p>
+     * It is deliberately {@link Fallback}, not {@code @Primary}: Spring Boot 4 auto-configures the
+     * Jackson 3 {@code jacksonJsonMapper} (customised in {@code JacksonConfig}) as the application's
+     * JSON mapper for HTTP (de)serialization, and that is the one to prefer going forward. Because
+     * this is the only bean of the Jackson 2 type, it still satisfies every Jackson 2 injection
+     * point; the annotation records intent and keeps the two mappers unambiguous (BootUI Spring
+     * Advisor SPRING-WIRING-003). Remove once callers migrate to {@code tools.jackson}.
      *
-     * @return a default {@link ObjectMapper}.
+     * @return a default Jackson 2 {@link ObjectMapper}.
      */
     @Bean
-    @Primary
+    @Fallback
     public ObjectMapper objectMapper() {
         return new ObjectMapper();
     }

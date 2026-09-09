@@ -60,7 +60,9 @@ public class CompatibilityServiceImpl implements CompatibilityService {
      * Computes the weighted 0..100 compatibility between two users across nine factors
      * (interests, hobbies, languages, age, timezone, activity, personality, energy, mood),
      * returning the overall score plus per-factor breakdown, human highlights, explanation
-     * and HIGH/MEDIUM/LOW bucket. Pure and deterministic — no LLM or I/O.
+     * and HIGH/MEDIUM/LOW bucket. Pure and deterministic — no LLM or I/O. The personality factor
+     * only counts when both users' LAZY {@code personality} maps are initialised (see
+     * {@code UserRepository#findByUuidWithPersonality}); on detached instances it scores neutral.
      *
      * @param a first user
      * @param b second user

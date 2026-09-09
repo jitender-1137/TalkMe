@@ -3,6 +3,7 @@ package com.neo.chat.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -16,7 +17,8 @@ import lombok.Setter;
 import java.time.Instant;
 
 @Entity
-@Table(name = "story_views", uniqueConstraints = @UniqueConstraint(columnNames = {"story_id", "user_id"}))
+@Table(name = "story_views", uniqueConstraints = @UniqueConstraint(columnNames = {"story_id", "user_id"}),
+        indexes = @Index(name = "idx_story_views_user_id", columnList = "user_id"))
 @Getter
 @Setter
 @Builder
@@ -24,11 +26,11 @@ import java.time.Instant;
 @AllArgsConstructor
 public class StoryView extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "story_id", nullable = false)
     private Story story;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

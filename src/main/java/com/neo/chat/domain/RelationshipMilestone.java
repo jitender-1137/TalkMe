@@ -5,7 +5,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -37,12 +36,11 @@ import java.time.Instant;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_relationship_milestone_pair_type_ref",
                 columnNames = {"user_a_id", "user_b_id", "type", "ref"}
-        ),
-        indexes = @Index(
-                name = "idx_relationship_milestone_pair",
-                columnList = "user_a_id, user_b_id"
         )
 )
+// (user_a_id, user_b_id) lookups are covered by the leading columns of
+// uk_relationship_milestone_pair_type_ref; the former idx_relationship_milestone_pair
+// index was redundant (BootUI DB-SCHEMA-003).
 @Getter
 @Setter
 @Builder

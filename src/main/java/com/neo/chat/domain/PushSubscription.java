@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -21,7 +22,8 @@ import lombok.Setter;
  * reports the endpoint is gone (404/410).
  */
 @Entity
-@Table(name = "push_subscriptions")
+@Table(name = "push_subscriptions",
+        indexes = @Index(name = "idx_push_subscriptions_user_id", columnList = "user_id"))
 @Getter
 @Setter
 @Builder
@@ -29,7 +31,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class PushSubscription extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

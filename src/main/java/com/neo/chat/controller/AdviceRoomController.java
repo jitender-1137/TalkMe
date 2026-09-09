@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Anonymous Advice Rooms (feature ADVICE_ROOMS). Every route is gated per-method by the
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
  * is stored for moderation only and the service's DTO mapping omits it entirely.
  */
 @RestController
+@Tag(name = "Advice Room", description = "Anonymous Advice Rooms (feature ADVICE_ROOMS)")
 @RequestMapping("/advice")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -47,7 +51,8 @@ public class AdviceRoomController {
      * @throws com.neo.chat.exception.ContentModerationException if the text fails moderation
      * @throws com.neo.chat.exception.TooManyRequestsException   if the rate cap is exceeded (TM_851)
      */
-    @PostMapping("/questions")
+    @Operation(summary = "Post an anonymous question")
+    @PostMapping(value = "/questions", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('ADVICE_ROOMS')")
     public ResponseEntity<ResponseDto<AdviceQuestionResponse>> ask(
             @Valid @RequestBody AskQuestionRequest request,
@@ -59,6 +64,7 @@ public class AdviceRoomController {
     /**
      * List questions (optionally filtered by category), newest first, cursor-paginated.
      */
+    @Operation(summary = "List questions (optionally filtered by category), newest first, cursor-paginated")
     @GetMapping("/questions")
     @PreAuthorize("@featureGuard.check('ADVICE_ROOMS')")
     public ResponseEntity<ResponseDto<AdviceQuestionPageResponse>> list(
@@ -77,6 +83,7 @@ public class AdviceRoomController {
      * @throws com.neo.chat.exception.BadRequestException if the UUID is malformed (TM_852)
      * @throws com.neo.chat.exception.NotFoundException   if the question is missing (TM_853)
      */
+    @Operation(summary = "A single question with its anonymised replies")
     @GetMapping("/questions/{uuid}")
     @PreAuthorize("@featureGuard.check('ADVICE_ROOMS')")
     public ResponseEntity<ResponseDto<AdviceThreadResponse>> getQuestion(
@@ -94,7 +101,8 @@ public class AdviceRoomController {
      * @throws com.neo.chat.exception.NotFoundException          if the question is missing (TM_853)
      * @throws com.neo.chat.exception.ContentModerationException if the body fails moderation
      */
-    @PostMapping("/questions/{uuid}/replies")
+    @Operation(summary = "Post an anonymous reply to a question, optionally threaded under a parent reply")
+    @PostMapping(value = "/questions/{uuid}/replies", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('ADVICE_ROOMS')")
     public ResponseEntity<ResponseDto<AdviceReplyResponse>> reply(
             @PathVariable("uuid") String uuid,
@@ -111,6 +119,7 @@ public class AdviceRoomController {
      * @throws com.neo.chat.exception.NotFoundException   if the question is missing (TM_853)
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not the author (TM_855)
      */
+    @Operation(summary = "Delete the caller's OWN question (author-only)")
     @DeleteMapping("/questions/{uuid}")
     @PreAuthorize("@featureGuard.check('ADVICE_ROOMS')")
     public ResponseEntity<ResponseDto<Void>> deleteQuestion(
@@ -127,6 +136,7 @@ public class AdviceRoomController {
      * @throws com.neo.chat.exception.NotFoundException   if the reply is missing (TM_853)
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not the author (TM_855)
      */
+    @Operation(summary = "Delete the caller's OWN reply (author-only)")
     @DeleteMapping("/replies/{uuid}")
     @PreAuthorize("@featureGuard.check('ADVICE_ROOMS')")
     public ResponseEntity<ResponseDto<Void>> deleteReply(

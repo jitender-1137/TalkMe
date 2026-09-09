@@ -32,7 +32,7 @@ import java.time.Duration;
  * Net effect: a WAN blip self-heals in seconds and commands fail fast instead of
  * piling into timeout storms.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class RedisResilienceConfig {
 
     /**

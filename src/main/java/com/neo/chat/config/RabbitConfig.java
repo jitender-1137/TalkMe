@@ -10,6 +10,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
  * and uses RabbitMQ's STOMP plugin, not these AMQP declarations.
  */
 @Slf4j
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "app.broker.amqp-events-enabled", havingValue = "true")
 public class RabbitConfig {
 
@@ -90,11 +91,19 @@ public class RabbitConfig {
      * Binds the message-send work queue to {@code talkme.events} with routing key
      * {@code message.send}.
      *
+     * <p>The queue and exchange are injected as method parameters (by bean name) rather
+     * than obtained by calling the sibling {@code @Bean} methods: this class runs in
+     * lite mode ({@code proxyBeanMethods = false}), where a direct call would build a
+     * fresh, unmanaged {@link Queue}/{@link TopicExchange} instead of the container bean.
+     *
+     * @param messageSendQueue the {@code q.message.send} work {@link Queue} bean.
+     * @param eventsExchange   the {@code talkme.events} {@link TopicExchange} bean.
      * @return the work-queue {@link Binding}.
      */
     @Bean
-    Binding messageSendBinding() {
-        return BindingBuilder.bind(messageSendQueue()).to(eventsExchange()).with(RK_MESSAGE_SEND);
+    Binding messageSendBinding(@Qualifier("messageSendQueue") Queue messageSendQueue,
+                               @Qualifier("eventsExchange") TopicExchange eventsExchange) {
+        return BindingBuilder.bind(messageSendQueue).to(eventsExchange).with(RK_MESSAGE_SEND);
     }
 
     // ── Dead-letter queue ──
@@ -113,11 +122,17 @@ public class RabbitConfig {
     /**
      * Binds the dead-letter queue to {@code talkme.dlx} with routing key {@code message.send}.
      *
+     * <p>Dependencies are injected by bean name for the same lite-mode reason as
+     * {@link #messageSendBinding(Queue, TopicExchange)}.
+     *
+     * @param dlqMessageSend the {@code dlq.message.send} dead-letter {@link Queue} bean.
+     * @param dlxExchange    the {@code talkme.dlx} {@link TopicExchange} bean.
      * @return the dead-letter {@link Binding}.
      */
     @Bean
-    Binding dlqMessageSendBinding() {
-        return BindingBuilder.bind(dlqMessageSend()).to(dlxExchange()).with(RK_MESSAGE_SEND);
+    Binding dlqMessageSendBinding(@Qualifier("dlqMessageSend") Queue dlqMessageSend,
+                                  @Qualifier("dlxExchange") TopicExchange dlxExchange) {
+        return BindingBuilder.bind(dlqMessageSend).to(dlxExchange).with(RK_MESSAGE_SEND);
     }
 
     // ── Serialization + template ──

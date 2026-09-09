@@ -44,10 +44,9 @@ import com.neo.chat.service.LoginAttemptService;
 import com.neo.chat.service.PwnedPasswordService;
 import com.neo.chat.service.ReputationRecorder;
 import com.neo.chat.service.WebPushService;
+import com.neo.chat.util.ClientRequestInfo;
 import com.neo.chat.util.LogSanitizer;
 import com.neo.chat.util.ProfileCompletion;
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -89,7 +88,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
@@ -112,26 +110,67 @@ public class AuthServiceImpl implements AuthService {
     private final FeatureAccessCache featureAccessCache;
     private final ReputationRecorder reputationRecorder;
 
-    @Value("${security.jwt.access-token-expiration-ms}")
-    private long accessTokenExpirationMs;
+    private final long accessTokenExpirationMs;
+    private final long refreshTokenExpirationMs;
+    private final long guestRefreshTokenExpirationMs;
+    private final long passwordResetTtlMinutes;
+    private final long emailVerificationTtlMinutes;
+    private final long accountDeletionWindowDays;
+    private final String frontendBaseUrl;
 
-    @Value("${security.jwt.refresh-token-expiration-ms}")
-    private long refreshTokenExpirationMs;
-
-    @Value("${security.jwt.guest-refresh-token-expiration-ms}")
-    private long guestRefreshTokenExpirationMs;
-
-    @Value("${app.auth.password-reset-token-ttl-minutes:30}")
-    private long passwordResetTtlMinutes;
-
-    @Value("${app.auth.email-verification-token-ttl-minutes:1440}")
-    private long emailVerificationTtlMinutes;
-
-    @Value("${app.auth.account-deletion-window-days:30}")
-    private long accountDeletionWindowDays;
-
-    @Value("${app.frontend-base-url:http://localhost:3000}")
-    private String frontendBaseUrl;
+    public AuthServiceImpl(UserRepository userRepository,
+                           RoleRepository roleRepository,
+                           RefreshTokenRepository refreshTokenRepository,
+                           SessionRepository sessionRepository,
+                           PasswordEncoder passwordEncoder,
+                           JwtTokenProvider tokenProvider,
+                           UserMapper userMapper,
+                           SessionMapper sessionMapper,
+                           CountryDetectionService countryDetectionService,
+                           LoginAttemptService loginAttemptService,
+                           StringRedisTemplate redisTemplate,
+                           PwnedPasswordService pwnedPasswordService,
+                           EmailService emailService,
+                           WebPushService webPushService,
+                           ContentModerationService moderationService,
+                           UserSettingRepository userSettingRepository,
+                           FeatureAccessService featureAccessService,
+                           FeatureAccessCache featureAccessCache,
+                           ReputationRecorder reputationRecorder,
+                           @Value("${security.jwt.access-token-expiration-ms}") long accessTokenExpirationMs,
+                           @Value("${security.jwt.refresh-token-expiration-ms}") long refreshTokenExpirationMs,
+                           @Value("${security.jwt.guest-refresh-token-expiration-ms}") long guestRefreshTokenExpirationMs,
+                           @Value("${app.auth.password-reset-token-ttl-minutes:30}") long passwordResetTtlMinutes,
+                           @Value("${app.auth.email-verification-token-ttl-minutes:1440}") long emailVerificationTtlMinutes,
+                           @Value("${app.auth.account-deletion-window-days:30}") long accountDeletionWindowDays,
+                           @Value("${app.frontend-base-url:http://localhost:3000}") String frontendBaseUrl) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.sessionRepository = sessionRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.tokenProvider = tokenProvider;
+        this.userMapper = userMapper;
+        this.sessionMapper = sessionMapper;
+        this.countryDetectionService = countryDetectionService;
+        this.loginAttemptService = loginAttemptService;
+        this.redisTemplate = redisTemplate;
+        this.pwnedPasswordService = pwnedPasswordService;
+        this.emailService = emailService;
+        this.webPushService = webPushService;
+        this.moderationService = moderationService;
+        this.userSettingRepository = userSettingRepository;
+        this.featureAccessService = featureAccessService;
+        this.featureAccessCache = featureAccessCache;
+        this.reputationRecorder = reputationRecorder;
+        this.accessTokenExpirationMs = accessTokenExpirationMs;
+        this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+        this.guestRefreshTokenExpirationMs = guestRefreshTokenExpirationMs;
+        this.passwordResetTtlMinutes = passwordResetTtlMinutes;
+        this.emailVerificationTtlMinutes = emailVerificationTtlMinutes;
+        this.accountDeletionWindowDays = accountDeletionWindowDays;
+        this.frontendBaseUrl = frontendBaseUrl;
+    }
 
     /**
      * Redis key prefix for one-time password-reset tokens (value = user UUID).
@@ -155,9 +194,7 @@ public class AuthServiceImpl implements AuthService {
      * session (single-device: prior tokens are revoked). Transactional.
      *
      * @param request     the login credentials (email/username + password)
-     * @param userAgent   the caller's User-Agent (recorded on the session + alert)
-     * @param ip          the caller IP (used for lockout accounting)
-     * @param httpRequest the servlet request (used for IP geolocation)
+     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with user + tokens
      * @throws com.neo.chat.exception.UnauthorizedException (TM_024) unknown user, bad password,
      *                                                         or a soft-deleted account past its recovery window
@@ -166,7 +203,9 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public LoginResponse login(LoginRequest request, String userAgent, String ip, HttpServletRequest httpRequest) {
+    public LoginResponse login(LoginRequest request, ClientRequestInfo client) {
+        String userAgent = client != null ? client.userAgent() : null;
+        String ip = client != null ? client.clientIp() : null;
         // Email / username are case-insensitive; trim + normalize so login works
         // regardless of the case the user typed (matches how signup stores email).
         String identifier = request.getEmail() == null ? "" : request.getEmail().trim();
@@ -222,7 +261,7 @@ public class AuthServiceImpl implements AuthService {
         // — a detection failure must never block login.
         CountryDetectionResult detection;
         try {
-            detection = countryDetectionService.detectCountry(httpRequest);
+            detection = countryDetectionService.detectCountry(client);
         } catch (Exception e) {
             log.warn("Location detection on login failed for {}: {}", user.getUuid(), e.getMessage());
             detection = null;
@@ -254,8 +293,7 @@ public class AuthServiceImpl implements AuthService {
      * verification email, and returns a login response. Transactional.
      *
      * @param request     the signup fields
-     * @param userAgent   the caller's User-Agent
-     * @param httpRequest the servlet request (used for country detection)
+     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with user + tokens
      * @throws com.neo.chat.exception.ConflictException          (TM_047) if the email already exists
      * @throws com.neo.chat.exception.BadRequestException        (TM_496) if the password is breached
@@ -263,7 +301,8 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public LoginResponse signup(SignupRequest request, String userAgent, HttpServletRequest httpRequest) {
+    public LoginResponse signup(SignupRequest request, ClientRequestInfo client) {
+        String userAgent = client != null ? client.userAgent() : null;
         // Canonicalize the email to lower-case (trimmed) so it's stored one way and
         // login matches regardless of the case the user types. The uniqueness check
         // is case-insensitive so "John@x.com" and "john@x.com" can't both register.
@@ -298,7 +337,7 @@ public class AuthServiceImpl implements AuthService {
 
         Role userRole = getOrCreateRole("ROLE_USER");
 
-        CountryDetectionResult detectionResult = countryDetectionService.detectCountry(httpRequest);
+        CountryDetectionResult detectionResult = countryDetectionService.detectCountry(client);
 
         // Referral attribution (who invited this user) — resolved BEFORE the insert so it's a single
         // save. Best-effort with no reward payout: any problem yields null and the signup proceeds
@@ -355,24 +394,24 @@ public class AuthServiceImpl implements AuthService {
      * with detected country, and returns a login response (guest refresh-token TTL). Transactional.
      *
      * @param request     the guest details (display name, age, gender)
-     * @param userAgent   the caller's User-Agent
-     * @param httpRequest the servlet request (used for country detection)
+     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with the guest user + tokens
      */
     @Override
     @Transactional
-    public LoginResponse loginAsGuest(GuestLoginRequest request, String userAgent, HttpServletRequest httpRequest) {
+    public LoginResponse loginAsGuest(GuestLoginRequest request, ClientRequestInfo client) {
+        String userAgent = client != null ? client.userAgent() : null;
         // ABUSE GUARD: cap guest-account creation per client IP per day. Each guest login inserts a
         // permanent users/session/refresh row, so an unbounded loop bloats the DB and inflates
         // stats. Fail-OPEN if Redis is unavailable.
-        if (!guestCreationAllowed(com.neo.chat.util.ClientIp.resolve(httpRequest))) {
+        if (!guestCreationAllowed(client != null ? client.clientIp() : "unknown")) {
             throw new TooManyRequestsException(
                     "Too many guest sessions from this network today. Please try again later or sign up.", "TM_007");
         }
         String username = "guest_" + UUID.randomUUID().toString().substring(0, 8);
         Role guestRole = getOrCreateRole("ROLE_GUEST");
 
-        CountryDetectionResult detectionResult = countryDetectionService.detectCountry(httpRequest);
+        CountryDetectionResult detectionResult = countryDetectionService.detectCountry(client);
 
         User guest = User.builder()
                 .name(request.getName())
@@ -400,21 +439,20 @@ public class AuthServiceImpl implements AuthService {
      * users, otherwise a best-effort sign-in alert. Transactional.
      *
      * @param info        the OAuth profile (provider id, email, name, picture, verified, age, gender)
-     * @param userAgent   the caller's User-Agent
-     * @param httpRequest the callback servlet request (used for country detection)
+     * @param client      the caller's request context (User-Agent, client IP, proxy headers)
      * @return the login response with user + tokens
      * @throws org.springframework.dao.DataIntegrityViolationException if a creation race cannot be
      *                                                                 resolved to an existing row
      */
     @Override
     @Transactional
-    public LoginResponse oauthLogin(OAuthUserInfo info, String userAgent,
-                                    HttpServletRequest httpRequest) {
+    public LoginResponse oauthLogin(OAuthUserInfo info, ClientRequestInfo client) {
+        String userAgent = client != null ? client.userAgent() : null;
         // Geolocate from the callback request IP — the OAuth callback is a top-level
         // browser navigation so the client IP is the real user's. Google's profile has
         // no reliable country, so we reuse the SAME detector as password/guest signup
         // (IP → proxy headers → server public IP fallback; see CountryDetectionService).
-        CountryDetectionResult detection = countryDetectionService.detectCountry(httpRequest);
+        CountryDetectionResult detection = countryDetectionService.detectCountry(client);
 
         // Canonical lower-case email (matches password-signup storage), so a Google
         // login links to the pre-existing password account regardless of case.

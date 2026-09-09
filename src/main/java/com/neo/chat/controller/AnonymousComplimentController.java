@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Anonymous Compliments (feature ANON_COMPLIMENTS). Every route is gated by the
@@ -27,6 +30,7 @@ import java.util.List;
  * in the service and DTO mapping — there is no endpoint that discloses an un-revealed sender.
  */
 @RestController
+@Tag(name = "Anonymous Compliment", description = "Anonymous Compliments (feature ANON_COMPLIMENTS)")
 @RequestMapping("/compliments")
 @RequiredArgsConstructor
 public class AnonymousComplimentController {
@@ -44,7 +48,8 @@ public class AnonymousComplimentController {
      * @throws com.neo.chat.exception.ContentModerationException if the message fails moderation
      * @throws com.neo.chat.exception.TooManyRequestsException   if the sender exceeds the rate limit
      */
-    @PostMapping
+    @Operation(summary = "Send an anonymous compliment to a user; the sender identity is not disclosed to the recipient")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<ComplimentResponse>> send(
             @Valid @RequestBody SendComplimentRequest request,
@@ -59,6 +64,7 @@ public class AnonymousComplimentController {
      * @param userDetails the authenticated principal (the recipient)
      * @return the list of received {@link ComplimentResponse} items
      */
+    @Operation(summary = "The caller's inbox — compliments addressed to them (sender hidden unless revealed)")
     @GetMapping("/inbox")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<List<ComplimentResponse>>> inbox(
@@ -73,6 +79,7 @@ public class AnonymousComplimentController {
      * @param userDetails the authenticated principal (the sender)
      * @return the list of sent {@link ComplimentResponse} items
      */
+    @Operation(summary = "The caller's own outgoing compliments")
     @GetMapping("/sent")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<List<ComplimentResponse>>> sent(
@@ -93,6 +100,7 @@ public class AnonymousComplimentController {
      * @throws com.neo.chat.exception.BadRequestException if the compliment was already
      *                                                       revealed or the reveal was declined
      */
+    @Operation(summary = "Recipient requests to learn who sent a compliment (notifies the sender); idempotent if a request is already pending")
     @PostMapping("/{uuid}/reveal-request")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<ComplimentResponse>> requestReveal(
@@ -114,6 +122,7 @@ public class AnonymousComplimentController {
      *                                                       or the caller is not its sender
      * @throws com.neo.chat.exception.BadRequestException if there is no pending reveal request
      */
+    @Operation(summary = "Sender accepts (accept=true) or declines (accept=false) a reveal request; on accept the recipient learns the sender's identity")
     @PostMapping("/{uuid}/reveal-response")
     @PreAuthorize("@featureGuard.check('ANON_COMPLIMENTS')")
     public ResponseEntity<ResponseDto<ComplimentResponse>> respondReveal(

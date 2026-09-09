@@ -17,11 +17,18 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
 
     Optional<PushSubscription> findByEndpoint(String endpoint);
 
-    void deleteByEndpoint(String endpoint);
+    // Bulk JPQL delete (BootUI HIB-QUERY-004): the derived deleteBy… variant loaded every row and
+    // removed it one by one. The entity has no cascades/orphanRemoval and no @PreRemove hooks, so a
+    // single DELETE statement is equivalent.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM PushSubscription s WHERE s.endpoint = :endpoint")
+    void deleteByEndpoint(@Param("endpoint") String endpoint);
 
     /**
      * Remove every push subscription for a user (used on the single-device login sweep).
      */
+    // Intentionally no clearAutomatically: runs inside the login transaction
+    // (AuthServiceImpl.generateLoginResponse), which keeps mutating and saving the managed User afterwards.
     @Modifying
     @Query("DELETE FROM PushSubscription p WHERE p.user.id = :userId")
     int deleteByUserId(@Param("userId") Long userId);

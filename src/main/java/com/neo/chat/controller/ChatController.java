@@ -23,6 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Core conversation endpoints: create/list/fetch chats plus per-user chat management (archive, mute,
@@ -30,6 +33,7 @@ import java.util.List;
  * service layer.
  */
 @RestController
+@Tag(name = "Chat", description = "Core conversation endpoints: create/list/fetch chats plus per-user chat management (archive, mute, pin, clear, delete, read/unread...")
 @RequestMapping("/chats")
 @RequiredArgsConstructor
 public class ChatController {
@@ -46,7 +50,8 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if a specified recipient user does not exist
      *                                                     (TM_064)
      */
-    @PostMapping
+    @Operation(summary = "Creates a chat: a 1:1 PRIVATE chat when recipientId is set (reusing/reopening any existing one between the two users), otherwise a...")
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<ChatResponse>> createChat(
             @Valid @RequestBody CreateChatRequest request,
@@ -62,6 +67,7 @@ public class ChatController {
      * @param userDetails the authenticated principal whose conversations are returned
      * @return 200 with the caller's list of {@link ChatResponse}
      */
+    @Operation(summary = "Lists the caller's chats, dropping message-less 1:1 chats, de-duplicating multiple 1:1 chats with the same user (keeping the most...")
     @GetMapping
     public ResponseEntity<ResponseDto<List<ChatResponse>>> getChats(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -79,6 +85,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Fetches a single chat the caller participates in (membership enforced to prevent leaking another conversation's participant data by UUID)")
     @GetMapping("/{id}")
     public ResponseEntity<ResponseDto<ChatResponse>> getChat(
             @PathVariable("id") String uuid,
@@ -101,6 +108,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Per-conversation encryption key — participant-only; held in client memory only")
     @GetMapping("/{id}/key")
     @PreAuthorize("hasAnyRole('USER','GUEST')")
     public ResponseEntity<ResponseDto<ChatKeyResponse>> getChatKey(
@@ -121,6 +129,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Sets the caller's per-member archived flag for the chat")
     @PutMapping("/{id}/archive")
     public ResponseEntity<ResponseDto<Void>> archiveChat(
             @PathVariable("id") String uuid,
@@ -142,6 +151,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Sets the caller's per-member muted flag for the chat")
     @PutMapping("/{id}/mute")
     public ResponseEntity<ResponseDto<Void>> muteChat(
             @PathVariable("id") String uuid,
@@ -163,6 +173,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Sets the caller's per-member pinned flag for the chat")
     @PutMapping("/{id}/pin")
     public ResponseEntity<ResponseDto<Void>> pinChat(
             @PathVariable("id") String uuid,
@@ -184,6 +195,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Clears the chat for the caller only by stamping their clearedAt so earlier messages no longer appear in their view (does not delete...")
     @DeleteMapping("/{id}/clear")
     public ResponseEntity<ResponseDto<Void>> clearChat(
             @PathVariable("id") String uuid,
@@ -204,6 +216,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.ForbiddenException if a multi-party chat is deleted by a non-owner
      *                                                      (TM_291)
      */
+    @Operation(summary = "Deletes the chat: hard-deletes all messages, soft-deletes the chat and its members, and broadcasts chat_deleted")
     @DeleteMapping("/{id}")
     public ResponseEntity<ResponseDto<Void>> deleteChat(
             @PathVariable("id") String uuid,
@@ -222,6 +235,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Marks the chat as read for the caller: clears any manual-unread flag, then advances the read watermark (multi-party) or updates/creates...")
     @PutMapping("/{id}/read")
     public ResponseEntity<ResponseDto<Void>> markRead(
             @PathVariable("id") String uuid,
@@ -239,6 +253,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Mark a chat as UNREAD (sticky badge until the user opens it again)")
     @PutMapping("/{id}/unread")
     public ResponseEntity<ResponseDto<Void>> markUnread(
             @PathVariable("id") String uuid,
@@ -258,6 +273,7 @@ public class ChatController {
      * @throws com.neo.chat.exception.NotFoundException if the chat does not exist (TM_121) or the caller
      *                                                     is not a member (TM_141)
      */
+    @Operation(summary = "Marks the chat's messages as delivered for the caller: upgrades SENT receipts to DELIVERED (never downgrading READ), creates missing...")
     @PutMapping("/{id}/delivered")
     public ResponseEntity<ResponseDto<Void>> markDelivered(
             @PathVariable("id") String uuid,
@@ -273,6 +289,7 @@ public class ChatController {
      * @param userDetails the authenticated principal whose chats are updated
      * @return 200 with an empty payload (message code TM_151)
      */
+    @Operation(summary = "Marks messages across all the caller's chats as delivered (typically on reconnect), broadcasting a messages_delivered event per updated...")
     @PutMapping("/deliver-all")
     public ResponseEntity<ResponseDto<Void>> markAllChatsDelivered(
             @AuthenticationPrincipal CustomUserDetails userDetails) {

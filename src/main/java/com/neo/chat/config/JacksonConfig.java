@@ -19,7 +19,7 @@ import tools.jackson.databind.DeserializationFeature;
  * autoconfigured {@code JsonMapper} used by Spring MVC (a bare {@code spring.jackson.*} property is
  * not reliably applied under every test slice).
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class JacksonConfig {
 
     @Bean

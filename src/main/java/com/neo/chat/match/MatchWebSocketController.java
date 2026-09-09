@@ -3,6 +3,7 @@ package com.neo.chat.match;
 import com.neo.chat.dto.request.MatchStartRequest;
 import com.neo.chat.enums.RevealChannel;
 import com.neo.chat.match.impl.MatchMessageBufferService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -25,6 +26,16 @@ import java.util.Map;
 @Slf4j
 @Controller
 @RequiredArgsConstructor
+@Tag(
+        name = "WebSocket (Stranger Match)",
+        description = """
+                STOMP message endpoints (not HTTP) for the anonymous stranger-match feature, all under \
+                the /app/match/* destination prefix: matchmaking lifecycle (start, exit, new-chat, \
+                resume), relay of text/typing/GIF/image frames (message, typing, gif, request-image, \
+                accept-image, decline-image, send-image), the 18+ text-consent handshake \
+                (accept-consent, decline-consent), the mutual identity-reveal handshake \
+                (reveal-request, reveal-accept, reveal-decline) and timed-mode actions (timed-action). \
+                Replies are delivered to the caller's /user/queue/match destination.""")
 public class MatchWebSocketController {
 
     private final MatchmakingService matchmakingService;

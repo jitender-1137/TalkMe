@@ -21,10 +21,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class FfmpegSupport {
 
-    @Value("${media.ffmpeg-path:ffmpeg}")
-    private String configuredPath;
+    private final String configuredPath;
 
     private volatile String resolved;
+
+    public FfmpegSupport(@Value("${media.ffmpeg-path:ffmpeg}") String configuredPath) {
+        this.configuredPath = configuredPath;
+    }
 
     /**
      * Resolves the ffmpeg executable path, caching the result (double-checked locking). An operator-set

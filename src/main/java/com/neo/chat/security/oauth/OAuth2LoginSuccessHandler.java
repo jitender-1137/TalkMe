@@ -1,5 +1,6 @@
 package com.neo.chat.security.oauth;
 
+import com.neo.chat.util.ClientRequestInfo;
 import com.neo.chat.dto.OAuthUserInfo;
 import com.neo.chat.dto.response.LoginResponse;
 import com.neo.chat.service.AuthService;
@@ -7,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import com.neo.chat.controller.AuthController;
 import com.neo.chat.security.JwtTokenProvider;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,22 +34,42 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final AuthService authService;
     private final GoogleProfileService googleProfileService;
     private final ObjectProvider<OAuth2AuthorizedClientService> authorizedClientService;
     private final JwtTokenProvider tokenProvider;
+    private final boolean cookieSecure;
+    private final String cookieSameSite;
+    private final String frontendBaseUrl;
 
-    @Value("${app.cookie.secure:false}")
-    private boolean cookieSecure;
-
-    @Value("${app.cookie.same-site:Lax}")
-    private String cookieSameSite;
-
-    @Value("${app.frontend-base-url:http://localhost:3000}")
-    private String frontendBaseUrl;
+    /**
+     * Constructor-injects the collaborators and the cookie / redirect settings.
+     *
+     * @param authService             creates/links the local account
+     * @param googleProfileService    best-effort People API profile fetch
+     * @param authorizedClientService access to the Google access token (may be absent)
+     * @param tokenProvider           mints the media-read cookie token
+     * @param cookieSecure            {@code app.cookie.secure} (default false)
+     * @param cookieSameSite          {@code app.cookie.same-site} (default Lax)
+     * @param frontendBaseUrl         {@code app.frontend-base-url} (default http://localhost:3000)
+     */
+    public OAuth2LoginSuccessHandler(AuthService authService,
+                                     GoogleProfileService googleProfileService,
+                                     ObjectProvider<OAuth2AuthorizedClientService> authorizedClientService,
+                                     JwtTokenProvider tokenProvider,
+                                     @Value("${app.cookie.secure:false}") boolean cookieSecure,
+                                     @Value("${app.cookie.same-site:Lax}") String cookieSameSite,
+                                     @Value("${app.frontend-base-url:http://localhost:3000}") String frontendBaseUrl) {
+        this.authService = authService;
+        this.googleProfileService = googleProfileService;
+        this.authorizedClientService = authorizedClientService;
+        this.tokenProvider = tokenProvider;
+        this.cookieSecure = cookieSecure;
+        this.cookieSameSite = cookieSameSite;
+        this.frontendBaseUrl = frontendBaseUrl;
+    }
 
     /**
      * Handles a successful Google authentication: extracts OIDC profile attributes, best-effort
@@ -67,7 +87,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                                         Authentication authentication) throws IOException {
         OAuth2User principal = (OAuth2User) authentication.getPrincipal();
 
-        assert principal != null;
+        assert principal != null : "OAuth2 authentication must carry an OAuth2User principal";
         String sub = principal.getAttribute("sub");
         String email = principal.getAttribute("email");
         String picture = principal.getAttribute("picture");
@@ -115,7 +135,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         // Pass the request so AuthService can geolocate the user's country from the
         // callback IP (same detection used by password/guest signup).
-        LoginResponse login = authService.oauthLogin(info, request.getHeader("User-Agent"), request);
+        LoginResponse login = authService.oauthLogin(info, ClientRequestInfo.from(request, request.getHeader("User-Agent")));
 
         setAuthCookies(response, login.getTokens().getRefreshToken());
         setMediaCookie(response, login);

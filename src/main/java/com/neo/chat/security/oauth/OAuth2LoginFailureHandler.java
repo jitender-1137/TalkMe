@@ -19,8 +19,17 @@ import java.io.IOException;
 @Component
 public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
-    @Value("${app.frontend-base-url:http://localhost:3000}")
-    private String frontendBaseUrl;
+    private final String frontendBaseUrl;
+
+    /**
+     * Constructor-injects the SPA base URL used for the error redirect.
+     *
+     * @param frontendBaseUrl {@code app.frontend-base-url} (default http://localhost:3000)
+     */
+    public OAuth2LoginFailureHandler(
+            @Value("${app.frontend-base-url:http://localhost:3000}") String frontendBaseUrl) {
+        this.frontendBaseUrl = frontendBaseUrl;
+    }
 
     /**
      * Redirects a failed/canceled OAuth login back to the SPA's login page with an

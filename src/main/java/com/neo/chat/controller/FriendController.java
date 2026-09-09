@@ -21,12 +21,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Friend graph management: friend requests (send/accept/decline/cancel), the friend list, and
  * user block/unblock. Every route is gated by {@code hasRole('USER')}.
  */
 @RestController
+@Tag(name = "Friend", description = "Friend graph management: friend requests (send/accept/decline/cancel), the friend list, and user block/unblock")
 @RequestMapping("/friends")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
@@ -46,7 +50,8 @@ public class FriendController {
      * @throws com.neo.chat.exception.ConflictException        already friends with this user (TM_096)
      * @throws com.neo.chat.exception.TooManyRequestsException daily new-request cap reached (TM_498)
      */
-    @PostMapping("/requests")
+    @Operation(summary = "Send (or re-send) a friend request; auto-accepts if the receiver already sent one to you")
+    @PostMapping(value = "/requests", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<FriendRequestResponse>> sendFriendRequest(
             @RequestBody Map<String, String> payload,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -65,6 +70,7 @@ public class FriendController {
      * @throws com.neo.chat.exception.ForbiddenException caller is not the request's receiver (TM_103)
      * @throws com.neo.chat.exception.ConflictException  request is not PENDING (already processed) (TM_096)
      */
+    @Operation(summary = "Accept a pending friend request (creates the mutual friendship)")
     @PutMapping("/requests/{id}/accept")
     public ResponseEntity<ResponseDto<Void>> acceptFriendRequest(
             @PathVariable("id") String requestUuid,
@@ -83,6 +89,7 @@ public class FriendController {
      * @throws com.neo.chat.exception.ForbiddenException caller is not the request's receiver (TM_103)
      * @throws com.neo.chat.exception.ConflictException  request is not PENDING (already processed) (TM_096)
      */
+    @Operation(summary = "Decline a pending friend request")
     @PutMapping("/requests/{id}/decline")
     public ResponseEntity<ResponseDto<Void>> rejectFriendRequest(
             @PathVariable("id") String requestUuid,
@@ -100,6 +107,7 @@ public class FriendController {
      * @throws com.neo.chat.exception.NotFoundException  request UUID does not exist (TM_094)
      * @throws com.neo.chat.exception.ForbiddenException caller is not the request's sender (TM_103)
      */
+    @Operation(summary = "Cancel a friend request you sent (deletes it)")
     @DeleteMapping("/requests/{id}/cancel")
     public ResponseEntity<ResponseDto<Void>> cancelFriendRequest(
             @PathVariable("id") String requestUuid,
@@ -114,6 +122,7 @@ public class FriendController {
      * @param userDetails the authenticated user
      * @return the caller's friend list wrapped in a success envelope
      */
+    @Operation(summary = "List the caller's friends, each enriched with presence and apparent last-seen")
     @GetMapping
     public ResponseEntity<ResponseDto<List<AuthUserResponse>>> getFriends(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -127,6 +136,7 @@ public class FriendController {
      * @param userDetails the authenticated receiver
      * @return the pending inbound requests wrapped in a success envelope
      */
+    @Operation(summary = "List the caller's incoming PENDING friend requests (newest first)")
     @GetMapping("/requests")
     public ResponseEntity<ResponseDto<List<FriendRequestResponse>>> getFriendRequests(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -142,6 +152,7 @@ public class FriendController {
      * @return empty success envelope (TM_098)
      * @throws com.neo.chat.exception.NotFoundException friend UUID does not exist (TM_064)
      */
+    @Operation(summary = "Remove a friend (drops the mutual friendship and clears any prior requests between them)")
     @DeleteMapping("/{id}")
     public ResponseEntity<ResponseDto<Void>> removeFriend(
             @PathVariable("id") String friendUuid,
@@ -159,6 +170,7 @@ public class FriendController {
      * @throws com.neo.chat.exception.NotFoundException   target UUID does not exist (TM_064)
      * @throws com.neo.chat.exception.BadRequestException blocking yourself (TM_071)
      */
+    @Operation(summary = "Block a user (also removes any existing friendship); idempotent if already blocked")
     @PostMapping("/block/{id}")
     public ResponseEntity<ResponseDto<Void>> blockUser(
             @PathVariable("id") String targetUuid,
@@ -175,6 +187,7 @@ public class FriendController {
      * @return empty success envelope (TM_068)
      * @throws com.neo.chat.exception.NotFoundException target UUID does not exist (TM_064)
      */
+    @Operation(summary = "Unblock a previously blocked user; a no-op if they were not blocked")
     @DeleteMapping("/block/{id}")
     public ResponseEntity<ResponseDto<Void>> unblockUser(
             @PathVariable("id") String targetUuid,

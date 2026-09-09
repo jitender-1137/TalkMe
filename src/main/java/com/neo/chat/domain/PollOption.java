@@ -4,6 +4,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -18,7 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "poll_options")
+@Table(name = "poll_options",
+        indexes = @Index(name = "idx_poll_options_poll_id", columnList = "poll_id"))
 @Getter
 @Setter
 @Builder
@@ -26,7 +28,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PollOption extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "poll_id", nullable = false)
     private Poll poll;
 

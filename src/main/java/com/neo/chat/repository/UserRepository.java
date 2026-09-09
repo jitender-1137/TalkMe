@@ -27,6 +27,26 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByUuid(UUID uuid);
 
+    /**
+     * Loads a user by UUID with the LAZY {@code personality} trait map fetch-joined, so compatibility
+     * scoring can read it on a detached instance (open-in-view is disabled; see application.yml).
+     *
+     * @param uuid the user's public UUID
+     * @return the user with {@code personality} initialised, if present
+     */
+    @Query("select u from User u left join fetch u.personality where u.uuid = :uuid")
+    Optional<User> findByUuidWithPersonality(@Param("uuid") UUID uuid);
+
+    /**
+     * Loads a user by id with the LAZY {@code personality} trait map fetch-joined. Used to re-load
+     * the (detached) authenticated principal before compatibility scoring.
+     *
+     * @param id the user's database id
+     * @return the user with {@code personality} initialised, if present
+     */
+    @Query("select u from User u left join fetch u.personality where u.id = :id")
+    Optional<User> findByIdWithPersonality(@Param("id") Long id);
+
     boolean existsByUsername(String username);
 
     // ── Case-insensitive lookups ─────────────────────────────────────────────
@@ -79,7 +99,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     /**
      * One-time correction: guests must never be verified. Returns rows fixed.
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.isVerified = false WHERE u.isGuest = true AND u.isVerified = true")
     int unverifyAllGuests();
 
@@ -99,7 +119,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("SELECT u.country, COUNT(u) FROM User u WHERE u.isGuest = false AND u.country IS NOT NULL GROUP BY u.country ORDER BY COUNT(u) DESC")
     List<Object[]> countGroupedByCountry();
 
-    @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u " +
+    @Query("SELECT u FROM User u JOIN UserPresence up ON up.user = u LEFT JOIN FETCH u.presence " +
             "WHERE up.status = 'ONLINE' " +
             "AND up.invisibleModeEnabled = false " +
             "AND up.ghostModeEnabled = false " +
@@ -107,17 +127,19 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             "AND u.isDeleted = false")
     List<User> findAllOnlineUsersExcludeSelf(@Param("currentUserId") Long currentUserId);
 
-    @Query("SELECT u FROM User u WHERE u.username IN :usernames AND (:currentUserId IS NULL OR u.id <> :currentUserId) AND u.isDeleted = false")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.presence WHERE u.username IN :usernames AND (:currentUserId IS NULL OR u.id <> :currentUserId) AND u.isDeleted = false")
     List<User> findAllByUsernameInExcludeSelf(@Param("usernames") Set<String> usernames, @Param("currentUserId") Long currentUserId);
 
     // ── Unread badge counter — atomic updates avoid optimistic-lock conflicts
     //    and lost updates from concurrent writers (presence, multiple messages).
 
+    // Intentionally no clearAutomatically: NotificationDispatchServiceImpl.onNewMessage() keeps
+    // reading the managed recipient User (and MessageBroadcaster reuses the loaded recipients) afterwards.
     @Modifying
     @Query("UPDATE User u SET u.totalUnreadCount = u.totalUnreadCount + 1 WHERE u.id = :id")
     void incrementTotalUnreadCount(@Param("id") Long id);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.totalUnreadCount = :count WHERE u.id = :id")
     void setTotalUnreadCount(@Param("id") Long id, @Param("count") int count);
 
@@ -127,6 +149,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     /**
      * Soft-deleted accounts whose recovery window has elapsed — due for permanent purge.
      */
-    @Query("SELECT u FROM User u WHERE u.isDeleted = true AND u.deletionRequestedAt IS NOT NULL AND u.deletionRequestedAt < :cutoff")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.presence WHERE u.isDeleted = true AND u.deletionRequestedAt IS NOT NULL AND u.deletionRequestedAt < :cutoff")
     List<User> findAccountsDueForPurge(@Param("cutoff") Instant cutoff);
 }

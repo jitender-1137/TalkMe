@@ -1,4 +1,20 @@
 spring:
+  # Mirror production's executor wiring (see src/main/resources/application.yml). The app defines
+  # its own Executor bean (broadcastExecutor), which makes Boot back off from creating
+  # applicationTaskExecutor unless mode=force; beans that inject @Qualifier("applicationTaskExecutor")
+  # would then fail to wire in @SpringBootTest, because this file shadows the main application.yml.
+  task:
+    execution:
+      mode: force
+      thread-name-prefix: async-
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 100
+    scheduling:
+      thread-name-prefix: sched-
+      pool:
+        size: 2
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
     username: sa

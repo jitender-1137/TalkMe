@@ -5,7 +5,6 @@ import com.neo.chat.match.MatchServerEvent;
 import com.neo.chat.match.MatchSession;
 import com.neo.chat.match.MatchTimerService;
 import com.neo.chat.match.SessionService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,7 +26,6 @@ import java.util.Set;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class MatchTimerServiceImpl implements MatchTimerService {
 
     private static final String TIMER_ZSET = "match:timer-deadlines";
@@ -54,8 +52,17 @@ public class MatchTimerServiceImpl implements MatchTimerService {
     private final SimpMessagingTemplate messagingTemplate;
     private final StringRedisTemplate redis;
 
-    @Value("${match.chemistry.prompt-interval-ms:45000}")
-    private long promptIntervalMs;
+    private final long promptIntervalMs;
+
+    public MatchTimerServiceImpl(SessionService sessionService,
+                                 SimpMessagingTemplate messagingTemplate,
+                                 StringRedisTemplate redis,
+                                 @Value("${match.chemistry.prompt-interval-ms:45000}") long promptIntervalMs) {
+        this.sessionService = sessionService;
+        this.messagingTemplate = messagingTemplate;
+        this.redis = redis;
+        this.promptIntervalMs = promptIntervalMs;
+    }
 
     /**
      * Arms the countdown for a session: records the deadline in Redis and the session

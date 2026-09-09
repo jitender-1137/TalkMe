@@ -88,11 +88,14 @@ class GlobalExceptionHandlerTest {
     // ── Max upload size → 413 / TM_493 ───────────────────────────────────────────
 
     @Test
-    void shouldMapMaxUploadSizeToPayloadTooLarge() {
+    void shouldMapMaxUploadSizeToContentTooLarge() {
         ResponseEntity<ResponseDto<Void>> res =
                 handler.handleMaxUploadSize(new MaxUploadSizeExceededException(30L * 1024 * 1024));
 
-        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        // CONTENT_TOO_LARGE is the non-deprecated RFC 9110 name for 413 (PAYLOAD_TOO_LARGE is
+        // deprecated in Spring 7); the wire status is unchanged.
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
+        assertThat(res.getStatusCode().value()).isEqualTo(413);
         assertThat(res.getBody().getMessageCode()).isEqualTo("TM_493");
     }
 

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,13 +37,15 @@ import java.util.List;
  * runs the API stateless (no HTTP session, JWT bearer auth), disables the built-in CSRF in
  * favor of a custom {@link com.neo.chat.security.CsrfTokenFilter}, and installs a set of
  * hardened response headers (CSP, HSTS, referrer/permissions policy, COOP/CORP, nos niff,
- * frame-deny). Authorization rules gate actuator, Swagger (profile-dependent), the admin API
- * (SUPER_ADMIN), and the public endpoints in {@link #unSecured()}; everything else under
+ * frame-deny). Two chains are defined: {@link #actuatorFilterChain} (matched first, only for
+ * {@code /actuator/**}: health public, everything else SUPER_ADMIN via bearer token) and the main
+ * {@link #securityFilterChain} whose authorization rules gate Swagger (profile-dependent), the
+ * admin API (SUPER_ADMIN), and the public endpoints in {@link #unSecured()}; everything else under
  * {@code /api/**} requires authentication while static SPA routes are permitted. Optionally
  * wires Google OAuth2 login when a client registration is present. The custom filter order is
  * CSRF → JWT → rate-limiting, ahead of {@code UsernamePasswordAuthenticationFilter}.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -76,7 +79,16 @@ public class SecurityConfig {
         }
         String extra = ad.toString(); // "" when unset, else " https://a https://b"
         return "default-src 'self'; " +
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com" + extra + "; " +
+                // NOTE: no 'unsafe-eval'. It used to be here for the in-browser TensorFlow.js /
+                // nsfwjs moderation model, but that was unnecessary: tfjs selects the WebGL backend
+                // (tf.ready() in TalkMe-UI/lib/moderation/nsfw-model.ts), which compiles GLSL
+                // shaders rather than evaluating JavaScript — neither @tensorflow/tfjs nor nsfwjs
+                // contains an eval()/new Function() call. 'wasm-unsafe-eval' is granted instead so
+                // a future WASM backend still works without re-opening JavaScript eval.
+                // 'unsafe-inline' HAS to stay: the Next.js static export emits ~47 inline scripts
+                // per page (hydration payload plus the accent/night-mode pre-paint snippets) and a
+                // pre-rendered export cannot carry a per-request nonce.
+                "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://challenges.cloudflare.com" + extra + "; " +
                 "style-src 'self' 'unsafe-inline'; " +
                 "img-src 'self' data: blob: https:; " +
                 "font-src 'self' data:; " +
@@ -108,12 +120,81 @@ public class SecurityConfig {
     }
 
     /**
-     * Builds the application {@link SecurityFilterChain}: stateless sessions, disabled built-in
-     * CSRF (custom filter used instead), the hardened security headers, the authorization rules
-     * (actuator, profile-gated Swagger, {@code /api/v1/admin/**} = SUPER_ADMIN, other {@code /api/**}
-     * authenticated, static routes permitted), optional Google OAuth2 login when a client is
-     * configured, and the CSRF → JWT → rate-limiting filter chain. Swagger docs are public only in
-     * non-prod profiles.
+     * Applies the platform's hardened response headers (frame-deny, HSTS, referrer policy, CSP with
+     * the optional ad-network hosts, permissions policy, nosniff, COOP, CORP). Shared by BOTH filter
+     * chains so an actuator response carries exactly the same headers as an API response.
+     *
+     * @param headers the chain's {@link HeadersConfigurer} to customise.
+     */
+    private void hardenedHeaders(HeadersConfigurer<HttpSecurity> headers) {
+        headers
+                // Anti-clickjacking
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                // Force HTTPS for a year incl. subdomains
+                .httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .maxAgeInSeconds(31536000))
+                .referrerPolicy(ref -> ref.policy(
+                        ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                // CSP — allows the bundled SPA, WebSocket (wss), media and the
+                // Cloudflare Turnstile widget; blocks plugins, framing and base hijack.
+                // Ad-network domains (ads.csp-domains) are appended to script/frame/
+                // img/connect ONLY when configured — with the default (house ads,
+                // empty list) this header is byte-identical to the pre-ads policy.
+                .addHeaderWriter(new StaticHeadersWriter("Content-Security-Policy",
+                        buildContentSecurityPolicy(adsProperties.getCspDomains())))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "geolocation=(), microphone=(self), camera=(self), payment=()"))
+                // Explicit MIME-sniffing block (Spring emits this by default; make it explicit).
+                .addHeaderWriter(new StaticHeadersWriter("X-Content-Type-Options", "nosniff"))
+                // Cross-origin isolation: prevent this origin's window from being
+                // referenced by cross-origin popups, and block cross-site embedding
+                // of its resources. (COEP:require-corp is intentionally NOT set — it
+                // would break the Turnstile widget and https media.)
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-site"));
+    }
+
+    /**
+     * Dedicated {@link SecurityFilterChain} for the actuator (BootUI SEC-ACT-003): matched BEFORE the
+     * main chain via {@code securityMatcher("/actuator/**")}, so every management endpoint is covered
+     * by a chain that explicitly targets it. Liveness/readiness probes ({@code /actuator/health},
+     * {@code /actuator/health/**}) stay public — {@code show-details=when_authorized}, so anonymous
+     * callers see only UP/DOWN. Everything else (metrics, Prometheus, info, the discovery page)
+     * requires {@code ROLE_SUPER_ADMIN}: metrics/prometheus/info expose request-URI templates, JVM,
+     * pool and cache internals, so a plain signed-in user (guests included) must NOT read them —
+     * operators scrape with an admin bearer token. Stateless, built-in CSRF disabled (JWT bearer API;
+     * the exposed endpoints are GET-only), and the {@link JwtAuthenticationFilter} is installed so an
+     * admin bearer token authenticates. Unauthenticated requests get the same 401 JSON body as the
+     * API (shared {@link JwtAuthenticationEntryPoint}); the hardened headers are identical too.
+     * The rate-limiting filter is deliberately absent: it only ever acted on {@code /api/**}.
+     *
+     * @param http the {@link HttpSecurity} builder (a fresh prototype per chain).
+     * @return the actuator {@link SecurityFilterChain}.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) {
+        http
+                .securityMatcher("/actuator/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(this::hardenedHeaders)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .anyRequest().hasRole("SUPER_ADMIN"))
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+
+    /**
+     * Builds the application {@link SecurityFilterChain} (every request NOT under {@code /actuator},
+     * which {@link #actuatorFilterChain} handles): stateless sessions, disabled built-in CSRF (custom
+     * filter used instead), the hardened security headers, the authorization rules (profile-gated
+     * Swagger, {@code /api/v1/admin/**} = SUPER_ADMIN, other {@code /api/**} authenticated, static
+     * routes permitted), optional Google OAuth2 login when a client is configured, and the
+     * CSRF → JWT → rate-limiting filter chain. Swagger docs are public only in non-prod profiles.
      *
      * @param http                                 the {@link HttpSecurity} builder.
      * @param environment                          the active {@link Environment} (drives Swagger visibility).
@@ -143,46 +224,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable) // Custom CsrfTokenFilter handles CSRF check
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers
-                        // Anti-clickjacking
-                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                        // Force HTTPS for a year incl. subdomains
-                        .httpStrictTransportSecurity(hsts -> hsts
-                                .includeSubDomains(true)
-                                .maxAgeInSeconds(31536000))
-                        .referrerPolicy(ref -> ref.policy(
-                                ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                        // CSP — allows the bundled SPA, WebSocket (wss), media and the
-                        // Cloudflare Turnstile widget; blocks plugins, framing and base hijack.
-                        // Ad-network domains (ads.csp-domains) are appended to script/frame/
-                        // img/connect ONLY when configured — with the default (house ads,
-                        // empty list) this header is byte-identical to the pre-ads policy.
-                        .addHeaderWriter(new StaticHeadersWriter("Content-Security-Policy",
-                                buildContentSecurityPolicy(adsProperties.getCspDomains())))
-                        .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
-                                "geolocation=(), microphone=(self), camera=(self), payment=()"))
-                        // Explicit MIME-sniffing block (Spring emits this by default; make it explicit).
-                        .addHeaderWriter(new StaticHeadersWriter("X-Content-Type-Options", "nosniff"))
-                        // Cross-origin isolation: prevent this origin's window from being
-                        // referenced by cross-origin popups, and block cross-site embedding
-                        // of its resources. (COEP:require-corp is intentionally NOT set — it
-                        // would break the Turnstile widget and https media.)
-                        .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
-                        .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-site")))
+                .headers(this::hardenedHeaders)
                 .authorizeHttpRequests(auth -> {
-                    // Actuator lives at /actuator (OUTSIDE the /api/v1 prefix), so it would
-                    // otherwise fall through to anyRequest().permitAll() and be exposed
-                    // unauthenticated. These MUST come before the /api/** and anyRequest rules.
-                    // Liveness/readiness probes stay public (health show-details=when_authorized,
-                    // so anonymous callers see only UP/DOWN); metrics, Prometheus, info and the
-                    // rest require authentication. authenticated() — not hasRole("ADMIN") — because
-                    // no user is ever granted ROLE_ADMIN, so admin-only would lock out everyone.
-                    // SECURITY: metrics/prometheus/info expose request-URI templates, JVM, pool and
-                    // cache internals. "authenticated()" let ANY signed-in user (guests included)
-                    // read them; restrict to SUPER_ADMIN (operators scrape with an admin token or
-                    // from a management port bound to localhost).
-                    auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                            .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN");
+                    // NOTE: /actuator/** never reaches this chain — actuatorFilterChain (ordered
+                    // first, securityMatcher "/actuator/**") owns it: health public, rest SUPER_ADMIN.
 
                     // BootUI (dev-only monitoring console: beans, env, mappings, metrics). It is
                     // CSRF-exempt and used to be permitAll in every profile — if it was ever enabled

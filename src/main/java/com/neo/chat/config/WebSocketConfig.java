@@ -1,7 +1,6 @@
 package com.neo.chat.config;
 
 import com.neo.chat.security.WebSocketChannelInterceptor;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -26,31 +25,48 @@ import java.util.Arrays;
  * The client inbound channel runs JWT auth then RabbitMQ destination rewriting, and transport
  * limits cap inbound frame size, send time, and outbound buffer to resist slow/malicious clients.
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableWebSocketMessageBroker
-@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketChannelInterceptor channelInterceptor;
     private final RabbitDestinationInterceptor rabbitDestinationInterceptor;
+    private final String allowedOrigins;
+    private final boolean relayEnabled;
+    private final String relayHost;
+    private final int relayPort;
+    private final String relayLogin;
+    private final String relayPasscode;
 
-    @Value("${app.cors.allowed-origins}")
-    private String allowedOrigins;
-
-    @Value("${app.broker.relay-enabled:false}")
-    private boolean relayEnabled;
-
-    @Value("${app.broker.relay-host:localhost}")
-    private String relayHost;
-
-    @Value("${app.broker.relay-port:61613}")
-    private int relayPort;
-
-    @Value("${app.broker.relay-login:talkme}")
-    private String relayLogin;
-
-    @Value("${app.broker.relay-passcode:talkme_dev_pass}")
-    private String relayPasscode;
+    /**
+     * Constructor-injects the inbound-channel interceptors and the broker/origin settings.
+     *
+     * @param channelInterceptor           JWT auth interceptor for STOMP CONNECT frames
+     * @param rabbitDestinationInterceptor RabbitMQ destination rewriting (relay mode)
+     * @param allowedOrigins               {@code app.cors.allowed-origins} (comma-separated)
+     * @param relayEnabled                 {@code app.broker.relay-enabled} (default false)
+     * @param relayHost                    {@code app.broker.relay-host} (default localhost)
+     * @param relayPort                    {@code app.broker.relay-port} (default 61613)
+     * @param relayLogin                   {@code app.broker.relay-login}
+     * @param relayPasscode                {@code app.broker.relay-passcode}
+     */
+    public WebSocketConfig(WebSocketChannelInterceptor channelInterceptor,
+                           RabbitDestinationInterceptor rabbitDestinationInterceptor,
+                           @Value("${app.cors.allowed-origins}") String allowedOrigins,
+                           @Value("${app.broker.relay-enabled:false}") boolean relayEnabled,
+                           @Value("${app.broker.relay-host:localhost}") String relayHost,
+                           @Value("${app.broker.relay-port:61613}") int relayPort,
+                           @Value("${app.broker.relay-login:talkme}") String relayLogin,
+                           @Value("${app.broker.relay-passcode:talkme_dev_pass}") String relayPasscode) {
+        this.channelInterceptor = channelInterceptor;
+        this.rabbitDestinationInterceptor = rabbitDestinationInterceptor;
+        this.allowedOrigins = allowedOrigins;
+        this.relayEnabled = relayEnabled;
+        this.relayHost = relayHost;
+        this.relayPort = relayPort;
+        this.relayLogin = relayLogin;
+        this.relayPasscode = relayPasscode;
+    }
 
     /**
      * Configures the message broker: RabbitMQ STOMP relay when the relay is enabled (with

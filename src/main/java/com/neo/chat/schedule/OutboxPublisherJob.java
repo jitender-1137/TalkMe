@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -79,6 +80,7 @@ public class OutboxPublisherJob {
      * Housekeeping: drop long-delivered rows daily.
      */
     @Scheduled(cron = "${app.outbox.cleanup-cron:0 30 3 * * *}")
+    @Transactional
     public void purgeOldPublished() {
         try {
             int deleted = outboxRepo.deletePublishedBefore(Instant.now().minus(RETENTION));

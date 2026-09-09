@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -23,7 +24,8 @@ import org.hibernate.annotations.ColumnDefault;
  * Read-only for users once submitted; surfaced to super-admins in the dashboard.
  */
 @Entity
-@Table(name = "feedback")
+@Table(name = "feedback",
+        indexes = @Index(name = "idx_feedback_user_id", columnList = "user_id"))
 @Getter
 @Setter
 @Builder
@@ -34,7 +36,7 @@ public class Feedback extends BaseEntity {
     /**
      * The author of the feedback.
      */
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 

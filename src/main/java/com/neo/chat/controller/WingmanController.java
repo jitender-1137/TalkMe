@@ -6,12 +6,15 @@ import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.ForbiddenException;
 import com.neo.chat.exception.NotFoundException;
-import com.neo.chat.repository.BlockUserRepository;
-import com.neo.chat.repository.FriendRepository;
-import com.neo.chat.repository.UserRepository;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.WingmanService;
+import com.neo.chat.service.lookup.RelationshipLookupService;
+import com.neo.chat.service.lookup.UserLookupService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,15 +38,15 @@ import java.util.UUID;
 @RequestMapping("/match/wingman")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Wingman", description = "AI Wingman: icebreakers, reply suggestions and draft rewrites")
 public class WingmanController {
 
     private static final int DEFAULT_MAX = 5;
     private static final int HARD_CAP = 10;
 
     private final WingmanService wingmanService;
-    private final UserRepository userRepository;
-    private final FriendRepository friendRepository;
-    private final BlockUserRepository blockUserRepository;
+    private final UserLookupService userLookupService;
+    private final RelationshipLookupService relationshipLookup;
 
     /**
      * Icebreakers between the current user and the target user. Because the suggestions are
@@ -60,27 +63,26 @@ public class WingmanController {
      * @throws com.neo.chat.exception.BadRequestException if the target is the caller themselves
      * @throws com.neo.chat.exception.ForbiddenException  if the two users are not friends
      */
+    @Operation(summary = "Icebreakers between the current user and the target user")
     @GetMapping("/icebreakers/{userUuid}")
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
     public ResponseEntity<ResponseDto<List<String>>> icebreakers(
             @PathVariable("userUuid") String userUuid,
             @RequestParam(value = "max", defaultValue = "5") int max,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User me = userDetails.getUser();
-        User other = userRepository.findByUuid(UUID.fromString(userUuid))
-                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        // Fetch-join the LAZY personality map on both sides: open-in-view is off and the principal
+        // is detached, so the compatibility-derived openers would otherwise score personality neutral.
+        User other = userLookupService.requireByUuidWithPersonality(UUID.fromString(userUuid));
+        User me = userLookupService.reloadWithPersonality(userDetails.getUser());
 
         if (other.getId().equals(me.getId())) {
             throw new BadRequestException("Icebreakers need another person", "TM_025");
         }
         // Don't leak block state — a blocked pair looks the same as a missing user.
-        if (blockUserRepository.existsByUserAndBlocked(me, other)
-                || blockUserRepository.existsByUserAndBlocked(other, me)) {
+        if (relationshipLookup.isBlockedEitherWay(me, other)) {
             throw new NotFoundException("User not found", "TM_024");
         }
-        boolean friends = friendRepository.findByUserAndFriend(me, other)
-                .map(f -> !f.isDeleted())
-                .orElse(false);
+        boolean friends = relationshipLookup.areActiveFriends(me, other);
         if (!friends) {
             throw new ForbiddenException("You can only get icebreakers for your friends", "TM_026");
         }
@@ -95,10 +97,11 @@ public class WingmanController {
      * @param request body carrying the last message and optional max (default 5)
      * @return 200 with the list of reply suggestions
      */
-    @PostMapping("/suggest")
+    @Operation(summary = "Reply suggestions given the other person's last message")
+    @PostMapping(value = "/suggest", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
     public ResponseEntity<ResponseDto<List<String>>> suggest(
-            @RequestBody SuggestRequest request) {
+            @Valid @RequestBody SuggestRequest request) {
         String lastMessage = request == null ? null : request.lastMessage();
         int max = request == null || request.max() == null ? DEFAULT_MAX : request.max();
         List<String> suggestions = wingmanService.replySuggestions(lastMessage, clamp(max));
@@ -114,10 +117,11 @@ public class WingmanController {
      * @return 200 with the list of rewritten variants
      * @throws com.neo.chat.exception.BadRequestException if the draft is blank or longer than 1000 chars
      */
-    @PostMapping("/rewrite")
+    @Operation(summary = "Rewrite the caller's own draft into polished variants in a chosen tone")
+    @PostMapping(value = "/rewrite", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('AI_WINGMAN')")
     public ResponseEntity<ResponseDto<List<String>>> rewrite(
-            @RequestBody RewriteRequest request) {
+            @Valid @RequestBody RewriteRequest request) {
         if (request == null || request.draft() == null || request.draft().isBlank()) {
             throw new BadRequestException("Nothing to rewrite", "TM_027");
         }

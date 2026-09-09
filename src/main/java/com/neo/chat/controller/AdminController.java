@@ -44,6 +44,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * SuperAdmin API. Every route requires ROLE_SUPER_ADMIN (class-level @PreAuthorize;
@@ -51,6 +54,7 @@ import java.util.List;
  * only in this phase — mutating actions (ban/delete/role) come next.
  */
 @RestController
+@Tag(name = "Admin", description = "SuperAdmin API")
 @RequestMapping("/admin")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -63,6 +67,7 @@ public class AdminController {
      *
      * @return {@link AdminStatsResponse} wrapped in the standard success envelope
      */
+    @Operation(summary = "Platform-wide counters snapshot (totals for users, chats, messages, etc.)")
     @GetMapping("/stats")
     public ResponseEntity<ResponseDto<AdminStatsResponse>> stats() {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getStats()));
@@ -76,6 +81,7 @@ public class AdminController {
      * @param size   page size (default 25)
      * @return a page of {@link AdminUserView} rows
      */
+    @Operation(summary = "Paged, filtered list of users for the admin console")
     @GetMapping("/users")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminUserView>>> users(
             @ModelAttribute AdminUserFilter filter,
@@ -91,6 +97,7 @@ public class AdminController {
      * @return the {@link AdminUserView} for that user
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Summary view of a single user")
     @GetMapping("/users/{uuid}")
     public ResponseEntity<ResponseDto<AdminUserView>> user(@PathVariable("uuid") String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUser(uuid)));
@@ -103,6 +110,7 @@ public class AdminController {
      * @return the {@link AdminUserFullView} for that user
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Full profile/activity detail view for a single user")
     @GetMapping("/users/{uuid}/full")
     public ResponseEntity<ResponseDto<AdminUserFullView>> userFull(@PathVariable("uuid") String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUserFull(uuid)));
@@ -115,6 +123,7 @@ public class AdminController {
      * @return the list of {@link AdminChatView} the user belongs to
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "All chats a given user participates in")
     @GetMapping("/users/{uuid}/chats")
     public ResponseEntity<ResponseDto<List<AdminChatView>>> userChats(@PathVariable("uuid") String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUserChats(uuid)));
@@ -131,6 +140,7 @@ public class AdminController {
      * @param size           page size (default 25)
      * @return a page of {@link AdminChatView} rows
      */
+    @Operation(summary = "Paged search across all chats; soft-deleted chats are included by default (flagged)")
     @GetMapping("/chats")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminChatView>>> chats(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -153,6 +163,7 @@ public class AdminController {
      * @param admin the authenticated admin principal (recorded for audit)
      * @return a page of {@link AdminMessageView} rows
      */
+    @Operation(summary = "Paged, decrypted messages of one chat (admin read; access is audited)")
     @GetMapping("/chats/{uuid}/messages")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminMessageView>>> chatMessages(
             @PathVariable("uuid") String uuid,
@@ -174,6 +185,7 @@ public class AdminController {
      * @return the updated {@link AdminUserView}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Ban or un-ban a user (audited moderation action)")
     @PostMapping("/users/{uuid}/ban")
     public ResponseEntity<ResponseDto<AdminUserView>> ban(
             @PathVariable("uuid") String uuid,
@@ -191,6 +203,7 @@ public class AdminController {
      * @return the updated {@link AdminUserView}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Set or clear a user's verified flag (audited)")
     @PostMapping("/users/{uuid}/verify")
     public ResponseEntity<ResponseDto<AdminUserView>> verify(
             @PathVariable("uuid") String uuid,
@@ -208,6 +221,7 @@ public class AdminController {
      * @return the updated {@link AdminUserView}
      * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
      */
+    @Operation(summary = "Soft-delete or restore a user account (audited)")
     @PostMapping("/users/{uuid}/soft-delete")
     public ResponseEntity<ResponseDto<AdminUserView>> softDelete(
             @PathVariable("uuid") String uuid,
@@ -226,6 +240,7 @@ public class AdminController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if the role is not assignable
      */
+    @Operation(summary = "Grant a role to a user (audited)")
     @PostMapping("/users/{uuid}/roles/grant")
     public ResponseEntity<ResponseDto<AdminUserView>> grantRole(
             @PathVariable("uuid") String uuid,
@@ -244,6 +259,7 @@ public class AdminController {
      * @throws com.neo.chat.exception.NotFoundException   if no user matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if the role is not assignable
      */
+    @Operation(summary = "Revoke a role from a user (audited)")
     @PostMapping("/users/{uuid}/roles/revoke")
     public ResponseEntity<ResponseDto<AdminUserView>> revokeRole(
             @PathVariable("uuid") String uuid,
@@ -264,6 +280,7 @@ public class AdminController {
      * @param size       page size (default 50)
      * @return a page of {@link AdminAuditView} entries
      */
+    @Operation(summary = "Paged, filtered admin audit log")
     @GetMapping("/audit")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminAuditView>>> audit(
             @RequestParam(value = "action", required = false) String action,
@@ -287,7 +304,8 @@ public class AdminController {
      * @return the created {@link AdminUserView}
      * @throws com.neo.chat.exception.ConflictException if the username or email already exists
      */
-    @PostMapping("/users")
+    @Operation(summary = "Create a new user account from the admin console (audited)")
+    @PostMapping(value = "/users", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ResponseDto<AdminUserView>> createUser(
             @Valid @RequestBody AdminCreateUserRequest req,
             @AuthenticationPrincipal CustomUserDetails admin) {
@@ -305,10 +323,11 @@ public class AdminController {
      * @throws com.neo.chat.exception.ConflictException if a changed username or email
      *                                                     collides with another account
      */
-    @PatchMapping("/users/{uuid}")
+    @Operation(summary = "Partially update an existing user's fields (audited)")
+    @PatchMapping(value = "/users/{uuid}", consumes = {MediaType.APPLICATION_JSON_VALUE, "application/merge-patch+json"})
     public ResponseEntity<ResponseDto<AdminUserView>> updateUser(
             @PathVariable("uuid") String uuid,
-            @RequestBody AdminUpdateUserRequest req,
+            @Valid @RequestBody AdminUpdateUserRequest req,
             @AuthenticationPrincipal CustomUserDetails admin) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.updateUser(uuid, req, name(admin))));
     }
@@ -320,6 +339,7 @@ public class AdminController {
      * @param admin the authenticated admin principal (recorded for audit)
      * @return an empty success envelope confirming deletion
      */
+    @Operation(summary = "Delete a single message (audited)")
     @DeleteMapping("/messages/{uuid}")
     public ResponseEntity<ResponseDto<Void>> deleteMessage(
             @PathVariable("uuid") String uuid,
@@ -335,6 +355,7 @@ public class AdminController {
      * @param admin the authenticated admin principal (recorded for audit)
      * @return an empty success envelope confirming deletion
      */
+    @Operation(summary = "Delete a chat (audited)")
     @DeleteMapping("/chats/{uuid}")
     public ResponseEntity<ResponseDto<Void>> deleteChat(
             @PathVariable("uuid") String uuid,
@@ -349,6 +370,7 @@ public class AdminController {
      * @param days number of trailing days to include (default 30)
      * @return the ordered list of {@link AdminTimeseriesPoint} signup buckets
      */
+    @Operation(summary = "Daily signup counts over the last N days")
     @GetMapping("/stats/timeseries")
     public ResponseEntity<ResponseDto<List<AdminTimeseriesPoint>>> timeseries(
             @RequestParam(value = "days", defaultValue = "30") int days) {
@@ -361,6 +383,7 @@ public class AdminController {
      * @param range range token such as {@code 30d} (default {@code 30d})
      * @return the {@link AdminAnalyticsResponse} aggregate metrics
      */
+    @Operation(summary = "Aggregate analytics dashboard payload for the given range")
     @GetMapping("/analytics")
     public ResponseEntity<ResponseDto<AdminAnalyticsResponse>> analytics(
             @RequestParam(value = "range", defaultValue = "30d") String range) {
@@ -377,6 +400,7 @@ public class AdminController {
      * @param to       optional explicit end timestamp (string)
      * @return the {@link AdminTimeseriesResult} for the requested metric
      */
+    @Operation(summary = "Generic time-series for a chosen metric over a range/interval")
     @GetMapping("/timeseries")
     public ResponseEntity<ResponseDto<AdminTimeseriesResult>> timeseriesMetric(
             @RequestParam(value = "metric", defaultValue = "messages") String metric,
@@ -399,6 +423,7 @@ public class AdminController {
      * @param size           page size (default 30)
      * @return a page of {@link AdminAttachmentView} rows
      */
+    @Operation(summary = "Paged, filtered listing of message attachments")
     @GetMapping("/attachments")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminAttachmentView>>> attachments(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -425,6 +450,7 @@ public class AdminController {
      * @param size        page size (default 40)
      * @return the {@link AdminStorageListResponse} page of storage objects
      */
+    @Operation(summary = "Browse raw storage-backend objects with filtering, orphan detection and sorting")
     @GetMapping("/storage/objects")
     public ResponseEntity<ResponseDto<AdminStorageListResponse>> storageObjects(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -448,6 +474,7 @@ public class AdminController {
      * @return an empty success envelope confirming deletion
      * @throws com.neo.chat.exception.BadRequestException if the key is invalid
      */
+    @Operation(summary = "Delete a single raw storage object by key (audited)")
     @DeleteMapping("/storage/object")
     public ResponseEntity<ResponseDto<Void>> deleteStorageObject(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -465,6 +492,7 @@ public class AdminController {
      * @param range range token such as {@code 30d} (default {@code 30d})
      * @return the {@link AdminMediaOwnershipResponse} ownership aggregates
      */
+    @Operation(summary = "Media-ownership analytics derived from the media_assets ledger")
     @GetMapping("/media/stats")
     public ResponseEntity<ResponseDto<AdminMediaOwnershipResponse>> mediaStats(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -482,6 +510,7 @@ public class AdminController {
      * @param size   page size (default 24)
      * @return the {@link AdminMediaListResponse} page of that user's media
      */
+    @Operation(summary = "Paged media assets attributed to a specific uploader")
     @GetMapping("/media/user")
     public ResponseEntity<ResponseDto<AdminMediaListResponse>> userMedia(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -501,6 +530,7 @@ public class AdminController {
      * @param size   page size (default 24)
      * @return the {@link AdminMediaListResponse} page of that chat's media
      */
+    @Operation(summary = "Paged media assets belonging to a specific chat")
     @GetMapping("/media/chat")
     public ResponseEntity<ResponseDto<AdminMediaListResponse>> chatMedia(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -518,6 +548,7 @@ public class AdminController {
      * @param size page size (default 20)
      * @return a page of {@link AdminPostView} rows
      */
+    @Operation(summary = "Paged listing of feed posts")
     @GetMapping("/posts")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostView>>> posts(
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -533,8 +564,9 @@ public class AdminController {
      * @param size page size (default 50)
      * @return a page of {@link AdminPostLikeView} rows
      */
+    @Operation(summary = "Paged list of users who liked a post")
     @GetMapping("/posts/{uuid}/likes")
-    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostLikeView>>> postLikes(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostLikeView>>> getPostLikes(
             @PathVariable String uuid,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
@@ -549,8 +581,9 @@ public class AdminController {
      * @param size page size (default 50)
      * @return a page of {@link AdminPostCommentView} rows
      */
+    @Operation(summary = "Paged list of comments on a post")
     @GetMapping("/posts/{uuid}/comments")
-    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostCommentView>>> postComments(
+    public ResponseEntity<ResponseDto<PaginatedResponse<AdminPostCommentView>>> getPostComments(
             @PathVariable String uuid,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "50") int size) {
@@ -565,6 +598,7 @@ public class AdminController {
      * @param size   page size (default 20)
      * @return a page of {@link AdminReportView} rows
      */
+    @Operation(summary = "Paged moderation-report queue, optionally filtered by status")
     @GetMapping("/moderation/reports")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminReportView>>> reports(
             @RequestParam(value = "status", required = false) String status,
@@ -580,6 +614,7 @@ public class AdminController {
      * @return the {@link AdminReportView} for that report
      * @throws com.neo.chat.exception.NotFoundException if no report matches the UUID
      */
+    @Operation(summary = "Detail view of a single moderation report")
     @GetMapping("/moderation/reports/{uuid}")
     public ResponseEntity<ResponseDto<AdminReportView>> report(@PathVariable String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getReport(uuid)));
@@ -596,6 +631,7 @@ public class AdminController {
      * @throws com.neo.chat.exception.NotFoundException   if no report matches the UUID
      * @throws com.neo.chat.exception.BadRequestException if the review action is unknown
      */
+    @Operation(summary = "Resolve a moderation report with a review action (audited)")
     @PostMapping("/moderation/reports/{uuid}/review")
     public ResponseEntity<ResponseDto<AdminReportView>> reviewReport(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -617,6 +653,7 @@ public class AdminController {
      * @param size   page size (default 20)
      * @return a page of {@link AdminFeedbackView} rows
      */
+    @Operation(summary = "Paged user-feedback queue, optionally filtered by type and status")
     @GetMapping("/feedback")
     public ResponseEntity<ResponseDto<PaginatedResponse<AdminFeedbackView>>> feedback(
             @RequestParam(value = "type", required = false) String type,
@@ -635,6 +672,7 @@ public class AdminController {
      * @return the updated {@link AdminFeedbackView}
      * @throws com.neo.chat.exception.BadRequestException if the status value is unknown
      */
+    @Operation(summary = "Update the workflow status of a feedback entry (audited)")
     @PostMapping("/feedback/{uuid}/status")
     public ResponseEntity<ResponseDto<AdminFeedbackView>> updateFeedbackStatus(
             @AuthenticationPrincipal CustomUserDetails admin,
@@ -650,6 +688,7 @@ public class AdminController {
      * @param userId the user's id whose friends to list
      * @return the list of {@link AdminConnectorView} connections
      */
+    @Operation(summary = "The friend/connector list for a given user")
     @GetMapping("/social/friends")
     public ResponseEntity<ResponseDto<List<AdminConnectorView>>> userFriends(
             @RequestParam("userId") String userId) {

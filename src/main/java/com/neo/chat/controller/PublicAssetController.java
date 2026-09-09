@@ -1,5 +1,7 @@
 package com.neo.chat.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -20,6 +22,7 @@ import java.util.concurrent.TimeUnit;
  */
 @RestController
 @RequestMapping("/assets") // WebMvcConfig prepends /api/v1 to all @RestControllers → /api/v1/assets
+@Tag(name = "Public Assets", description = "Public, unauthenticated brand assets referenced from transactional emails")
 public class PublicAssetController {
 
     private final Resource logo = new ClassPathResource("mail/logo.png");
@@ -29,6 +32,7 @@ public class PublicAssetController {
      *
      * @return the logo image, or 404 Not Found if the classpath resource is absent
      */
+    @Operation(summary = "Serves the brand logo PNG from the classpath with a 30-day public cache; 404s if the resource is missing")
     @GetMapping(value = "/logo.png", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<Resource> logo() {
         if (!logo.exists()) {

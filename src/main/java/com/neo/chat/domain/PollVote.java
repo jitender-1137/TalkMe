@@ -2,6 +2,7 @@ package com.neo.chat.domain;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -20,8 +21,11 @@ import lombok.Setter;
 @Entity
 @Table(
         name = "poll_votes",
-        uniqueConstraints = @UniqueConstraint(name = "uk_poll_vote_user", columnNames = {"poll_id", "user_id"})
-)
+        uniqueConstraints = @UniqueConstraint(name = "uk_poll_vote_user", columnNames = {"poll_id", "user_id"}),
+        indexes = {
+                @Index(name = "idx_poll_votes_option_id", columnList = "option_id"),
+                @Index(name = "idx_poll_votes_user_id", columnList = "user_id")
+        })
 @Getter
 @Setter
 @Builder
@@ -30,15 +34,15 @@ import lombok.Setter;
 public class PollVote extends BaseEntity {
 
     // Denormalized poll reference so the (poll, user) uniqueness holds across options.
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "poll_id", nullable = false)
     private Poll poll;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "option_id", nullable = false)
     private PollOption option;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 }

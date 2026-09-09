@@ -6,8 +6,11 @@ import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.dto.response.WhiteboardOp;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.WhiteboardService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,6 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/whiteboard")
 @RequiredArgsConstructor
+@Tag(name = "Whiteboard", description = "Shared real-time collaborative whiteboard inside a 1:1 chat")
 public class WhiteboardController {
 
     private final WhiteboardService whiteboardService;
@@ -44,6 +48,7 @@ public class WhiteboardController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is not a valid UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
+    @Operation(summary = "Return the current op-log for a chat's shared whiteboard")
     @GetMapping("/{chatUuid}")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<List<WhiteboardOp>>> getBoard(
@@ -64,7 +69,8 @@ public class WhiteboardController {
      *                                                       exceeds the point cap / has a malformed point
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
-    @PostMapping("/stroke")
+    @Operation(summary = "Append a stroke to the whiteboard and re-broadcast it on the chat topic")
+    @PostMapping(value = "/stroke", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<WhiteboardOp>> addStroke(
             @Valid @RequestBody WhiteboardStrokeRequest request,
@@ -82,6 +88,7 @@ public class WhiteboardController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is not a valid UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
+    @Operation(summary = "Clear the whole whiteboard and broadcast the clear op")
     @PostMapping("/{chatUuid}/clear")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<Void>> clear(
@@ -101,6 +108,7 @@ public class WhiteboardController {
      * @throws com.neo.chat.exception.BadRequestException if the chat id is not a valid UUID
      * @throws com.neo.chat.exception.ForbiddenException  if the caller is not a member of the chat
      */
+    @Operation(summary = "Undo the last op and broadcast the undo")
     @PostMapping("/{chatUuid}/undo")
     @PreAuthorize("@featureGuard.check('SHARED_WHITEBOARD')")
     public ResponseEntity<ResponseDto<WhiteboardOp>> undo(

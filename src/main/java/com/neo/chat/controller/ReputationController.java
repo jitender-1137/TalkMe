@@ -6,6 +6,8 @@ import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
 import com.neo.chat.service.ReputationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/reputation")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('USER')")
+@Tag(name = "Reputation", description = "Cosmetic reputation surface (level/star) and prestige")
 public class ReputationController {
 
     private final ReputationService reputationService;
@@ -35,6 +38,7 @@ public class ReputationController {
      * @param userDetails the authenticated caller
      * @return the caller's reputation response in a success envelope
      */
+    @Operation(summary = "The caller's own cosmetic reputation card (level, star, prestige)")
     @GetMapping("/me")
     @PreAuthorize("@featureGuard.check('REPUTATION')")
     public ResponseEntity<ResponseDto<ReputationResponse>> getMine(
@@ -50,6 +54,7 @@ public class ReputationController {
      * @param userDetails the authenticated caller
      * @return the reputation "why" explainer in a success envelope
      */
+    @Operation(summary = "Explainer for the caller's reputation: labeled contributor breakdown")
     @GetMapping("/why")
     @PreAuthorize("@featureGuard.check('REPUTATION')")
     public ResponseEntity<ResponseDto<ReputationWhyResponse>> why(
@@ -67,6 +72,7 @@ public class ReputationController {
      * @throws com.neo.chat.exception.BadRequestException if {@code userUuid} is not a valid UUID (TM_400)
      * @throws com.neo.chat.exception.NotFoundException   if no user has that UUID (TM_404)
      */
+    @Operation(summary = "A third party's cosmetic reputation card (read-only cached snapshot)")
     @GetMapping("/{userUuid}")
     @PreAuthorize("@featureGuard.check('REPUTATION')")
     public ResponseEntity<ResponseDto<ReputationResponse>> getFor(@PathVariable String userUuid) {
@@ -82,6 +88,7 @@ public class ReputationController {
      * @return the post-prestige reputation response (message "Prestige successful", TM_941)
      * @throws com.neo.chat.exception.BadRequestException if the caller has not reached level 100 (TM_940)
      */
+    @Operation(summary = "Prestige the caller — resets the level curve and increments prestige count")
     @PostMapping("/prestige")
     @PreAuthorize("@featureGuard.check('PRESTIGE')")
     public ResponseEntity<ResponseDto<ReputationResponse>> prestige(

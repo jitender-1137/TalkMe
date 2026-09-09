@@ -36,8 +36,8 @@ import java.util.Set;
 @Table(name = "chats", indexes = {
         // Discovery: list PUBLIC groups/channels/rooms of a given type.
         @Index(name = "idx_chats_visibility_type", columnList = "visibility, chat_type"),
-        // Public @handle lookup.
-        @Index(name = "idx_chats_slug", columnList = "slug"),
+        // (Public @handle lookup is served by the UNIQUE constraint on slug; a separate
+        // idx_chats_slug was redundant — BootUI DB-SCHEMA-003.)
         // Virtual Night City district lookup (feature #25).
         @Index(name = "idx_chats_city_location", columnList = "city_location")
 })
@@ -141,9 +141,14 @@ public class Chat extends BaseEntity {
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "chat_tags",
             joinColumns = @JoinColumn(name = "chat_id"),
-            indexes = @Index(name = "idx_chat_tags_tag", columnList = "tag"))
+            indexes = {
+                    @Index(name = "idx_chat_tags_tag", columnList = "tag"),
+                    // Non-nullable element => Hibernate generates the (chat_id, tag) PK on fresh schemas; the explicit
+                    // FK index is kept because ddl-auto=update never adds a PK to the pre-existing production table.
+                    @Index(name = "idx_chat_tags_chat_id", columnList = "chat_id")
+            })
     @Enumerated(EnumType.STRING)
-    @Column(name = "tag", length = 30)
+    @Column(name = "tag", length = 30, nullable = false)
     @Builder.Default
     private Set<Interest> tags = new HashSet<>();
 

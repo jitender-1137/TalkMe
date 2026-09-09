@@ -42,15 +42,15 @@ class AdsControllerUnitTest {
      * provider/label so assertions stay independent of config defaults.
      */
     private MockMvc mockMvcFor(boolean adsGloballyOn) {
-        featureFlags = new FeatureFlags();
-        featureFlags.setEnabledByDefault(false);
         Map<String, Boolean> flags = new HashMap<>();
         flags.put("ads", adsGloballyOn);
-        featureFlags.setFlags(flags);
+        featureFlags = new FeatureFlags(false, flags, false, false);
 
-        adsProperties = new AdsProperties();
-        adsProperties.setProvider("adsterra"); // explicit so the test is default-independent
-        adsProperties.setLabel("Sponsored");
+        // explicit provider/label so the test is default-independent
+        adsProperties = new AdsProperties().toBuilder()
+                .provider("adsterra")
+                .label("Sponsored")
+                .build();
 
         AdsController controller = new AdsController(adsProperties, featureFlags);
         return MockMvcBuilders.standaloneSetup(controller)
@@ -94,10 +94,10 @@ class AdsControllerUnitTest {
         @Test
         @DisplayName("field names are camelCase on the wire (client contract)")
         void serializesCamelCaseFields() throws Exception {
-            adsProperties = new AdsProperties();
-            adsProperties.setAdChoicesUrl("https://example.com/why");
-            featureFlags = new FeatureFlags();
-            featureFlags.setFlags(Map.of("ads", true));
+            adsProperties = new AdsProperties().toBuilder()
+                    .adChoicesUrl("https://example.com/why")
+                    .build();
+            featureFlags = new FeatureFlags(true, Map.of("ads", true), false, false);
             MockMvc mvc = MockMvcBuilders
                     .standaloneSetup(new AdsController(adsProperties, featureFlags))
                     .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))

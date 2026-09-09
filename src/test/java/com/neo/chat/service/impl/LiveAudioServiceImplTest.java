@@ -63,13 +63,7 @@ class LiveAudioServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        props = new LiveAudioProperties();
-        props.setEnabled(true);
-        props.setApiKey(API_KEY);
-        props.setApiSecret(API_SECRET);
-        props.setWsUrl(WS_URL);
-        props.setTokenTtlSeconds(3600);
-
+        props = new LiveAudioProperties(true, API_KEY, API_SECRET, WS_URL, 3600);
         service = new LiveAudioServiceImpl(props, chatRepository, chatMemberRepository);
 
         user = User.builder().username("alice").name("Alice Wonder").build();
@@ -93,7 +87,9 @@ class LiveAudioServiceImplTest {
         @Test
         @DisplayName("seam not ready → BadRequest TM_980, no repo access")
         void notReady() {
-            props.setEnabled(false);
+            // seam switched off → rebuild the (immutable) props and the service under test
+            props = new LiveAudioProperties(false, API_KEY, API_SECRET, WS_URL, 3600);
+            service = new LiveAudioServiceImpl(props, chatRepository, chatMemberRepository);
 
             assertThatThrownBy(() -> service.mintToken(user, CHAT_ID))
                     .isInstanceOfSatisfying(BadRequestException.class,

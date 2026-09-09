@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 
 /**
  * Dedicated create endpoints for the two multi-party subtypes, so the URLs read
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  * join, …) stays under /chats/group/**.
  */
 @RestController
+@Tag(name = "Channel Room", description = "Dedicated create endpoints for the two multi-party subtypes, so the URLs read cleanly: POST /chats/channel and POST /chats/room")
 @RequestMapping("/chats")
 @RequiredArgsConstructor
 public class ChannelRoomController {
@@ -38,7 +42,8 @@ public class ChannelRoomController {
      * @param userDetails the authenticated principal; its user becomes the channel owner
      * @return 200 with the created {@link ChatResponse} wrapped in a success envelope (code TM_280)
      */
-    @PostMapping("/channel")
+    @Operation(summary = "Creates a broadcast channel by forcing the request subtype to \"channel\" and delegating to the unified group-creation path")
+    @PostMapping(value = "/channel", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<ChatResponse>> createChannel(
             @Valid @RequestBody CreateGroupRequest request,
@@ -56,7 +61,8 @@ public class ChannelRoomController {
      * @param userDetails the authenticated principal; its user becomes the room owner
      * @return 200 with the created {@link ChatResponse} wrapped in a success envelope (code TM_280)
      */
-    @PostMapping("/room")
+    @Operation(summary = "Creates a public room by forcing the request subtype to \"room\" and delegating to the unified group-creation path")
+    @PostMapping(value = "/room", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<ChatResponse>> createRoom(
             @Valid @RequestBody CreateGroupRequest request,

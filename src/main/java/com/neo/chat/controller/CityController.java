@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Virtual Night City (feature #25) — a curated map of themed districts over the ROOM
@@ -24,6 +26,7 @@ import java.util.List;
  * gets TM_FEATURE_LOCKED and the client shows the gate.
  */
 @RestController
+@Tag(name = "City", description = "Virtual Night City (feature #25) — a curated map of themed districts over the ROOM model")
 @RequestMapping("/city")
 @RequiredArgsConstructor
 public class CityController {
@@ -35,6 +38,7 @@ public class CityController {
      *
      * @return 200 with the list of {@link CityDistrictResponse} district cards
      */
+    @Operation(summary = "The city map: every district with its live count + curated room count")
     @GetMapping
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
     public ResponseEntity<ResponseDto<List<CityDistrictResponse>>> districts() {
@@ -49,6 +53,7 @@ public class CityController {
      * @return 200 with the {@link CityDistrictDetailResponse} (card, curated rooms, online usernames)
      * @throws com.neo.chat.exception.NotFoundException if the slug matches no known district (TM_970)
      */
+    @Operation(summary = "One district: card + curated rooms + live roster")
     @GetMapping("/{slug}")
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
     public ResponseEntity<ResponseDto<CityDistrictDetailResponse>> district(
@@ -66,6 +71,7 @@ public class CityController {
      * @return 200 with the refreshed {@link CityDistrictDetailResponse} (message code TM_971)
      * @throws com.neo.chat.exception.NotFoundException if the slug matches no known district (TM_970)
      */
+    @Operation(summary = "Announce presence in a district (joins the Redis presence set, broadcasts a join)")
     @PostMapping("/{slug}/enter")
     @PreAuthorize("@featureGuard.check('VIRTUAL_CITY')")
     public ResponseEntity<ResponseDto<CityDistrictDetailResponse>> enter(
@@ -92,6 +98,7 @@ public class CityController {
      * @return 200 with an empty payload (message code TM_972)
      * @throws com.neo.chat.exception.NotFoundException if the slug matches no known district (TM_970)
      */
+    @Operation(summary = "Removes the caller from a district's presence set and broadcasts a leave")
     @PostMapping("/{slug}/leave")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ResponseDto<Void>> leave(

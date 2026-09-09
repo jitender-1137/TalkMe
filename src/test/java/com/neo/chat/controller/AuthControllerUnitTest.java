@@ -3,6 +3,7 @@ package com.neo.chat.controller;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.request.LoginRequest;
+import com.neo.chat.util.ClientRequestInfo;
 import com.neo.chat.dto.request.SignupRequest;
 import com.neo.chat.dto.request.UpdateProfileRequest;
 import com.neo.chat.dto.response.AuthUserResponse;
@@ -117,10 +118,8 @@ class AuthControllerUnitTest {
 
     @BeforeEach
     void setUp() {
-        AuthController controller = new AuthController(authService, captchaService, tokenProvider);
+        AuthController controller = new AuthController(authService, captchaService, tokenProvider, false, "Lax");
         // @Value fields are not resolved without a Spring context — set them explicitly.
-        ReflectionTestUtils.setField(controller, "cookieSecure", false);
-        ReflectionTestUtils.setField(controller, "cookieSameSite", "Lax");
 
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
@@ -236,7 +235,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldReturn200AndSetCookiesWhenSignupSucceeds() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenReturn(loginResponse("newuser", false, "refresh-abc"));
 
             mockMvc.perform(post(SIGNUP)
@@ -263,7 +262,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldPassDeserializedRequestAndUserAgentToService() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenReturn(loginResponse("newuser", false, "refresh-abc"));
 
             mockMvc.perform(post(SIGNUP)
@@ -273,20 +272,20 @@ class AuthControllerUnitTest {
                     .andExpect(status().isOk());
 
             ArgumentCaptor<SignupRequest> req = ArgumentCaptor.forClass(SignupRequest.class);
-            ArgumentCaptor<String> ua = ArgumentCaptor.forClass(String.class);
-            verify(authService, times(1)).signup(req.capture(), ua.capture(), any(HttpServletRequest.class));
+            ArgumentCaptor<ClientRequestInfo> client = ArgumentCaptor.forClass(ClientRequestInfo.class);
+            verify(authService, times(1)).signup(req.capture(), client.capture());
             assertThat(req.getValue().getName()).isEqualTo("New User");
             assertThat(req.getValue().getUsername()).isEqualTo("newuser");
             assertThat(req.getValue().getEmail()).isEqualTo("newuser@example.com");
             assertThat(req.getValue().getAge()).isEqualTo(25);
             assertThat(req.getValue().getGender()).isEqualTo("male");
-            assertThat(ua.getValue()).isEqualTo("JUnit-UA");
+            assertThat(client.getValue().userAgent()).isEqualTo("JUnit-UA");
         }
 
         @Test
         void shouldPassNullUserAgentWhenHeaderAbsent() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenReturn(loginResponse("newuser", false, "refresh-abc"));
 
             mockMvc.perform(post(SIGNUP)
@@ -294,9 +293,9 @@ class AuthControllerUnitTest {
                             .content(validSignupPayload()))
                     .andExpect(status().isOk());
 
-            ArgumentCaptor<String> ua = ArgumentCaptor.forClass(String.class);
-            verify(authService).signup(any(), ua.capture(), any());
-            assertThat(ua.getValue()).isNull();
+            ArgumentCaptor<ClientRequestInfo> client = ArgumentCaptor.forClass(ClientRequestInfo.class);
+            verify(authService).signup(any(), client.capture());
+            assertThat(client.getValue().userAgent()).isNull();
         }
 
         @Test
@@ -338,7 +337,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldReturn409WhenServiceReportsDuplicate() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenThrow(new ConflictException("Email already registered", "TM_047"));
 
             mockMvc.perform(post(SIGNUP)
@@ -426,7 +425,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldAcceptBoundaryAge18() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenReturn(loginResponse("newuser", false, "r"));
             mockMvc.perform(post(SIGNUP).contentType(MediaType.APPLICATION_JSON)
                             .content(signupPayload("Nm", "newuser", "a@b.com", "password1", 18, "male")))
@@ -436,7 +435,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldAcceptBoundaryAge99AndCaseInsensitiveGender() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenReturn(loginResponse("newuser", false, "r"));
             mockMvc.perform(post(SIGNUP).contentType(MediaType.APPLICATION_JSON)
                             .content(signupPayload("Nm", "newuser", "a@b.com", "password1", 99, "FEMALE")))
@@ -446,7 +445,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldAcceptUnicodeAndEmojiName() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any()))
+            when(authService.signup(any(), any()))
                     .thenReturn(loginResponse("newuser", false, "r"));
 
             mockMvc.perform(post(SIGNUP).contentType(MediaType.APPLICATION_JSON)
@@ -454,7 +453,7 @@ class AuthControllerUnitTest {
                     .andExpect(status().isOk());
 
             ArgumentCaptor<SignupRequest> req = ArgumentCaptor.forClass(SignupRequest.class);
-            verify(authService).signup(req.capture(), any(), any());
+            verify(authService).signup(req.capture(), any());
             assertThat(req.getValue().getName()).isEqualTo("José 🌟 名字");
         }
 
@@ -471,7 +470,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldReturn500WhenUnexpectedServiceErrorOccurs() throws Exception {
             allowCaptcha();
-            when(authService.signup(any(), any(), any())).thenThrow(new RuntimeException("boom"));
+            when(authService.signup(any(), any())).thenThrow(new RuntimeException("boom"));
 
             mockMvc.perform(post(SIGNUP).contentType(MediaType.APPLICATION_JSON).content(validSignupPayload()))
                     .andExpect(status().isInternalServerError())
@@ -505,7 +504,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldReturn200WithUserCookieMaxAgeWhenCredentialsValid() throws Exception {
             allowCaptcha();
-            when(authService.login(any(), any(), any(), any()))
+            when(authService.login(any(), any()))
                     .thenReturn(loginResponse("testuser", false, "refresh-user"));
 
             mockMvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON).content(CREDENTIALS))
@@ -516,14 +515,14 @@ class AuthControllerUnitTest {
                     .andExpect(cookie().value("refreshToken", "refresh-user"))
                     .andExpect(cookie().maxAge("refreshToken", (int) USER_MAX_AGE));
 
-            verify(authService).login(any(), any(), any(), any());
-            verify(authService, never()).loginAsGuest(any(), any(), any());
+            verify(authService).login(any(), any());
+            verify(authService, never()).loginAsGuest(any(), any());
         }
 
         @Test
         void shouldReturn200WithGuestCookieMaxAgeWhenIsGuestTrue() throws Exception {
             allowCaptcha();
-            when(authService.loginAsGuest(any(), any(), any()))
+            when(authService.loginAsGuest(any(), any()))
                     .thenReturn(loginResponse("guest_ab12", true, "refresh-guest"));
 
             mockMvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON).content(GUEST))
@@ -533,14 +532,14 @@ class AuthControllerUnitTest {
                     .andExpect(cookie().value("refreshToken", "refresh-guest"))
                     .andExpect(cookie().maxAge("refreshToken", (int) GUEST_MAX_AGE));
 
-            verify(authService).loginAsGuest(any(), any(), any());
-            verify(authService, never()).login(any(), any(), any(), any());
+            verify(authService).loginAsGuest(any(), any());
+            verify(authService, never()).login(any(), any());
         }
 
         @Test
         void shouldForwardParsedCredentialsAndClientIpToService() throws Exception {
             allowCaptcha();
-            when(authService.login(any(), any(), any(), any()))
+            when(authService.login(any(), any()))
                     .thenReturn(loginResponse("testuser", false, "r"));
 
             mockMvc.perform(post(LOGIN)
@@ -550,35 +549,34 @@ class AuthControllerUnitTest {
                     .andExpect(status().isOk());
 
             ArgumentCaptor<LoginRequest> req = ArgumentCaptor.forClass(LoginRequest.class);
-            ArgumentCaptor<String> ua = ArgumentCaptor.forClass(String.class);
-            ArgumentCaptor<String> ip = ArgumentCaptor.forClass(String.class);
-            verify(authService).login(req.capture(), ua.capture(), ip.capture(), any());
+            ArgumentCaptor<ClientRequestInfo> client = ArgumentCaptor.forClass(ClientRequestInfo.class);
+            verify(authService).login(req.capture(), client.capture());
             assertThat(req.getValue().getEmail()).isEqualTo("testuser@example.com");
             assertThat(req.getValue().getPassword()).isEqualTo("password123");
-            assertThat(ua.getValue()).isEqualTo("JUnit-UA");
+            assertThat(client.getValue().userAgent()).isEqualTo("JUnit-UA");
             // X-Forwarded-For wins over remoteAddr; only the LAST hop (appended by the trusted
             // proxy) is trusted — the client-supplied first hop is ignored.
-            assertThat(ip.getValue()).isEqualTo("70.41.3.18");
+            assertThat(client.getValue().clientIp()).isEqualTo("70.41.3.18");
         }
 
         @Test
         void shouldUseRemoteAddrWhenNoForwardedForHeader() throws Exception {
             allowCaptcha();
-            when(authService.login(any(), any(), any(), any()))
+            when(authService.login(any(), any()))
                     .thenReturn(loginResponse("testuser", false, "r"));
 
             mockMvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON).content(CREDENTIALS))
                     .andExpect(status().isOk());
 
-            ArgumentCaptor<String> ip = ArgumentCaptor.forClass(String.class);
-            verify(authService).login(any(), any(), ip.capture(), any());
-            assertThat(ip.getValue()).isEqualTo("127.0.0.1");
+            ArgumentCaptor<ClientRequestInfo> client = ArgumentCaptor.forClass(ClientRequestInfo.class);
+            verify(authService).login(any(), client.capture());
+            assertThat(client.getValue().clientIp()).isEqualTo("127.0.0.1");
         }
 
         @Test
         void shouldReturn401WhenServiceRejectsCredentials() throws Exception {
             allowCaptcha();
-            when(authService.login(any(), any(), any(), any()))
+            when(authService.login(any(), any()))
                     .thenThrow(new UnauthorizedException("Invalid credentials", "TM_024"));
 
             mockMvc.perform(post(LOGIN).contentType(MediaType.APPLICATION_JSON).content(CREDENTIALS))
@@ -589,7 +587,7 @@ class AuthControllerUnitTest {
         @Test
         void shouldReturn429WhenServiceRateLimitsLogin() throws Exception {
             allowCaptcha();
-            when(authService.login(any(), any(), any(), any()))
+            when(authService.login(any(), any()))
                     .thenThrow(new TooManyRequestsException(
                             "Too many failed attempts", "TM_025"));
 
@@ -641,7 +639,7 @@ class AuthControllerUnitTest {
             // The controller does not sanitize input — this documents that the raw value reaches
             // the service layer (defense lives below, via parameterized queries / JPA).
             allowCaptcha();
-            when(authService.login(any(), any(), any(), any()))
+            when(authService.login(any(), any()))
                     .thenThrow(new UnauthorizedException("Invalid credentials", "TM_024"));
             String body = """
                     {"email":"' OR '1'='1","password":"password123"}""";
@@ -650,7 +648,7 @@ class AuthControllerUnitTest {
                     .andExpect(status().isUnauthorized());
 
             ArgumentCaptor<LoginRequest> req = ArgumentCaptor.forClass(LoginRequest.class);
-            verify(authService).login(req.capture(), any(), any(), any());
+            verify(authService).login(req.capture(), any());
             assertThat(req.getValue().getEmail()).isEqualTo("' OR '1'='1");
         }
     }
