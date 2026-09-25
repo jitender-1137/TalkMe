@@ -2,6 +2,8 @@ package com.neo.chat.service.impl;
 
 import com.neo.chat.domain.BlockUser;
 import com.neo.chat.domain.Friend;
+import com.neo.chat.domain.FriendRequest;
+import com.neo.chat.enums.FriendRequestStatus;
 import com.neo.chat.domain.MatchReport;
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserSetting;
@@ -33,6 +35,7 @@ import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.moderation.ModerationResult;
 import com.neo.chat.repository.BlockUserRepository;
 import com.neo.chat.repository.FriendRepository;
+import com.neo.chat.repository.FriendRequestRepository;
 import com.neo.chat.repository.MatchReportRepository;
 import com.neo.chat.repository.PostRepository;
 import com.neo.chat.repository.UserFollowRepository;
@@ -103,6 +106,8 @@ class UserServiceImplTest {
     @Mock
     private FriendRepository friendRepository;
     @Mock
+    private FriendRequestRepository friendRequestRepository;
+    @Mock
     private UserSettingRepository userSettingRepository;
     @Mock
     private BlockUserRepository blockUserRepository;
@@ -140,9 +145,9 @@ class UserServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new UserServiceImpl(
-                userRepository, friendRepository, userSettingRepository, blockUserRepository,
-                matchReportRepository, presenceService, storageService, userMapper, redisTemplate,
-                userFollowRepository, postRepository, moderationService, notificationService,
+                userRepository, friendRepository, friendRequestRepository, userSettingRepository,
+                blockUserRepository, matchReportRepository, presenceService, storageService, userMapper,
+                redisTemplate, userFollowRepository, postRepository, moderationService, notificationService,
                 reputationRecorder, reputationService, compatibilityService, streakService);
 
         // ── Shared enrichment defaults (populate* helpers run on almost every path) ──
@@ -667,6 +672,111 @@ class UserServiceImplTest {
             UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
 
             assertThat(res.isFriend()).isFalse();
+        }
+
+        @Test
+        @DisplayName("viewer follows target → isFollowing=true")
+        void isFollowingTrue() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(me, t, "ACCEPTED"))
+                    .thenReturn(true);
+
+            UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
+
+            assertThat(res.isFollowing()).isTrue();
+        }
+
+        @Test
+        @DisplayName("not following → isFollowing=false")
+        void isFollowingFalse() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+
+            UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
+
+            assertThat(res.isFollowing()).isFalse();
+        }
+
+        @Test
+        @DisplayName("pending request I sent → friendRequestOutgoingId set, incoming null")
+        void outgoingPending() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+            FriendRequest out = FriendRequest.builder().sender(me).receiver(t)
+                    .status(FriendRequestStatus.PENDING).build();
+            UUID outId = UUID.randomUUID();
+            out.setUuid(outId);
+            when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(me, t))
+                    .thenReturn(Optional.of(out));
+            when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(t, me))
+                    .thenReturn(Optional.empty());
+
+            UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
+
+            assertThat(res.getFriendRequestOutgoingId()).isEqualTo(outId.toString());
+            assertThat(res.getFriendRequestIncomingId()).isNull();
+        }
+
+        @Test
+        @DisplayName("pending request they sent → friendRequestIncomingId set, outgoing null")
+        void incomingPending() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+            FriendRequest in = FriendRequest.builder().sender(t).receiver(me)
+                    .status(FriendRequestStatus.PENDING).build();
+            UUID inId = UUID.randomUUID();
+            in.setUuid(inId);
+            when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(me, t))
+                    .thenReturn(Optional.empty());
+            when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(t, me))
+                    .thenReturn(Optional.of(in));
+
+            UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
+
+            assertThat(res.getFriendRequestIncomingId()).isEqualTo(inId.toString());
+            assertThat(res.getFriendRequestOutgoingId()).isNull();
+        }
+
+        @Test
+        @DisplayName("non-PENDING request is ignored → no direction ids")
+        void nonPendingIgnored() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+            FriendRequest rejected = FriendRequest.builder().sender(me).receiver(t)
+                    .status(FriendRequestStatus.REJECTED).build();
+            rejected.setUuid(UUID.randomUUID());
+            when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(me, t))
+                    .thenReturn(Optional.of(rejected));
+            when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(t, me))
+                    .thenReturn(Optional.empty());
+
+            UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
+
+            assertThat(res.getFriendRequestOutgoingId()).isNull();
+            assertThat(res.getFriendRequestIncomingId()).isNull();
+        }
+
+        @Test
+        @DisplayName("already friends → request-direction lookups skipped, both ids null")
+        void friendsSkipRequestLookup() {
+            User me = viewer();
+            User t = target();
+            when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
+            when(friendRepository.findByUserAndFriend(me, t)).thenReturn(Optional.of(new Friend()));
+
+            UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
+
+            assertThat(res.isFriend()).isTrue();
+            assertThat(res.getFriendRequestOutgoingId()).isNull();
+            assertThat(res.getFriendRequestIncomingId()).isNull();
+            verify(friendRequestRepository, never())
+                    .findFirstBySenderAndReceiverOrderByIdDesc(any(), any());
         }
 
         @Test

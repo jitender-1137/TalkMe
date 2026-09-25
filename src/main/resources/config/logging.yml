@@ -33,4 +33,11 @@ logging:
       clean-history-on-start: false
 
   pattern:
+    # ONE correlation id per line. We keep `requestId` (our own per-request UUID, also
+    # returned to clients on the X-Request-Id response header → true client↔log
+    # correlation) and blank out Spring Boot's default trace/span correlation segment so
+    # logs aren't cluttered with two ids. Tracing itself is unaffected: OpenTelemetry
+    # still generates + exports traceId/spanId to the OTLP collector — it's simply not
+    # duplicated in the console/file line.
     level: "%5p [requestId=%X{requestId}]"
+    correlation: ""

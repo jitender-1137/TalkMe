@@ -870,7 +870,11 @@ public class ChatServiceImpl implements ChatService {
             unreadCount = messageRepository.countUnreadForWatermark(
                     chat, currentUser.getId(), watermark != null ? watermark : 0L, clearedAt);
         } else {
-            unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId());
+            // 1:1 (PRIVATE/STRANGER): mirror the badge's rules — respect clearedAt and
+            // exclude SYSTEM messages — so the per-chat count and the app-icon badge
+            // (countTotalUnreadForUser) never disagree.
+            Instant clearedAt = memberSelf != null ? memberSelf.getClearedAt() : null;
+            unreadCount = messageRepository.countUnreadMessages(chat, currentUser.getId(), clearedAt);
         }
         // "Mark as unread" from the chat list — force the badge on even with no
         // genuinely-unread messages. Cleared when the user opens/reads the chat.

@@ -70,12 +70,13 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT m FROM Message m WHERE m.chat = :chat AND m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT")
     List<Message> findMessagesToMarkRead(Chat chat, Long userId);
 
-    @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND " +
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chat = :chat AND m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.neo.chat.enums.MessageType.SYSTEM AND (CAST(:clearedAt AS timestamp) IS NULL OR m.createdAt > :clearedAt) AND " +
             "NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')")
-    long countUnreadMessages(Chat chat, Long userId);
+    long countUnreadMessages(Chat chat, Long userId, Instant clearedAt);
 
     @Query("SELECT COUNT(m) FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.neo.chat.enums.MessageType.SYSTEM " +
-            "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
+            "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL " +
+            "     AND (cm.clearedAt IS NULL OR m.createdAt > cm.clearedAt)) " +
             "AND ( " +
             "  (m.chat.chatType IN (com.neo.chat.enums.ChatType.PRIVATE, com.neo.chat.enums.ChatType.STRANGER) " +
             "     AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
@@ -190,7 +191,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
      * Most-recent unread messages for a user (newest first) — source of digest preview rows.
      */
     @Query("SELECT m FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.neo.chat.enums.MessageType.SYSTEM " +
-            "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL) " +
+            "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL " +
+            "     AND (cm.clearedAt IS NULL OR m.createdAt > cm.clearedAt)) " +
             "AND ( (m.chat.chatType IN (com.neo.chat.enums.ChatType.PRIVATE, com.neo.chat.enums.ChatType.STRANGER) AND NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')) " +
             "  OR (m.chat.chatType = com.neo.chat.enums.ChatType.GROUP AND m.id > COALESCE((SELECT cm2.lastReadMessageId FROM ChatMember cm2 WHERE cm2.chat = m.chat AND cm2.user.id = :userId), 0)) ) " +
             "ORDER BY m.id DESC")

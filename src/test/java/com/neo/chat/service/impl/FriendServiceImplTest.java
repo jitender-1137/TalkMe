@@ -457,6 +457,87 @@ class FriendServiceImplTest {
         }
     }
 
+    // ─────────────────────────────────────── respondToFriendRequests (bulk) ──────────────────────
+
+    @Nested
+    @DisplayName("respondToFriendRequests (bulk)")
+    class RespondToFriendRequests {
+
+        @Test
+        @DisplayName("accept all pending → each ACCEPTED, two Friend rows each, returns processed count")
+        void acceptsAll() {
+            FriendRequest r1 = request(other, me, FriendRequestStatus.PENDING);
+            User third = user(3L, "third");
+            FriendRequest r2 = request(third, me, FriendRequestStatus.PENDING);
+            when(friendRequestRepository.findByUuid(r1.getUuid())).thenReturn(Optional.of(r1));
+            when(friendRequestRepository.findByUuid(r2.getUuid())).thenReturn(Optional.of(r2));
+
+            int processed = service.respondToFriendRequests(
+                    List.of(r1.getUuid().toString(), r2.getUuid().toString()), true, me);
+
+            assertThat(processed).isEqualTo(2);
+            assertThat(r1.getStatus()).isEqualTo(FriendRequestStatus.ACCEPTED);
+            assertThat(r2.getStatus()).isEqualTo(FriendRequestStatus.ACCEPTED);
+            verify(friendRepository, times(4)).save(any()); // 2 Friend rows per accept
+        }
+
+        @Test
+        @DisplayName("reject all pending → each REJECTED, no Friend rows, returns processed count")
+        void rejectsAll() {
+            FriendRequest r1 = request(other, me, FriendRequestStatus.PENDING);
+            when(friendRequestRepository.findByUuid(r1.getUuid())).thenReturn(Optional.of(r1));
+
+            int processed = service.respondToFriendRequests(List.of(r1.getUuid().toString()), false, me);
+
+            assertThat(processed).isEqualTo(1);
+            assertThat(r1.getStatus()).isEqualTo(FriendRequestStatus.REJECTED);
+            verify(friendRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("stale / not-mine / already-processed ids are skipped; valid ones still processed")
+        void skipsBadIdsButProcessesValid() {
+            FriendRequest ok = request(other, me, FriendRequestStatus.PENDING);
+            FriendRequest notMine = request(me, other, FriendRequestStatus.PENDING); // receiver != me
+            FriendRequest done = request(other, me, FriendRequestStatus.ACCEPTED);    // not PENDING
+            UUID missing = UUID.randomUUID();
+            when(friendRequestRepository.findByUuid(ok.getUuid())).thenReturn(Optional.of(ok));
+            when(friendRequestRepository.findByUuid(notMine.getUuid())).thenReturn(Optional.of(notMine));
+            when(friendRequestRepository.findByUuid(done.getUuid())).thenReturn(Optional.of(done));
+            when(friendRequestRepository.findByUuid(missing)).thenReturn(Optional.empty());
+
+            int processed = service.respondToFriendRequests(
+                    List.of(ok.getUuid().toString(), notMine.getUuid().toString(),
+                            done.getUuid().toString(), missing.toString()), true, me);
+
+            assertThat(processed).isEqualTo(1);
+            assertThat(ok.getStatus()).isEqualTo(FriendRequestStatus.ACCEPTED);
+            assertThat(notMine.getStatus()).isEqualTo(FriendRequestStatus.PENDING); // untouched
+            assertThat(done.getStatus()).isEqualTo(FriendRequestStatus.ACCEPTED);   // untouched
+        }
+
+        @Test
+        @DisplayName("duplicate ids are de-duplicated → processed once")
+        void dedupes() {
+            FriendRequest r = request(other, me, FriendRequestStatus.PENDING);
+            when(friendRequestRepository.findByUuid(r.getUuid())).thenReturn(Optional.of(r));
+
+            int processed = service.respondToFriendRequests(
+                    List.of(r.getUuid().toString(), r.getUuid().toString()), true, me);
+
+            assertThat(processed).isEqualTo(1);
+            verify(friendRequestRepository).save(r); // saved exactly once
+        }
+
+        @Test
+        @DisplayName("empty or null list → returns 0, no repository interaction")
+        void emptyOrNull() {
+            assertThat(service.respondToFriendRequests(List.of(), true, me)).isZero();
+            assertThat(service.respondToFriendRequests(null, true, me)).isZero();
+            verifyNoInteractions(friendRequestRepository);
+        }
+    }
+
     // ─────────────────────────────────────────── cancelFriendRequest ─────────────────────────────
 
     @Nested

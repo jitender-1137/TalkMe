@@ -25,6 +25,7 @@ import com.neo.chat.mapper.UserMapper;
 import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.repository.BlockUserRepository;
 import com.neo.chat.repository.FriendRepository;
+import com.neo.chat.repository.FriendRequestRepository;
 import com.neo.chat.repository.MatchReportRepository;
 import com.neo.chat.repository.PostRepository;
 import com.neo.chat.repository.UserFollowRepository;
@@ -80,6 +81,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
+    private final FriendRequestRepository friendRequestRepository;
     private final UserSettingRepository userSettingRepository;
     private final BlockUserRepository blockUserRepository;
     private final MatchReportRepository matchReportRepository;
@@ -212,8 +214,17 @@ public class UserServiceImpl implements UserService {
                 }
             }
         }
+        // voiceIntroUrl: absent (null) = leave unchanged; BLANK ("") = explicit REMOVE
+        // (clear the intro AND its duration). A non-blank value sets/replaces it. The old
+        // "only apply when != null" check made removal impossible — the client's null was
+        // silently ignored, so the saved intro kept showing after tapping Remove.
         if (request.getVoiceIntroUrl() != null) {
-            user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+            if (request.getVoiceIntroUrl().isBlank()) {
+                user.setVoiceIntroUrl(null);
+                user.setVoiceIntroDurationMs(null);
+            } else {
+                user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+            }
         }
         if (request.getVoiceIntroDurationMs() != null) {
             user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());
@@ -431,6 +442,25 @@ public class UserServiceImpl implements UserService {
                 && !currentUser.getId().equals(targetUser.getId())
                 && friendRepository.findByUserAndFriend(currentUser, targetUser).isPresent();
         response.setFriend(friend);
+
+        // Follow + directional friend-request state for the viewer→target relationship.
+        // All are viewer-relative and never apply to one's own profile. Cheap indexed lookups.
+        if (currentUser != null && !currentUser.getId().equals(targetUser.getId())) {
+            response.setFollowing(userFollowRepository
+                    .existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(currentUser, targetUser, "ACCEPTED"));
+            if (!friend) {
+                // Outgoing: I sent → them (drives "Requested"/cancel).
+                friendRequestRepository
+                        .findFirstBySenderAndReceiverOrderByIdDesc(currentUser, targetUser)
+                        .filter(fr -> fr.getStatus() == com.neo.chat.enums.FriendRequestStatus.PENDING)
+                        .ifPresent(fr -> response.setFriendRequestOutgoingId(fr.getUuid().toString()));
+                // Incoming: they sent → me (drives Accept/Decline).
+                friendRequestRepository
+                        .findFirstBySenderAndReceiverOrderByIdDesc(targetUser, currentUser)
+                        .filter(fr -> fr.getStatus() == com.neo.chat.enums.FriendRequestStatus.PENDING)
+                        .ifPresent(fr -> response.setFriendRequestIncomingId(fr.getUuid().toString()));
+            }
+        }
         return response;
     }
 

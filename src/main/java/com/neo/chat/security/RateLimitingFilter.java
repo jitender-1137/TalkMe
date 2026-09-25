@@ -60,8 +60,12 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        // Skip rate limiting entirely in local/dev/test profiles
-        if (env.acceptsProfiles(Profiles.of("local", "default", "test")) || env.getActiveProfiles().length == 0) {
+        // Skip rate limiting entirely in local/dev/test profiles. NOTE: "dev" MUST be
+        // listed — it's the profile IntelliJ/local runs use, and without it the limiter
+        // throttled ordinary localhost traffic (a single browser reconnect/bootstrap makes
+        // dozens of /api calls, all sharing the one ::1 bucket → "Rate limit exceeded" spam
+        // even with no page really open). Only "prod" is rate-limited.
+        if (env.acceptsProfiles(Profiles.of("local", "default", "dev", "test")) || env.getActiveProfiles().length == 0) {
             filterChain.doFilter(request, response);
             return;
         }

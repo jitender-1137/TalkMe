@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -150,7 +151,7 @@ public class PhotoMusicMuxer {
      * Run ffmpeg to loop the image over the trimmed audio, producing an iOS-safe H.264/AAC MP4.
      */
     private boolean runFfmpeg(Path image, Path audio, int start, int clip, Path output) {
-        List<String> command = List.of(
+        List<String> command = new ArrayList<>(List.of(
                 ffmpeg.path(), "-y", "-nostdin",
                 // SECURITY: restrict demuxer protocols to local file/pipe so a crafted image/audio
                 // container cannot make ffmpeg fetch remote/file segments (SSRF/LFI).
@@ -158,12 +159,12 @@ public class PhotoMusicMuxer {
                 "-loop", "1", "-i", image.toString(),
                 "-ss", String.valueOf(start), "-i", audio.toString(),
                 "-t", String.valueOf(clip),
-                "-map_metadata", "-1",
-                // libopenh264 (bundled, cross-platform, BSD) — libx264 is not in the
-                // bundled build. Produces standard H.264 (avc1) that plays on iOS.
-                // openh264 uses target bitrate, not -crf/-preset/-tune.
-                "-c:v", "libopenh264",
-                "-b:v", "2000k",
+                "-map_metadata", "-1"));
+        // H.264 encoder is chosen from what THIS ffmpeg actually has (libx264 / libopenh264 /
+        // mpeg4 fallback) — a hardcoded encoder was silently failing on servers whose ffmpeg
+        // lacked libopenh264, causing the post to fall back to image + separate audio.
+        command.addAll(ffmpeg.h264VideoArgs());
+        command.addAll(List.of(
                 "-pix_fmt", "yuv420p",
                 "-r", "24",
                 "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
@@ -172,7 +173,7 @@ public class PhotoMusicMuxer {
                 "-movflags", "+faststart",
                 "-shortest",
                 output.toString()
-        );
+        ));
 
         Process process = null;
         try {

@@ -1,7 +1,9 @@
 package com.neo.chat.controller;
 
+import com.neo.chat.dto.request.BulkFriendRequestActionRequest;
 import com.neo.chat.dto.response.AuthUserResponse;
 import com.neo.chat.dto.response.FriendRequestResponse;
+import jakarta.validation.Valid;
 import com.neo.chat.dto.response.ResponseDto;
 import com.neo.chat.dto.response.SuccessResponseDto;
 import com.neo.chat.security.CustomUserDetails;
@@ -96,6 +98,28 @@ public class FriendController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         friendService.rejectFriendRequest(requestUuid, userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Friend request rejected", "TM_092"));
+    }
+
+    /**
+     * Bulk accept/reject pending friend requests in a SINGLE call — replaces the client firing
+     * one request per pending item (which tripped the per-user rate limiter). Ids that are stale,
+     * already processed, or not addressed to the caller are skipped.
+     *
+     * @param request     the selected request ids + action (ACCEPT/REJECT)
+     * @param userDetails the authenticated receiver
+     * @return the number of requests processed
+     */
+    @Operation(summary = "Bulk accept/reject pending friend requests in one call")
+    @PostMapping(value = "/requests/respond", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ResponseDto<Map<String, Integer>>> respondToFriendRequests(
+            @Valid @RequestBody BulkFriendRequestActionRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        boolean accept = request.getAction() == BulkFriendRequestActionRequest.Action.ACCEPT;
+        int processed = friendService.respondToFriendRequests(
+                request.getRequestIds(), accept, userDetails.getUser());
+        String msg = accept ? "Friend requests accepted" : "Friend requests rejected";
+        return ResponseEntity.ok(SuccessResponseDto.success(
+                Map.of("processed", processed), msg, accept ? "TM_091" : "TM_092"));
     }
 
     /**

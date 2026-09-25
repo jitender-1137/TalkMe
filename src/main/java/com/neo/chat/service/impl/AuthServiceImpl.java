@@ -1517,8 +1517,16 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
                 }
             }
         }
+        // voiceIntroUrl: absent (null) = leave unchanged; BLANK ("") = explicit REMOVE
+        // (clear the intro AND its duration). Non-blank sets/replaces it. Mirrors
+        // UserServiceImpl — without this, a client can never clear a saved voice intro.
         if (request.getVoiceIntroUrl() != null) {
-            user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+            if (request.getVoiceIntroUrl().isBlank()) {
+                user.setVoiceIntroUrl(null);
+                user.setVoiceIntroDurationMs(null);
+            } else {
+                user.setVoiceIntroUrl(request.getVoiceIntroUrl());
+            }
         }
         if (request.getVoiceIntroDurationMs() != null) {
             user.setVoiceIntroDurationMs(request.getVoiceIntroDurationMs());

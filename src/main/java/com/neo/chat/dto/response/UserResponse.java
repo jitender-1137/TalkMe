@@ -60,6 +60,23 @@ public class UserResponse {
     @JsonProperty("isFriend")
     private boolean isFriend;
     /**
+     * Whether the requesting user currently FOLLOWS this user (drives the Follow/Following
+     * toggle on the profile). Follow is a system separate from friendship. Self is never following.
+     */
+    @JsonProperty("isFollowing")
+    private boolean isFollowing;
+    /**
+     * UUID of a PENDING friend request the requesting user RECEIVED from this user
+     * (null when none). Lets the client show Accept / Decline and call the request-scoped
+     * endpoints without a second lookup.
+     */
+    private String friendRequestIncomingId;
+    /**
+     * UUID of a PENDING friend request the requesting user SENT to this user
+     * (null when none). Drives the "Requested" (cancel) state.
+     */
+    private String friendRequestOutgoingId;
+    /**
      * Whether the requesting user is currently allowed to message this user
      * (false only when this user restricts messages to friends and the
      * requester is not a friend). Null/absent means "allowed".

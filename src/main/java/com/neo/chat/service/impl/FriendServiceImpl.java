@@ -263,6 +263,11 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public void rejectFriendRequest(String requestUuid, User currentUser) {
+        doRejectFriendRequest(requestUuid, currentUser);
+    }
+
+    /** Proxy-free counterpart of {@link #rejectFriendRequest} for same-bean callers (bulk respond). */
+    private void doRejectFriendRequest(String requestUuid, User currentUser) {
         FriendRequest request = friendRequestRepository.findByUuid(UUID.fromString(requestUuid))
                 .orElseThrow(() -> new NotFoundException("Friend request not found", "TM_094"));
 
@@ -278,6 +283,34 @@ public class FriendServiceImpl implements FriendService {
         friendRequestRepository.save(request);
         broadcastFriendEvent(request.getSender(), "friend_request_rejected");
         broadcastFriendEvent(request.getReceiver(), "friend_request_rejected");
+    }
+
+    /**
+     * Bulk accept/reject in ONE transaction. Each id is validated + processed via the private
+     * do*FriendRequest helpers; a per-id failure (missing / already-processed / not the caller's)
+     * is caught and skipped so one stale id can't fail the whole batch. Because the helpers throw
+     * BEFORE any write, catching here never marks the transaction rollback-only. Capped + de-duped
+     * to bound the work per request.
+     */
+    @Override
+    @Transactional
+    public int respondToFriendRequests(List<String> requestUuids, boolean accept, User currentUser) {
+        if (requestUuids == null || requestUuids.isEmpty()) return 0;
+        int processed = 0;
+        for (String id : requestUuids.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .distinct()
+                .limit(500)
+                .toList()) {
+            try {
+                if (accept) doAcceptFriendRequest(id, currentUser);
+                else doRejectFriendRequest(id, currentUser);
+                processed++;
+            } catch (RuntimeException e) {
+                log.debug("Bulk friend respond skipped {} ({})", id, e.getMessage());
+            }
+        }
+        return processed;
     }
 
     /**

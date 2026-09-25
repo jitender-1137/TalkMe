@@ -485,10 +485,16 @@ public class PresenceServiceImpl implements PresenceService, com.neo.chat.event.
                 return PresenceStatus.OFFLINE;
             }
             String statusStr = (String) cachedPresence.get("status");
-            try {
-                return PresenceStatus.valueOf(statusStr);
-            } catch (Exception e) {
-                log.warn("Failed to parse cached status {} for user {}", statusStr, LogSanitizer.mask(username));
+            // A hash with no `status` field (statusStr == null) is a NORMAL cold/partial
+            // cache — just fall through to the DB fallback silently (this used to flood WARNs
+            // on the first presence-heavy request after a restart). Only a genuinely
+            // corrupt, non-null value is worth warning about.
+            if (statusStr != null) {
+                try {
+                    return PresenceStatus.valueOf(statusStr);
+                } catch (Exception e) {
+                    log.warn("Failed to parse cached status {} for user {}", statusStr, LogSanitizer.mask(username));
+                }
             }
         }
 

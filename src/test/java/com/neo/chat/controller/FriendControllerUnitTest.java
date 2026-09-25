@@ -315,6 +315,68 @@ class FriendControllerUnitTest {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    //  POST /friends/requests/respond (bulk accept/reject)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("POST /friends/requests/respond")
+    class RespondBulk {
+
+        @Test
+        @DisplayName("ACCEPT → forwards ids + accept=true, returns processed count, TM_091")
+        void shouldAcceptAll() throws Exception {
+            authenticate();
+            when(friendService.respondToFriendRequests(any(), eq(true), any())).thenReturn(3);
+
+            mockMvc.perform(post(BASE + "/requests/respond").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"requestIds\":[\"a\",\"b\",\"c\"],\"action\":\"ACCEPT\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.messageCode").value("TM_091"))
+                    .andExpect(jsonPath("$.data.processed").value(3));
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<String>> ids = ArgumentCaptor.forClass(List.class);
+            verify(friendService).respondToFriendRequests(ids.capture(), eq(true), eq(testUser));
+            assertThat(ids.getValue()).containsExactly("a", "b", "c");
+        }
+
+        @Test
+        @DisplayName("REJECT → forwards accept=false, TM_092")
+        void shouldRejectAll() throws Exception {
+            authenticate();
+            when(friendService.respondToFriendRequests(any(), eq(false), any())).thenReturn(2);
+
+            mockMvc.perform(post(BASE + "/requests/respond").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"requestIds\":[\"a\",\"b\"],\"action\":\"REJECT\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.messageCode").value("TM_092"))
+                    .andExpect(jsonPath("$.data.processed").value(2));
+
+            verify(friendService).respondToFriendRequests(any(), eq(false), eq(testUser));
+        }
+
+        @Test
+        @DisplayName("empty requestIds → 400 (bean validation), service untouched")
+        void shouldReject400WhenIdsEmpty() throws Exception {
+            authenticate();
+            mockMvc.perform(post(BASE + "/requests/respond").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"requestIds\":[],\"action\":\"ACCEPT\"}"))
+                    .andExpect(status().isBadRequest());
+            verifyNoInteractions(friendService);
+        }
+
+        @Test
+        @DisplayName("missing action → 400 (bean validation), service untouched")
+        void shouldReject400WhenActionMissing() throws Exception {
+            authenticate();
+            mockMvc.perform(post(BASE + "/requests/respond").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"requestIds\":[\"a\"]}"))
+                    .andExpect(status().isBadRequest());
+            verifyNoInteractions(friendService);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     //  GET /friends  &  GET /friends/requests
     // ──────────────────────────────────────────────────────────────────────────
 
