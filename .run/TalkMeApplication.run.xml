@@ -1,24 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <!--
-    Dev run configuration for local development (dev/local profiles).
-
-    Fixes two JVM-diagnostics findings that only affect the IDE-launched JVM (production uses
-    deploy/start_script.sh, which is already tuned correctly):
-
-    * MEM-POOL-006 (JIT capped at tier 1): ENABLE_LAUNCH_OPTIMIZATION=false stops IntelliJ from
-      auto-adding "-XX:TieredStopAtLevel=1 -XX:+UseParallelGC" (its faster-startup shortcut), so
-      the app runs with full C2 optimisation like production.
-
-    * MEM-FOOTPRINT-004 (JVM partially swapped on a low-memory host): the VM options bound the
-      committed footprint (heap 256m-768m, G1, MaxRAMPercentage 50) so it fits in free physical
-      RAM instead of spilling to swap on a busy Mac. Raise -Xmx if your machine has spare RAM.
-  -->
   <configuration default="false" name="TalkMeApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
-    <option name="ENABLE_LAUNCH_OPTIMIZATION" value="false" />
-    <option name="ENABLE_DEBUG_MODE" value="false" />
-    <module name="com.neo.talkMe.main" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.neo.chat.TalkMeApplication" />
     <option name="ACTIVE_PROFILES" value="dev" />
+    <option name="ENABLE_LAUNCH_OPTIMIZATION" value="false" />
+    <module name="NeoChatHub.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.neo.chat.TalkMeApplication" />
     <option name="VM_PARAMETERS" value="-Xms256m -Xmx768m -XX:+UseG1GC -XX:MaxRAMPercentage=50 -XX:+ExitOnOutOfMemoryError" />
     <method v="2">
       <option name="Make" enabled="true" />
