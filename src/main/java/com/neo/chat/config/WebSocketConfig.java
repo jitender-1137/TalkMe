@@ -12,7 +12,11 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * STOMP-over-WebSocket messaging configuration. In relay mode
@@ -29,9 +33,14 @@ import java.util.Arrays;
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    /** Localhost dev origins (any port) always allowed outside the prod profile. */
+    private static final List<String> DEV_ORIGIN_PATTERNS =
+            List.of("http://localhost:[*]", "http://127.0.0.1:[*]");
+
     private final WebSocketChannelInterceptor channelInterceptor;
     private final RabbitDestinationInterceptor rabbitDestinationInterceptor;
     private final String allowedOrigins;
+    private final boolean devLike;
     private final boolean relayEnabled;
     private final String relayHost;
     private final int relayPort;
@@ -52,7 +61,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      */
     public WebSocketConfig(WebSocketChannelInterceptor channelInterceptor,
                            RabbitDestinationInterceptor rabbitDestinationInterceptor,
-                           @Value("${app.cors.allowed-origins}") String allowedOrigins,
+                           @Value("${app.cors.allowed-origins:}") String allowedOrigins,
+                           @Value("${spring.profiles.active:}") String activeProfiles,
                            @Value("${app.broker.relay-enabled:false}") boolean relayEnabled,
                            @Value("${app.broker.relay-host:localhost}") String relayHost,
                            @Value("${app.broker.relay-port:61613}") int relayPort,
@@ -61,6 +71,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         this.channelInterceptor = channelInterceptor;
         this.rabbitDestinationInterceptor = rabbitDestinationInterceptor;
         this.allowedOrigins = allowedOrigins;
+        // Any non-prod run auto-allows the Next.js dev server (localhost) for the WS handshake.
+        this.devLike = !activeProfiles.toLowerCase().contains("prod");
         this.relayEnabled = relayEnabled;
         this.relayHost = relayHost;
         this.relayPort = relayPort;
@@ -126,16 +138,29 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     /**
      * Registers the STOMP handshake endpoints {@code /ws} and {@code /api/v1/ws}, both with a
-     * SockJS fallback and as raw WebSocket, restricting allowed origins to the trimmed
-     * {@code app.cors.allowed-origins} list (or {@code "*"} when unset).
+     * SockJS fallback and as raw WebSocket. Allowed origins are the trimmed
+     * {@code app.cors.allowed-origins} list, plus {@code http://localhost:*} /
+     * {@code http://127.0.0.1:*} outside the prod profile so the Next.js dev server can connect;
+     * falls back to {@code "*"} only when nothing is configured and the profile is non-prod.
      *
      * @param registry the {@link StompEndpointRegistry} to register endpoints on.
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        String[] origins = allowedOrigins != null ?
-                Arrays.stream(allowedOrigins.split(",")).map(String::trim).toArray(String[]::new) :
-                new String[]{"*"};
+        Set<String> patterns = new LinkedHashSet<>();
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            Arrays.stream(allowedOrigins.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(patterns::add);
+        }
+        if (devLike) {
+            patterns.addAll(DEV_ORIGIN_PATTERNS);
+        }
+        if (patterns.isEmpty()) {
+            patterns.add("*");
+        }
+        String[] origins = new ArrayList<>(patterns).toArray(new String[0]);
         registry.addEndpoint("/ws", "/api/v1/ws")
                 .setAllowedOriginPatterns(origins)
                 .withSockJS();

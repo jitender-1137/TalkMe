@@ -95,7 +95,8 @@ class ActuatorSecurityChainTest {
         @Bean
         RateLimitingFilter rateLimitingFilter(Environment env) {
             // No active profile → the filter passes every request straight through.
-            return new RateLimitingFilter(Mockito.mock(StringRedisTemplate.class), env);
+            return new RateLimitingFilter(Mockito.mock(StringRedisTemplate.class), env,
+                    new com.neo.chat.config.RateLimitProperties(true, 60, 240, 60, 60, java.util.Map.of()));
         }
 
         @Bean

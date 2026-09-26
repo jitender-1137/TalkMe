@@ -34,11 +34,47 @@ app:
     # Fail boot (enforce) / warn / off when a PUBLIC deployment (https origins) is missing the
     # 'prod' profile or exposes BootUI beyond localhost. Guards against shipping a dev .env to prod.
     production-hardening: ${PRODUCTION_HARDENING:warn}
+    # HTTP rate limiting (RateLimitingFilter). Enforced only in prod-like profiles. Two buckets per
+    # request: a GLOBAL per-user/per-IP backstop AND a PER-ENDPOINT bucket (same subject + normalized
+    # "METHOD /route"), so a burst on one endpoint can't drain the whole quota.
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+      # PER-ENDPOINT (below) is the real limit: default 60 / user / endpoint / 60s (≈1 req/sec avg).
+      # The GLOBAL caps are only a high anti-spray ceiling — sized ABOVE a very active genuine user's
+      # measured aggregate (~600–800/min) so real users never hit them; they only catch a client
+      # hammering MANY endpoints at once. Tune granularly with the per-endpoint overrides instead.
+      auth-limit: ${RATE_LIMIT_AUTH:1200}           # global ceiling / user / window
+      anon-limit: ${RATE_LIMIT_ANON:120}            # global ceiling / IP / window
+      endpoint-default: ${RATE_LIMIT_ENDPOINT_DEFAULT:60}  # per-endpoint cap / subject / window
+      # Per-endpoint overrides. Key = normalized "METHOD /route" (path ids masked to :id), in Spring
+      # bracket-literal form so the exact method/case/slashes are preserved verbatim.
+      endpoints:
+        # ── RAISED: genuine active users legitimately exceed 60/min here (undebounced search,
+        #    rapid chat-switching + history scroll, fast texting; all chats share one :id bucket). ──
+        "[GET /api/v1/users/search]": 200
+        "[GET /api/v1/discover]": 200
+        "[GET /api/v1/chats/:id/messages]": 200
+        "[GET /api/v1/chats/:id/messages/sync]": 150
+        "[POST /api/v1/chats/:id/messages]": 150
+        "[PUT /api/v1/chats/:id/read]": 150
+        "[PUT /api/v1/chats/:id/delivered]": 150
+        "[POST /api/v1/translate/batch]": 150
+        # ── TIGHTENED: brute-force / spam vectors (well under 60). ──
+        "[POST /api/v1/auth/login]": 10
+        "[POST /api/v1/auth/signup]": 8
+        "[POST /api/v1/auth/forgot-password]": 4
+        "[POST /api/v1/auth/reset-password]": 8
+        "[POST /api/v1/auth/change-password]": 8
+        "[POST /api/v1/auth/resend-verification]": 4
+        "[POST /api/v1/friends/requests]": 30
   cookie:
     secure: ${COOKIE_SECURE}
     same-site: ${COOKIE_SAME_SITE}
   cors:
-    allowed-origins: ${ALLOWED_ORIGINS}
+    # Empty default so a dev/local run without the env var still boots (non-prod profiles
+    # auto-allow http://localhost:* / http://127.0.0.1:* — see CorsConfig). Prod MUST set it.
+    allowed-origins: ${ALLOWED_ORIGINS:}
     allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
     allowed-headers: Authorization,Content-Type,X-CSRF-Token,Accept,X-Request-Id
     exposed-headers: Set-Cookie,X-Request-Id,Retry-After

@@ -15,6 +15,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -177,6 +178,7 @@ public class SecurityConfig {
     public SecurityFilterChain actuatorFilterChain(HttpSecurity http) {
         http
                 .securityMatcher("/actuator/**")
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -221,6 +223,12 @@ public class SecurityConfig {
         // Swagger UI has no Bearer token to present) — see the authorize rules below.
         boolean docsPublic = !environment.acceptsProfiles(Profiles.of("prod"));
         http
+                // Enable CORS via the corsConfigurationSource bean (CorsConfig). This installs
+                // Spring's CorsFilter EARLY in the security chain so cross-origin preflight
+                // (OPTIONS) is answered before authorization — otherwise a preflight to a secured
+                // /api/** endpoint (which carries no credentials) is rejected 401 without CORS
+                // headers and the browser reports a CORS error.
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable) // Custom CsrfTokenFilter handles CSRF check
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -69,10 +69,12 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     private static final int SEND_LIMIT = 600;
     private static final int SEND_WINDOW_SECONDS = 10;
 
-    // Per-user CONNECT storm guard. The client reconnects with exponential backoff
-    // (≈6/min worst case), so 30/min never affects a legit user but stops a client
-    // hammering the handshake.
-    private static final int CONNECT_LIMIT = 30;
+    // Per-user CONNECT storm guard. A healthy client reconnects with exponential backoff
+    // (≈12/min worst case at the 5s cap), and each browser tab / page reload opens a fresh
+    // STOMP session — so a dev with fast-refresh or a few tabs can legitimately open many
+    // handshakes a minute. 60/min leaves head-room for that while still stopping a true
+    // handshake flood (which is orders of magnitude higher). Exceeding it REJECTS the CONNECT.
+    private static final int CONNECT_LIMIT = 60;
     private static final int CONNECT_WINDOW_SECONDS = 60;
 
     // Destination allow-list vocabulary (see authorizeSubscribe / authorizeSend).
@@ -144,9 +146,19 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                 if (!userDetails.isEnabled()) {
                     throw new AccessDeniedException("STOMP CONNECT rejected: account disabled");
                 }
-                // Connection-storm guard (per user).
-                if (!allowConnect(username)) {
-                    log.warn("Rejecting STOMP CONNECT from {} — connect rate limit exceeded", LogSanitizer.mask(username));
+                // Connection-storm guard (per user). A client that keeps hitting the limit (a dev
+                // page-refresh storm, or a reconnect loop) would otherwise spam one WARN per retry,
+                // so we log WARN only on the FIRST rejection in the window and DEBUG for the rest.
+                long connectCount = incrementWindow("ws:ratelimit:connect:" + username, CONNECT_WINDOW_SECONDS);
+                if (connectCount >= 0 && connectCount > CONNECT_LIMIT) {
+                    if (connectCount == CONNECT_LIMIT + 1) {
+                        log.warn("Rejecting STOMP CONNECT from {} — connect rate limit exceeded "
+                                        + "({}/{}s); further rejections this window at DEBUG",
+                                LogSanitizer.mask(username), CONNECT_LIMIT, CONNECT_WINDOW_SECONDS);
+                    } else {
+                        log.debug("Rejecting STOMP CONNECT from {} — over connect limit (count={})",
+                                LogSanitizer.mask(username), connectCount);
+                    }
                     throw new AccessDeniedException("Too many connection attempts; slow down");
                 }
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -388,15 +400,6 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
         return withinLimit("ws:ratelimit:send:" + username, SEND_LIMIT, SEND_WINDOW_SECONDS);
     }
 
-    /**
-     * Checks the per-user CONNECT storm limit.
-     *
-     * @param username the connecting user
-     * @return {@code true} if the CONNECT is within the per-user rate limit
-     */
-    private boolean allowConnect(String username) {
-        return withinLimit("ws:ratelimit:connect:" + username, CONNECT_LIMIT, CONNECT_WINDOW_SECONDS);
-    }
 
     /**
      * Increments and evaluates a Redis fixed-window counter, seeding the window TTL on first hit.
@@ -407,15 +410,32 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
      * @return {@code true} if within the limit (or if Redis is unavailable — fail-open)
      */
     private boolean withinLimit(String key, int limit, int windowSeconds) {
+        long count = incrementWindow(key, windowSeconds);
+        return count < 0 || count <= limit;
+    }
+
+    /**
+     * Increments a Redis fixed-window counter, seeding the window TTL on the first hit, and returns
+     * the current count within the window. Returns {@code -1} when Redis is unavailable so callers
+     * fail open.
+     *
+     * @param key           the Redis counter key
+     * @param windowSeconds the window length in seconds
+     * @return the count within the current window, or {@code -1} if Redis is unavailable
+     */
+    private long incrementWindow(String key, int windowSeconds) {
         try {
             Long count = redisTemplate.opsForValue().increment(key);
-            if (count != null && count == 1L) {
+            if (count == null) {
+                return -1;
+            }
+            if (count == 1L) {
                 redisTemplate.expire(key, windowSeconds, TimeUnit.SECONDS);
             }
-            return count == null || count <= limit;
+            return count;
         } catch (Exception e) {
             log.debug("WS rate-limit check failed (fail-open): {}", e.getMessage());
-            return true;
+            return -1;
         }
     }
 }

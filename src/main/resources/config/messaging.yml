@@ -35,8 +35,11 @@ app:
     amqp-events-enabled: ${BROKER_AMQP_EVENTS_ENABLED}
 
 # WebSocket allowed origins (comma-separated; '*' only for local).
+# NOTE: the STOMP handshake actually uses app.cors.allowed-origins (see WebSocketConfig),
+# which auto-allows localhost outside prod. This key is retained for compatibility; empty
+# default so an unset env var never breaks placeholder resolution.
 websocket:
-  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS}
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:}
 
 # Web Push (VAPID).
 webpush:

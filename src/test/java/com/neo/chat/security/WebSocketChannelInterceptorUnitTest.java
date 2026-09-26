@@ -250,7 +250,7 @@ class WebSocketChannelInterceptorUnitTest {
             when(tokenProvider.validateToken("good")).thenReturn(true);
             when(tokenProvider.getUsernameFromToken("good")).thenReturn("alice");
             when(userDetailsService.loadUserByUsername("alice")).thenReturn(new CustomUserDetails(alice));
-            stubRedisCount(31L); // over CONNECT_LIMIT (30)
+            stubRedisCount(61L); // over CONNECT_LIMIT (60)
 
             StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
             accessor.addNativeHeader("Authorization", "Bearer good");
