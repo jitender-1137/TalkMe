@@ -19,16 +19,23 @@ import java.util.Optional;
 public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
     Optional<ChatMember> findByChatAndUser(Chat chat, User user);
 
-    @Query("SELECT m FROM ChatMember m JOIN FETCH m.user WHERE m.chat = :chat AND m.isDeleted = false")
+    // Member listing/count also exclude members whose USER ACCOUNT is soft-deleted or
+    // banned — a deleted account must not appear in a group/room/channel member list or
+    // inflate its member count, even though the membership row survives.
+    @Query("SELECT m FROM ChatMember m JOIN FETCH m.user WHERE m.chat = :chat AND m.isDeleted = false "
+            + "AND m.user.isDeleted = false AND m.user.banned = false")
     List<ChatMember> findByChat(@Param("chat") Chat chat);
 
-    @Query("SELECT m FROM ChatMember m JOIN FETCH m.user WHERE m.chat = :chat AND m.isDeleted = false")
+    @Query("SELECT m FROM ChatMember m JOIN FETCH m.user WHERE m.chat = :chat AND m.isDeleted = false "
+            + "AND m.user.isDeleted = false AND m.user.banned = false")
     Page<ChatMember> findByChat(@Param("chat") Chat chat, Pageable pageable);
 
-    @Query("SELECT COUNT(m) FROM ChatMember m WHERE m.chat = :chat AND m.isDeleted = false AND m.isBanned = false AND m.leftAt IS NULL")
+    @Query("SELECT COUNT(m) FROM ChatMember m WHERE m.chat = :chat AND m.isDeleted = false AND m.isBanned = false AND m.leftAt IS NULL "
+            + "AND m.user.isDeleted = false AND m.user.banned = false")
     long countActiveMembers(@Param("chat") Chat chat);
 
-    @Query("SELECT m FROM ChatMember m JOIN FETCH m.user WHERE m.chat = :chat AND m.role = :role AND m.isDeleted = false")
+    @Query("SELECT m FROM ChatMember m JOIN FETCH m.user WHERE m.chat = :chat AND m.role = :role AND m.isDeleted = false "
+            + "AND m.user.isDeleted = false AND m.user.banned = false")
     List<ChatMember> findByChatAndRole(@Param("chat") Chat chat, @Param("role") MemberRole role);
 
     /**

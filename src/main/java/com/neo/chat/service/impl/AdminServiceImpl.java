@@ -39,6 +39,7 @@ import com.neo.chat.dto.response.AdminTimeseriesPoint;
 import com.neo.chat.dto.response.AdminTimeseriesResult;
 import com.neo.chat.dto.response.AdminUserFullView;
 import com.neo.chat.dto.response.AdminUserView;
+import com.neo.chat.dto.response.UsernameHistoryView;
 import com.neo.chat.dto.response.LabelCount;
 import com.neo.chat.dto.response.PaginatedResponse;
 import com.neo.chat.enums.ChatType;
@@ -70,6 +71,7 @@ import com.neo.chat.repository.StoryRepository;
 import com.neo.chat.repository.UserFollowRepository;
 import com.neo.chat.repository.UserPresenceRepository;
 import com.neo.chat.repository.UserRepository;
+import com.neo.chat.repository.UsernameHistoryRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.AdminService;
 import com.neo.chat.service.PresenceService;
@@ -160,6 +162,9 @@ public class AdminServiceImpl implements AdminService {
     private final MediaStorage mediaStorage;
     private final StorageProperties storageProperties;
     private final MediaAssetRepository mediaAssetRepository;
+    // ── Username change history (admin-only audit) ──────────────────────────────
+    private final UsernameHistoryRepository usernameHistoryRepository;
+    private final UsernameHistoryRecorder usernameHistoryRecorder;
 
     /*
      * Redis-backed read-through cache for the expensive analytics aggregates, so the
@@ -501,6 +506,30 @@ public class AdminServiceImpl implements AdminService {
         // Admin view = the full history, including soft-deleted chats (flagged in the DTO).
         return chatRepository.findAllChatsByUserForAdmin(u).stream()
                 .map(this::toChatView).collect(Collectors.toList());
+    }
+
+    /**
+     * Every username change recorded for a user, newest first (admin-only).
+     *
+     * @param uuid the target user's uuid
+     * @return the username-change history
+     * @throws com.neo.chat.exception.NotFoundException if no user matches the uuid (TM_064)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<UsernameHistoryView> getUsernameHistory(String uuid) {
+        User u = userRepository.findByUuid(parseUuid(uuid, "User not found", "TM_064"))
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_064"));
+        return usernameHistoryRepository.findByUserIdOrderByCreatedAtDesc(u.getId()).stream()
+                .map(h -> UsernameHistoryView.builder()
+                        .id(h.getUuid() != null ? h.getUuid().toString() : String.valueOf(h.getId()))
+                        .oldUsername(h.getOldUsername())
+                        .newUsername(h.getNewUsername())
+                        .changedBy(h.getChangedBy())
+                        .changedByType(h.getChangedByType())
+                        .changedAt(h.getCreatedAt() != null ? h.getCreatedAt().toString() : null)
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**
@@ -959,7 +988,11 @@ public class AdminServiceImpl implements AdminService {
             if (!username.equalsIgnoreCase(u.getUsername()) && userRepository.existsByUsernameIgnoreCase(username)) {
                 throw new ConflictException("TM_048");
             }
+            String previousUsername = u.getUsername();
             u.setUsername(username);
+            // Admin-only audit trail (no-op if unchanged); recorded as an ADMIN-initiated change.
+            usernameHistoryRecorder.record(u, previousUsername, username, adminUsername,
+                    UsernameHistoryRecorder.BY_ADMIN);
         }
         if (req.getInterests() != null) {
             u.setInterests(req.getInterests().stream()

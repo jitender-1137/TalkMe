@@ -14,7 +14,10 @@ import java.util.Optional;
 public interface FriendRepository extends JpaRepository<Friend, Long> {
     Optional<Friend> findByUserAndFriend(User user, User friend);
 
-    @Query("SELECT f.friend FROM Friend f WHERE f.user = :user AND f.isDeleted = false")
+    // Excludes friends whose ACCOUNT is soft-deleted or banned — a removed/banned user
+    // must not surface in anyone's friends list even though the friendship row survives.
+    @Query("SELECT f.friend FROM Friend f WHERE f.user = :user AND f.isDeleted = false "
+            + "AND f.friend.isDeleted = false AND f.friend.banned = false")
     List<User> findFriendsByUser(User user);
 
     // ── Admin analytics: friend hierarchy ─────────────────────────────────────

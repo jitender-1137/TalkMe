@@ -20,13 +20,17 @@ public interface ProfileViewRepository extends JpaRepository<ProfileView, Long> 
 
     Optional<ProfileView> findByViewerAndViewed(User viewer, User viewed);
 
-    @Query("SELECT pv FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.isDeleted = false ORDER BY pv.lastViewedAt DESC")
+    // "Who viewed me" — exclude viewers whose account is soft-deleted or banned.
+    @Query("SELECT pv FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.isDeleted = false "
+            + "AND pv.viewer.isDeleted = false AND pv.viewer.banned = false ORDER BY pv.lastViewedAt DESC")
     List<ProfileView> findRecentByViewed(@Param("viewed") User viewed, Pageable pageable);
 
-    @Query("SELECT COUNT(pv) FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.isDeleted = false")
+    @Query("SELECT COUNT(pv) FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.isDeleted = false "
+            + "AND pv.viewer.isDeleted = false AND pv.viewer.banned = false")
     long countByViewed(@Param("viewed") User viewed);
 
-    @Query("SELECT COUNT(pv) FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.seen = false AND pv.isDeleted = false")
+    @Query("SELECT COUNT(pv) FROM ProfileView pv WHERE pv.viewed = :viewed AND pv.seen = false AND pv.isDeleted = false "
+            + "AND pv.viewer.isDeleted = false AND pv.viewer.banned = false")
     long countUnseenByViewed(@Param("viewed") User viewed);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

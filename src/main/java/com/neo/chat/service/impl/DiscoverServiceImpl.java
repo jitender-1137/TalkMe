@@ -145,6 +145,9 @@ public class DiscoverServiceImpl implements DiscoverService {
             // @SQLRestriction on User, so this must be applied explicitly).
             predicates.add(cb.equal(root.get("isDeleted"), false));
 
+            // Exclude banned accounts too.
+            predicates.add(cb.equal(root.get("banned"), false));
+
             // Search query filter
             if (query != null && !query.isBlank()) {
                 // Match only public identifiers — NOT the private email column (enumeration

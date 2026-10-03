@@ -151,6 +151,8 @@ public class CommunityHelpServiceImpl implements CommunityHelpService {
             predicates.add(cb.greaterThan(root.get("expiresAt"), now));
             predicates.add(cb.equal(cb.lower(root.get("city")), resolvedCity.toLowerCase()));
             predicates.add(cb.isFalse(root.get("asker").get("banned")));
+            predicates.add(cb.isFalse(root.get("asker").get("isDeleted")));
+            predicates.add(cb.isFalse(root.get("asker").get("isGuest")));
             if (category != null) {
                 predicates.add(cb.equal(root.get("category"), category));
             }

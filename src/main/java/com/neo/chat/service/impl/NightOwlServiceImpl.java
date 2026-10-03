@@ -64,7 +64,7 @@ public class NightOwlServiceImpl implements NightOwlService {
                 ? List.of()
                 : userRepository.findByUsernameIn(sample);
         List<NightUserCard> onlineNow = onlineUsers.stream()
-                .filter(u -> !u.isGuest() && !u.isBanned())
+                .filter(u -> !u.isGuest() && !u.isBanned() && !u.isDeleted())
                 .map(u -> toCard(u, "online"))
                 .collect(Collectors.toList());
 

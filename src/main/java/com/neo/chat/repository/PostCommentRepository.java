@@ -18,18 +18,24 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     // Comment deletion is a soft-delete (isDeleted=true); these listing queries
     // must exclude tombstone comments so a deleted comment disappears on refetch
-    // and isn't counted in commentsCount.
-    @Query("SELECT c FROM PostComment c WHERE c.post = :post AND c.parent IS NULL AND c.isDeleted = false ORDER BY c.createdAt ASC")
+    // and isn't counted in commentsCount. They also exclude comments whose AUTHOR
+    // account is soft-deleted or banned (consistent with hiding a deleted user's posts),
+    // so a deleted user's identity never surfaces in a comment thread.
+    @Query("SELECT c FROM PostComment c WHERE c.post = :post AND c.parent IS NULL AND c.isDeleted = false "
+            + "AND c.user.isDeleted = false AND c.user.banned = false ORDER BY c.createdAt ASC")
     List<PostComment> findByPostAndParentNullOrderByCreatedAtAsc(Post post);
 
-    @Query("SELECT c FROM PostComment c WHERE c.post = :post AND c.parent IS NULL AND c.isDeleted = false")
+    @Query("SELECT c FROM PostComment c WHERE c.post = :post AND c.parent IS NULL AND c.isDeleted = false "
+            + "AND c.user.isDeleted = false AND c.user.banned = false")
     Page<PostComment> findByPostAndParentIsNull(Post post, Pageable pageable);
 
     // Replies of a single comment (one level deep), oldest first.
-    @Query("SELECT c FROM PostComment c WHERE c.parent = :parent AND c.isDeleted = false ORDER BY c.createdAt ASC")
+    @Query("SELECT c FROM PostComment c WHERE c.parent = :parent AND c.isDeleted = false "
+            + "AND c.user.isDeleted = false AND c.user.banned = false ORDER BY c.createdAt ASC")
     Page<PostComment> findReplies(PostComment parent, Pageable pageable);
 
-    @Query("SELECT COUNT(c) FROM PostComment c WHERE c.parent = :parent AND c.isDeleted = false")
+    @Query("SELECT COUNT(c) FROM PostComment c WHERE c.parent = :parent AND c.isDeleted = false "
+            + "AND c.user.isDeleted = false AND c.user.banned = false")
     long countReplies(PostComment parent);
 
     // ── Admin news view: all comments (incl. replies) of a post ───────────────

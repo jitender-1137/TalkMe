@@ -124,10 +124,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             "AND up.invisibleModeEnabled = false " +
             "AND up.ghostModeEnabled = false " +
             "AND u.id <> :currentUserId " +
-            "AND u.isDeleted = false")
+            "AND u.isDeleted = false AND u.banned = false")
     List<User> findAllOnlineUsersExcludeSelf(@Param("currentUserId") Long currentUserId);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.presence WHERE u.username IN :usernames AND (:currentUserId IS NULL OR u.id <> :currentUserId) AND u.isDeleted = false")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.presence WHERE u.username IN :usernames AND (:currentUserId IS NULL OR u.id <> :currentUserId) AND u.isDeleted = false AND u.banned = false")
     List<User> findAllByUsernameInExcludeSelf(@Param("usernames") Set<String> usernames, @Param("currentUserId") Long currentUserId);
 
     // ── Unread badge counter — atomic updates avoid optimistic-lock conflicts

@@ -7,6 +7,7 @@ import com.neo.chat.dto.response.AdminAnalyticsResponse;
 import com.neo.chat.dto.response.AdminAttachmentView;
 import com.neo.chat.dto.response.AdminAuditView;
 import com.neo.chat.dto.response.AdminChatView;
+import com.neo.chat.dto.response.UsernameHistoryView;
 import com.neo.chat.dto.response.AdminConnectorView;
 import com.neo.chat.dto.response.AdminFeedbackView;
 import com.neo.chat.dto.response.AdminMediaListResponse;
@@ -42,6 +43,9 @@ public interface AdminService {
     AdminUserFullView getUserFull(String uuid);
 
     List<AdminChatView> getUserChats(String uuid);
+
+    /** Every username change recorded for a user, newest first (admin-only audit trail). */
+    List<UsernameHistoryView> getUsernameHistory(String uuid);
 
     /**
      * Decrypted messages for a chat. adminUsername is logged for the access trail.

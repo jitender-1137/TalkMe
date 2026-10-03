@@ -7,6 +7,7 @@ import com.neo.chat.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -65,4 +66,24 @@ public interface MessageReadReceiptRepository extends JpaRepository<MessageReadR
     @Query("UPDATE MessageReadReceipt r SET r.status = 'DELIVERED', r.deliveredAt = :deliveredAt " +
             "WHERE r.message.chat = :chat AND r.user.id = :userId AND r.status = 'SENT'")
     int bulkMarkAsDelivered(Chat chat, Long userId, Instant deliveredAt);
+
+    /**
+     * Account-purge cleanup: delete every receipt this user OWNS (their own
+     * read/delivered marks). Called when a soft-deleted account is finalized so no
+     * stale receipt from a purged user lingers in the table. Returns rows deleted.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM MessageReadReceipt r WHERE r.user = :user")
+    int deleteByUser(@Param("user") User user);
+
+    /**
+     * Account-purge cleanup: delete every receipt left by OTHERS on messages this user
+     * AUTHORED (the receipts on a purged user's messages, whose 1:1 chats are now hidden).
+     * Removing them keeps the receipt table free of rows tied to a purged account. Returns
+     * rows deleted. Safe for unread counts: the badge already excludes a deleted sender's
+     * messages, so re-"unreading" them changes nothing.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM MessageReadReceipt r WHERE r.message.sender = :user")
+    int deleteByMessageSender(@Param("user") User user);
 }

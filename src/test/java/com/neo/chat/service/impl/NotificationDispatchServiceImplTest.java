@@ -41,10 +41,12 @@ import static org.mockito.Mockito.when;
  * Pure Mockito unit test for {@link NotificationDispatchServiceImpl} — server-driven
  * unread-badge bookkeeping + Web Push fan-out for background delivery.
  *
- * <p>Key invariants: (1) {@code onNewMessage} atomically increments the unread count,
- * reads it back (falling back to the principal's stale value when the read returns null),
- * broadcasts the badge, and only web-pushes when the feature is enabled and a payload was
- * built; (2) the push body is decrypted/previewed and truncated; (3) all broadcast and
+ * <p>Key invariants: (1) {@code onNewMessage} recomputes the AUTHORITATIVE unread count
+ * from scratch ({@code countTotalUnreadForUser}), persists it atomically
+ * ({@code setTotalUnreadCount}), broadcasts that exact badge, and only web-pushes when the
+ * feature is enabled and a payload was built — a blind +1 would drift the closed-PWA push
+ * badge above the value a foreground resync computes; (2) the push body is decrypted/previewed
+ * and truncated; (3) all broadcast and
  * payload-build failures are swallowed so the message flow never breaks; (4)
  * {@code onEphemeralMessage} is gated on enabled + non-null recipient; (5)
  * {@code recomputeUnread} persists the fresh count atomically and returns it.
@@ -98,16 +100,16 @@ class NotificationDispatchServiceImplTest {
     class OnNewMessage {
 
         @Test
-        @DisplayName("increments, broadcasts the server count, and web-pushes when enabled")
+        @DisplayName("recomputes, persists, broadcasts the authoritative count, and web-pushes when enabled")
         void nominalEnabled() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(5);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(5L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken("bob", "chat-uuid")).thenReturn("dtok");
 
             service.onNewMessage(r, "chat-uuid", message("m1", "chat-uuid", "hello there"), "Alice", "http://a.png");
 
-            verify(userRepository).incrementTotalUnreadCount(7L);
+            verify(userRepository).setTotalUnreadCount(7L, 5);
             verify(messagingTemplate).convertAndSendToUser("bob", "/queue/unread", Map.of("totalUnread", 5));
 
             ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
@@ -124,27 +126,31 @@ class NotificationDispatchServiceImplTest {
         }
 
         @Test
-        @DisplayName("null server count → falls back to principal's stale count + 1")
-        void nullServerCountFallsBack() {
-            User r = recipient(7L, "bob", 3);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(null);
+        @DisplayName("ignores the stale principal counter — persists & broadcasts the freshly-recomputed count")
+        void recomputesIgnoringStalePrincipal() {
+            // The principal carries a stale denormalized counter (99); the authoritative
+            // query says 4. A blind +1 on the principal would broadcast 100 and drift the
+            // closed-PWA push badge — instead we persist and broadcast exactly 4.
+            User r = recipient(7L, "bob", 99);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(4L);
             when(webPushProperties.isEnabled()).thenReturn(false);
 
             service.onNewMessage(r, "c", message("m1", "c", "hi"), "Alice", null);
 
+            verify(userRepository).setTotalUnreadCount(7L, 4);
             verify(messagingTemplate).convertAndSendToUser("bob", "/queue/unread", Map.of("totalUnread", 4));
         }
 
         @Test
-        @DisplayName("web push disabled → increments + broadcasts but never pushes")
+        @DisplayName("web push disabled → recomputes + persists + broadcasts but never pushes")
         void disabledSkipsPush() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(2);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(2L);
             when(webPushProperties.isEnabled()).thenReturn(false);
 
             service.onNewMessage(r, "c", message("m1", "c", "hi"), "Alice", null);
 
-            verify(userRepository).incrementTotalUnreadCount(7L);
+            verify(userRepository).setTotalUnreadCount(7L, 2);
             verify(messagingTemplate).convertAndSendToUser("bob", "/queue/unread", Map.of("totalUnread", 2));
             verify(webPushService, never()).sendToUser(anyLong(), anyString());
         }
@@ -153,7 +159,7 @@ class NotificationDispatchServiceImplTest {
         @DisplayName("blank sender name → default push title 'New message'")
         void blankSenderNameDefaultTitle() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
 
@@ -168,7 +174,7 @@ class NotificationDispatchServiceImplTest {
         @DisplayName("encrypted content is decrypted for the preview body")
         void decryptsEncryptedPreview() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
             String chatUuid = UUID.randomUUID().toString();
@@ -189,7 +195,7 @@ class NotificationDispatchServiceImplTest {
         @DisplayName("null content → '📎 Attachment' preview")
         void nullContentAttachmentLabel() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
 
@@ -204,7 +210,7 @@ class NotificationDispatchServiceImplTest {
         @DisplayName("still-encrypted content after failed decrypt → '📎 Attachment'")
         void undecryptableEncryptedFallsBackToAttachment() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
             String chatUuid = UUID.randomUUID().toString();
@@ -222,7 +228,7 @@ class NotificationDispatchServiceImplTest {
         @DisplayName("long content is truncated to 117 chars + ellipsis")
         void truncatesLongContent() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
             String longText = "x".repeat(200);
@@ -237,17 +243,17 @@ class NotificationDispatchServiceImplTest {
         }
 
         @Test
-        @DisplayName("payload-build failure (token error) → no push, increment/broadcast still happen")
+        @DisplayName("payload-build failure (token error) → no push, recompute/broadcast still happen")
         void payloadBuildFailureSwallowed() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString()))
                     .thenThrow(new RuntimeException("jwt boom"));
 
             service.onNewMessage(r, "c", message("m1", "c", "hi"), "Alice", null);
 
-            verify(userRepository).incrementTotalUnreadCount(7L);
+            verify(userRepository).setTotalUnreadCount(7L, 1);
             verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/unread"), any());
             verify(webPushService, never()).sendToUser(anyLong(), anyString());
         }
@@ -256,7 +262,7 @@ class NotificationDispatchServiceImplTest {
         @DisplayName("broadcast failure is swallowed — push path still runs")
         void broadcastFailureSwallowed() {
             User r = recipient(7L, "bob", 0);
-            when(userRepository.getTotalUnreadCount(7L)).thenReturn(1);
+            when(messageRepository.countTotalUnreadForUser(7L)).thenReturn(1L);
             when(webPushProperties.isEnabled()).thenReturn(true);
             when(jwtTokenProvider.generateDeliveryToken(anyString(), anyString())).thenReturn("t");
             Mockito.doThrow(new RuntimeException("broker down"))

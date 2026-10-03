@@ -138,6 +138,8 @@ class UserServiceImplTest {
     @Mock
     private StreakService streakService;
     @Mock
+    private UsernameHistoryRecorder usernameHistoryRecorder;
+    @Mock
     private SetOperations<String, String> setOps;
 
     private UserServiceImpl service;
@@ -148,7 +150,8 @@ class UserServiceImplTest {
                 userRepository, friendRepository, friendRequestRepository, userSettingRepository,
                 blockUserRepository, matchReportRepository, presenceService, storageService, userMapper,
                 redisTemplate, userFollowRepository, postRepository, moderationService, notificationService,
-                reputationRecorder, reputationService, compatibilityService, streakService);
+                reputationRecorder, reputationService, compatibilityService, streakService,
+                usernameHistoryRecorder);
 
         // ── Shared enrichment defaults (populate* helpers run on almost every path) ──
         lenient().when(userMapper.toUserResponse(any(User.class)))
@@ -960,6 +963,47 @@ class UserServiceImplTest {
             assertThatThrownBy(() -> service.getPublicProfileByUsername("d"))
                     .isInstanceOfSatisfying(NotFoundException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_USER_NOT_FOUND"));
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    @Nested
+    @DisplayName("changeUsername")
+    class ChangeUsername {
+
+        private User me() {
+            User u = User.builder().username("alice").build();
+            u.setId(1L);
+            u.setUuid(TARGET_UUID);
+            return u;
+        }
+
+        @Test
+        @DisplayName("records the change (old→new) as a SELF username-history entry")
+        void recordsChange() {
+            User me = me();
+            when(userRepository.findById(1L)).thenReturn(Optional.of(me));
+            when(userRepository.existsByUsernameIgnoreCase("bob")).thenReturn(false);
+            when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            service.changeUsername("bob", me);
+
+            assertThat(me.getUsername()).isEqualTo("bob");
+            verify(usernameHistoryRecorder)
+                    .record(me, "alice", "bob", "alice", UsernameHistoryRecorder.BY_SELF);
+        }
+
+        @Test
+        @DisplayName("taken username → ConflictException TM_048, no history recorded")
+        void takenName() {
+            User me = me();
+            when(userRepository.findById(1L)).thenReturn(Optional.of(me));
+            when(userRepository.existsByUsernameIgnoreCase("bob")).thenReturn(true);
+
+            assertThatThrownBy(() -> service.changeUsername("bob", me))
+                    .isInstanceOfSatisfying(ConflictException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_048"));
+            verify(usernameHistoryRecorder, never()).record(any(), any(), any(), any(), any());
         }
     }
 

@@ -18,6 +18,7 @@ import com.neo.chat.domain.PostLike;
 import com.neo.chat.domain.PostMedia;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.User;
+import com.neo.chat.domain.UsernameHistory;
 import com.neo.chat.domain.UserPresence;
 import com.neo.chat.domain.UserSetting;
 import com.neo.chat.dto.request.AdminCreateUserRequest;
@@ -27,6 +28,7 @@ import com.neo.chat.dto.response.AdminAnalyticsResponse;
 import com.neo.chat.dto.response.AdminAttachmentView;
 import com.neo.chat.dto.response.AdminAuditView;
 import com.neo.chat.dto.response.AdminChatView;
+import com.neo.chat.dto.response.UsernameHistoryView;
 import com.neo.chat.dto.response.AdminConnectorView;
 import com.neo.chat.dto.response.AdminFeedbackView;
 import com.neo.chat.dto.response.AdminMediaOwnershipResponse;
@@ -74,6 +76,7 @@ import com.neo.chat.repository.StoryRepository;
 import com.neo.chat.repository.UserFollowRepository;
 import com.neo.chat.repository.UserPresenceRepository;
 import com.neo.chat.repository.UserRepository;
+import com.neo.chat.repository.UsernameHistoryRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.PresenceService;
 import com.neo.chat.storage.MediaStorage;
@@ -195,6 +198,10 @@ class AdminServiceImplTest {
     private StorageProperties storageProperties;
     @Mock
     private MediaAssetRepository mediaAssetRepository;
+    @Mock
+    private UsernameHistoryRepository usernameHistoryRepository;
+    @Mock
+    private UsernameHistoryRecorder usernameHistoryRecorder;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -211,7 +218,8 @@ class AdminServiceImplTest {
                 storyRepository, profileViewRepository, matchReportRepository, feedbackRepository,
                 userFollowRepository, friendRepository, friendRequestRepository, reactionRepository,
                 postLikeRepository, postCommentRepository, userSettingRepository, userPresenceRepository,
-                redisTemplate, objectMapper, mediaStorage, storageProperties, mediaAssetRepository);
+                redisTemplate, objectMapper, mediaStorage, storageProperties, mediaAssetRepository,
+                usernameHistoryRepository, usernameHistoryRecorder);
 
         // Shared, harmless defaults. lenient() so methods that don't touch them don't fail.
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
@@ -551,6 +559,50 @@ class AdminServiceImplTest {
             when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getUserChats(id.toString()))
+                    .isInstanceOfSatisfying(NotFoundException.class,
+                            ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_064"));
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * {@code getUsernameHistory}: resolves the user by uuid and maps their username-change rows
+     * (newest first) into admin views; TM_064 for an unknown user.
+     */
+    @Nested
+    @DisplayName("getUsernameHistory")
+    class GetUsernameHistory {
+
+        @Test
+        @DisplayName("maps a user's username changes into views")
+        void mapsHistory() {
+            User u = user("erin");
+            UsernameHistory h = UsernameHistory.builder()
+                    .userId(u.getId()).userUuid(u.getUuid().toString())
+                    .oldUsername("erin").newUsername("erin2")
+                    .changedBy("erin").changedByType(UsernameHistoryRecorder.BY_SELF)
+                    .build();
+            h.setId(5L);
+            when(userRepository.findByUuid(u.getUuid())).thenReturn(Optional.of(u));
+            when(usernameHistoryRepository.findByUserIdOrderByCreatedAtDesc(u.getId()))
+                    .thenReturn(List.of(h));
+
+            List<UsernameHistoryView> views = service.getUsernameHistory(u.getUuid().toString());
+
+            assertThat(views).hasSize(1);
+            assertThat(views.getFirst().getOldUsername()).isEqualTo("erin");
+            assertThat(views.getFirst().getNewUsername()).isEqualTo("erin2");
+            assertThat(views.getFirst().getChangedByType()).isEqualTo("SELF");
+        }
+
+        @Test
+        @DisplayName("absent user → NotFoundException TM_064")
+        void notFound() {
+            UUID id = UUID.randomUUID();
+            when(userRepository.findByUuid(id)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getUsernameHistory(id.toString()))
                     .isInstanceOfSatisfying(NotFoundException.class,
                             ex -> assertThat(ex.getMessageCode()).isEqualTo("TM_064"));
         }

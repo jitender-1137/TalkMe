@@ -7,6 +7,7 @@ import com.neo.chat.dto.response.AdminAnalyticsResponse;
 import com.neo.chat.dto.response.AdminAttachmentView;
 import com.neo.chat.dto.response.AdminAuditView;
 import com.neo.chat.dto.response.AdminChatView;
+import com.neo.chat.dto.response.UsernameHistoryView;
 import com.neo.chat.dto.response.AdminConnectorView;
 import com.neo.chat.dto.response.AdminFeedbackView;
 import com.neo.chat.dto.response.AdminMediaListResponse;
@@ -127,6 +128,20 @@ public class AdminController {
     @GetMapping("/users/{uuid}/chats")
     public ResponseEntity<ResponseDto<List<AdminChatView>>> userChats(@PathVariable("uuid") String uuid) {
         return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUserChats(uuid)));
+    }
+
+    /**
+     * Username change history for a given user (newest first) — every self- or admin-initiated
+     * username change, tracked for the admin portal only.
+     *
+     * @param uuid the target user's uuid
+     * @return the username-change history
+     * @throws com.neo.chat.exception.NotFoundException if no user matches the UUID
+     */
+    @Operation(summary = "Username change history for a given user")
+    @GetMapping("/users/{uuid}/username-history")
+    public ResponseEntity<ResponseDto<List<UsernameHistoryView>>> usernameHistory(@PathVariable("uuid") String uuid) {
+        return ResponseEntity.ok(SuccessResponseDto.success(adminService.getUsernameHistory(uuid)));
     }
 
     /**

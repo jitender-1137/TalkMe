@@ -161,6 +161,7 @@ public class KnowledgeNetworkServiceImpl implements KnowledgeNetworkService {
             predicates.add(cb.notEqual(root.get("user").get("id"), viewer.getId()));
             predicates.add(cb.isFalse(root.get("user").get("isGuest")));
             predicates.add(cb.isFalse(root.get("user").get("banned")));
+            predicates.add(cb.isFalse(root.get("user").get("isDeleted")));
             if (like != null) {
                 predicates.add(cb.like(cb.lower(root.get("tag")), like));
             }

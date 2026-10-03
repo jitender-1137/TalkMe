@@ -32,10 +32,21 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, Lo
      */
     List<FriendRequest> findAllBySenderAndReceiver(User sender, User receiver);
 
-    // Newest requests first, so the list shows the most recent at the top.
-    List<FriendRequest> findByReceiverAndStatusOrderByCreatedAtDesc(User receiver, FriendRequestStatus status);
+    // Newest requests first, so the list shows the most recent at the top. Skip requests
+    // whose SENDER account is soft-deleted or banned — a deleted user's pending request
+    // must not show in the receiver's list.
+    @Query("SELECT fr FROM FriendRequest fr WHERE fr.receiver = :receiver AND fr.status = :status "
+            + "AND fr.sender.isDeleted = false AND fr.sender.banned = false "
+            + "ORDER BY fr.createdAt DESC")
+    List<FriendRequest> findByReceiverAndStatusOrderByCreatedAtDesc(
+            @Param("receiver") User receiver, @Param("status") FriendRequestStatus status);
 
-    List<FriendRequest> findBySenderAndStatusOrderByCreatedAtDesc(User sender, FriendRequestStatus status);
+    // Same guard on the outgoing side: skip requests whose RECEIVER is deleted or banned.
+    @Query("SELECT fr FROM FriendRequest fr WHERE fr.sender = :sender AND fr.status = :status "
+            + "AND fr.receiver.isDeleted = false AND fr.receiver.banned = false "
+            + "ORDER BY fr.createdAt DESC")
+    List<FriendRequest> findBySenderAndStatusOrderByCreatedAtDesc(
+            @Param("sender") User sender, @Param("status") FriendRequestStatus status);
 
     @Query(
             "SELECT fr.status, COUNT(fr) FROM FriendRequest fr GROUP BY fr.status")

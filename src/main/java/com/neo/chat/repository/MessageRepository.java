@@ -74,7 +74,19 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             "NOT EXISTS (SELECT r FROM MessageReadReceipt r WHERE r.message = m AND r.user.id = :userId AND r.status = 'READ')")
     long countUnreadMessages(Chat chat, Long userId, Instant clearedAt);
 
-    @Query("SELECT COUNT(m) FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.neo.chat.enums.MessageType.SYSTEM " +
+    // The authoritative unread badge. It MUST stay aligned with the visible chat list
+    // (ChatRepository.findChatsByUser filters `c.isDeleted = false AND m.isDeleted = false`),
+    // otherwise the OS app-icon badge drifts above what the user can actually see and open.
+    // `m.chat.isDeleted = false` is the critical parity: a SOFT-DELETED chat (e.g. a 1:1 whose
+    // peer deleted their account — see finalizeDeletedAccount) is hidden from the list, so an
+    // unread message left in it must not keep badging the icon with a phantom "+1" the user has
+    // no row to clear. The ChatMember EXISTS clause below already mirrors the `m.isDeleted = false`
+    // (per-user hide) half via `cm.isDeleted = false AND cm.leftAt IS NULL`.
+    // `m.sender.isDeleted = false` enforces the [[hide-deleted-users-nonadmin]] invariant on the
+    // COUNT: a message from a soft-deleted / banned sender is not shown to a non-admin (their
+    // account is filtered out of every list), so it must not badge the icon either — filter the
+    // joined USER account, not just the message row.
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.sender.id <> :userId AND m.isDeleted = false AND m.sender.isDeleted = false AND m.chat.isDeleted = false AND m.isBlocked = false AND :userId NOT MEMBER OF m.deletedForUserIds AND m.moderationStatus <> com.neo.chat.enums.ModerationStatus.BLOCKED_PENDING_CONSENT AND m.messageType <> com.neo.chat.enums.MessageType.SYSTEM " +
             "AND EXISTS (SELECT 1 FROM ChatMember cm WHERE cm.chat = m.chat AND cm.user.id = :userId AND cm.isDeleted = false AND cm.leftAt IS NULL " +
             "     AND (cm.clearedAt IS NULL OR m.createdAt > cm.clearedAt)) " +
             "AND ( " +

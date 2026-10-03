@@ -97,6 +97,7 @@ public class UserServiceImpl implements UserService {
     private final ReputationService reputationService;
     private final CompatibilityService compatibilityService;
     private final StreakService streakService;
+    private final UsernameHistoryRecorder usernameHistoryRecorder;
 
     /**
      * Load the caller's own profile with presence forced to online, current last-seen, and
@@ -284,8 +285,12 @@ public class UserServiceImpl implements UserService {
             throw new ConflictException(
                     "This username is already taken.", "TM_048");
         }
+        String previousUsername = user.getUsername();
         user.setUsername(next);
         user = userRepository.save(user);
+        // Admin-only audit trail: record the change (no-op if the username didn't actually change).
+        usernameHistoryRecorder.record(user, previousUsername, next, previousUsername,
+                UsernameHistoryRecorder.BY_SELF);
 
         UserResponse response = userMapper.toUserResponse(user);
         response.setPresence("online");
@@ -627,8 +632,9 @@ public class UserServiceImpl implements UserService {
             List<Predicate> predicate = new ArrayList<>();
             predicate.add(cb.notEqual(root.get("id"), currentUser.getId()));
             // Never surface soft-deleted / deletion-requested accounts (both carry
-            // isDeleted=true) or guest sessions in people search / discover.
+            // isDeleted=true), banned accounts, or guest sessions in people search / discover.
             predicate.add(cb.equal(root.get("isDeleted"), false));
+            predicate.add(cb.equal(root.get("banned"), false));
             predicate.add(cb.equal(root.get("isGuest"), false));
             // Match only public identifiers — NOT email. Matching the private email column turned
             // people-search into an email-enumeration oracle (a hit confirms the address exists).

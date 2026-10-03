@@ -1,6 +1,7 @@
 package com.neo.chat.service.impl;
 
 import com.neo.chat.cache.FeatureAccessCache;
+import com.neo.chat.domain.Chat;
 import com.neo.chat.domain.RefreshToken;
 import com.neo.chat.domain.Role;
 import com.neo.chat.domain.Session;
@@ -19,6 +20,7 @@ import com.neo.chat.dto.response.CountryDetectionResult;
 import com.neo.chat.dto.response.JwtTokensResponse;
 import com.neo.chat.dto.response.LoginResponse;
 import com.neo.chat.dto.response.SessionResponse;
+import com.neo.chat.enums.ChatType;
 import com.neo.chat.enums.ReputationEventType;
 import com.neo.chat.exception.BadRequestException;
 import com.neo.chat.exception.ConflictException;
@@ -30,8 +32,10 @@ import com.neo.chat.exception.UnauthorizedException;
 import com.neo.chat.mapper.SessionMapper;
 import com.neo.chat.mapper.UserMapper;
 import com.neo.chat.moderation.ContentModerationService;
+import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.RefreshTokenRepository;
 import com.neo.chat.repository.RoleRepository;
+import com.neo.chat.repository.MessageReadReceiptRepository;
 import com.neo.chat.repository.SessionRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
@@ -92,9 +96,11 @@ import java.util.stream.Collectors;
 public class AuthServiceImpl implements AuthService, OAuthLoginPort {
 
     private final UserRepository userRepository;
+    private final ChatRepository chatRepository;
     private final RoleRepository roleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final SessionRepository sessionRepository;
+    private final MessageReadReceiptRepository messageReadReceiptRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final UserMapper userMapper;
@@ -120,9 +126,11 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
     private final String frontendBaseUrl;
 
     public AuthServiceImpl(UserRepository userRepository,
+                           ChatRepository chatRepository,
                            RoleRepository roleRepository,
                            RefreshTokenRepository refreshTokenRepository,
                            SessionRepository sessionRepository,
+                           MessageReadReceiptRepository messageReadReceiptRepository,
                            PasswordEncoder passwordEncoder,
                            JwtTokenProvider tokenProvider,
                            UserMapper userMapper,
@@ -146,9 +154,11 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
                            @Value("${app.auth.account-deletion-window-days:30}") long accountDeletionWindowDays,
                            @Value("${app.frontend-base-url:http://localhost:3000}") String frontendBaseUrl) {
         this.userRepository = userRepository;
+        this.chatRepository = chatRepository;
         this.roleRepository = roleRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.sessionRepository = sessionRepository;
+        this.messageReadReceiptRepository = messageReadReceiptRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
         this.userMapper = userMapper;
@@ -1149,10 +1159,10 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
 
     /**
      * Scheduled purge: for each soft-deleted account past its recovery window, revokes tokens,
-     * deletes sessions and anonymizes PII (per-account failures are logged and skipped, not fatal).
-     * Transactional.
+     * deletes sessions and finalizes the account (see {@link #finalizeDeletedAccount(User)}).
+     * Per-account failures are logged and skipped, not fatal. Transactional.
      *
-     * @return the number of accounts anonymized
+     * @return the number of accounts finalized
      */
     @Override
     @Transactional
@@ -1164,10 +1174,11 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
             try {
                 refreshTokenRepository.revokeAllUserTokens(user);
                 sessionRepository.deleteByUser(user);
-                anonymizeAccount(user);
+                finalizeDeletedAccount(user);
                 userRepository.save(user);
                 purged++;
-                log.info("Permanently anonymized account id={} after deletion window elapsed", user.getId());
+                log.info("Finalized deleted account id={} after window elapsed (identity kept, private chats hidden)",
+                        user.getId());
             } catch (Exception e) {
                 log.error("Failed to purge account id={}: {}", user.getId(), e.getMessage());
             }
@@ -1176,29 +1187,48 @@ public class AuthServiceImpl implements AuthService, OAuthLoginPort {
     }
 
     /**
-     * Irreversible permanent deletion: scrub all PII and destroy credentials so the
-     * account can never be recovered or re-identified. The row is retained (not
-     * hard-deleted) to preserve referential integrity of messages/posts authored by
-     * the account, which are de-identified by this scrub. isDeleted stays true.
+     * Finalizes a soft-deleted account once its recovery window has elapsed.
+     *
+     * <p><b>Product decision:</b> the account and its data are KEPT INTACT — name, username,
+     * email, profile and authored messages are NOT anonymized — so the super-admin dashboard
+     * can still identify and audit the account. Instead of scrubbing PII, finalizing:</p>
+     * <ul>
+     *   <li>keeps {@code isDeleted=true} and clears {@code deletionRequestedAt}, so the reaper
+     *       never re-picks the account and it can never be recovered on login (the login
+     *       recovery gate requires a non-null {@code deletionRequestedAt} inside the window);</li>
+     *   <li>soft-deletes every one of the user's 1:1 conversations (PRIVATE / STRANGER) by
+     *       setting {@code chat.isDeleted=true}. That hides each chat AND its messages from
+     *       EVERY normal user — {@code ChatRepository.findChatsByUser} filters
+     *       {@code c.isDeleted=false} — while the super-admin path
+     *       ({@code findAllChatsByUserForAdmin}) still returns them. Group / channel / room
+     *       chats are shared with other members and are deliberately left intact.</li>
+     * </ul>
      */
-    private void anonymizeAccount(User user) {
-        user.setUsername("deleted_" + user.getUuid());
-        user.setEmail(null);
-        user.setPasswordHash(null);
-        user.setName("Deleted User");
-        user.setProfileImage(null);
-        user.setMobileNumber(null);
-        user.setBio(null);
-        user.setOccupation(null);
-        user.setEducation(null);
-        user.setCountry(null);
-        user.setCity(null);
-        user.setAge(null);
-        user.setGender(null);
-        if (user.getInterests() != null) {
-            user.getInterests().clear();
+    private void finalizeDeletedAccount(User user) {
+        // Purge this account's message read-receipts so no rows tied to a finalized
+        // account linger: their OWN read/delivered marks, and the marks OTHERS left on the
+        // messages this user authored (those 1:1 chats are hidden below). This keeps the
+        // unread computation clean — the PWA/OS badge (countTotalUnreadForUser) already
+        // excludes a deleted sender's messages and soft-deleted chats, so removing these
+        // receipts never resurrects a phantom unread; it just prevents stale receipt rows.
+        int ownReceipts = messageReadReceiptRepository.deleteByUser(user);
+        int onAuthored = messageReadReceiptRepository.deleteByMessageSender(user);
+        if (ownReceipts > 0 || onAuthored > 0) {
+            log.info("Purged read-receipts for finalized account id={} (own={}, on-authored={})",
+                    user.getId(), ownReceipts, onAuthored);
         }
-        // Purge complete: clear the timer so it's no longer picked up by the reaper.
+
+        // Hide the user's private conversations from everyone but the super-admin.
+        for (Chat chat : chatRepository.findAllChatsByUserForAdmin(user)) {
+            ChatType type = chat.getChatType();
+            boolean oneToOne = type == ChatType.PRIVATE || type == ChatType.STRANGER;
+            if (oneToOne && !chat.isDeleted()) {
+                chat.setDeleted(true);
+                chatRepository.save(chat);
+            }
+        }
+        // Keep the row + identity intact; only stop the recovery timer so the account is
+        // neither re-purged nor recoverable on a future login.
         user.setDeletionRequestedAt(null);
     }
 

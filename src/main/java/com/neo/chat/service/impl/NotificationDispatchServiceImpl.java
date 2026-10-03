@@ -60,13 +60,21 @@ public class NotificationDispatchServiceImpl implements NotificationDispatchServ
     @Transactional
     public void onNewMessage(User recipient, String chatUuid, MessageResponse message,
                              String senderName, String senderAvatar) {
-        // 1. Atomically bump the server-driven unread count (race-safe; no optimistic lock)
-        userRepository.incrementTotalUnreadCount(recipient.getId());
-        Integer current = userRepository.getTotalUnreadCount(recipient.getId());
-        int newCount = current != null ? current : recipient.getTotalUnreadCount() + 1;
+        // 1. Recompute the AUTHORITATIVE unread total (do NOT blindly +1 the denormalized counter).
+        //    This runs AFTER_COMMIT (and the outbox re-drive reads a committed row), so the new
+        //    message is already visible → countTotalUnreadForUser counts it. A blind increment
+        //    drifts ABOVE this authoritative count (it also +1's for channel/room/cleared messages
+        //    that the badge query excludes); an OPEN app hides that drift by resyncing through
+        //    /push/unread-count (also recomputed), but a CLOSED iOS PWA is ONLY ever badged by the
+        //    Web Push below — so the drift surfaced as a permanent "+1" on the home-screen icon.
+        //    Using the recomputed value keeps the push (and WS) badge identical to the resync.
+        final Long recipientId = recipient.getId();
+        final String recipientUsername = recipient.getUsername();
+        int newCount = (int) messageRepository.countTotalUnreadForUser(recipientId);
+        userRepository.setTotalUnreadCount(recipientId, newCount);
 
         // 2. Broadcast unread count over WS (badge sync for foreground + installed apps)
-        broadcastUnread(recipient.getUsername(), newCount);
+        broadcastUnread(recipientUsername, newCount);
 
         // 3. Web Push for background delivery — sent to whoever has registered
         //    push subscriptions (installed PWA or an explicit browser opt-in).

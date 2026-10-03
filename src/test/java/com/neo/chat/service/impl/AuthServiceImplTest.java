@@ -3,6 +3,7 @@ package com.neo.chat.service.impl;
 import com.neo.chat.cache.FeatureAccessCache;
 import com.neo.chat.domain.RefreshToken;
 import com.neo.chat.domain.Role;
+import com.neo.chat.domain.Chat;
 import com.neo.chat.domain.Session;
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserSetting;
@@ -18,6 +19,7 @@ import com.neo.chat.dto.response.AuthUserResponse;
 import com.neo.chat.dto.response.CountryDetectionResult;
 import com.neo.chat.dto.response.LoginResponse;
 import com.neo.chat.dto.response.SessionResponse;
+import com.neo.chat.enums.ChatType;
 import com.neo.chat.enums.ConversationEnergy;
 import com.neo.chat.enums.Interest;
 import com.neo.chat.enums.Language;
@@ -36,9 +38,11 @@ import com.neo.chat.mapper.SessionMapper;
 import com.neo.chat.mapper.UserMapper;
 import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.moderation.ModerationResult;
+import com.neo.chat.repository.ChatRepository;
 import com.neo.chat.repository.PermissionRepository;
 import com.neo.chat.repository.RefreshTokenRepository;
 import com.neo.chat.repository.RoleRepository;
+import com.neo.chat.repository.MessageReadReceiptRepository;
 import com.neo.chat.repository.SessionRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
@@ -112,6 +116,8 @@ class AuthServiceImplTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private ChatRepository chatRepository;
+    @Mock
     private RoleRepository roleRepository;
     @Mock
     private PermissionRepository permissionRepository;
@@ -119,6 +125,8 @@ class AuthServiceImplTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Mock
     private SessionRepository sessionRepository;
+    @Mock
+    private MessageReadReceiptRepository messageReadReceiptRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -162,8 +170,8 @@ class AuthServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AuthServiceImpl(
-                userRepository, roleRepository, refreshTokenRepository,
-                sessionRepository, passwordEncoder, tokenProvider, userMapper, sessionMapper,
+                userRepository, chatRepository, roleRepository, refreshTokenRepository,
+                sessionRepository, messageReadReceiptRepository, passwordEncoder, tokenProvider, userMapper, sessionMapper,
                 countryDetectionService, loginAttemptService, redisTemplate, pwnedPasswordService,
                 emailService, webPushService, moderationService, userSettingRepository,
                 featureAccessService, featureAccessCache, reputationRecorder,
@@ -186,6 +194,8 @@ class AuthServiceImplTest {
         // tests that never build a user response, are unaffected.
         lenient().when(userMapper.toAuthUserResponse(any(User.class))).thenReturn(new AuthUserResponse());
         lenient().when(featureAccessService.effectiveWireNames(any(User.class))).thenReturn(Set.of("chat"));
+        // Account finalization (purge) looks up the user's chats to hide their 1:1s; default to none.
+        lenient().when(chatRepository.findAllChatsByUserForAdmin(any(User.class))).thenReturn(List.of());
     }
 
     // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -1629,14 +1639,16 @@ class AuthServiceImplTest {
     class PurgeExpiredDeletedAccounts {
 
         @Test
-        @DisplayName("due accounts are anonymized and the purged count is returned")
+        @DisplayName("due accounts keep their identity, get their private chats hidden, and the count is returned")
         void purgesDue() {
             User a = activeUser();
             a.setId(10L);
             a.setUuid(UUID.randomUUID());
+            a.setDeleted(true); // accounts due for purge are already soft-deleted
             User b = activeUser();
             b.setId(11L);
             b.setUuid(UUID.randomUUID());
+            b.setDeleted(true);
             when(userRepository.findAccountsDueForPurge(any(Instant.class))).thenReturn(List.of(a, b));
 
             int purged = service.purgeExpiredDeletedAccounts();
@@ -1644,14 +1656,39 @@ class AuthServiceImplTest {
             assertThat(purged).isEqualTo(2);
             verify(refreshTokenRepository).revokeAllUserTokens(a);
             verify(sessionRepository).deleteByUser(a);
+            // The account's private chats are looked up so 1:1s can be hidden.
+            verify(chatRepository).findAllChatsByUserForAdmin(a);
             ArgumentCaptor<User> cap = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(2)).save(cap.capture());
-            User scrubbed = cap.getAllValues().get(0);
-            assertThat(scrubbed.getUsername()).startsWith("deleted_");
-            assertThat(scrubbed.getEmail()).isNull();
-            assertThat(scrubbed.getPasswordHash()).isNull();
-            assertThat(scrubbed.getName()).isEqualTo("Deleted User");
-            assertThat(scrubbed.getDeletionRequestedAt()).isNull();
+            User finalized = cap.getAllValues().get(0);
+            // Identity is KEPT INTACT (no anonymization) so the super-admin can still audit it.
+            assertThat(finalized.getUsername()).isEqualTo("alice");
+            assertThat(finalized.getEmail()).isEqualTo("alice@example.com");
+            assertThat(finalized.getPasswordHash()).isEqualTo("$2a$hash");
+            assertThat(finalized.getName()).isEqualTo("Alice");
+            assertThat(finalized.isDeleted()).isTrue();
+            // Only the recovery timer is cleared → never re-purged and never recoverable on login.
+            assertThat(finalized.getDeletionRequestedAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("a due account's 1:1 (PRIVATE/STRANGER) chats are soft-deleted; group chats are left intact")
+        void hidesOneToOneChatsOnly() {
+            User a = activeUser();
+            a.setId(10L);
+            a.setUuid(UUID.randomUUID());
+            Chat oneToOne = Chat.builder().chatType(ChatType.PRIVATE).build();
+            Chat stranger = Chat.builder().chatType(ChatType.STRANGER).build();
+            Chat group = Chat.builder().chatType(ChatType.GROUP).build();
+            when(userRepository.findAccountsDueForPurge(any(Instant.class))).thenReturn(List.of(a));
+            when(chatRepository.findAllChatsByUserForAdmin(a))
+                    .thenReturn(List.of(oneToOne, stranger, group));
+
+            service.purgeExpiredDeletedAccounts();
+
+            assertThat(oneToOne.isDeleted()).isTrue();
+            assertThat(stranger.isDeleted()).isTrue();
+            assertThat(group.isDeleted()).isFalse();
         }
 
         @Test
@@ -2607,8 +2644,8 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("purge: account with null interests set → anonymized without clearing")
-        void purgeAccountWithNullInterests() {
+        @DisplayName("purge: account identity is kept intact (name/username unchanged), only the timer is cleared")
+        void purgeKeepsIdentity() {
             User u = activeUser();
             u.setId(10L);
             u.setUuid(UUID.randomUUID());
@@ -2619,7 +2656,9 @@ class AuthServiceImplTest {
 
             assertThat(purged).isEqualTo(1);
             assertThat(u.getInterests()).isNull();
-            assertThat(u.getUsername()).startsWith("deleted_");
+            assertThat(u.getUsername()).isEqualTo("alice");
+            assertThat(u.getName()).isEqualTo("Alice");
+            assertThat(u.getDeletionRequestedAt()).isNull();
         }
     }
 
