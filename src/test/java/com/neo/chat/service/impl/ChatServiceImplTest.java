@@ -742,31 +742,31 @@ class ChatServiceImplTest {
     class DeleteChat {
 
         @Test
-        @DisplayName("1:1 delete → messages removed, chat + members soft-deleted, WS broadcast")
+        @DisplayName("1:1 delete → PER-USER only: caller's membership hidden + cleared, chat/messages/peer untouched")
         void deletesPrivateChat() {
             Chat chat = privateChat();
             when(chatRepository.findByUuid(any())).thenReturn(Optional.of(chat));
             when(chatMemberRepository.findByChatAndUser(any(), any()))
                     .thenReturn(Optional.of(selfMemberOf(chat)));
-            when(messageRepository.findByChat(chat)).thenReturn(List.of());
 
             service.deleteChat(CHAT_UUID, currentUser);
 
-            verify(messageRepository).deleteAll(any());
-            ArgumentCaptor<Chat> chatCap = ArgumentCaptor.forClass(Chat.class);
-            verify(chatRepository).save(chatCap.capture());
-            assertThat(chatCap.getValue().isDeleted()).isTrue();
+            // Per-user delete: no message purge, no chat/peer mutation.
+            verify(messageRepository, never()).deleteAll(any());
+            verify(chatRepository, never()).save(any());
+            // Only the caller's OWN membership is saved: hidden + clearedAt stamped.
             ArgumentCaptor<ChatMember> mCap = ArgumentCaptor.forClass(ChatMember.class);
-            verify(chatMemberRepository, times(2)).save(mCap.capture());
-            assertThat(mCap.getAllValues()).allSatisfy(m -> {
-                assertThat(m.isDeleted()).isTrue();
-                assertThat(m.isPinned()).isFalse();
-                assertThat(m.isArchived()).isFalse();
-            });
-            // topic broadcast + a personal queue notify to the OTHER member only.
-            verify(messagingTemplate).convertAndSend(eq("/topic/chat/" + CHAT_UUID + "/messages"), any(Object.class));
-            verify(messagingTemplate).convertAndSendToUser(eq("bob"), eq("/queue/chats"), any());
-            verify(messagingTemplate, never()).convertAndSendToUser(eq("alice"), anyString(), any());
+            verify(chatMemberRepository).save(mCap.capture());
+            ChatMember saved = mCap.getValue();
+            assertThat(saved.getUser().getId()).isEqualTo(currentUser.getId());
+            assertThat(saved.isDeleted()).isTrue();
+            assertThat(saved.getClearedAt()).isNotNull();
+            assertThat(saved.isPinned()).isFalse();
+            assertThat(saved.isArchived()).isFalse();
+            // Only the caller's own devices are notified — never the peer, never the topic.
+            verify(messagingTemplate).convertAndSendToUser(eq("alice"), eq("/queue/chats"), any());
+            verify(messagingTemplate, never()).convertAndSendToUser(eq("bob"), anyString(), any());
+            verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
         }
 
         @Test
@@ -819,9 +819,9 @@ class ChatServiceImplTest {
         }
 
         @Test
-        @DisplayName("WS broadcast failure is swallowed — deletion still commits")
+        @DisplayName("WS broadcast failure is swallowed — group deletion still commits")
         void broadcastFailureSwallowed() {
-            Chat chat = privateChat();
+            Chat chat = groupChat(MemberRole.OWNER);
             when(chatRepository.findByUuid(any())).thenReturn(Optional.of(chat));
             when(chatMemberRepository.findByChatAndUser(any(), any()))
                     .thenReturn(Optional.of(selfMemberOf(chat)));
@@ -833,6 +833,23 @@ class ChatServiceImplTest {
             ArgumentCaptor<Chat> chatCap = ArgumentCaptor.forClass(Chat.class);
             verify(chatRepository).save(chatCap.capture());
             assertThat(chatCap.getValue().isDeleted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("1:1 per-user delete: WS notify failure is swallowed — membership still saved")
+        void perUserDeleteBroadcastFailureSwallowed() {
+            Chat chat = privateChat();
+            when(chatRepository.findByUuid(any())).thenReturn(Optional.of(chat));
+            when(chatMemberRepository.findByChatAndUser(any(), any()))
+                    .thenReturn(Optional.of(selfMemberOf(chat)));
+            Mockito.doThrow(new RuntimeException("broker down"))
+                    .when(messagingTemplate).convertAndSendToUser(anyString(), anyString(), any());
+
+            service.deleteChat(CHAT_UUID, currentUser);
+
+            ArgumentCaptor<ChatMember> mCap = ArgumentCaptor.forClass(ChatMember.class);
+            verify(chatMemberRepository).save(mCap.capture());
+            assertThat(mCap.getValue().isDeleted()).isTrue();
         }
 
         private void doThrowOnBroadcast() {

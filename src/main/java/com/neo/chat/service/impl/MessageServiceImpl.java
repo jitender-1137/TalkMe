@@ -355,6 +355,22 @@ public class MessageServiceImpl implements MessageService {
         // concurrent sends to the same chat don't fail with optimistic-lock errors.
         chatRepository.touchUpdatedAt(chat.getId(), Instant.now());
 
+        // Re-surface a per-user-deleted 1:1 chat for the recipient. When they "deleted"
+        // the conversation it was hidden for them only (member.deleted = true) with their
+        // clearedAt stamped; a new message must bring it back — but their clearedAt is
+        // left intact, so they only see this message onward, never the old history.
+        if (!chat.isMultiParty()) {
+            for (ChatMember m : chat.getMembers()) {
+                if (m.getUser() != null
+                        && !m.getUser().getId().equals(currentUser.getId())
+                        && m.isDeleted()
+                        && m.getLeftAt() == null) {
+                    m.setDeleted(false);
+                    chatMemberRepository.save(m);
+                }
+            }
+        }
+
         MessageResponse response = messageMapper.toMessageResponse(message);
 
         // Fan-out only if not blocked.
@@ -634,6 +650,10 @@ public class MessageServiceImpl implements MessageService {
     public MessagePageResponse getMessages(String chatUuid, Long cursor, int limit, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // A soft-deleted / purge-hidden chat is invisible to every normal user (super-admin only).
+        if (chat.isDeleted()) {
+            throw new NotFoundException("Chat not found", "TM_121");
+        }
 
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));
@@ -678,6 +698,10 @@ public class MessageServiceImpl implements MessageService {
     public List<MessageResponse> getMessagesAfter(String chatUuid, Long afterSequence, User currentUser) {
         Chat chat = chatRepository.findByUuid(UUID.fromString(chatUuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // A soft-deleted / purge-hidden chat is invisible to every normal user (super-admin only).
+        if (chat.isDeleted()) {
+            throw new NotFoundException("Chat not found", "TM_121");
+        }
 
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, currentUser)
                 .orElseThrow(() -> new ForbiddenException("You are not a member of this chat", "TM_141"));

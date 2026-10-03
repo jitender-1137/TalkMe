@@ -149,9 +149,26 @@ public class ChatServiceImpl implements ChatService {
                         m.setClearedAt(reopenedAt);
                         chatMemberRepository.save(m);
                     }
+                } else {
+                    // Active chat: reusing it must NOT reset the user's pin / archive /
+                    // cleared state. EXCEPT when the CALLER had per-user-deleted it — then
+                    // re-initiating the conversation must un-hide it for them (their
+                    // membership was deleted, which also blocks sendMessage), with a fresh
+                    // clearedAt so their prior (deleted) history stays hidden. The peer is
+                    // untouched.
+                    chat.getMembers().stream()
+                            .filter(m -> m.getUser() != null
+                                    && m.getUser().getId().equals(managedUser.getId())
+                                    && m.isDeleted())
+                            .findFirst()
+                            .ifPresent(m -> {
+                                m.setDeleted(false);
+                                m.setPinned(false);
+                                m.setArchived(false);
+                                m.setClearedAt(Instant.now());
+                                chatMemberRepository.save(m);
+                            });
                 }
-                // An ACTIVE chat is returned untouched — reusing it must NOT reset
-                // the user's pin / archive / cleared state.
 
                 // Send user chat event to the recipient so their frontend can fetch it and subscribe
                 try {
@@ -324,6 +341,12 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // A soft-deleted chat is invisible to every normal user — this includes 1:1 chats hidden
+        // when the other party's account was finalized after deletion (only the super-admin
+        // dashboard can still read those). Treat it as not-found for regular callers.
+        if (chat.isDeleted()) {
+            throw new NotFoundException("Chat not found", "TM_121");
+        }
         // Only a participant may read a chat — otherwise any authenticated user could
         // fetch another conversation's participant PII + last-message preview by UUID.
         chatMemberRepository.findByChatAndUser(chat, managedUser)
@@ -347,6 +370,10 @@ public class ChatServiceImpl implements ChatService {
         User managedUser = ensureManagedUser(currentUser);
         Chat chat = chatRepository.findByUuid(UUID.fromString(uuid))
                 .orElseThrow(() -> new NotFoundException("Chat not found", "TM_121"));
+        // No decryption key for a soft-deleted / purge-hidden chat (invisible to normal users).
+        if (chat.isDeleted()) {
+            throw new NotFoundException("Chat not found", "TM_121");
+        }
         // Only a participant of this chat may fetch its key.
         chatMemberRepository.findByChatAndUser(chat, managedUser)
                 .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
@@ -454,9 +481,19 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * Deletes the chat. Physically removes all messages (cascading to receipts/reactions/attachments), then
-     * soft-deletes the chat and every membership and broadcasts a {@code chat_deleted} WebSocket event. For
-     * a multi-party chat this deletes it for everyone, so only the owner may do it.
+     * Deletes the chat.
+     *
+     * <p><b>1:1 (PRIVATE/STRANGER) — per-user delete (WhatsApp style).</b> Removes the chat for the
+     * CALLER ONLY: stamps their membership {@code clearedAt = now} (so the prior history never resurfaces
+     * for them) and hides it from their list ({@code member.deleted = true}). The chat entity, its messages
+     * and the OTHER member are left untouched, so the peer can still see the conversation and send new
+     * messages. When a new message arrives, {@code MessageServiceImpl.sendMessage} un-hides the caller's
+     * membership so the chat reappears for them — showing only messages after {@code clearedAt}. Only the
+     * caller's own other devices are notified (never the peer).
+     *
+     * <p><b>Multi-party (group/channel/room) — delete for everyone.</b> Physically removes all messages
+     * (cascading to receipts/reactions/attachments), soft-deletes the chat and every membership, and
+     * broadcasts {@code chat_deleted} to all members. Only the owner may do this.
      *
      * @param uuid        the chat UUID
      * @param currentUser the authenticated member
@@ -473,9 +510,35 @@ public class ChatServiceImpl implements ChatService {
         ChatMember member = chatMemberRepository.findByChatAndUser(chat, managedUser)
                 .orElseThrow(() -> new NotFoundException("Not a member of this chat", "TM_141"));
 
-        // For a group/channel/room, deleting removes it for EVERYONE — only the
-        // owner may do that. (1:1 chats keep the existing per-user delete behavior.)
-        if (chat.isMultiParty() && member.getRole() != MemberRole.OWNER) {
+        // ── 1:1 chats: per-user delete only. Never hard-delete messages or flag the
+        // chat/peer as deleted — that would make the conversation vanish for the other
+        // person and reject their next message with "chat not found" (TM_121). ────────
+        if (!chat.isMultiParty()) {
+            member.setClearedAt(Instant.now());
+            member.setDeleted(true);
+            member.setPinned(false);
+            member.setArchived(false);
+            member.setManuallyUnread(false);
+            chatMemberRepository.save(member);
+
+            // Only the caller's OWN sessions need to hide the row; the peer is unaffected.
+            try {
+                Map<String, Object> eventWrapper = new HashMap<>();
+                eventWrapper.put("event", "chat_deleted");
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("chatId", uuid);
+                eventWrapper.put("payload", payload);
+                messagingTemplate.convertAndSendToUser(
+                        managedUser.getUsername(), "/queue/chats", eventWrapper);
+            } catch (Exception e) {
+                log.error("Failed to send per-user chat_deleted WS event", e);
+            }
+            log.info("Per-user delete of 1:1 chat {} for user {}", uuid, managedUser.getUuid());
+            return;
+        }
+
+        // ── Multi-party: deleting removes it for EVERYONE — only the owner may do that. ──
+        if (member.getRole() != MemberRole.OWNER) {
             throw new ForbiddenException(
                     "Only the group owner can delete the group", "TM_291");
         }
