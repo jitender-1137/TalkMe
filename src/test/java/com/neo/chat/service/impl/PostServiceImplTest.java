@@ -41,7 +41,8 @@ import com.neo.chat.repository.PostCommentRepository;
 import com.neo.chat.repository.PostLikeRepository;
 import com.neo.chat.repository.PostMediaRepository;
 import com.neo.chat.repository.PostRepository;
-import com.neo.chat.repository.UserFollowRepository;
+import com.neo.chat.cache.FollowCache;
+import com.neo.chat.cache.PostStatsCache;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.FeatureAccessService;
@@ -130,7 +131,9 @@ class PostServiceImplTest {
     @Mock
     private MediaStorage mediaStorage;
     @Mock
-    private UserFollowRepository userFollowRepository;
+    private FollowCache followCache;
+    @Mock
+    private PostStatsCache postStatsCache;
     @Mock
     private FeatureAccessService featureAccessService;
 
@@ -147,7 +150,7 @@ class PostServiceImplTest {
                 postRepository, postMediaRepository, postLikeRepository, postCommentRepository,
                 postCommentLikeRepository, postBookmarkRepository, pollRepository, pollOptionRepository,
                 pollVoteRepository, userRepository, userSettingRepository, userMapper, notificationService,
-                moderationService, photoMusicMuxer, mediaStorage, userFollowRepository, featureAccessService);
+                moderationService, photoMusicMuxer, mediaStorage, followCache, postStatsCache, featureAccessService);
 
         currentUser = user(1L, "alice");
         owner = user(2L, "bob");
@@ -706,8 +709,7 @@ class PostServiceImplTest {
             Post p = post(75L, owner);
             p.setAudience(PostAudience.FRIENDS);
             when(postRepository.findByUuid(p.getUuid())).thenReturn(Optional.of(p));
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(
-                    currentUser, owner, "ACCEPTED")).thenReturn(true);
+            when(followCache.isFollowing(currentUser, owner)).thenReturn(true);
 
             assertThat(service.getPost(p.getUuid().toString(), currentUser)).isNotNull();
         }
@@ -1915,10 +1917,8 @@ class PostServiceImplTest {
             p.setAudience(PostAudience.FRIENDS);
             when(postRepository.findByUuid(p.getUuid())).thenReturn(Optional.of(p));
             // forward (viewer→owner) absent; reverse (owner→viewer) accepted.
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(
-                    currentUser, owner, "ACCEPTED")).thenReturn(false);
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(
-                    owner, currentUser, "ACCEPTED")).thenReturn(true);
+            when(followCache.isFollowing(currentUser, owner)).thenReturn(false);
+            when(followCache.isFollowing(owner, currentUser)).thenReturn(true);
 
             assertThat(service.getPost(p.getUuid().toString(), currentUser)).isNotNull();
         }

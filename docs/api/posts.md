@@ -23,7 +23,7 @@ Creates a new post with text content and optional media attachments.
   "content": "Just had an amazing day exploring the city! Check out this view. #travel #adventure",
   "media": [
     {
-      "mediaUrl": "https://api.talkme.app/api/v1/uploads/city_view_4982.jpg",
+      "mediaUrl": "https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg",
       "mediaType": "IMAGE"
     }
   ]
@@ -43,7 +43,7 @@ Creates a new post with text content and optional media attachments.
       "name": "Jane Doe",
       "email": "janedoe@example.com",
       "username": "janedoe",
-      "avatar": "https://api.talkme.app/api/v1/uploads/jane_avatar.png",
+      "avatar": "https://api.neochathub.com/api/v1/uploads/jane_avatar.png",
       "isVerified": true,
       "isGuest": false,
       "createdAt": "2026-05-15T12:00:00Z",
@@ -56,7 +56,7 @@ Creates a new post with text content and optional media attachments.
     "media": [
       {
         "id": "pm4a12c4-42a1-43ff-a12e-a5fe48d9a102",
-        "mediaUrl": "https://api.talkme.app/api/v1/uploads/city_view_4982.jpg",
+        "mediaUrl": "https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg",
         "mediaType": "IMAGE"
       }
     ],
@@ -98,7 +98,7 @@ Retrieves a paginated list of posts for the user's home feed.
           "name": "Jane Doe",
           "email": "janedoe@example.com",
           "username": "janedoe",
-          "avatar": "https://api.talkme.app/api/v1/uploads/jane_avatar.png",
+          "avatar": "https://api.neochathub.com/api/v1/uploads/jane_avatar.png",
           "isVerified": true,
           "isGuest": false,
           "createdAt": "2026-05-15T12:00:00Z",
@@ -111,7 +111,7 @@ Retrieves a paginated list of posts for the user's home feed.
         "media": [
           {
             "id": "pm4a12c4-42a1-43ff-a12e-a5fe48d9a102",
-            "mediaUrl": "https://api.talkme.app/api/v1/uploads/city_view_4982.jpg",
+            "mediaUrl": "https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg",
             "mediaType": "IMAGE"
           }
         ],
@@ -169,7 +169,7 @@ Retrieves a paginated list of posts created by a specific user.
           "name": "Jane Doe",
           "email": "janedoe@example.com",
           "username": "janedoe",
-          "avatar": "https://api.talkme.app/api/v1/uploads/jane_avatar.png",
+          "avatar": "https://api.neochathub.com/api/v1/uploads/jane_avatar.png",
           "isVerified": true,
           "isGuest": false,
           "createdAt": "2026-05-15T12:00:00Z",
@@ -182,7 +182,7 @@ Retrieves a paginated list of posts created by a specific user.
         "media": [
           {
             "id": "pm4a12c4-42a1-43ff-a12e-a5fe48d9a102",
-            "mediaUrl": "https://api.talkme.app/api/v1/uploads/city_view_4982.jpg",
+            "mediaUrl": "https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg",
             "mediaType": "IMAGE"
           }
         ],

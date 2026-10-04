@@ -51,7 +51,7 @@ Creates a new 1-to-1 private chat or a group chat.
       "name": "Jane Smith",
       "email": "janesmith@example.com",
       "username": "janesmith",
-      "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+      "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
       "isVerified": true,
       "isGuest": false,
       "createdAt": "2026-06-02T10:00:00Z"
@@ -93,7 +93,7 @@ Retrieves all active chats for the authenticated user, ordered by pinned status 
         "name": "Jane Smith",
         "email": "janesmith@example.com",
         "username": "janesmith",
-        "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+        "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
         "isVerified": true,
         "isGuest": false,
         "createdAt": "2026-06-02T10:00:00Z"
@@ -145,7 +145,7 @@ Fetches metadata for a specific chat conversation.
       "name": "Jane Smith",
       "email": "janesmith@example.com",
       "username": "janesmith",
-      "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+      "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
       "isVerified": true,
       "isGuest": false,
       "createdAt": "2026-06-02T10:00:00Z"

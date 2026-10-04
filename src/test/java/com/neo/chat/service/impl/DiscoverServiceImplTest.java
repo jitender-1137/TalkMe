@@ -1,7 +1,7 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.cache.FriendCache;
 import com.neo.chat.domain.DiscoverLike;
-import com.neo.chat.domain.Friend;
 import com.neo.chat.domain.FriendRequest;
 import com.neo.chat.domain.User;
 import com.neo.chat.dto.response.DiscoverProfileResponse;
@@ -11,7 +11,6 @@ import com.neo.chat.enums.Interest;
 import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.exception.NotFoundException;
 import com.neo.chat.repository.DiscoverLikeRepository;
-import com.neo.chat.repository.FriendRepository;
 import com.neo.chat.repository.FriendRequestRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
@@ -63,7 +62,7 @@ class DiscoverServiceImplTest {
     @Mock
     private DiscoverLikeRepository discoverLikeRepository;
     @Mock
-    private FriendRepository friendRepository;
+    private FriendCache friendCache;
     @Mock
     private FriendRequestRepository friendRequestRepository;
     @Mock
@@ -77,7 +76,7 @@ class DiscoverServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new DiscoverServiceImpl(userRepository, discoverLikeRepository, friendRepository,
+        service = new DiscoverServiceImpl(userRepository, discoverLikeRepository, friendCache,
                 friendRequestRepository, userSettingRepository, presenceService);
         currentUser = user(1L, "me", "Me");
     }
@@ -122,7 +121,7 @@ class DiscoverServiceImplTest {
         void emptyPage() {
             stubPresenceSets();
             stubFindAll(page(List.of(), 0, 10, 0));
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
 
             PaginatedResponse<DiscoverProfileResponse> res = callDefault();
 
@@ -151,17 +150,14 @@ class DiscoverServiceImplTest {
 
             stubFindAll(page(List.of(target), 0, 10, 1));
 
-            // currentUser friends {F10, F20}; target friends {F20, F30} → 1 mutual (F20)
-            User f10 = user(10L, "f10", "F10");
-            User f20 = user(20L, "f20", "F20");
-            User f30 = user(30L, "f30", "F30");
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of(f10, f20));
-            when(friendRepository.findFriendsByUser(target)).thenReturn(List.of(f20, f30));
+            // currentUser friends {target=2, 20}; target friends {20, 30} → 1 mutual (20),
+            // and currentUser's set contains the target (id 2) → isFriend true.
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of(2L, 20L));
+            when(friendCache.friendIds(target)).thenReturn(Set.of(20L, 30L));
 
             when(userSettingRepository.findFriendsOnlyUserIds(anyCollection())).thenReturn(Set.of(2L));
             when(presenceService.getStatus(target)).thenReturn(PresenceStatus.ONLINE);
             when(discoverLikeRepository.existsByUserAndLikedUser(currentUser, target)).thenReturn(true);
-            when(friendRepository.findByUserAndFriend(currentUser, target)).thenReturn(Optional.of(new Friend()));
             when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, target))
                     .thenReturn(Optional.empty());
 
@@ -195,12 +191,11 @@ class DiscoverServiceImplTest {
             User target = user(2L, "bob", "Bob");
             target.setInterests(Set.of());
             stubFindAll(page(List.of(target), 0, 10, 1));
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
-            when(friendRepository.findFriendsByUser(target)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
+            when(friendCache.friendIds(target)).thenReturn(Set.of());
             when(userSettingRepository.findFriendsOnlyUserIds(anyCollection())).thenReturn(Set.of());
             when(presenceService.getStatus(target)).thenReturn(PresenceStatus.OFFLINE);
             when(discoverLikeRepository.existsByUserAndLikedUser(currentUser, target)).thenReturn(false);
-            when(friendRepository.findByUserAndFriend(currentUser, target)).thenReturn(Optional.empty());
 
             FriendRequest req = FriendRequest.builder().status(FriendRequestStatus.PENDING).build();
             UUID reqUuid = UUID.randomUUID();
@@ -222,12 +217,11 @@ class DiscoverServiceImplTest {
             User target = user(2L, "bob", "Bob");
             target.setInterests(Set.of());
             stubFindAll(page(List.of(target), 0, 10, 1));
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
-            when(friendRepository.findFriendsByUser(target)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
+            when(friendCache.friendIds(target)).thenReturn(Set.of());
             when(userSettingRepository.findFriendsOnlyUserIds(anyCollection())).thenReturn(Set.of());
             when(presenceService.getStatus(target)).thenReturn(PresenceStatus.OFFLINE);
             when(discoverLikeRepository.existsByUserAndLikedUser(currentUser, target)).thenReturn(false);
-            when(friendRepository.findByUserAndFriend(currentUser, target)).thenReturn(Optional.empty());
 
             FriendRequest req = FriendRequest.builder().status(FriendRequestStatus.ACCEPTED).build();
             req.setUuid(UUID.randomUUID());
@@ -326,7 +320,7 @@ class DiscoverServiceImplTest {
         @DisplayName("non-numeric cursor falls back to page 0 (no exception)")
         void cursorInvalidFallsBack() {
             stubPresenceSets();
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
             ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
             stubFindAll(page(List.of(), 0, 10, 0));
 
@@ -341,7 +335,7 @@ class DiscoverServiceImplTest {
         @DisplayName("blank (whitespace) cursor falls back to page 0 without parsing")
         void cursorBlankFallsBack() {
             stubPresenceSets();
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
             ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
             stubFindAll(page(List.of(), 0, 10, 0));
 
@@ -357,7 +351,7 @@ class DiscoverServiceImplTest {
         @DisplayName("blank (whitespace) interests string is ignored without splitting")
         void interestsBlankIgnored() {
             stubPresenceSets();
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
             stubFindAll(page(List.of(), 0, 10, 0));
 
             // interests != null but isBlank() → interestEnums stays empty, no split/parse
@@ -372,7 +366,7 @@ class DiscoverServiceImplTest {
         @DisplayName("interests filter parses valid enums and ignores invalid tokens without throwing")
         void interestsParsingIsLenient() {
             stubPresenceSets();
-            when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
+            when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
             stubFindAll(page(List.of(), 0, 10, 0));
 
             // "music" is valid (case-insensitive), "nonsense" is ignored by the catch branch
@@ -388,12 +382,11 @@ class DiscoverServiceImplTest {
      * Wire the per-user enrichment lookups to neutral/false values (target is OFFLINE).
      */
     private void wireNeutralEnrichment(User target) {
-        when(friendRepository.findFriendsByUser(currentUser)).thenReturn(List.of());
-        when(friendRepository.findFriendsByUser(target)).thenReturn(List.of());
+        when(friendCache.friendIds(currentUser)).thenReturn(Set.of());
+        when(friendCache.friendIds(target)).thenReturn(Set.of());
         when(userSettingRepository.findFriendsOnlyUserIds(anyCollection())).thenReturn(Set.of());
         when(presenceService.getStatus(target)).thenReturn(PresenceStatus.OFFLINE);
         when(discoverLikeRepository.existsByUserAndLikedUser(currentUser, target)).thenReturn(false);
-        when(friendRepository.findByUserAndFriend(currentUser, target)).thenReturn(Optional.empty());
         when(friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, target))
                 .thenReturn(Optional.empty());
     }

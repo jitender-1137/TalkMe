@@ -1,6 +1,7 @@
 package com.neo.chat.service.impl;
 
 import com.neo.chat.cache.BlockCache;
+import com.neo.chat.cache.FriendCache;
 import com.neo.chat.cache.MemberCountCache;
 import com.neo.chat.cache.UserSettingsCache;
 import com.neo.chat.crypto.ChatKeyService;
@@ -29,7 +30,6 @@ import com.neo.chat.mapper.MessageMapper;
 import com.neo.chat.mapper.UserMapper;
 import com.neo.chat.repository.ChatMemberRepository;
 import com.neo.chat.repository.ChatRepository;
-import com.neo.chat.repository.FriendRepository;
 import com.neo.chat.repository.MessageReadReceiptRepository;
 import com.neo.chat.repository.MessageRepository;
 import com.neo.chat.repository.OutboxEventRepository;
@@ -98,6 +98,8 @@ class ChatServiceImplTest {
     @Mock
     private BlockCache blockCache;
     @Mock
+    private FriendCache friendCache;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private MessageRepository messageRepository;
@@ -113,8 +115,6 @@ class ChatServiceImplTest {
     private PresenceService presenceService;
     @Mock
     private SimpMessagingTemplate messagingTemplate;
-    @Mock
-    private FriendRepository friendRepository;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
     @Mock
@@ -135,9 +135,9 @@ class ChatServiceImplTest {
     void setUp() {
         service = new ChatServiceImpl(
                 chatRepository, chatMemberRepository, memberCountCache, userSettingsCache,
-                blockCache, userRepository, messageRepository, readReceiptRepository,
+                blockCache, friendCache, userRepository, messageRepository, readReceiptRepository,
                 userMapper, messageMapper, chatMapper, presenceService, messagingTemplate,
-                friendRepository, applicationEventPublisher, objectMapper, outboxEventRepository,
+                applicationEventPublisher, objectMapper, outboxEventRepository,
                 chatKeyService, messageCryptoService);
 
         currentUser = user(1L, CURRENT_UUID, "alice", "Alice");
@@ -1182,9 +1182,9 @@ class ChatServiceImplTest {
         void nullPresenceServiceTreatedAsNonGhost() {
             ChatServiceImpl noPresence = new ChatServiceImpl(
                     chatRepository, chatMemberRepository, memberCountCache, userSettingsCache,
-                    blockCache, userRepository, messageRepository, readReceiptRepository,
+                    blockCache, friendCache, userRepository, messageRepository, readReceiptRepository,
                     userMapper, messageMapper, chatMapper, /* presenceService */ null, messagingTemplate,
-                    friendRepository, applicationEventPublisher, objectMapper, outboxEventRepository,
+                    applicationEventPublisher, objectMapper, outboxEventRepository,
                     chatKeyService, messageCryptoService);
             Chat chat = privateChat();
             when(chatRepository.findChatsByUser(currentUser)).thenReturn(List.of(chat));
@@ -1558,8 +1558,7 @@ class ChatServiceImplTest {
             when(chatRepository.findByUuid(UUID.fromString(CHAT_UUID))).thenReturn(Optional.of(chat));
             when(chatMemberRepository.findByChatAndUser(any(), any()))
                     .thenReturn(Optional.of(selfMemberOf(chat)));
-            Friend friend = Friend.builder().build(); // isDeleted == false
-            when(friendRepository.findByUserAndFriend(currentUser, otherUser)).thenReturn(Optional.of(friend));
+            when(friendCache.areFriends(currentUser, otherUser.getId())).thenReturn(true);
             when(presenceService.getApparentLastSeen(otherUser)).thenReturn(Instant.parse("2026-01-01T00:00:00Z"));
             when(blockCache.hasBlocked(currentUser, otherUser.getId())).thenReturn(false); // I did not block them
             when(blockCache.hasBlocked(otherUser, 1L)).thenReturn(true); // peer blocked me
@@ -1573,15 +1572,15 @@ class ChatServiceImplTest {
         }
 
         @Test
-        @DisplayName("private chat: friend row exists but is soft-deleted → not a friend")
-        void privateChatDeletedFriendNotFriend() {
+        @DisplayName("private chat: not in the cached friend set → not a friend")
+        void privateChatNotFriend() {
             Chat chat = privateChat();
             when(chatRepository.findByUuid(UUID.fromString(CHAT_UUID))).thenReturn(Optional.of(chat));
             when(chatMemberRepository.findByChatAndUser(any(), any()))
                     .thenReturn(Optional.of(selfMemberOf(chat)));
-            Friend friend = Friend.builder().build();
-            friend.setDeleted(true);
-            when(friendRepository.findByUserAndFriend(currentUser, otherUser)).thenReturn(Optional.of(friend));
+            // FriendCache.areFriends false (also how a since-deleted friend surfaces — the
+            // cache loads from findFriendsByUser, which excludes deleted/banned accounts).
+            when(friendCache.areFriends(currentUser, otherUser.getId())).thenReturn(false);
 
             ChatResponse resp = service.getChatByUuid(CHAT_UUID, currentUser);
 

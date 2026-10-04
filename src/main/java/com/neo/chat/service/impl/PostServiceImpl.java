@@ -35,12 +35,13 @@ import com.neo.chat.repository.PollOptionRepository;
 import com.neo.chat.repository.PollRepository;
 import com.neo.chat.repository.PollVoteRepository;
 import com.neo.chat.repository.PostBookmarkRepository;
+import com.neo.chat.cache.FollowCache;
+import com.neo.chat.cache.PostStatsCache;
 import com.neo.chat.repository.PostCommentLikeRepository;
 import com.neo.chat.repository.PostCommentRepository;
 import com.neo.chat.repository.PostLikeRepository;
 import com.neo.chat.repository.PostMediaRepository;
 import com.neo.chat.repository.PostRepository;
-import com.neo.chat.repository.UserFollowRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.FeatureAccessService;
@@ -89,7 +90,8 @@ public class PostServiceImpl implements PostService {
     private final ContentModerationService moderationService;
     private final PhotoMusicMuxer photoMusicMuxer;
     private final MediaStorage mediaStorage;
-    private final UserFollowRepository userFollowRepository;
+    private final FollowCache followCache;
+    private final PostStatsCache postStatsCache;
     private final FeatureAccessService featureAccessService;
 
     /**
@@ -424,8 +426,9 @@ public class PostServiceImpl implements PostService {
         if (post.getAudience() != PostAudience.FRIENDS) return true;
         if (viewer == null) return false;
         if (post.getUser().getId().equals(viewer.getId())) return true;
-        return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, post.getUser(), "ACCEPTED")
-                || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(post.getUser(), viewer, "ACCEPTED");
+        // Cached follow-graph check (either direction) — avoids 2 DB hits per feed post.
+        return followCache.isFollowing(viewer, post.getUser())
+                || followCache.isFollowing(post.getUser(), viewer);
     }
 
     /**
@@ -580,6 +583,7 @@ public class PostServiceImpl implements PostService {
 
         PostLike like = PostLike.builder().post(post).user(currentUser).build();
         postLikeRepository.save(like);
+        postStatsCache.evictLikes(post.getId()); // real-time: like count changed
 
         if (!post.getUser().getId().equals(currentUser.getId())) {
             notificationService.createNotification(
@@ -609,6 +613,7 @@ public class PostServiceImpl implements PostService {
 
         postLikeRepository.findByPostAndUser(post, currentUser)
                 .ifPresent(postLikeRepository::delete);
+        postStatsCache.evictLikes(post.getId()); // real-time: like count changed
     }
 
     /**
@@ -894,7 +899,7 @@ public class PostServiceImpl implements PostService {
                 .richContent(post.getRichContent())
                 .caption(post.getCaption())
                 .media(mediaRes)
-                .likesCount(post.getLikes().size())
+                .likesCount((int) postStatsCache.likeCount(post))
                 .commentsCount(commentsRes.size())
                 .likedByMe(liked)
                 .bookmarkedByMe(bookmarked)

@@ -28,7 +28,7 @@ import com.neo.chat.repository.FriendRepository;
 import com.neo.chat.repository.FriendRequestRepository;
 import com.neo.chat.repository.MatchReportRepository;
 import com.neo.chat.repository.PostRepository;
-import com.neo.chat.repository.UserFollowRepository;
+import com.neo.chat.cache.FollowCache;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.CompatibilityService;
@@ -89,7 +89,7 @@ public class UserServiceImpl implements UserService {
     private final StorageService storageService;
     private final UserMapper userMapper;
     private final StringRedisTemplate redisTemplate;
-    private final UserFollowRepository userFollowRepository;
+    private final FollowCache followCache;
     private final PostRepository postRepository;
     private final ContentModerationService moderationService;
     private final NotificationService notificationService;
@@ -98,6 +98,7 @@ public class UserServiceImpl implements UserService {
     private final CompatibilityService compatibilityService;
     private final StreakService streakService;
     private final UsernameHistoryRecorder usernameHistoryRecorder;
+    private final com.neo.chat.config.AvatarCatalog avatarCatalog;
 
     /**
      * Load the caller's own profile with presence forced to online, current last-seen, and
@@ -146,7 +147,13 @@ public class UserServiceImpl implements UserService {
             user.setName(request.getName());
         }
         if (request.getProfileImage() != null) {
-            user.setProfileImage(request.getProfileImage());
+            String img = request.getProfileImage();
+            // A preset ("/avatars/…") value must be a known catalog path — reject
+            // injection of arbitrary preset paths. Uploaded-media refs are unchanged.
+            if (img.startsWith("/avatars/") && !avatarCatalog.isValidPath(img)) {
+                throw new BadRequestException("Unknown preset avatar", "TM_USER_003");
+            }
+            user.setProfileImage(img);
         }
         if (request.getCountry() != null && !request.getCountry().equals(user.getCountry())) {
             throw new BadRequestException("Country cannot be updated", "TM_099");
@@ -397,6 +404,30 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * Set the caller's avatar to a preset ("cute") avatar, validated against the static
+     * avatar catalog. No upload/moderation needed — the assets are curated and shipped.
+     *
+     * @param id          the preset avatar id (manifest key, e.g. "neutral-07")
+     * @param currentUser the caller
+     * @return the updated {@link UserResponse}
+     * @throws BadRequestException (TM_USER_003) when the id is not a known preset
+     * @throws NotFoundException   (TM_024) when the user no longer exists
+     */
+    @Override
+    @Transactional
+    public UserResponse selectPresetAvatar(String id, User currentUser) {
+        String path = avatarCatalog.resolvePath(id);
+        if (path == null) {
+            throw new BadRequestException("Unknown avatar id", "TM_USER_003");
+        }
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new NotFoundException("User not found", "TM_024"));
+        user.setProfileImage(path);
+        userRepository.save(user);
+        return userMapper.toUserResponse(user);
+    }
+
+    /**
      * Clear the caller's profile image (sends no notification, unlike upload).
      *
      * @param currentUser the caller
@@ -451,8 +482,7 @@ public class UserServiceImpl implements UserService {
         // Follow + directional friend-request state for the viewer→target relationship.
         // All are viewer-relative and never apply to one's own profile. Cheap indexed lookups.
         if (currentUser != null && !currentUser.getId().equals(targetUser.getId())) {
-            response.setFollowing(userFollowRepository
-                    .existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(currentUser, targetUser, "ACCEPTED"));
+            response.setFollowing(followCache.isFollowing(currentUser, targetUser));
             if (!friend) {
                 // Outgoing: I sent → them (drives "Requested"/cancel).
                 friendRequestRepository
@@ -506,8 +536,8 @@ public class UserServiceImpl implements UserService {
                         .isVerified(base.isVerified())
                         .createdAt(base.getCreatedAt())
                         .presence(presenceService.getStatus(u).name().toLowerCase())
-                        .followersCount(userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(u, "ACCEPTED"))
-                        .followingCount(userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(u, "ACCEPTED"))
+                        .followersCount(followCache.followersCount(u))
+                        .followingCount(followCache.followingCount(u))
                         .postsCount(postRepository.countVisibleByUser(u))
                         .build();
 
@@ -854,8 +884,8 @@ public class UserServiceImpl implements UserService {
      * @param user     the user whose counts are computed
      */
     private void populateUserCounts(UserResponse response, User user) {
-        long followers = userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(user, "ACCEPTED");
-        long following = userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        long followers = followCache.followersCount(user);
+        long following = followCache.followingCount(user);
         long posts = postRepository.countVisibleByUser(user);
         response.setFollowersCount(followers);
         response.setFollowingCount(following);

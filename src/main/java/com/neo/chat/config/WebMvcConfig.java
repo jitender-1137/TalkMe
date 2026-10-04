@@ -102,6 +102,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // deploy is picked up immediately (the revalidation is a cheap 304), while
         // the heavy hashed chunks above still load from cache with no network at
         // all. The service worker adds true offline fallback on top of this.
+        // ── Preset ("cute") avatar assets (/avatars/**) ─────────────────────────
+        // Build-generated avatars (public/avatars → bundled into the export). Names
+        // are logical + deterministic (the generator reproduces identical art for a
+        // given id from a fixed seed), so a given URL's bytes never change → cache a
+        // year, immutable, like the hashed _next chunks (ZERO revalidation on repeat
+        // visits). Registered BEFORE "/**" so this long-lived caching wins. The
+        // caching resolver also serves them from the in-memory inflate cache,
+        // avoiding the nested-jar ZipException under concurrency.
+        registry.addResourceHandler("/avatars/**")
+                .addResourceLocations("classpath:/static/avatars/")
+                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable())
+                .resourceChain(true)
+                .addResolver(new CachingSpaResourceResolver());
+
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/")
                 .setCacheControl(CacheControl.noCache())

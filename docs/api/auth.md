@@ -233,7 +233,7 @@ Returns the authenticated user's metadata.
     "name": "John Doe",
     "email": "johndoe@example.com",
     "username": "johndoe",
-    "avatar": "https://api.talkme.app/api/v1/uploads/avatar.jpg",
+    "avatar": "https://api.neochathub.com/api/v1/uploads/avatar.jpg",
     "isVerified": true,
     "isGuest": false,
     "createdAt": "2026-06-03T00:33:00Z",
@@ -265,7 +265,7 @@ Modifies current profile info.
 ```json
 {
   "name": "Johnathan Doe",
-  "profileImage": "https://api.talkme.app/api/v1/uploads/avatar.jpg",
+  "profileImage": "https://api.neochathub.com/api/v1/uploads/avatar.jpg",
   "country": "US",
   "city": "Austin",
   "mobileNumber": "+1999999999",
@@ -284,7 +284,7 @@ Modifies current profile info.
     "name": "Johnathan Doe",
     "email": "johndoe@example.com",
     "username": "johndoe",
-    "avatar": "https://api.talkme.app/api/v1/uploads/avatar.jpg",
+    "avatar": "https://api.neochathub.com/api/v1/uploads/avatar.jpg",
     "isVerified": true,
     "isGuest": false,
     "createdAt": "2026-06-03T00:33:00Z",

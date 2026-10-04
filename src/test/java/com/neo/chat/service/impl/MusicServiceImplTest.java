@@ -1,5 +1,6 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.cache.MusicSearchCache;
 import com.neo.chat.dto.response.MusicTrackResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -39,14 +41,20 @@ class MusicServiceImplTest {
 
     @Mock
     private HttpClient httpClient;
+    @Mock
+    private MusicSearchCache musicSearchCache;
 
     private MusicServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new MusicServiceImpl(new ObjectMapper());
+        service = new MusicServiceImpl(new ObjectMapper(), musicSearchCache);
         // Replace the inline-constructed final HttpClient with our mock.
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
+        // Make the cache transparent: run the loader (the real iTunes fetch) every time, so
+        // these tests still exercise the fetch/mapping/fail-open logic unchanged.
+        lenient().when(musicSearchCache.getOrCompute(any(), anyInt(), any()))
+                .thenAnswer(inv -> inv.getArgument(2, java.util.function.Supplier.class).get());
     }
 
     @SuppressWarnings("unchecked")

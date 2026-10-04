@@ -1,5 +1,6 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.cache.FollowCache;
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserFollow;
 import com.neo.chat.dto.response.AuthUserResponse;
@@ -61,6 +62,8 @@ class FollowServiceImplTest {
     private UserMapper userMapper;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private FollowCache followCache;
 
     private FollowServiceImpl service;
 
@@ -69,7 +72,7 @@ class FollowServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new FollowServiceImpl(userFollowRepository, userRepository, userMapper, notificationService);
+        service = new FollowServiceImpl(userFollowRepository, userRepository, userMapper, notificationService, followCache);
 
         currentUser = User.builder().username("alice").name("Alice").build();
         currentUser.setId(1L);
@@ -107,6 +110,10 @@ class FollowServiceImplTest {
                     eq(CURRENT_UUID),
                     eq(currentUser),
                     isNull());
+
+            // Real-time cache update: both sides' follow-graph entries invalidated.
+            verify(followCache).evict(currentUser.getId());
+            verify(followCache).evict(targetUser.getId());
         }
 
         @Test
@@ -177,6 +184,9 @@ class FollowServiceImplTest {
             ArgumentCaptor<UserFollow> saved = ArgumentCaptor.forClass(UserFollow.class);
             verify(userFollowRepository).save(saved.capture());
             assertThat(saved.getValue().isDeleted()).isTrue();
+            // Real-time cache update: both sides' follow-graph entries invalidated.
+            verify(followCache).evict(currentUser.getId());
+            verify(followCache).evict(targetUser.getId());
         }
 
         @Test
@@ -223,6 +233,9 @@ class FollowServiceImplTest {
             ArgumentCaptor<UserFollow> saved = ArgumentCaptor.forClass(UserFollow.class);
             verify(userFollowRepository).save(saved.capture());
             assertThat(saved.getValue().isDeleted()).isTrue();
+            // Real-time cache update: the removed follower + caller invalidated.
+            verify(followCache).evict(targetUser.getId());
+            verify(followCache).evict(currentUser.getId());
         }
 
         @Test
@@ -333,7 +346,7 @@ class FollowServiceImplTest {
         @DisplayName("returns the accepted-follower count from the repository")
         void returnsCount() {
             when(userRepository.findByUuid(UUID.fromString(TARGET_UUID))).thenReturn(Optional.of(targetUser));
-            when(userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(targetUser, "ACCEPTED")).thenReturn(7L);
+            when(followCache.followersCount(targetUser)).thenReturn(7L);
 
             assertThat(service.getFollowersCount(TARGET_UUID)).isEqualTo(7L);
         }
@@ -357,7 +370,7 @@ class FollowServiceImplTest {
         @DisplayName("returns the accepted-following count from the repository")
         void returnsCount() {
             when(userRepository.findByUuid(UUID.fromString(CURRENT_UUID))).thenReturn(Optional.of(currentUser));
-            when(userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(currentUser, "ACCEPTED")).thenReturn(3L);
+            when(followCache.followingCount(currentUser)).thenReturn(3L);
 
             assertThat(service.getFollowingCount(CURRENT_UUID)).isEqualTo(3L);
         }
@@ -380,8 +393,7 @@ class FollowServiceImplTest {
         @Test
         @DisplayName("delegates to the repository existence check → true")
         void returnsTrue() {
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(
-                    currentUser, targetUser, "ACCEPTED")).thenReturn(true);
+            when(followCache.isFollowing(currentUser, targetUser)).thenReturn(true);
 
             assertThat(service.isFollowing(currentUser, targetUser)).isTrue();
         }
@@ -389,8 +401,7 @@ class FollowServiceImplTest {
         @Test
         @DisplayName("delegates to the repository existence check → false")
         void returnsFalse() {
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(
-                    currentUser, targetUser, "ACCEPTED")).thenReturn(false);
+            when(followCache.isFollowing(currentUser, targetUser)).thenReturn(false);
 
             assertThat(service.isFollowing(currentUser, targetUser)).isFalse();
         }

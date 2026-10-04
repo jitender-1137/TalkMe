@@ -1,6 +1,7 @@
 package com.neo.chat.service.impl;
 
 import com.neo.chat.cache.BlockCache;
+import com.neo.chat.cache.FriendCache;
 import com.neo.chat.cache.MemberCountCache;
 import com.neo.chat.cache.UserSettingsCache;
 import com.neo.chat.crypto.ChatKeyService;
@@ -27,7 +28,6 @@ import com.neo.chat.mapper.MessageMapper;
 import com.neo.chat.mapper.UserMapper;
 import com.neo.chat.repository.ChatMemberRepository;
 import com.neo.chat.repository.ChatRepository;
-import com.neo.chat.repository.FriendRepository;
 import com.neo.chat.repository.MessageReadReceiptRepository;
 import com.neo.chat.repository.MessageRepository;
 import com.neo.chat.repository.OutboxEventRepository;
@@ -72,6 +72,7 @@ public class ChatServiceImpl implements ChatService {
     private final MemberCountCache memberCountCache;
     private final UserSettingsCache userSettingsCache;
     private final BlockCache blockCache;
+    private final FriendCache friendCache;
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final MessageReadReceiptRepository readReceiptRepository;
@@ -80,7 +81,6 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMapper chatMapper;
     private final PresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final FriendRepository friendRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
@@ -894,10 +894,8 @@ public class ChatServiceImpl implements ChatService {
                 // Avatar mappings
                 response.setAvatar(null);
 
-                // Friendship Check
-                boolean isFriend = friendRepository.findByUserAndFriend(currentUser, otherUser)
-                        .map(f -> !f.isDeleted())
-                        .orElse(false);
+                // Friendship Check (cached per-user friend set — avoids a DB hit per 1:1 chat).
+                boolean isFriend = friendCache.areFriends(currentUser, otherUser.getId());
                 response.setFriend(isFriend);
 
                 // Blocking Check (cached per-user blocked set — avoids 2 DB hits per 1:1 chat).

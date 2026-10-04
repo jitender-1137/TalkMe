@@ -54,7 +54,7 @@ public class WebPushProperties {
         private final String publicKey;
         private final String privateKey;
         /**
-         * Contact URI, e.g. "mailto:admin@talkme.app".
+         * Contact URI, e.g. "mailto:admin@neochathub.com".
          */
         private final String subject;
 
@@ -70,7 +70,7 @@ public class WebPushProperties {
          *
          * @param publicKey  VAPID public key
          * @param privateKey VAPID private key
-         * @param subject    contact URI, e.g. "mailto:admin@talkme.app"
+         * @param subject    contact URI, e.g. "mailto:admin@neochathub.com"
          */
         @ConstructorBinding
         public Vapid(String publicKey, String privateKey, String subject) {

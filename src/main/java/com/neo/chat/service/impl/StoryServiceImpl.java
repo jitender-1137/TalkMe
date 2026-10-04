@@ -21,7 +21,8 @@ import com.neo.chat.mapper.UserMapper;
 import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.repository.StoryRepository;
 import com.neo.chat.repository.StoryViewRepository;
-import com.neo.chat.repository.UserFollowRepository;
+import com.neo.chat.cache.FollowCache;
+import com.neo.chat.cache.StoryStatsCache;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.FeatureAccessService;
 import com.neo.chat.service.NotificationService;
@@ -53,7 +54,8 @@ public class StoryServiceImpl implements StoryService {
     private final ContentModerationService moderationService;
     private final UserSettingRepository userSettingRepository;
     private final PhotoMusicMuxer photoMusicMuxer;
-    private final UserFollowRepository userFollowRepository;
+    private final FollowCache followCache;
+    private final StoryStatsCache storyStatsCache;
     private final NotificationService notificationService;
     private final FeatureAccessService featureAccessService;
 
@@ -191,8 +193,9 @@ public class StoryServiceImpl implements StoryService {
         if (story.getAudience() != PostAudience.FRIENDS) return true;
         if (viewer == null) return false;
         if (story.getUser().getId().equals(viewer.getId())) return true;
-        return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(viewer, story.getUser(), "ACCEPTED")
-                || userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(story.getUser(), viewer, "ACCEPTED");
+        // Cached follow-graph check (either direction) — avoids 2 DB hits per story.
+        return followCache.isFollowing(viewer, story.getUser())
+                || followCache.isFollowing(story.getUser(), viewer);
     }
 
     /**
@@ -246,6 +249,7 @@ public class StoryServiceImpl implements StoryService {
                 .viewedAt(Instant.now())
                 .build();
         storyViewRepository.save(view);
+        storyStatsCache.evictViews(story.getId()); // real-time: view count changed
     }
 
     /**
@@ -322,7 +326,7 @@ public class StoryServiceImpl implements StoryService {
                 .viewedByMe(viewed)
                 // Total distinct viewers — only meaningful to the owner, but cheap to
                 // always include (the owner's UI reads it; others simply ignore it).
-                .viewCount(storyViewRepository.countByStory(story))
+                .viewCount(storyStatsCache.viewCount(story))
                 .owner(isOwner)
                 .expired(story.isExpired())
                 .audience(story.getAudience() != null ? story.getAudience().name() : "EVERYONE")

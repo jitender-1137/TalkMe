@@ -1,5 +1,6 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.cache.MusicSearchCache;
 import com.neo.chat.dto.response.MusicTrackResponse;
 import com.neo.chat.service.MusicService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,6 +30,7 @@ import java.util.List;
 public class MusicServiceImpl implements MusicService {
 
     private final ObjectMapper objectMapper;
+    private final MusicSearchCache musicSearchCache;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
@@ -47,6 +49,16 @@ public class MusicServiceImpl implements MusicService {
             return List.of();
         }
         int lim = Math.clamp(limit, 1, 50);
+        // Cached read-through (long TTL, no eviction — iTunes results are immutable); the
+        // external fetch below only runs on a cache miss. Fail-open inside the cache.
+        return musicSearchCache.getOrCompute(query, lim, () -> fetchFromItunes(query, lim));
+    }
+
+    /**
+     * The live iTunes Search fetch + mapping (run only on a cache miss). Returns an empty list
+     * on any non-200/exception so a failure never propagates to the caller.
+     */
+    private List<MusicTrackResponse> fetchFromItunes(String query, int lim) {
         try {
             String url = "https://itunes.apple.com/search?media=music&entity=song&limit=" + lim
                     + "&term=" + URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);

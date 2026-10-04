@@ -39,6 +39,9 @@ public interface UserService {
 
     Map<String, String> uploadAvatar(MultipartFile file, User currentUser);
 
+    /** Set the caller's avatar to a validated preset ("cute") avatar by its manifest id. */
+    UserResponse selectPresetAvatar(String id, User currentUser);
+
     void removeAvatar(User currentUser);
 
     UserResponse getUserById(String userId, User currentUser);

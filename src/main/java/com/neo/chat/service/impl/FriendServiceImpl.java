@@ -1,6 +1,7 @@
 package com.neo.chat.service.impl;
 
 import com.neo.chat.cache.BlockCache;
+import com.neo.chat.cache.FriendCache;
 import com.neo.chat.domain.BlockUser;
 import com.neo.chat.domain.Friend;
 import com.neo.chat.domain.FriendRequest;
@@ -59,6 +60,7 @@ public class FriendServiceImpl implements FriendService {
     private final FriendRequestRepository friendRequestRepository;
     private final BlockUserRepository blockUserRepository;
     private final BlockCache blockCache;
+    private final FriendCache friendCache;
     private final UserSettingRepository userSettingRepository;
     private final FriendRequestMapper friendRequestMapper;
     private final UserMapper userMapper;
@@ -244,6 +246,10 @@ public class FriendServiceImpl implements FriendService {
         Friend friend2 = Friend.builder().user(request.getReceiver()).friend(request.getSender()).build();
         friendRepository.save(friend1);
         friendRepository.save(friend2);
+        // Real-time correctness: both sides gained a friend → drop their cached sets so
+        // the next chat-list / discover read reflects the new friendship immediately.
+        friendCache.evict(request.getSender().getId());
+        friendCache.evict(request.getReceiver().getId());
 
         broadcastFriendEvent(request.getSender(), "friend_request_accepted");
         broadcastFriendEvent(request.getReceiver(), "friend_request_accepted");
@@ -406,6 +412,10 @@ public class FriendServiceImpl implements FriendService {
 
         if (f1 != null) friendRepository.delete(f1);
         if (f2 != null) friendRepository.delete(f2);
+        // Real-time correctness: both sides lost a friend → drop their cached sets (also
+        // covers blockUser, which removes the friendship via this method).
+        friendCache.evict(currentUser.getId());
+        friendCache.evict(friendUser.getId());
 
         // Clean up any friend requests so they can add each other again cleanly
         friendRequestRepository.deleteAll(friendRequestRepository.findAllBySenderAndReceiver(currentUser, friendUser));

@@ -2,6 +2,7 @@ package com.neo.chat.controller;
 
 import com.neo.chat.dto.request.ChangeUsernameRequest;
 import com.neo.chat.dto.request.DeleteAccountRequest;
+import com.neo.chat.dto.request.SelectPresetAvatarRequest;
 import com.neo.chat.dto.request.UpdateProfileRequest;
 import com.neo.chat.dto.response.BlockedUserResponse;
 import com.neo.chat.dto.response.MutualFriendsResponse;
@@ -175,6 +176,24 @@ public class UserController {
     public ResponseEntity<ResponseDto<Void>> removeAvatar(@AuthenticationPrincipal CustomUserDetails userDetails) {
         userService.removeAvatar(userDetails.getUser());
         return ResponseEntity.ok(SuccessResponseDto.success(null, "Avatar removed", "TM_USER_002"));
+    }
+
+    /**
+     * Select a preset ("cute") avatar by its manifest id. No upload — the id is
+     * validated against the static avatar catalog and resolved to its stored path.
+     *
+     * @param request     body carrying the preset avatar id
+     * @param userDetails the authenticated principal
+     * @return 200 with the updated {@link UserResponse}
+     */
+    @Operation(summary = "Select a preset avatar by id")
+    @PutMapping("/me/avatar/preset")
+    public ResponseEntity<ResponseDto<UserResponse>> selectPresetAvatar(
+            @Valid @RequestBody SelectPresetAvatarRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        UserResponse response = userService.selectPresetAvatar(request.getId(), userDetails.getUser());
+        return ResponseEntity.ok(SuccessResponseDto.success(response, "Avatar updated", "TM_USER_004"));
     }
 
     /**

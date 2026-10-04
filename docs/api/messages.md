@@ -43,7 +43,7 @@ Sends a new message (text or media attachment) inside a chat.
   "messageType": "DOCUMENT",
   "fileName": "resume.pdf",
   "fileSize": 102400,
-  "fileUrl": "https://api.talkme.app/api/v1/uploads/resume_e32.pdf",
+  "fileUrl": "https://api.neochathub.com/api/v1/uploads/resume_e32.pdf",
   "mimeType": "application/pdf"
 }
 ```

@@ -39,7 +39,7 @@ Retrieves recommended discovery profiles based on interests, verified status, on
         "occupation": "Blogger",
         "education": "BA in Arts",
         "interests": ["TRAVEL", "MUSIC"],
-        "images": ["https://api.talkme.app/api/v1/uploads/jane.jpg"],
+        "images": ["https://api.neochathub.com/api/v1/uploads/jane.jpg"],
         "isVerified": true,
         "isOnline": true,
         "isLiked": false,

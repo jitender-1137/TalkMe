@@ -21,7 +21,8 @@ import com.neo.chat.moderation.ContentModerationService;
 import com.neo.chat.moderation.ModerationResult;
 import com.neo.chat.repository.StoryRepository;
 import com.neo.chat.repository.StoryViewRepository;
-import com.neo.chat.repository.UserFollowRepository;
+import com.neo.chat.cache.FollowCache;
+import com.neo.chat.cache.StoryStatsCache;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.FeatureAccessService;
 import com.neo.chat.service.NotificationService;
@@ -78,7 +79,9 @@ class StoryServiceImplTest {
     @Mock
     private PhotoMusicMuxer photoMusicMuxer;
     @Mock
-    private UserFollowRepository userFollowRepository;
+    private FollowCache followCache;
+    @Mock
+    private StoryStatsCache storyStatsCache;
     @Mock
     private NotificationService notificationService;
     @Mock
@@ -92,7 +95,7 @@ class StoryServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new StoryServiceImpl(storyRepository, storyViewRepository, userMapper,
-                moderationService, userSettingRepository, photoMusicMuxer, userFollowRepository,
+                moderationService, userSettingRepository, photoMusicMuxer, followCache, storyStatsCache,
                 notificationService, featureAccessService);
 
         owner = User.builder().username("owner").name("Owner").email("o@e.com").build();
@@ -102,7 +105,7 @@ class StoryServiceImplTest {
 
         // Shared, harmless defaults for the private mapToStoryResponse mapper.
         lenient().when(storyViewRepository.existsByStoryAndUser(any(), any())).thenReturn(false);
-        lenient().when(storyViewRepository.countByStory(any())).thenReturn(0L);
+        lenient().when(storyStatsCache.viewCount(any())).thenReturn(0L);
         lenient().when(userMapper.toAuthUserResponse(any()))
                 .thenAnswer(inv -> AuthUserResponse.builder().username("mapped").build());
         lenient().when(userSettingRepository.findByUser(any())).thenReturn(Optional.empty());
@@ -345,8 +348,7 @@ class StoryServiceImplTest {
             List<StoryResponse> result = service.getActiveStories(other);
 
             assertThat(result).hasSize(1);
-            verify(userFollowRepository, never())
-                    .existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(any(), any(), any());
+            verify(followCache, never()).isFollowing(any(), any());
         }
 
         @Test
@@ -367,8 +369,7 @@ class StoryServiceImplTest {
         void friendsVisibleToFollower() {
             Story s = story(PostAudience.FRIENDS, StoryKind.VISUAL, owner);
             when(storyRepository.findActiveStories(any())).thenReturn(List.of(s));
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(other, owner, "ACCEPTED"))
-                    .thenReturn(true);
+            when(followCache.isFollowing(other, owner)).thenReturn(true);
 
             assertThat(service.getActiveStories(other)).hasSize(1);
         }
@@ -378,8 +379,7 @@ class StoryServiceImplTest {
         void friendsHiddenFromStranger() {
             Story s = story(PostAudience.FRIENDS, StoryKind.VISUAL, owner);
             when(storyRepository.findActiveStories(any())).thenReturn(List.of(s));
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(any(), any(), eq("ACCEPTED")))
-                    .thenReturn(false);
+            when(followCache.isFollowing(any(), any())).thenReturn(false);
 
             assertThat(service.getActiveStories(other)).isEmpty();
         }

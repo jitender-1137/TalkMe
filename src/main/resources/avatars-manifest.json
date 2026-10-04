@@ -1,0 +1,485 @@
+{
+  "version": 1,
+  "avatars": [
+    {
+      "id": "female-01",
+      "collection": "female",
+      "path": "/avatars/female/female-01.webp"
+    },
+    {
+      "id": "female-02",
+      "collection": "female",
+      "path": "/avatars/female/female-02.webp"
+    },
+    {
+      "id": "female-03",
+      "collection": "female",
+      "path": "/avatars/female/female-03.webp"
+    },
+    {
+      "id": "female-04",
+      "collection": "female",
+      "path": "/avatars/female/female-04.webp"
+    },
+    {
+      "id": "female-05",
+      "collection": "female",
+      "path": "/avatars/female/female-05.webp"
+    },
+    {
+      "id": "female-06",
+      "collection": "female",
+      "path": "/avatars/female/female-06.webp"
+    },
+    {
+      "id": "female-07",
+      "collection": "female",
+      "path": "/avatars/female/female-07.webp"
+    },
+    {
+      "id": "female-08",
+      "collection": "female",
+      "path": "/avatars/female/female-08.webp"
+    },
+    {
+      "id": "female-09",
+      "collection": "female",
+      "path": "/avatars/female/female-09.webp"
+    },
+    {
+      "id": "female-10",
+      "collection": "female",
+      "path": "/avatars/female/female-10.webp"
+    },
+    {
+      "id": "female-11",
+      "collection": "female",
+      "path": "/avatars/female/female-11.webp"
+    },
+    {
+      "id": "female-12",
+      "collection": "female",
+      "path": "/avatars/female/female-12.webp"
+    },
+    {
+      "id": "female-13",
+      "collection": "female",
+      "path": "/avatars/female/female-13.webp"
+    },
+    {
+      "id": "female-14",
+      "collection": "female",
+      "path": "/avatars/female/female-14.webp"
+    },
+    {
+      "id": "female-15",
+      "collection": "female",
+      "path": "/avatars/female/female-15.webp"
+    },
+    {
+      "id": "female-16",
+      "collection": "female",
+      "path": "/avatars/female/female-16.webp"
+    },
+    {
+      "id": "female-17",
+      "collection": "female",
+      "path": "/avatars/female/female-17.webp"
+    },
+    {
+      "id": "female-18",
+      "collection": "female",
+      "path": "/avatars/female/female-18.webp"
+    },
+    {
+      "id": "female-19",
+      "collection": "female",
+      "path": "/avatars/female/female-19.webp"
+    },
+    {
+      "id": "female-20",
+      "collection": "female",
+      "path": "/avatars/female/female-20.webp"
+    },
+    {
+      "id": "female-21",
+      "collection": "female",
+      "path": "/avatars/female/female-21.webp"
+    },
+    {
+      "id": "female-22",
+      "collection": "female",
+      "path": "/avatars/female/female-22.webp"
+    },
+    {
+      "id": "female-23",
+      "collection": "female",
+      "path": "/avatars/female/female-23.webp"
+    },
+    {
+      "id": "female-24",
+      "collection": "female",
+      "path": "/avatars/female/female-24.webp"
+    },
+    {
+      "id": "female-25",
+      "collection": "female",
+      "path": "/avatars/female/female-25.webp"
+    },
+    {
+      "id": "female-26",
+      "collection": "female",
+      "path": "/avatars/female/female-26.webp"
+    },
+    {
+      "id": "female-27",
+      "collection": "female",
+      "path": "/avatars/female/female-27.webp"
+    },
+    {
+      "id": "female-28",
+      "collection": "female",
+      "path": "/avatars/female/female-28.webp"
+    },
+    {
+      "id": "female-29",
+      "collection": "female",
+      "path": "/avatars/female/female-29.webp"
+    },
+    {
+      "id": "female-30",
+      "collection": "female",
+      "path": "/avatars/female/female-30.webp"
+    },
+    {
+      "id": "female-31",
+      "collection": "female",
+      "path": "/avatars/female/female-31.webp"
+    },
+    {
+      "id": "female-32",
+      "collection": "female",
+      "path": "/avatars/female/female-32.webp"
+    },
+    {
+      "id": "male-01",
+      "collection": "male",
+      "path": "/avatars/male/male-01.webp"
+    },
+    {
+      "id": "male-02",
+      "collection": "male",
+      "path": "/avatars/male/male-02.webp"
+    },
+    {
+      "id": "male-03",
+      "collection": "male",
+      "path": "/avatars/male/male-03.webp"
+    },
+    {
+      "id": "male-04",
+      "collection": "male",
+      "path": "/avatars/male/male-04.webp"
+    },
+    {
+      "id": "male-05",
+      "collection": "male",
+      "path": "/avatars/male/male-05.webp"
+    },
+    {
+      "id": "male-06",
+      "collection": "male",
+      "path": "/avatars/male/male-06.webp"
+    },
+    {
+      "id": "male-07",
+      "collection": "male",
+      "path": "/avatars/male/male-07.webp"
+    },
+    {
+      "id": "male-08",
+      "collection": "male",
+      "path": "/avatars/male/male-08.webp"
+    },
+    {
+      "id": "male-09",
+      "collection": "male",
+      "path": "/avatars/male/male-09.webp"
+    },
+    {
+      "id": "male-10",
+      "collection": "male",
+      "path": "/avatars/male/male-10.webp"
+    },
+    {
+      "id": "male-11",
+      "collection": "male",
+      "path": "/avatars/male/male-11.webp"
+    },
+    {
+      "id": "male-12",
+      "collection": "male",
+      "path": "/avatars/male/male-12.webp"
+    },
+    {
+      "id": "male-13",
+      "collection": "male",
+      "path": "/avatars/male/male-13.webp"
+    },
+    {
+      "id": "male-14",
+      "collection": "male",
+      "path": "/avatars/male/male-14.webp"
+    },
+    {
+      "id": "male-15",
+      "collection": "male",
+      "path": "/avatars/male/male-15.webp"
+    },
+    {
+      "id": "male-16",
+      "collection": "male",
+      "path": "/avatars/male/male-16.webp"
+    },
+    {
+      "id": "male-17",
+      "collection": "male",
+      "path": "/avatars/male/male-17.webp"
+    },
+    {
+      "id": "male-18",
+      "collection": "male",
+      "path": "/avatars/male/male-18.webp"
+    },
+    {
+      "id": "male-19",
+      "collection": "male",
+      "path": "/avatars/male/male-19.webp"
+    },
+    {
+      "id": "male-20",
+      "collection": "male",
+      "path": "/avatars/male/male-20.webp"
+    },
+    {
+      "id": "male-21",
+      "collection": "male",
+      "path": "/avatars/male/male-21.webp"
+    },
+    {
+      "id": "male-22",
+      "collection": "male",
+      "path": "/avatars/male/male-22.webp"
+    },
+    {
+      "id": "male-23",
+      "collection": "male",
+      "path": "/avatars/male/male-23.webp"
+    },
+    {
+      "id": "male-24",
+      "collection": "male",
+      "path": "/avatars/male/male-24.webp"
+    },
+    {
+      "id": "male-25",
+      "collection": "male",
+      "path": "/avatars/male/male-25.webp"
+    },
+    {
+      "id": "male-26",
+      "collection": "male",
+      "path": "/avatars/male/male-26.webp"
+    },
+    {
+      "id": "male-27",
+      "collection": "male",
+      "path": "/avatars/male/male-27.webp"
+    },
+    {
+      "id": "male-28",
+      "collection": "male",
+      "path": "/avatars/male/male-28.webp"
+    },
+    {
+      "id": "male-29",
+      "collection": "male",
+      "path": "/avatars/male/male-29.webp"
+    },
+    {
+      "id": "male-30",
+      "collection": "male",
+      "path": "/avatars/male/male-30.webp"
+    },
+    {
+      "id": "male-31",
+      "collection": "male",
+      "path": "/avatars/male/male-31.webp"
+    },
+    {
+      "id": "male-32",
+      "collection": "male",
+      "path": "/avatars/male/male-32.webp"
+    },
+    {
+      "id": "neutral-01",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-01.webp"
+    },
+    {
+      "id": "neutral-02",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-02.webp"
+    },
+    {
+      "id": "neutral-03",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-03.webp"
+    },
+    {
+      "id": "neutral-04",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-04.webp"
+    },
+    {
+      "id": "neutral-05",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-05.webp"
+    },
+    {
+      "id": "neutral-06",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-06.webp"
+    },
+    {
+      "id": "neutral-07",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-07.webp"
+    },
+    {
+      "id": "neutral-08",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-08.webp"
+    },
+    {
+      "id": "neutral-09",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-09.webp"
+    },
+    {
+      "id": "neutral-10",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-10.webp"
+    },
+    {
+      "id": "neutral-11",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-11.webp"
+    },
+    {
+      "id": "neutral-12",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-12.webp"
+    },
+    {
+      "id": "neutral-13",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-13.webp"
+    },
+    {
+      "id": "neutral-14",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-14.webp"
+    },
+    {
+      "id": "neutral-15",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-15.webp"
+    },
+    {
+      "id": "neutral-16",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-16.webp"
+    },
+    {
+      "id": "neutral-17",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-17.webp"
+    },
+    {
+      "id": "neutral-18",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-18.webp"
+    },
+    {
+      "id": "neutral-19",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-19.webp"
+    },
+    {
+      "id": "neutral-20",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-20.webp"
+    },
+    {
+      "id": "neutral-21",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-21.webp"
+    },
+    {
+      "id": "neutral-22",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-22.webp"
+    },
+    {
+      "id": "neutral-23",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-23.webp"
+    },
+    {
+      "id": "neutral-24",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-24.webp"
+    },
+    {
+      "id": "neutral-25",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-25.webp"
+    },
+    {
+      "id": "neutral-26",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-26.webp"
+    },
+    {
+      "id": "neutral-27",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-27.webp"
+    },
+    {
+      "id": "neutral-28",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-28.webp"
+    },
+    {
+      "id": "neutral-29",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-29.webp"
+    },
+    {
+      "id": "neutral-30",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-30.webp"
+    },
+    {
+      "id": "neutral-31",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-31.webp"
+    },
+    {
+      "id": "neutral-32",
+      "collection": "neutral",
+      "path": "/avatars/neutral/neutral-32.webp"
+    }
+  ]
+}

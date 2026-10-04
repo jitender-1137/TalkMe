@@ -20,7 +20,7 @@ Publishes a new story (disappearing photo or video status) visible to the user's
 
 ```json
 {
-  "mediaUrl": "https://api.talkme.app/api/v1/uploads/story_9281.jpg",
+  "mediaUrl": "https://api.neochathub.com/api/v1/uploads/story_9281.jpg",
   "caption": "Rise and shine! ☀️"
 }
 ```
@@ -38,7 +38,7 @@ Publishes a new story (disappearing photo or video status) visible to the user's
       "name": "Jane Doe",
       "email": "janedoe@example.com",
       "username": "janedoe",
-      "avatar": "https://api.talkme.app/api/v1/uploads/jane_avatar.png",
+      "avatar": "https://api.neochathub.com/api/v1/uploads/jane_avatar.png",
       "isVerified": true,
       "isGuest": false,
       "createdAt": "2026-05-15T12:00:00Z",
@@ -47,7 +47,7 @@ Publishes a new story (disappearing photo or video status) visible to the user's
       "mobileNumber": "+15550199",
       "interests": ["travel", "photography", "hiking"]
     },
-    "mediaUrl": "https://api.talkme.app/api/v1/uploads/story_9281.jpg",
+    "mediaUrl": "https://api.neochathub.com/api/v1/uploads/story_9281.jpg",
     "caption": "Rise and shine! ☀️",
     "createdAt": "2026-06-03T00:33:00Z",
     "expiresAt": "2026-06-04T00:33:00Z",
@@ -80,7 +80,7 @@ Retrieves a list of active (non-expired) stories from the user and their friends
         "name": "Jane Doe",
         "email": "janedoe@example.com",
         "username": "janedoe",
-        "avatar": "https://api.talkme.app/api/v1/uploads/jane_avatar.png",
+        "avatar": "https://api.neochathub.com/api/v1/uploads/jane_avatar.png",
         "isVerified": true,
         "isGuest": false,
         "createdAt": "2026-05-15T12:00:00Z",
@@ -89,7 +89,7 @@ Retrieves a list of active (non-expired) stories from the user and their friends
         "mobileNumber": "+15550199",
         "interests": ["travel", "photography", "hiking"]
       },
-      "mediaUrl": "https://api.talkme.app/api/v1/uploads/story_9281.jpg",
+      "mediaUrl": "https://api.neochathub.com/api/v1/uploads/story_9281.jpg",
       "caption": "Rise and shine! ☀️",
       "createdAt": "2026-06-03T00:33:00Z",
       "expiresAt": "2026-06-04T00:33:00Z",
@@ -102,7 +102,7 @@ Retrieves a list of active (non-expired) stories from the user and their friends
         "name": "Bob Smith",
         "email": "bobsmith@example.com",
         "username": "bobsmith",
-        "avatar": "https://api.talkme.app/api/v1/uploads/bob_avatar.png",
+        "avatar": "https://api.neochathub.com/api/v1/uploads/bob_avatar.png",
         "isVerified": false,
         "isGuest": false,
         "createdAt": "2026-05-20T10:30:00Z",
@@ -111,7 +111,7 @@ Retrieves a list of active (non-expired) stories from the user and their friends
         "mobileNumber": "+15550288",
         "interests": ["cooking", "gaming"]
       },
-      "mediaUrl": "https://api.talkme.app/api/v1/uploads/story_coffee.mp4",
+      "mediaUrl": "https://api.neochathub.com/api/v1/uploads/story_coffee.mp4",
       "caption": "Brewing some fresh coffee ☕️",
       "createdAt": "2026-06-02T22:15:00Z",
       "expiresAt": "2026-06-03T22:15:00Z",
@@ -191,7 +191,7 @@ Retrieves the list of users who have viewed a specific story (only available to 
       "name": "Bob Smith",
       "email": "bobsmith@example.com",
       "username": "bobsmith",
-      "avatar": "https://api.talkme.app/api/v1/uploads/bob_avatar.png",
+      "avatar": "https://api.neochathub.com/api/v1/uploads/bob_avatar.png",
       "isVerified": false,
       "isGuest": false,
       "createdAt": "2026-05-20T10:30:00Z",

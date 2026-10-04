@@ -38,7 +38,7 @@ import com.neo.chat.repository.FriendRepository;
 import com.neo.chat.repository.FriendRequestRepository;
 import com.neo.chat.repository.MatchReportRepository;
 import com.neo.chat.repository.PostRepository;
-import com.neo.chat.repository.UserFollowRepository;
+import com.neo.chat.cache.FollowCache;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
 import com.neo.chat.service.CompatibilityService;
@@ -122,7 +122,7 @@ class UserServiceImplTest {
     @Mock
     private StringRedisTemplate redisTemplate;
     @Mock
-    private UserFollowRepository userFollowRepository;
+    private FollowCache followCache;
     @Mock
     private PostRepository postRepository;
     @Mock
@@ -140,6 +140,8 @@ class UserServiceImplTest {
     @Mock
     private UsernameHistoryRecorder usernameHistoryRecorder;
     @Mock
+    private com.neo.chat.config.AvatarCatalog avatarCatalog;
+    @Mock
     private SetOperations<String, String> setOps;
 
     private UserServiceImpl service;
@@ -149,9 +151,9 @@ class UserServiceImplTest {
         service = new UserServiceImpl(
                 userRepository, friendRepository, friendRequestRepository, userSettingRepository,
                 blockUserRepository, matchReportRepository, presenceService, storageService, userMapper,
-                redisTemplate, userFollowRepository, postRepository, moderationService, notificationService,
+                redisTemplate, followCache, postRepository, moderationService, notificationService,
                 reputationRecorder, reputationService, compatibilityService, streakService,
-                usernameHistoryRecorder);
+                usernameHistoryRecorder, avatarCatalog);
 
         // ── Shared enrichment defaults (populate* helpers run on almost every path) ──
         lenient().when(userMapper.toUserResponse(any(User.class)))
@@ -165,10 +167,8 @@ class UserServiceImplTest {
         lenient().when(friendRepository.findByUserAndFriend(any(User.class), any(User.class)))
                 .thenReturn(Optional.empty());
         lenient().when(friendRepository.findFriendsByUser(any(User.class))).thenReturn(List.of());
-        lenient().when(userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(any(User.class), eq("ACCEPTED")))
-                .thenReturn(0L);
-        lenient().when(userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(any(User.class), eq("ACCEPTED")))
-                .thenReturn(0L);
+        lenient().when(followCache.followersCount(any(User.class))).thenReturn(0L);
+        lenient().when(followCache.followingCount(any(User.class))).thenReturn(0L);
         lenient().when(postRepository.countVisibleByUser(any(User.class))).thenReturn(0L);
     }
 
@@ -219,8 +219,8 @@ class UserServiceImplTest {
         void returnsCurrentUser() {
             User me = viewer();
             when(userRepository.findById(1L)).thenReturn(Optional.of(me));
-            when(userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(me, "ACCEPTED")).thenReturn(7L);
-            when(userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(me, "ACCEPTED")).thenReturn(3L);
+            when(followCache.followersCount(me)).thenReturn(7L);
+            when(followCache.followingCount(me)).thenReturn(3L);
             when(postRepository.countVisibleByUser(me)).thenReturn(5L);
 
             UserResponse res = service.getCurrentUser(me);
@@ -683,8 +683,7 @@ class UserServiceImplTest {
             User me = viewer();
             User t = target();
             when(userRepository.findByUuid(TARGET_UUID)).thenReturn(Optional.of(t));
-            when(userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(me, t, "ACCEPTED"))
-                    .thenReturn(true);
+            when(followCache.isFollowing(me, t)).thenReturn(true);
 
             UserResponse res = service.getUserById(TARGET_UUID.toString(), me);
 
@@ -869,8 +868,8 @@ class UserServiceImplTest {
                     .id(TARGET_UUID.toString()).name("Target").username("neo")
                     .avatar("a.png").bio("hi").isVerified(true).createdAt("2020").build());
             when(presenceService.getStatus(u)).thenReturn(PresenceStatus.ONLINE);
-            when(userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(u, "ACCEPTED")).thenReturn(4L);
-            when(userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(u, "ACCEPTED")).thenReturn(2L);
+            when(followCache.followersCount(u)).thenReturn(4L);
+            when(followCache.followingCount(u)).thenReturn(2L);
             when(postRepository.countVisibleByUser(u)).thenReturn(9L);
             when(reputationService.getFor(TARGET_UUID.toString())).thenReturn(
                     ReputationResponse.builder().level(5).starRank("GOLD").prestigeCount(1).build());

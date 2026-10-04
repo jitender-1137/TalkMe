@@ -317,7 +317,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"John Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"country\": \"US\",\n    \"city\": \"Dallas\",\n    \"mobileNumber\": \"+1234567890\",\n    \"interests\": [\"GAMING\", \"TRAVEL\"]\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"John Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"country\": \"US\",\n    \"city\": \"Dallas\",\n    \"mobileNumber\": \"+1234567890\",\n    \"interests\": [\"GAMING\", \"TRAVEL\"]\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -350,7 +350,7 @@
             "description": "Modifies current profile info.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Johnathan Doe\",\n  \"profileImage\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n  \"country\": \"US\",\n  \"city\": \"Austin\",\n  \"mobileNumber\": \"+1999999999\",\n  \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"]\n}",
+              "raw": "{\n  \"name\": \"Johnathan Doe\",\n  \"profileImage\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n  \"country\": \"US\",\n  \"city\": \"Austin\",\n  \"mobileNumber\": \"+1999999999\",\n  \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -387,7 +387,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Johnathan Doe\",\n  \"profileImage\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n  \"country\": \"US\",\n  \"city\": \"Austin\",\n  \"mobileNumber\": \"+1999999999\",\n  \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"]\n}",
+                  "raw": "{\n  \"name\": \"Johnathan Doe\",\n  \"profileImage\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n  \"country\": \"US\",\n  \"city\": \"Austin\",\n  \"mobileNumber\": \"+1999999999\",\n  \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -405,7 +405,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"Johnathan Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"country\": \"US\",\n    \"city\": \"Austin\",\n    \"mobileNumber\": \"+1999999999\",\n    \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"]\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"Johnathan Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"country\": \"US\",\n    \"city\": \"Austin\",\n    \"mobileNumber\": \"+1999999999\",\n    \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"]\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -919,7 +919,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Chat created successfully\",\n  \"data\": {\n    \"id\": \"c1f729b8-12cd-43ff-be45-e8a6eb4862b3\",\n    \"chatType\": \"PRIVATE\",\n    \"name\": \"Jane Smith\",\n    \"otherUser\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\"\n    },\n    \"lastMessage\": null,\n    \"unreadCount\": 0,\n    \"isPinned\": false,\n    \"isArchived\": false,\n    \"isMuted\": false,\n    \"typingUsers\": [],\n    \"createdAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Chat created successfully\",\n  \"data\": {\n    \"id\": \"c1f729b8-12cd-43ff-be45-e8a6eb4862b3\",\n    \"chatType\": \"PRIVATE\",\n    \"name\": \"Jane Smith\",\n    \"otherUser\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\"\n    },\n    \"lastMessage\": null,\n    \"unreadCount\": 0,\n    \"isPinned\": false,\n    \"isArchived\": false,\n    \"isMuted\": false,\n    \"typingUsers\": [],\n    \"createdAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -965,7 +965,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"c1f729b8-12cd-43ff-be45-e8a6eb4862b3\",\n      \"chatType\": \"PRIVATE\",\n      \"name\": \"Jane Smith\",\n      \"otherUser\": {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-06-02T10:00:00Z\"\n      },\n      \"lastMessage\": {\n        \"id\": \"m9a12c45-42a1-43ff-a12e-a5fe48d9a202\",\n        \"senderId\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"content\": \"Hey, did you finish the documentation?\",\n        \"messageType\": \"TEXT\",\n        \"createdAt\": \"2026-06-03T00:30:00Z\",\n        \"isEdited\": false,\n        \"reactions\": [],\n        \"attachments\": [],\n        \"status\": \"DELIVERED\"\n      },\n      \"unreadCount\": 1,\n      \"isPinned\": true,\n      \"isArchived\": false,\n      \"isMuted\": false,\n      \"typingUsers\": [],\n      \"createdAt\": \"2026-06-03T00:10:00Z\"\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"c1f729b8-12cd-43ff-be45-e8a6eb4862b3\",\n      \"chatType\": \"PRIVATE\",\n      \"name\": \"Jane Smith\",\n      \"otherUser\": {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-06-02T10:00:00Z\"\n      },\n      \"lastMessage\": {\n        \"id\": \"m9a12c45-42a1-43ff-a12e-a5fe48d9a202\",\n        \"senderId\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"content\": \"Hey, did you finish the documentation?\",\n        \"messageType\": \"TEXT\",\n        \"createdAt\": \"2026-06-03T00:30:00Z\",\n        \"isEdited\": false,\n        \"reactions\": [],\n        \"attachments\": [],\n        \"status\": \"DELIVERED\"\n      },\n      \"unreadCount\": 1,\n      \"isPinned\": true,\n      \"isArchived\": false,\n      \"isMuted\": false,\n      \"typingUsers\": [],\n      \"createdAt\": \"2026-06-03T00:10:00Z\"\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -1020,7 +1020,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"c1f729b8-12cd-43ff-be45-e8a6eb4862b3\",\n    \"chatType\": \"PRIVATE\",\n    \"name\": \"Jane Smith\",\n    \"otherUser\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\"\n    },\n    \"lastMessage\": null,\n    \"unreadCount\": 0,\n    \"isPinned\": false,\n    \"isArchived\": false,\n    \"isMuted\": false,\n    \"typingUsers\": [],\n    \"createdAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"c1f729b8-12cd-43ff-be45-e8a6eb4862b3\",\n    \"chatType\": \"PRIVATE\",\n    \"name\": \"Jane Smith\",\n    \"otherUser\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\"\n    },\n    \"lastMessage\": null,\n    \"unreadCount\": 0,\n    \"isPinned\": false,\n    \"isArchived\": false,\n    \"isMuted\": false,\n    \"typingUsers\": [],\n    \"createdAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -1632,7 +1632,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"age\": 25,\n        \"username\": \"janesmith\",\n        \"bio\": \"Travel blogger and photographer.\",\n        \"location\": \"London, UK\",\n        \"distance\": \"2 miles away\",\n        \"distanceKm\": 3.2,\n        \"occupation\": \"Blogger\",\n        \"education\": \"BA in Arts\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"],\n        \"images\": [\"https://api.talkme.app/api/v1/uploads/jane.jpg\"],\n        \"isVerified\": true,\n        \"isOnline\": true,\n        \"isLiked\": false,\n        \"isFriend\": false,\n        \"mutualFriendsCount\": 2\n      }\n    ],\n    \"pagination\": {\n      \"cursor\": \"1\",\n      \"hasNext\": true,\n      \"hasPrevious\": false,\n      \"total\": 5\n    }\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"age\": 25,\n        \"username\": \"janesmith\",\n        \"bio\": \"Travel blogger and photographer.\",\n        \"location\": \"London, UK\",\n        \"distance\": \"2 miles away\",\n        \"distanceKm\": 3.2,\n        \"occupation\": \"Blogger\",\n        \"education\": \"BA in Arts\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"],\n        \"images\": [\"https://api.neochathub.com/api/v1/uploads/jane.jpg\"],\n        \"isVerified\": true,\n        \"isOnline\": true,\n        \"isLiked\": false,\n        \"isFriend\": false,\n        \"mutualFriendsCount\": 2\n      }\n    ],\n    \"pagination\": {\n      \"cursor\": \"1\",\n      \"hasNext\": true,\n      \"hasPrevious\": false,\n      \"total\": 5\n    }\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -1863,7 +1863,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Friend request sent successfully\",\n  \"data\": {\n    \"id\": \"r8b91a78-43cd-42ee-ae56-e8a6eb4862b4\",\n    \"sender\": {\n      \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n      \"name\": \"John Doe\",\n      \"email\": \"johndoe@example.com\",\n      \"username\": \"johndoe\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-01T12:00:00Z\",\n      \"country\": \"US\",\n      \"city\": \"Austin\",\n      \"mobileNumber\": \"+1234567890\",\n      \"interests\": [\"GAMING\", \"TRAVEL\"]\n    },\n    \"status\": \"PENDING\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Friend request sent successfully\",\n  \"data\": {\n    \"id\": \"r8b91a78-43cd-42ee-ae56-e8a6eb4862b4\",\n    \"sender\": {\n      \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n      \"name\": \"John Doe\",\n      \"email\": \"johndoe@example.com\",\n      \"username\": \"johndoe\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-01T12:00:00Z\",\n      \"country\": \"US\",\n      \"city\": \"Austin\",\n      \"mobileNumber\": \"+1234567890\",\n      \"interests\": [\"GAMING\", \"TRAVEL\"]\n    },\n    \"status\": \"PENDING\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -2122,7 +2122,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\",\n      \"country\": \"UK\",\n      \"city\": \"London\",\n      \"mobileNumber\": \"+1987654321\",\n      \"interests\": [\"TRAVEL\", \"MUSIC\"]\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\",\n      \"country\": \"UK\",\n      \"city\": \"London\",\n      \"mobileNumber\": \"+1987654321\",\n      \"interests\": [\"TRAVEL\", \"MUSIC\"]\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -2170,7 +2170,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"r8b91a78-43cd-42ee-ae56-e8a6eb4862b4\",\n      \"sender\": {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-06-02T10:00:00Z\",\n        \"country\": \"UK\",\n        \"city\": \"London\",\n        \"mobileNumber\": \"+1987654321\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"]\n      },\n      \"status\": \"PENDING\"\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"r8b91a78-43cd-42ee-ae56-e8a6eb4862b4\",\n      \"sender\": {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-06-02T10:00:00Z\",\n        \"country\": \"UK\",\n        \"city\": \"London\",\n        \"mobileNumber\": \"+1987654321\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"]\n      },\n      \"status\": \"PENDING\"\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -2468,7 +2468,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Match found successfully\",\n  \"data\": {\n    \"id\": \"s8a42b10-671c-43fe-a5fe-e8a6eb4862b5\",\n    \"partner\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\",\n      \"country\": \"UK\",\n      \"city\": \"London\",\n      \"mobileNumber\": \"+1987654321\",\n      \"interests\": [\"TRAVEL\", \"MUSIC\"]\n    },\n    \"chatId\": \"c5b20d18-971c-43fe-a5fe-e8a6eb4862b4\",\n    \"isActive\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Match found successfully\",\n  \"data\": {\n    \"id\": \"s8a42b10-671c-43fe-a5fe-e8a6eb4862b5\",\n    \"partner\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\",\n      \"country\": \"UK\",\n      \"city\": \"London\",\n      \"mobileNumber\": \"+1987654321\",\n      \"interests\": [\"TRAVEL\", \"MUSIC\"]\n    },\n    \"chatId\": \"c5b20d18-971c-43fe-a5fe-e8a6eb4862b4\",\n    \"isActive\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -2576,7 +2576,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"s8a42b10-671c-43fe-a5fe-e8a6eb4862b5\",\n    \"partner\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\",\n      \"country\": \"UK\",\n      \"city\": \"London\",\n      \"mobileNumber\": \"+1987654321\",\n      \"interests\": [\"TRAVEL\", \"MUSIC\"]\n    },\n    \"chatId\": \"c5b20d18-971c-43fe-a5fe-e8a6eb4862b4\",\n    \"isActive\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"s8a42b10-671c-43fe-a5fe-e8a6eb4862b5\",\n    \"partner\": {\n      \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n      \"name\": \"Jane Smith\",\n      \"email\": \"janesmith@example.com\",\n      \"username\": \"janesmith\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-06-02T10:00:00Z\",\n      \"country\": \"UK\",\n      \"city\": \"London\",\n      \"mobileNumber\": \"+1987654321\",\n      \"interests\": [\"TRAVEL\", \"MUSIC\"]\n    },\n    \"chatId\": \"c5b20d18-971c-43fe-a5fe-e8a6eb4862b4\",\n    \"isActive\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -3392,7 +3392,7 @@
             "description": "Creates a new post with text content and optional media attachments.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n  \"media\": [\n    {\n      \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/city_view_4982.jpg\",\n      \"mediaType\": \"IMAGE\"\n    }\n  ]\n}",
+              "raw": "{\n  \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n  \"media\": [\n    {\n      \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg\",\n      \"mediaType\": \"IMAGE\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3428,7 +3428,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n  \"media\": [\n    {\n      \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/city_view_4982.jpg\",\n      \"mediaType\": \"IMAGE\"\n    }\n  ]\n}",
+                  "raw": "{\n  \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n  \"media\": [\n    {\n      \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg\",\n      \"mediaType\": \"IMAGE\"\n    }\n  ]\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -3446,7 +3446,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Post created successfully\",\n  \"data\": {\n    \"id\": \"p8f13b67-42a1-43ff-a12e-a5fe48d9a101\",\n    \"user\": {\n      \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n      \"name\": \"Jane Doe\",\n      \"email\": \"janedoe@example.com\",\n      \"username\": \"janedoe\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane_avatar.png\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-05-15T12:00:00Z\",\n      \"country\": \"United States\",\n      \"city\": \"San Francisco\",\n      \"mobileNumber\": \"+15550199\",\n      \"interests\": [\"travel\", \"photography\", \"hiking\"]\n    },\n    \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n    \"media\": [\n      {\n        \"id\": \"pm4a12c4-42a1-43ff-a12e-a5fe48d9a102\",\n        \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/city_view_4982.jpg\",\n        \"mediaType\": \"IMAGE\"\n      }\n    ],\n    \"likesCount\": 0,\n    \"likedByMe\": false,\n    \"bookmarkedByMe\": false,\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"comments\": []\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Post created successfully\",\n  \"data\": {\n    \"id\": \"p8f13b67-42a1-43ff-a12e-a5fe48d9a101\",\n    \"user\": {\n      \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n      \"name\": \"Jane Doe\",\n      \"email\": \"janedoe@example.com\",\n      \"username\": \"janedoe\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane_avatar.png\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-05-15T12:00:00Z\",\n      \"country\": \"United States\",\n      \"city\": \"San Francisco\",\n      \"mobileNumber\": \"+15550199\",\n      \"interests\": [\"travel\", \"photography\", \"hiking\"]\n    },\n    \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n    \"media\": [\n      {\n        \"id\": \"pm4a12c4-42a1-43ff-a12e-a5fe48d9a102\",\n        \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg\",\n        \"mediaType\": \"IMAGE\"\n      }\n    ],\n    \"likesCount\": 0,\n    \"likedByMe\": false,\n    \"bookmarkedByMe\": false,\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"comments\": []\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -3494,7 +3494,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"content\": [\n      {\n        \"id\": \"p8f13b67-42a1-43ff-a12e-a5fe48d9a101\",\n        \"user\": {\n          \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n          \"name\": \"Jane Doe\",\n          \"email\": \"janedoe@example.com\",\n          \"username\": \"janedoe\",\n          \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane_avatar.png\",\n          \"isVerified\": true,\n          \"isGuest\": false,\n          \"createdAt\": \"2026-05-15T12:00:00Z\",\n          \"country\": \"United States\",\n          \"city\": \"San Francisco\",\n          \"mobileNumber\": \"+15550199\",\n          \"interests\": [\"travel\", \"photography\", \"hiking\"]\n        },\n        \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n        \"media\": [\n          {\n            \"id\": \"pm4a12c4-42a1-43ff-a12e-a5fe48d9a102\",\n            \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/city_view_4982.jpg\",\n            \"mediaType\": \"IMAGE\"\n          }\n        ],\n        \"likesCount\": 15,\n        \"likedByMe\": true,\n        \"bookmarkedByMe\": false,\n        \"createdAt\": \"2026-06-03T00:33:00Z\",\n        \"comments\": [\n          {\n            \"id\": \"c7b12c45-42a1-43ff-a12e-a5fe48d9a301\",\n            \"username\": \"johndoe\",\n            \"name\": \"John Doe\",\n            \"content\": \"Looks incredible! Wish I was there.\",\n            \"createdAt\": \"2026-06-03T00:34:00Z\"\n          }\n        ]\n      }\n    ],\n    \"totalPages\": 1,\n    \"totalElements\": 1,\n    \"size\": 20,\n    \"number\": 0,\n    \"first\": true,\n    \"last\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"content\": [\n      {\n        \"id\": \"p8f13b67-42a1-43ff-a12e-a5fe48d9a101\",\n        \"user\": {\n          \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n          \"name\": \"Jane Doe\",\n          \"email\": \"janedoe@example.com\",\n          \"username\": \"janedoe\",\n          \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane_avatar.png\",\n          \"isVerified\": true,\n          \"isGuest\": false,\n          \"createdAt\": \"2026-05-15T12:00:00Z\",\n          \"country\": \"United States\",\n          \"city\": \"San Francisco\",\n          \"mobileNumber\": \"+15550199\",\n          \"interests\": [\"travel\", \"photography\", \"hiking\"]\n        },\n        \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n        \"media\": [\n          {\n            \"id\": \"pm4a12c4-42a1-43ff-a12e-a5fe48d9a102\",\n            \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg\",\n            \"mediaType\": \"IMAGE\"\n          }\n        ],\n        \"likesCount\": 15,\n        \"likedByMe\": true,\n        \"bookmarkedByMe\": false,\n        \"createdAt\": \"2026-06-03T00:33:00Z\",\n        \"comments\": [\n          {\n            \"id\": \"c7b12c45-42a1-43ff-a12e-a5fe48d9a301\",\n            \"username\": \"johndoe\",\n            \"name\": \"John Doe\",\n            \"content\": \"Looks incredible! Wish I was there.\",\n            \"createdAt\": \"2026-06-03T00:34:00Z\"\n          }\n        ]\n      }\n    ],\n    \"totalPages\": 1,\n    \"totalElements\": 1,\n    \"size\": 20,\n    \"number\": 0,\n    \"first\": true,\n    \"last\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -3551,7 +3551,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"content\": [\n      {\n        \"id\": \"p8f13b67-42a1-43ff-a12e-a5fe48d9a101\",\n        \"user\": {\n          \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n          \"name\": \"Jane Doe\",\n          \"email\": \"janedoe@example.com\",\n          \"username\": \"janedoe\",\n          \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane_avatar.png\",\n          \"isVerified\": true,\n          \"isGuest\": false,\n          \"createdAt\": \"2026-05-15T12:00:00Z\",\n          \"country\": \"United States\",\n          \"city\": \"San Francisco\",\n          \"mobileNumber\": \"+15550199\",\n          \"interests\": [\"travel\", \"photography\", \"hiking\"]\n        },\n        \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n        \"media\": [\n          {\n            \"id\": \"pm4a12c4-42a1-43ff-a12e-a5fe48d9a102\",\n            \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/city_view_4982.jpg\",\n            \"mediaType\": \"IMAGE\"\n          }\n        ],\n        \"likesCount\": 15,\n        \"likedByMe\": true,\n        \"bookmarkedByMe\": false,\n        \"createdAt\": \"2026-06-03T00:33:00Z\",\n        \"comments\": []\n      }\n    ],\n    \"totalPages\": 1,\n    \"totalElements\": 1,\n    \"size\": 20,\n    \"number\": 0,\n    \"first\": true,\n    \"last\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"content\": [\n      {\n        \"id\": \"p8f13b67-42a1-43ff-a12e-a5fe48d9a101\",\n        \"user\": {\n          \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n          \"name\": \"Jane Doe\",\n          \"email\": \"janedoe@example.com\",\n          \"username\": \"janedoe\",\n          \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane_avatar.png\",\n          \"isVerified\": true,\n          \"isGuest\": false,\n          \"createdAt\": \"2026-05-15T12:00:00Z\",\n          \"country\": \"United States\",\n          \"city\": \"San Francisco\",\n          \"mobileNumber\": \"+15550199\",\n          \"interests\": [\"travel\", \"photography\", \"hiking\"]\n        },\n        \"content\": \"Just had an amazing day exploring the city! Check out this view. #travel #adventure\",\n        \"media\": [\n          {\n            \"id\": \"pm4a12c4-42a1-43ff-a12e-a5fe48d9a102\",\n            \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg\",\n            \"mediaType\": \"IMAGE\"\n          }\n        ],\n        \"likesCount\": 15,\n        \"likedByMe\": true,\n        \"bookmarkedByMe\": false,\n        \"createdAt\": \"2026-06-03T00:33:00Z\",\n        \"comments\": []\n      }\n    ],\n    \"totalPages\": 1,\n    \"totalElements\": 1,\n    \"size\": 20,\n    \"number\": 0,\n    \"first\": true,\n    \"last\": true\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -4541,7 +4541,7 @@
             "description": "Publishes a new story (disappearing photo or video status) visible to the user's friends.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/story_9281.jpg\",\n  \"caption\": \"Rise and shine! \u2600\ufe0f\"\n}",
+              "raw": "{\n  \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/story_9281.jpg\",\n  \"caption\": \"Rise and shine! \u2600\ufe0f\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4577,7 +4577,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/story_9281.jpg\",\n  \"caption\": \"Rise and shine! \u2600\ufe0f\"\n}",
+                  "raw": "{\n  \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/story_9281.jpg\",\n  \"caption\": \"Rise and shine! \u2600\ufe0f\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -4595,7 +4595,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Story posted successfully\",\n  \"data\": {\n    \"id\": \"s3a12c45-42a1-43ff-a12e-a5fe48d9a401\",\n    \"user\": {\n      \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n      \"name\": \"Jane Doe\",\n      \"email\": \"janedoe@example.com\",\n      \"username\": \"janedoe\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane_avatar.png\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-05-15T12:00:00Z\",\n      \"country\": \"United States\",\n      \"city\": \"San Francisco\",\n      \"mobileNumber\": \"+15550199\",\n      \"interests\": [\"travel\", \"photography\", \"hiking\"]\n    },\n    \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/story_9281.jpg\",\n    \"caption\": \"Rise and shine! \u2600\ufe0f\",\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"expiresAt\": \"2026-06-04T00:33:00Z\",\n    \"viewedByMe\": false\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Story posted successfully\",\n  \"data\": {\n    \"id\": \"s3a12c45-42a1-43ff-a12e-a5fe48d9a401\",\n    \"user\": {\n      \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n      \"name\": \"Jane Doe\",\n      \"email\": \"janedoe@example.com\",\n      \"username\": \"janedoe\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane_avatar.png\",\n      \"isVerified\": true,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-05-15T12:00:00Z\",\n      \"country\": \"United States\",\n      \"city\": \"San Francisco\",\n      \"mobileNumber\": \"+15550199\",\n      \"interests\": [\"travel\", \"photography\", \"hiking\"]\n    },\n    \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/story_9281.jpg\",\n    \"caption\": \"Rise and shine! \u2600\ufe0f\",\n    \"createdAt\": \"2026-06-03T00:33:00Z\",\n    \"expiresAt\": \"2026-06-04T00:33:00Z\",\n    \"viewedByMe\": false\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -4643,7 +4643,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"s3a12c45-42a1-43ff-a12e-a5fe48d9a401\",\n      \"user\": {\n        \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n        \"name\": \"Jane Doe\",\n        \"email\": \"janedoe@example.com\",\n        \"username\": \"janedoe\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane_avatar.png\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-05-15T12:00:00Z\",\n        \"country\": \"United States\",\n        \"city\": \"San Francisco\",\n        \"mobileNumber\": \"+15550199\",\n        \"interests\": [\"travel\", \"photography\", \"hiking\"]\n      },\n      \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/story_9281.jpg\",\n      \"caption\": \"Rise and shine! \u2600\ufe0f\",\n      \"createdAt\": \"2026-06-03T00:33:00Z\",\n      \"expiresAt\": \"2026-06-04T00:33:00Z\",\n      \"viewedByMe\": true\n    },\n    {\n      \"id\": \"s5b98c32-12f9-482a-b72e-d82e18d9e201\",\n      \"user\": {\n        \"id\": \"u7d89ab6-a2cf-4c95-b22d-8bb3d07e700e\",\n        \"name\": \"Bob Smith\",\n        \"email\": \"bobsmith@example.com\",\n        \"username\": \"bobsmith\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/bob_avatar.png\",\n        \"isVerified\": false,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-05-20T10:30:00Z\",\n        \"country\": \"Canada\",\n        \"city\": \"Toronto\",\n        \"mobileNumber\": \"+15550288\",\n        \"interests\": [\"cooking\", \"gaming\"]\n      },\n      \"mediaUrl\": \"https://api.talkme.app/api/v1/uploads/story_coffee.mp4\",\n      \"caption\": \"Brewing some fresh coffee \u2615\ufe0f\",\n      \"createdAt\": \"2026-06-02T22:15:00Z\",\n      \"expiresAt\": \"2026-06-03T22:15:00Z\",\n      \"viewedByMe\": false\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"s3a12c45-42a1-43ff-a12e-a5fe48d9a401\",\n      \"user\": {\n        \"id\": \"u5c37ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n        \"name\": \"Jane Doe\",\n        \"email\": \"janedoe@example.com\",\n        \"username\": \"janedoe\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane_avatar.png\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-05-15T12:00:00Z\",\n        \"country\": \"United States\",\n        \"city\": \"San Francisco\",\n        \"mobileNumber\": \"+15550199\",\n        \"interests\": [\"travel\", \"photography\", \"hiking\"]\n      },\n      \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/story_9281.jpg\",\n      \"caption\": \"Rise and shine! \u2600\ufe0f\",\n      \"createdAt\": \"2026-06-03T00:33:00Z\",\n      \"expiresAt\": \"2026-06-04T00:33:00Z\",\n      \"viewedByMe\": true\n    },\n    {\n      \"id\": \"s5b98c32-12f9-482a-b72e-d82e18d9e201\",\n      \"user\": {\n        \"id\": \"u7d89ab6-a2cf-4c95-b22d-8bb3d07e700e\",\n        \"name\": \"Bob Smith\",\n        \"email\": \"bobsmith@example.com\",\n        \"username\": \"bobsmith\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/bob_avatar.png\",\n        \"isVerified\": false,\n        \"isGuest\": false,\n        \"createdAt\": \"2026-05-20T10:30:00Z\",\n        \"country\": \"Canada\",\n        \"city\": \"Toronto\",\n        \"mobileNumber\": \"+15550288\",\n        \"interests\": [\"cooking\", \"gaming\"]\n      },\n      \"mediaUrl\": \"https://api.neochathub.com/api/v1/uploads/story_coffee.mp4\",\n      \"caption\": \"Brewing some fresh coffee \u2615\ufe0f\",\n      \"createdAt\": \"2026-06-02T22:15:00Z\",\n      \"expiresAt\": \"2026-06-03T22:15:00Z\",\n      \"viewedByMe\": false\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -4836,7 +4836,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"u7d89ab6-a2cf-4c95-b22d-8bb3d07e700e\",\n      \"name\": \"Bob Smith\",\n      \"email\": \"bobsmith@example.com\",\n      \"username\": \"bobsmith\",\n      \"avatar\": \"https://api.talkme.app/api/v1/uploads/bob_avatar.png\",\n      \"isVerified\": false,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-05-20T10:30:00Z\",\n      \"country\": \"Canada\",\n      \"city\": \"Toronto\",\n      \"mobileNumber\": \"+15550288\",\n      \"interests\": [\"cooking\", \"gaming\"]\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": [\n    {\n      \"id\": \"u7d89ab6-a2cf-4c95-b22d-8bb3d07e700e\",\n      \"name\": \"Bob Smith\",\n      \"email\": \"bobsmith@example.com\",\n      \"username\": \"bobsmith\",\n      \"avatar\": \"https://api.neochathub.com/api/v1/uploads/bob_avatar.png\",\n      \"isVerified\": false,\n      \"isGuest\": false,\n      \"createdAt\": \"2026-05-20T10:30:00Z\",\n      \"country\": \"Canada\",\n      \"city\": \"Toronto\",\n      \"mobileNumber\": \"+15550288\",\n      \"interests\": [\"cooking\", \"gaming\"]\n    }\n  ],\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         }
@@ -4939,7 +4939,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"File uploaded successfully\",\n  \"data\": {\n    \"url\": \"https://api.talkme.app/api/v1/uploads/city_view_4982.jpg\",\n    \"thumbnail\": \"https://api.talkme.app/api/v1/uploads/thumb_city_view_4982.jpg\",\n    \"fileName\": \"city_view.jpg\",\n    \"fileSize\": 1024000,\n    \"mimeType\": \"image/jpeg\",\n    \"duration\": null\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"File uploaded successfully\",\n  \"data\": {\n    \"url\": \"https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg\",\n    \"thumbnail\": \"https://api.neochathub.com/api/v1/uploads/thumb_city_view_4982.jpg\",\n    \"fileName\": \"city_view.jpg\",\n    \"fileSize\": 1024000,\n    \"mimeType\": \"image/jpeg\",\n    \"duration\": null\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         }
@@ -4992,7 +4992,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"John Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n    \"bio\": \"Software developer loving real-time web applications.\",\n    \"phone\": \"+1234567890\",\n    \"age\": 28,\n    \"country\": \"US\",\n    \"city\": \"Austin\",\n    \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"],\n    \"occupation\": \"Tech Lead\",\n    \"education\": \"BS in Computer Science\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"online\",\n    \"lastSeen\": \"2026-06-03T00:33:00Z\",\n    \"createdAt\": \"2026-06-01T12:00:00Z\",\n    \"updatedAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"John Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n    \"bio\": \"Software developer loving real-time web applications.\",\n    \"phone\": \"+1234567890\",\n    \"age\": 28,\n    \"country\": \"US\",\n    \"city\": \"Austin\",\n    \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"],\n    \"occupation\": \"Tech Lead\",\n    \"education\": \"BS in Computer Science\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"online\",\n    \"lastSeen\": \"2026-06-03T00:33:00Z\",\n    \"createdAt\": \"2026-06-01T12:00:00Z\",\n    \"updatedAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5080,7 +5080,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"Johnathan Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.talkme.app/api/v1/uploads/avatar.jpg\",\n    \"bio\": \"Senior tech developer.\",\n    \"phone\": \"+1999999999\",\n    \"age\": 29,\n    \"country\": \"US\",\n    \"city\": \"Dallas\",\n    \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"],\n    \"occupation\": \"Tech Lead\",\n    \"education\": \"BS in Computer Science\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"online\",\n    \"lastSeen\": \"2026-06-03T00:33:00Z\",\n    \"createdAt\": \"2026-06-01T12:00:00Z\",\n    \"updatedAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully\",\n  \"data\": {\n    \"id\": \"e3037ab6-c2cf-4b95-a22d-7bb3d07e600d\",\n    \"name\": \"Johnathan Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"username\": \"johndoe\",\n    \"avatar\": \"https://api.neochathub.com/api/v1/uploads/avatar.jpg\",\n    \"bio\": \"Senior tech developer.\",\n    \"phone\": \"+1999999999\",\n    \"age\": 29,\n    \"country\": \"US\",\n    \"city\": \"Dallas\",\n    \"interests\": [\"GAMING\", \"TRAVEL\", \"CODING\"],\n    \"occupation\": \"Tech Lead\",\n    \"education\": \"BS in Computer Science\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"online\",\n    \"lastSeen\": \"2026-06-03T00:33:00Z\",\n    \"createdAt\": \"2026-06-01T12:00:00Z\",\n    \"updatedAt\": \"2026-06-03T00:33:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5114,7 +5114,7 @@
             "description": "Uploads a new avatar photo.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"success\": true,\n  \"message\": \"Avatar uploaded successfully\",\n  \"data\": {\n    \"avatarUrl\": \"https://api.talkme.app/api/v1/uploads/avatar_e3037ab6.jpg\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}",
+              "raw": "{\n  \"success\": true,\n  \"message\": \"Avatar uploaded successfully\",\n  \"data\": {\n    \"avatarUrl\": \"https://api.neochathub.com/api/v1/uploads/avatar_e3037ab6.jpg\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5152,7 +5152,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"success\": true,\n  \"message\": \"Avatar uploaded successfully\",\n  \"data\": {\n    \"avatarUrl\": \"https://api.talkme.app/api/v1/uploads/avatar_e3037ab6.jpg\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}",
+                  "raw": "{\n  \"success\": true,\n  \"message\": \"Avatar uploaded successfully\",\n  \"data\": {\n    \"avatarUrl\": \"https://api.neochathub.com/api/v1/uploads/avatar_e3037ab6.jpg\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5170,7 +5170,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Avatar uploaded successfully\",\n  \"data\": {\n    \"avatarUrl\": \"https://api.talkme.app/api/v1/uploads/avatar_e3037ab6.jpg\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Avatar uploaded successfully\",\n  \"data\": {\n    \"avatarUrl\": \"https://api.neochathub.com/api/v1/uploads/avatar_e3037ab6.jpg\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5287,7 +5287,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n    \"name\": \"Jane Smith\",\n    \"email\": \"janesmith@example.com\",\n    \"username\": \"janesmith\",\n    \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n    \"bio\": \"Travel blogger and photographer.\",\n    \"phone\": \"+1987654321\",\n    \"age\": 25,\n    \"country\": \"UK\",\n    \"city\": \"London\",\n    \"interests\": [\"TRAVEL\", \"MUSIC\"],\n    \"occupation\": \"Blogger\",\n    \"education\": \"BA in Arts\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"offline\",\n    \"lastSeen\": \"2026-06-02T18:00:00Z\",\n    \"createdAt\": \"2026-06-02T10:00:00Z\",\n    \"updatedAt\": \"2026-06-02T18:00:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n    \"name\": \"Jane Smith\",\n    \"email\": \"janesmith@example.com\",\n    \"username\": \"janesmith\",\n    \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n    \"bio\": \"Travel blogger and photographer.\",\n    \"phone\": \"+1987654321\",\n    \"age\": 25,\n    \"country\": \"UK\",\n    \"city\": \"London\",\n    \"interests\": [\"TRAVEL\", \"MUSIC\"],\n    \"occupation\": \"Blogger\",\n    \"education\": \"BA in Arts\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"offline\",\n    \"lastSeen\": \"2026-06-02T18:00:00Z\",\n    \"createdAt\": \"2026-06-02T10:00:00Z\",\n    \"updatedAt\": \"2026-06-02T18:00:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5335,7 +5335,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n        \"bio\": \"Travel blogger.\",\n        \"phone\": \"+1987654321\",\n        \"age\": 25,\n        \"country\": \"UK\",\n        \"city\": \"London\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"],\n        \"occupation\": \"Blogger\",\n        \"education\": \"BA in Arts\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"isBlocked\": false,\n        \"presence\": \"offline\",\n        \"lastSeen\": \"2026-06-02T18:00:00Z\",\n        \"createdAt\": \"2026-06-02T10:00:00Z\",\n        \"updatedAt\": \"2026-06-02T18:00:00Z\"\n      }\n    ],\n    \"pagination\": {\n      \"cursor\": \"1\",\n      \"hasNext\": true,\n      \"hasPrevious\": false,\n      \"total\": 15\n    }\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n        \"bio\": \"Travel blogger.\",\n        \"phone\": \"+1987654321\",\n        \"age\": 25,\n        \"country\": \"UK\",\n        \"city\": \"London\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"],\n        \"occupation\": \"Blogger\",\n        \"education\": \"BA in Arts\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"isBlocked\": false,\n        \"presence\": \"offline\",\n        \"lastSeen\": \"2026-06-02T18:00:00Z\",\n        \"createdAt\": \"2026-06-02T10:00:00Z\",\n        \"updatedAt\": \"2026-06-02T18:00:00Z\"\n      }\n    ],\n    \"pagination\": {\n      \"cursor\": \"1\",\n      \"hasNext\": true,\n      \"hasPrevious\": false,\n      \"total\": 15\n    }\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5521,7 +5521,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"d748f210-911a-4f51-b8ef-e328ea48d890\",\n        \"name\": \"Annoying Spammer\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/spammer.jpg\",\n        \"blockedAt\": \"2026-06-02T15:20:00Z\"\n      }\n    ],\n    \"pagination\": {\n      \"cursor\": null,\n      \"hasNext\": false,\n      \"hasPrevious\": false,\n      \"total\": 1\n    }\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"d748f210-911a-4f51-b8ef-e328ea48d890\",\n        \"name\": \"Annoying Spammer\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/spammer.jpg\",\n        \"blockedAt\": \"2026-06-02T15:20:00Z\"\n      }\n    ],\n    \"pagination\": {\n      \"cursor\": null,\n      \"hasNext\": false,\n      \"hasPrevious\": false,\n      \"total\": 1\n    }\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5732,7 +5732,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n    \"name\": \"Jane Smith\",\n    \"email\": \"janesmith@example.com\",\n    \"username\": \"janesmith\",\n    \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n    \"bio\": \"Travel blogger.\",\n    \"phone\": \"+1987654321\",\n    \"age\": 25,\n    \"country\": \"UK\",\n    \"city\": \"London\",\n    \"interests\": [\"TRAVEL\", \"MUSIC\"],\n    \"occupation\": \"Blogger\",\n    \"education\": \"BA in Arts\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"offline\",\n    \"lastSeen\": \"2026-06-02T18:00:00Z\",\n    \"createdAt\": \"2026-06-02T10:00:00Z\",\n    \"updatedAt\": \"2026-06-02T18:00:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n    \"name\": \"Jane Smith\",\n    \"email\": \"janesmith@example.com\",\n    \"username\": \"janesmith\",\n    \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n    \"bio\": \"Travel blogger.\",\n    \"phone\": \"+1987654321\",\n    \"age\": 25,\n    \"country\": \"UK\",\n    \"city\": \"London\",\n    \"interests\": [\"TRAVEL\", \"MUSIC\"],\n    \"occupation\": \"Blogger\",\n    \"education\": \"BA in Arts\",\n    \"isVerified\": true,\n    \"isGuest\": false,\n    \"isBlocked\": false,\n    \"presence\": \"offline\",\n    \"lastSeen\": \"2026-06-02T18:00:00Z\",\n    \"createdAt\": \"2026-06-02T10:00:00Z\",\n    \"updatedAt\": \"2026-06-02T18:00:00Z\"\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         },
@@ -5789,7 +5789,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"count\": 1,\n    \"users\": [\n      {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.talkme.app/api/v1/uploads/jane.jpg\",\n        \"bio\": \"Travel blogger.\",\n        \"phone\": \"+1987654321\",\n        \"age\": 25,\n        \"country\": \"UK\",\n        \"city\": \"London\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"],\n        \"occupation\": \"Blogger\",\n        \"education\": \"BA in Arts\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"isBlocked\": false,\n        \"presence\": \"offline\",\n        \"lastSeen\": \"2026-06-02T18:00:00Z\",\n        \"createdAt\": \"2026-06-02T10:00:00Z\",\n        \"updatedAt\": \"2026-06-02T18:00:00Z\"\n      }\n    ]\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Success\",\n  \"data\": {\n    \"count\": 1,\n    \"users\": [\n      {\n        \"id\": \"f8a42b10-671c-43fe-a5fe-e8a6eb4862b2\",\n        \"name\": \"Jane Smith\",\n        \"email\": \"janesmith@example.com\",\n        \"username\": \"janesmith\",\n        \"avatar\": \"https://api.neochathub.com/api/v1/uploads/jane.jpg\",\n        \"bio\": \"Travel blogger.\",\n        \"phone\": \"+1987654321\",\n        \"age\": 25,\n        \"country\": \"UK\",\n        \"city\": \"London\",\n        \"interests\": [\"TRAVEL\", \"MUSIC\"],\n        \"occupation\": \"Blogger\",\n        \"education\": \"BA in Arts\",\n        \"isVerified\": true,\n        \"isGuest\": false,\n        \"isBlocked\": false,\n        \"presence\": \"offline\",\n        \"lastSeen\": \"2026-06-02T18:00:00Z\",\n        \"createdAt\": \"2026-06-02T10:00:00Z\",\n        \"updatedAt\": \"2026-06-02T18:00:00Z\"\n      }\n    ]\n  },\n  \"timestamp\": \"2026-06-03T00:33:00Z\"\n}"
             }
           ]
         }

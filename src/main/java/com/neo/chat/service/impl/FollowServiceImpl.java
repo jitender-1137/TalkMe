@@ -1,5 +1,6 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.cache.FollowCache;
 import com.neo.chat.domain.User;
 import com.neo.chat.domain.UserFollow;
 import com.neo.chat.dto.response.AuthUserResponse;
@@ -32,6 +33,7 @@ public class FollowServiceImpl implements FollowService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final NotificationService notificationService;
+    private final FollowCache followCache;
 
     /**
      * Resolve a user by uuid string.
@@ -71,6 +73,9 @@ public class FollowServiceImpl implements FollowService {
                 .build();
 
         userFollowRepository.save(follow);
+        // Real-time cache update: caller's following set + target's follower count changed.
+        followCache.evict(currentUser.getId());
+        followCache.evict(targetUser.getId());
 
         notificationService.createNotification(
                 targetUser,
@@ -100,6 +105,9 @@ public class FollowServiceImpl implements FollowService {
 
         follow.setDeleted(true);
         userFollowRepository.save(follow);
+        // Real-time cache update: caller's following set + target's follower count changed.
+        followCache.evict(currentUser.getId());
+        followCache.evict(targetUser.getId());
     }
 
     /**
@@ -119,6 +127,9 @@ public class FollowServiceImpl implements FollowService {
 
         follow.setDeleted(true);
         userFollowRepository.save(follow);
+        // Real-time cache update: follower's following set + caller's follower count changed.
+        followCache.evict(follower.getId());
+        followCache.evict(currentUser.getId());
     }
 
     /**
@@ -164,7 +175,7 @@ public class FollowServiceImpl implements FollowService {
     @Transactional(readOnly = true)
     public long getFollowersCount(String userUuid) {
         User user = getUser(userUuid);
-        return userFollowRepository.countByFollowingAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        return followCache.followersCount(user);
     }
 
     /**
@@ -178,7 +189,7 @@ public class FollowServiceImpl implements FollowService {
     @Transactional(readOnly = true)
     public long getFollowingCount(String userUuid) {
         User user = getUser(userUuid);
-        return userFollowRepository.countByFollowerAndStatusAndIsDeletedFalse(user, "ACCEPTED");
+        return followCache.followingCount(user);
     }
 
     /**
@@ -191,6 +202,6 @@ public class FollowServiceImpl implements FollowService {
     @Override
     @Transactional(readOnly = true)
     public boolean isFollowing(User follower, User following) {
-        return userFollowRepository.existsByFollowerAndFollowingAndStatusAndIsDeletedFalse(follower, following, "ACCEPTED");
+        return followCache.isFollowing(follower, following);
     }
 }

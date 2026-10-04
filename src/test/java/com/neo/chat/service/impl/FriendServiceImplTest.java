@@ -1,6 +1,7 @@
 package com.neo.chat.service.impl;
 
 import com.neo.chat.cache.BlockCache;
+import com.neo.chat.cache.FriendCache;
 import com.neo.chat.domain.BlockUser;
 import com.neo.chat.domain.Friend;
 import com.neo.chat.domain.FriendRequest;
@@ -75,6 +76,8 @@ class FriendServiceImplTest {
     @Mock
     private BlockCache blockCache;
     @Mock
+    private FriendCache friendCache;
+    @Mock
     private UserSettingRepository userSettingRepository;
     @Mock
     private FriendRequestMapper friendRequestMapper;
@@ -97,7 +100,7 @@ class FriendServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new FriendServiceImpl(userRepository, friendRepository, friendRequestRepository,
-                blockUserRepository, blockCache, userSettingRepository, friendRequestMapper,
+                blockUserRepository, blockCache, friendCache, userSettingRepository, friendRequestMapper,
                 userMapper, presenceService, messagingTemplate, redisTemplate);
         me = user(1L, "me");
         other = user(2L, "other");
@@ -368,6 +371,9 @@ class FriendServiceImplTest {
                     .containsExactlyInAnyOrder(other, me);
             verify(messagingTemplate).convertAndSendToUser(eq("other"), eq("/queue/friends"), any());
             verify(messagingTemplate).convertAndSendToUser(eq("me"), eq("/queue/friends"), any());
+            // Real-time cache update: both sides' friend sets invalidated on accept.
+            verify(friendCache).evict(other.getId());
+            verify(friendCache).evict(me.getId());
         }
 
         @Test
@@ -684,6 +690,9 @@ class FriendServiceImplTest {
             verify(friendRequestRepository, times(2)).deleteAll(any());
             verify(messagingTemplate).convertAndSendToUser(eq("me"), eq("/queue/friends"), any());
             verify(messagingTemplate).convertAndSendToUser(eq("other"), eq("/queue/friends"), any());
+            // Real-time cache update: both sides' friend sets invalidated on remove.
+            verify(friendCache).evict(me.getId());
+            verify(friendCache).evict(other.getId());
         }
 
         @Test
@@ -735,6 +744,9 @@ class FriendServiceImplTest {
             verify(blockCache).evict(me.getId());
             // removeFriend side effect fired (friend-removed broadcast to both parties).
             verify(messagingTemplate).convertAndSendToUser(eq("me"), eq("/queue/friends"), any());
+            // Blocking removes the friendship → friend cache invalidated for both sides too.
+            verify(friendCache).evict(me.getId());
+            verify(friendCache).evict(other.getId());
         }
 
         @Test

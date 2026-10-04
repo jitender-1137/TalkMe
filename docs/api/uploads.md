@@ -29,8 +29,8 @@ Uploads a multipart file (e.g. image, video, audio, document) to the backend sto
   "success": true,
   "message": "File uploaded successfully",
   "data": {
-    "url": "https://api.talkme.app/api/v1/uploads/city_view_4982.jpg",
-    "thumbnail": "https://api.talkme.app/api/v1/uploads/thumb_city_view_4982.jpg",
+    "url": "https://api.neochathub.com/api/v1/uploads/city_view_4982.jpg",
+    "thumbnail": "https://api.neochathub.com/api/v1/uploads/thumb_city_view_4982.jpg",
     "fileName": "city_view.jpg",
     "fileSize": 1024000,
     "mimeType": "image/jpeg",

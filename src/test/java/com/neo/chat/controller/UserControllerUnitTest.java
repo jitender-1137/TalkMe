@@ -166,6 +166,41 @@ class UserControllerUnitTest {
         }
     }
 
+    // ── PUT /users/me/avatar/preset ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("PUT /users/me/avatar/preset (select preset avatar)")
+    class SelectPresetAvatar {
+        @Test
+        void shouldSelectValidPreset() throws Exception {
+            when(userService.selectPresetAvatar(eq("neutral-07"), eq(testUser))).thenReturn(user("testuser"));
+            mockMvc.perform(put(BASE + "/me/avatar/preset").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":\"neutral-07\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.messageCode").value("TM_USER_004"))
+                    .andExpect(jsonPath("$.data.username").value("testuser"));
+            verify(userService).selectPresetAvatar("neutral-07", testUser);
+        }
+
+        @Test
+        void shouldRejectUnknownId() throws Exception {
+            when(userService.selectPresetAvatar(eq("bogus"), any()))
+                    .thenThrow(new BadRequestException("Unknown avatar id", "TM_USER_003"));
+            mockMvc.perform(put(BASE + "/me/avatar/preset").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":\"bogus\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.messageCode").value("TM_USER_003"));
+        }
+
+        @Test
+        void shouldRejectBlankId() throws Exception {
+            mockMvc.perform(put(BASE + "/me/avatar/preset").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"id\":\"\"}"))
+                    .andExpect(status().isBadRequest());
+            verify(userService, never()).selectPresetAvatar(any(), any());
+        }
+    }
+
     // ── PATCH/PUT /users/me ─────────────────────────────────────────────────────
 
     @Nested

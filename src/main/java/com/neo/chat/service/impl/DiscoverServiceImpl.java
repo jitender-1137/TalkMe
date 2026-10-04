@@ -1,5 +1,6 @@
 package com.neo.chat.service.impl;
 
+import com.neo.chat.cache.FriendCache;
 import com.neo.chat.domain.DiscoverLike;
 import com.neo.chat.domain.FriendRequest;
 import com.neo.chat.domain.User;
@@ -10,7 +11,6 @@ import com.neo.chat.enums.Interest;
 import com.neo.chat.enums.PresenceStatus;
 import com.neo.chat.exception.NotFoundException;
 import com.neo.chat.repository.DiscoverLikeRepository;
-import com.neo.chat.repository.FriendRepository;
 import com.neo.chat.repository.FriendRequestRepository;
 import com.neo.chat.repository.UserRepository;
 import com.neo.chat.repository.UserSettingRepository;
@@ -57,7 +57,7 @@ public class DiscoverServiceImpl implements DiscoverService {
 
     private final UserRepository userRepository;
     private final DiscoverLikeRepository discoverLikeRepository;
-    private final FriendRepository friendRepository;
+    private final FriendCache friendCache;
     private final FriendRequestRepository friendRequestRepository;
     private final UserSettingRepository userSettingRepository;
     private final PresenceService presenceService;
@@ -235,7 +235,9 @@ public class DiscoverServiceImpl implements DiscoverService {
         };
 
         Page<User> userPage = userRepository.findAll(spec, pageable);
-        List<User> currentUserFriends = friendRepository.findFriendsByUser(currentUser);
+        // Caller's friend-id set from Redis (cached) — derive once and reuse for every
+        // candidate's mutual-count + isFriend flag instead of per-candidate DB lookups.
+        Set<Long> currentUserFriendIds = friendCache.friendIds(currentUser);
         Set<Long> friendsOnlyIds = userPage.getContent().isEmpty()
                 ? Collections.emptySet()
                 : userSettingRepository.findFriendsOnlyUserIds(
@@ -243,18 +245,18 @@ public class DiscoverServiceImpl implements DiscoverService {
 
         List<DiscoverProfileResponse> items = userPage.getContent().stream()
                 .map(u -> {
-                    List<User> targetUserFriends = friendRepository.findFriendsByUser(u);
-                    Set<Long> targetFriendIds = targetUserFriends.stream()
-                            .map(User::getId)
-                            .collect(Collectors.toSet());
+                    // Candidate's friend set from Redis (cached) — removes the per-candidate
+                    // findFriendsByUser SELECT that drove the discover-list N+1.
+                    Set<Long> targetFriendIds = friendCache.friendIds(u);
 
-                    int mutualCount = (int) currentUserFriends.stream()
-                            .filter(friend -> targetFriendIds.contains(friend.getId()))
+                    int mutualCount = (int) currentUserFriendIds.stream()
+                            .filter(targetFriendIds::contains)
                             .count();
 
                     boolean online = presenceService.getStatus(u) == PresenceStatus.ONLINE;
                     boolean liked = discoverLikeRepository.existsByUserAndLikedUser(currentUser, u);
-                    boolean isFriend = friendRepository.findByUserAndFriend(currentUser, u).isPresent();
+                    // Reuse the caller's cached friend-id set (no per-candidate DB lookup).
+                    boolean isFriend = currentUserFriendIds.contains(u.getId());
 
                     Optional<FriendRequest> reqOpt = friendRequestRepository.findFirstBySenderAndReceiverOrderByIdDesc(currentUser, u);
                     boolean requestSent = false;

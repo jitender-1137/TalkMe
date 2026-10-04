@@ -22,7 +22,7 @@ Retrieves the authenticated user's full profile details.
     "name": "John Doe",
     "email": "johndoe@example.com",
     "username": "johndoe",
-    "avatar": "https://api.talkme.app/api/v1/uploads/avatar.jpg",
+    "avatar": "https://api.neochathub.com/api/v1/uploads/avatar.jpg",
     "bio": "Software developer loving real-time web applications.",
     "phone": "+1234567890",
     "age": 28,
@@ -82,7 +82,7 @@ Modifies the authenticated user's profile details. Mapped to both `PATCH` and `P
     "name": "Johnathan Doe",
     "email": "johndoe@example.com",
     "username": "johndoe",
-    "avatar": "https://api.talkme.app/api/v1/uploads/avatar.jpg",
+    "avatar": "https://api.neochathub.com/api/v1/uploads/avatar.jpg",
     "bio": "Senior tech developer.",
     "phone": "+1999999999",
     "age": 29,
@@ -130,7 +130,7 @@ file: <image binary>  (jpg/png/webp/heic, max 5 MB)
   "success": true,
   "message": "Avatar uploaded successfully",
   "data": {
-    "avatarUrl": "https://api.talkme.app/api/v1/uploads/avatar_e3037ab6.jpg"
+    "avatarUrl": "https://api.neochathub.com/api/v1/uploads/avatar_e3037ab6.jpg"
   },
   "timestamp": "2026-06-03T00:33:00Z"
 }
@@ -180,7 +180,7 @@ Gets public details of another user by UUID.
     "name": "Jane Smith",
     "email": "janesmith@example.com",
     "username": "janesmith",
-    "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+    "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
     "bio": "Travel blogger and photographer.",
     "phone": "+1987654321",
     "age": 25,
@@ -227,7 +227,7 @@ Searches the directory by matching name, username, or email.
         "name": "Jane Smith",
         "email": "janesmith@example.com",
         "username": "janesmith",
-        "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+        "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
         "bio": "Travel blogger.",
         "phone": "+1987654321",
         "age": 25,
@@ -324,7 +324,7 @@ Fetches a list of blocked users.
       {
         "id": "d748f210-911a-4f51-b8ef-e328ea48d890",
         "name": "Annoying Spammer",
-        "avatar": "https://api.talkme.app/api/v1/uploads/spammer.jpg",
+        "avatar": "https://api.neochathub.com/api/v1/uploads/spammer.jpg",
         "blockedAt": "2026-06-02T15:20:00Z"
       }
     ],
@@ -434,7 +434,7 @@ Fetches public profile card. Identical structure to UserResponse.
     "name": "Jane Smith",
     "email": "janesmith@example.com",
     "username": "janesmith",
-    "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+    "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
     "bio": "Travel blogger.",
     "phone": "+1987654321",
     "age": 25,
@@ -478,7 +478,7 @@ Retrieves the list and count of mutual friends between current user and target u
         "name": "Jane Smith",
         "email": "janesmith@example.com",
         "username": "janesmith",
-        "avatar": "https://api.talkme.app/api/v1/uploads/jane.jpg",
+        "avatar": "https://api.neochathub.com/api/v1/uploads/jane.jpg",
         "bio": "Travel blogger.",
         "phone": "+1987654321",
         "age": 25,
